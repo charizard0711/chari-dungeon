@@ -24,6 +24,12 @@ body {
   color: var(--text);
   font-family: 'Segoe UI', 'Yu Gothic UI', 'Meiryo', sans-serif;
   overflow: hidden;
+  /* スマホ：スクロール・ピンチズーム・ダブルタップズームを無効化 */
+  touch-action: none;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  position: fixed;
 }
 
 #app {

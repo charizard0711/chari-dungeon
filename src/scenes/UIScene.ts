@@ -4,7 +4,7 @@ import { GAME_W, GAME_H } from '../main';
 import { durabilityRisk } from '../combat';
 import { weaponFullName } from '../player';
 import { getTheme, MAGIC_DESC, MONSTER_DEFS, ITEM_DEFS, plusColor, plusColorHex, isRareItem } from '../data';
-import type { MagicCode, ItemKind, Item } from '../types';
+import type { MagicCode, ItemKind, Item, Dir } from '../types';
 import { shieldFullName } from '../player';
 import { Audio } from '../audio/manager';
 
@@ -43,6 +43,8 @@ export class UIScene extends Phaser.Scene {
     this.buildLeftMenu();
     this.buildStatusPanel();
     this.buildBottom();
+    // タッチ端末（スマホ・タブレット）では画面に十字ボタンを表示
+    if (this.sys.game.device.input.touch) this.buildTouchControls();
 
     this.buildTooltip();
     this.overlay = this.add.container(0, 0).setDepth(100).setVisible(false);
@@ -213,6 +215,48 @@ export class UIScene extends Phaser.Scene {
     this.itemContainer = this.add.container(0, 0);
     // ターン終了ボタン
     this.turnEndButton();
+  }
+
+  // ---- スマホ用タッチ操作：十字ボタン（マップ左下に半透明で重ねる）----
+  // 押しっぱなしで歩き続ける（GameScene.touchDir 経由でキーボード長押しと同じ扱い）
+  buildTouchControls() {
+    const cx = 284, cy = 444, gap = 64, R = 28;
+    const mkButton = (dx: number, dy: number, angleDeg: number | null, onDown: () => void, onUp?: () => void) => {
+      const bx = cx + dx, by = cy + dy;
+      const g = this.add.graphics().setDepth(60);
+      const draw = (active: boolean) => {
+        g.clear();
+        g.fillStyle(active ? 0x2f6f6a : 0x0e1420, active ? 0.9 : 0.5).fillCircle(bx, by, R);
+        g.lineStyle(2, 0x3fe0d0, 0.75).strokeCircle(bx, by, R);
+        if (angleDeg !== null) {
+          // 進行方向を指す三角矢印
+          const a = Phaser.Math.DegToRad(angleDeg);
+          const pt = (r: number, da: number): [number, number] =>
+            [bx + Math.cos(a + da) * r, by + Math.sin(a + da) * r];
+          const [x1, y1] = pt(14, 0);
+          const [x2, y2] = pt(12, 2.5);
+          const [x3, y3] = pt(12, -2.5);
+          g.fillStyle(0xdfe7f0, 0.95).fillTriangle(x1, y1, x2, y2, x3, y3);
+        } else {
+          // 中央ボタン＝足踏み（1ターン休む）
+          g.fillStyle(0xdfe7f0, 0.9).fillCircle(bx, by, 7);
+        }
+      };
+      draw(false);
+      const zone = this.add.zone(bx - R - 8, by - R - 8, (R + 8) * 2, (R + 8) * 2)
+        .setOrigin(0).setInteractive().setDepth(61);
+      zone.on('pointerdown', () => { draw(true); onDown(); });
+      const release = () => { draw(false); onUp?.(); };
+      zone.on('pointerup', release);
+      zone.on('pointerout', release);
+    };
+    const hold = (d: Dir) => () => { this.gs.touchDir = d; };
+    const release = () => { this.gs.touchDir = null; };
+    mkButton(0, -gap, -90, hold('up'), release);
+    mkButton(0, gap, 90, hold('down'), release);
+    mkButton(-gap, 0, 180, hold('left'), release);
+    mkButton(gap, 0, 0, hold('right'), release);
+    mkButton(0, 0, null, () => { Audio.playSe('click'); this.gs.playerAct('wait'); });
   }
 
   turnEndButton() {

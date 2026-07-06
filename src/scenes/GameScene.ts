@@ -91,6 +91,7 @@ export class GameScene extends Phaser.Scene {
   // 長押し移動：押しっぱなしで歩き続ける
   heldDir: Dir | null = null;
   holdRepeatAt = 0; // この時刻を過ぎたらリピート開始（初回の誤連打防止）
+  touchDir: Dir | null = null; // スマホ用十字ボタンの押しっぱなし方向（UISceneが設定）
 
   constructor() {
     super('GameScene');
@@ -140,6 +141,7 @@ export class GameScene extends Phaser.Scene {
     kb.on('keydown-ENTER', () => this.tryDescend());
     this.heldDir = null;
     this.holdRepeatAt = 0;
+    this.touchDir = null;
 
     // UIシーン起動（重ねて表示）
     this.scene.launch('UIScene');
@@ -1493,6 +1495,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   // 矢印キーのホールド処理：押した瞬間に1歩、押しっぱなしで歩き続ける
+  // （スマホ用十字ボタンの touchDir も同じ仕組みで処理）
   handleMoveKeys(time: number) {
     if (this.busy || this.gameEnded) return;
     const entries: [Phaser.Input.Keyboard.Key, Dir][] = [
@@ -1504,8 +1507,8 @@ export class GameScene extends Phaser.Scene {
     for (const [k, d] of entries) {
       if (k.isDown && (!best || k.timeDown > best[0].timeDown)) best = [k, d];
     }
-    if (!best) { this.heldDir = null; return; }
-    const dir = best[1];
+    const dir = best ? best[1] : this.touchDir;
+    if (!dir) { this.heldDir = null; return; }
     if (this.heldDir !== dir) {
       // 押した瞬間：即1歩（向き変えも含む）
       this.heldDir = dir;
