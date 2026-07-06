@@ -5,8 +5,8 @@ import { GameScene } from './scenes/GameScene';
 import { UIScene } from './scenes/UIScene';
 import { EndScene } from './scenes/EndScene';
 
-export const GAME_W = 1280;
-export const GAME_H = 760;
+import { GAME_W, GAME_H } from './layout';
+export { GAME_W, GAME_H };
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,

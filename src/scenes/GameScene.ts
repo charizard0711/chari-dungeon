@@ -9,11 +9,8 @@ import { computePlayerAttack, computeEnemyAttack } from '../combat';
 import { Audio } from '../audio/manager';
 import { bgmForFloor } from '../audio/config';
 
-// マップ表示ビューポート（画面上の座標）
-export const MAP_X = 176;
-export const MAP_Y = 48;
-export const MAP_W = 740;
-export const MAP_H = 520;
+// マップ表示ビューポート（画面上の座標。スマホ縦持ちでは縦型レイアウト）
+import { MAP_X, MAP_Y, MAP_W, MAP_H } from '../layout';
 
 const ANIM = 110;
 // 探索画面のズーム倍率（大きいほど拡大。1.0=等倍）

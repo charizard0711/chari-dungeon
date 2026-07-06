@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GameScene } from './GameScene';
 import { GAME_W, GAME_H } from '../main';
+import { IS_MOBILE, MAP_X, MAP_Y, MAP_W, MAP_H } from '../layout';
 import { durabilityRisk } from '../combat';
 import { weaponFullName } from '../player';
 import { getTheme, MAGIC_DESC, MONSTER_DEFS, ITEM_DEFS, plusColor, plusColorHex, isRareItem } from '../data';
@@ -20,7 +21,7 @@ export class UIScene extends Phaser.Scene {
   statusText!: Phaser.GameObjects.Text;
   hpBar!: Phaser.GameObjects.Graphics;
   equipSlots: { tag: string; bg: Phaser.GameObjects.Graphics; icon: Phaser.GameObjects.Image; name: Phaser.GameObjects.Text; sub: Phaser.GameObjects.Text; rect: [number, number, number, number] }[] = [];
-  codexText!: Phaser.GameObjects.Text;
+  codexText?: Phaser.GameObjects.Text; // モンスター図鑑サイドパネル（PCのみ）
   logTexts: Phaser.GameObjects.Text[] = []; // 固定8行（行ごとに色分け）
   itemContainer!: Phaser.GameObjects.Container;
   overlay!: Phaser.GameObjects.Container;
@@ -28,6 +29,13 @@ export class UIScene extends Phaser.Scene {
   pickSlot = 0; // 'pick'モードで開いている装備スロット（0武器/1盾/2頭/3体）
   gachaAnimating = false; // ガチャ演出中は再描画をブロック
   enemyInfoText!: Phaser.GameObjects.Text;
+  // レイアウト依存の座標（PC / スマホ縦で切り替え）
+  L!: {
+    hpBar: { x: number; y: number; w: number };
+    items: { x: number; y: number; cols: number };
+    ov: { x: number; y: number; w: number; h: number };
+  };
+  equipIconSize = 60;
 
   constructor() {
     super('UIScene');
@@ -38,17 +46,35 @@ export class UIScene extends Phaser.Scene {
     // UIScene起動前に発行されたログ（フロア到達など）を復元
     this.logLines = [...(this.gs.logHistory ?? [])];
 
-    this.buildFrames();
-    this.buildTopBar();
-    this.buildLeftMenu();
-    this.buildStatusPanel();
-    this.buildBottom();
-    // タッチ端末（スマホ・タブレット）では画面に十字ボタンを表示
-    if (this.sys.game.device.input.touch) this.buildTouchControls();
+    if (IS_MOBILE) {
+      // スマホ縦持ち：縦型レイアウト
+      this.L = {
+        hpBar: { x: 20, y: 114, w: 560 },
+        items: { x: 18, y: 622, cols: 9 },
+        ov: { x: 10, y: 120, w: 580, h: 760 }
+      };
+      this.equipIconSize = 52;
+      this.buildMobileLayout();
+    } else {
+      // PC：従来レイアウト
+      this.L = {
+        hpBar: { x: 938, y: 128, w: 320 },
+        items: { x: 730, y: 596, cols: 8 },
+        ov: { x: 200, y: 80, w: 680, h: 460 }
+      };
+      this.equipIconSize = 60;
+      this.buildFrames();
+      this.buildTopBar();
+      this.buildLeftMenu();
+      this.buildStatusPanel();
+      this.buildBottom();
+      // タッチ操作もできるPC（タッチ対応ノート等）では十字ボタンをマップに重ねる
+      if (this.sys.game.device.input.touch) this.buildTouchControls(284, 444, 64, 28);
+    }
 
     this.buildTooltip();
     this.overlay = this.add.container(0, 0).setDepth(100).setVisible(false);
-    this.enemyInfoText = this.add.text(GAME_W - 360, 300, '', {
+    this.enemyInfoText = this.add.text(IS_MOBILE ? MAP_X + 8 : GAME_W - 360, IS_MOBILE ? MAP_Y + 8 : 300, '', {
       fontFamily: '"Yu Gothic UI"', fontSize: '14px', color: '#dfe7f0',
       backgroundColor: '#0a1420ee', padding: { x: 8, y: 6 }, lineSpacing: 4
     }).setDepth(90).setVisible(false);
@@ -217,10 +243,122 @@ export class UIScene extends Phaser.Scene {
     this.turnEndButton();
   }
 
-  // ---- スマホ用タッチ操作：十字ボタン（マップ左下に半透明で重ねる）----
+  // ============ スマホ縦型レイアウト ============
+  buildMobileLayout() {
+    // ---- 上部バー（タイトル＋フロア情報）----
+    this.panel(8, 8, 584, 52);
+    this.add.text(16, 12, 'ちゃりだんじょん', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '17px', color: '#3fe0d0', fontStyle: 'bold'
+    });
+    this.topText = this.add.text(16, 34, '', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#f5c542'
+    });
+
+    // ---- ステータス ----
+    this.panel(8, 66, 584, 94);
+    const style = { fontFamily: '"Yu Gothic UI"', fontSize: '14px', color: '#dfe7f0' };
+    this.statusText = this.add.text(20, 74, '', style);
+    this.hpLabel = this.add.text(20, 94, '', style);
+    this.hpBar = this.add.graphics();
+    this.atkLabel = this.add.text(20, 136, '', { ...style, fontSize: '13px' });
+
+    // ---- マップ枠 ----
+    const fg = this.add.graphics();
+    fg.lineStyle(2, 0x2f6f6a, 1).strokeRoundedRect(MAP_X - 2, MAP_Y - 2, MAP_W + 4, MAP_H + 4, 4);
+
+    // ---- そうび（右カラム・縦2枠）----
+    this.panel(436, MAP_Y, 156, MAP_H, 'そうび');
+    const tags = ['⚔', '🛡'];
+    this.equipSlots = [];
+    for (let i = 0; i < 2; i++) {
+      const sx = 444, sy = MAP_Y + 34 + i * 138, sw = 140, sh = 128;
+      const bg = this.add.graphics();
+      const icon = this.add.image(sx + sw / 2, sy + 44, 'coin').setDisplaySize(52, 52);
+      this.add.text(sx + 6, sy + 4, tags[i], { fontFamily: '"Yu Gothic UI"', fontSize: '13px' });
+      const name = this.add.text(sx + sw / 2, sy + 76, '', {
+        fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#dfe7f0', align: 'center',
+        wordWrap: { width: sw - 8 }
+      }).setOrigin(0.5, 0);
+      const sub = this.add.text(sx + sw / 2, sy + sh - 16, '', {
+        fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: '#9fb4c4', align: 'center'
+      }).setOrigin(0.5, 0);
+      this.equipSlots.push({ tag: tags[i], bg, icon, name, sub, rect: [sx, sy, sw, sh] });
+      const slotIndex = i;
+      const zone = this.add.zone(sx, sy, sw, sh).setOrigin(0).setInteractive({ useHandCursor: true });
+      zone.on('pointerdown', () => { Audio.playSe('click'); this.pickSlot = slotIndex; this.setOverlay('pick'); });
+    }
+
+    // ---- もちもの（マップ下の横1列）----
+    this.panel(8, 594, 584, 86, 'もちもの（タップで使用）');
+    this.itemContainer = this.add.container(0, 0);
+
+    // ---- 冒険ログ（2行）----
+    this.panel(8, 688, 584, 64, '冒険ログ');
+    this.logTexts = [];
+    for (let i = 0; i < 2; i++) {
+      this.logTexts.push(this.add.text(20, 710 + i * 18, '', {
+        fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#dfe7f0'
+      }));
+    }
+
+    // ---- 操作エリア：十字キー＋ターン終了 ----
+    this.buildTouchControls(108, 846, 58, 30);
+    this.mobileTurnEndButton();
+
+    // ---- 下部ナビ（メニュー）----
+    this.buildMobileNav();
+  }
+
+  mobileTurnEndButton() {
+    const x = 330, y = 780, w = 254, h = 132;
+    const g = this.add.graphics();
+    const draw = (c: number) => {
+      g.clear();
+      g.fillStyle(c, 1).fillRoundedRect(x, y, w, h, 12);
+      g.lineStyle(2.5, 0x3fe0d0).strokeRoundedRect(x, y, w, h, 12);
+    };
+    draw(0x2f6f6a);
+    this.add.text(x + w / 2, y + h / 2 - 14, '⏭ ターン終了', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '22px', color: '#ffffff', fontStyle: 'bold'
+    }).setOrigin(0.5);
+    this.add.text(x + w / 2, y + h / 2 + 20, '（その場で1ターン休む）', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#bfe8e0'
+    }).setOrigin(0.5);
+    const zone = this.add.zone(x, y, w, h).setOrigin(0).setInteractive({ useHandCursor: true });
+    zone.on('pointerover', () => draw(0x3f8f88));
+    zone.on('pointerout', () => draw(0x2f6f6a));
+    zone.on('pointerdown', () => { Audio.playSe('click'); this.gs.playerAct('wait'); });
+  }
+
+  buildMobileNav() {
+    const items: { icon: string; label: string; f: () => void }[] = [
+      { icon: '⚔', label: '装備', f: () => this.setOverlay('equip') },
+      { icon: '🎒', label: '所持品', f: () => this.setOverlay('inv') },
+      { icon: '🛒', label: 'ショップ', f: () => this.setOverlay('shop') },
+      { icon: '🎰', label: 'ガチャ', f: () => this.setOverlay('gacha') },
+      { icon: '👾', label: '図鑑', f: () => this.setOverlay('codex') },
+      { icon: '⚙', label: '設定', f: () => this.showSettings() }
+    ];
+    this.panel(8, 944, 584, 52);
+    items.forEach((it, i) => {
+      const x = 14 + i * 96, y = 948, w = 92, h = 44;
+      const g = this.add.graphics();
+      const draw = (c: number) => { g.clear(); g.fillStyle(c, 1).fillRoundedRect(x, y, w, h, 6); };
+      draw(0x1c2536);
+      this.add.text(x + w / 2, y + 13, it.icon, { fontSize: '15px' }).setOrigin(0.5);
+      this.add.text(x + w / 2, y + 32, it.label, {
+        fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: '#dfe7f0'
+      }).setOrigin(0.5);
+      const zone = this.add.zone(x, y, w, h).setOrigin(0).setInteractive({ useHandCursor: true });
+      zone.on('pointerdown', () => { draw(0x264a48); Audio.playSe('click'); it.f(); });
+      zone.on('pointerup', () => draw(0x1c2536));
+      zone.on('pointerout', () => draw(0x1c2536));
+    });
+  }
+
+  // ---- タッチ操作：十字ボタン（スマホ=操作エリア、タッチPC=マップ左下に重ねる）----
   // 押しっぱなしで歩き続ける（GameScene.touchDir 経由でキーボード長押しと同じ扱い）
-  buildTouchControls() {
-    const cx = 284, cy = 444, gap = 64, R = 28;
+  buildTouchControls(cx: number, cy: number, gap: number, R: number) {
     const mkButton = (dx: number, dy: number, angleDeg: number | null, onDown: () => void, onUp?: () => void) => {
       const bx = cx + dx, by = cy + dy;
       const g = this.add.graphics().setDepth(60);
@@ -284,11 +422,11 @@ export class UIScene extends Phaser.Scene {
     this.hpLabel.setText(`HP  ${p.hp} / ${p.hpMax}`);
     this.atkLabel.setText(`攻撃力 ${p.atkMin}-${p.atkMax}   防御力 ${p.def}   💰 ${p.gold} G`);
 
-    // HPバー（ラベルの下の固定位置）
-    const bx = 938, bw = 320;
+    // HPバー（ラベルの下の固定位置。座標はレイアウト設定から）
+    const { x: bx, y: by, w: bw } = this.L.hpBar;
     this.hpBar.clear();
-    this.hpBar.fillStyle(0x2a1518).fillRect(bx, 128, bw, 14);
-    this.hpBar.fillStyle(0xff5a5a).fillRect(bx, 128, bw * Math.max(0, p.hp / p.hpMax), 14);
+    this.hpBar.fillStyle(0x2a1518).fillRect(bx, by, bw, 14);
+    this.hpBar.fillStyle(0xff5a5a).fillRect(bx, by, bw * Math.max(0, p.hp / p.hpMax), 14);
 
     const w = p.weapon, s = p.shield;
     const slotInfo: { tex: string | null; name: string; sub: string; plus: number }[] = [
@@ -307,7 +445,7 @@ export class UIScene extends Phaser.Scene {
       slot.bg.fillStyle(0x0f1826, has ? 1 : 0.5).fillRoundedRect(sx, sy, sw, sh, 8);
       slot.bg.lineStyle(info.plus > 0 ? 2 : 1.5, rim, has ? 1 : 0.5).strokeRoundedRect(sx, sy, sw, sh, 8);
       if (has) {
-        slot.icon.setTexture(info.tex!).setDisplaySize(60, 60).setVisible(true).setAlpha(1);
+        slot.icon.setTexture(info.tex!).setDisplaySize(this.equipIconSize, this.equipIconSize).setVisible(true).setAlpha(1);
       } else {
         slot.icon.setVisible(false);
       }
@@ -316,13 +454,15 @@ export class UIScene extends Phaser.Scene {
       slot.sub.setText(info.sub);
     });
 
-    // 図鑑（サイドは件数のみコンパクト表示。詳細は図鑑オーバーレイで）
-    const found = MONSTER_DEFS.filter((m) => this.gs.discovered.has(m.key));
-    const recent = found.slice(-3).map((m) => m.name).join('、');
-    this.codexText.setText(
-      `発見数: ${found.length} / ${MONSTER_DEFS.length}` +
-      (found.length ? `\n最近: ${recent}\n（「👾モンスター」で一覧）` : '\n（まだ発見していない）')
-    );
+    // 図鑑（サイドパネルはPCのみ。詳細は図鑑オーバーレイで）
+    if (this.codexText) {
+      const found = MONSTER_DEFS.filter((m) => this.gs.discovered.has(m.key));
+      const recent = found.slice(-3).map((m) => m.name).join('、');
+      this.codexText.setText(
+        `発見数: ${found.length} / ${MONSTER_DEFS.length}` +
+        (found.length ? `\n最近: ${recent}\n（「👾モンスター」で一覧）` : '\n（まだ発見していない）')
+      );
+    }
 
     this.rebuildItems();
     this.renderLog();
@@ -343,8 +483,8 @@ export class UIScene extends Phaser.Scene {
   rebuildItems() {
     this.itemContainer.removeAll(true);
     const p = this.gs.player;
-    const startX = 730, startY = 596;
-    const cols = 8, cell = 62;
+    const { x: startX, y: startY, cols } = this.L.items;
+    const cell = 62;
     const groups = this.stackInventory(p.inventory);
     groups.forEach((grp, i) => {
       const cx = startX + (i % cols) * cell;
@@ -388,8 +528,9 @@ export class UIScene extends Phaser.Scene {
   }
 
   renderLog() {
-    const lines = this.logLines.slice(-8);
-    for (let i = 0; i < 8; i++) {
+    const n = this.logTexts.length;
+    const lines = this.logLines.slice(-n);
+    for (let i = 0; i < n; i++) {
       const t = this.logTexts[i];
       if (!t) continue;
       const l = lines[i];
@@ -458,7 +599,7 @@ export class UIScene extends Phaser.Scene {
   rebuildOverlay() {
     if (this.gachaAnimating) return; // 演出中に消さない
     this.overlay.removeAll(true);
-    const x = 200, y = 80, w = 680, h = 460;
+    const { x, y, w, h } = this.L.ov;
     const g = this.add.graphics();
     g.fillStyle(0x0e1420, 0.98).fillRoundedRect(x, y, w, h, 10);
     g.lineStyle(2, 0x3fe0d0).strokeRoundedRect(x, y, w, h, 10);
@@ -699,8 +840,8 @@ export class UIScene extends Phaser.Scene {
   playGachaAnimation(result: { rank: 'SS' | 'S' | 'A' | 'B' | 'C'; color: number; name: string; texKey: string }) {
     this.gachaAnimating = true;
     // モーダル（ガチャウィンドウ）の矩形。演出はすべてこの中で完結させる
-    const mx = 200, my = 80, mw = 680, mh = 460;
-    const cx = mx + mw / 2, cy = my + mh / 2 + 10;
+    const { x: mx, y: my, w: mw, h: mh } = this.L.ov;
+    const cx = mx + mw / 2, cy = Math.min(my + mh / 2 + 10, my + 320);
     const high = result.rank === 'SS' || result.rank === 'S';
     const mid = result.rank === 'A';
     const objs: Phaser.GameObjects.GameObject[] = [];

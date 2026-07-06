@@ -57,6 +57,8 @@ export class TitleScene extends Phaser.Scene {
       logo.add(sub);
     }
 
+    // スマホ縦画面では横幅に収まるよう縮小
+    if (GAME_W < 700) logo.setScale(0.72);
     this.tweens.add({ targets: logo, y: 210, yoyo: true, repeat: -1, duration: 2200, ease: 'Sine.inOut' });
 
     // スタートボタン
@@ -77,7 +79,7 @@ export class TitleScene extends Phaser.Scene {
     ];
     this.add.text(GAME_W / 2, 540, help.join('\n'), {
       fontFamily: '"Yu Gothic UI", sans-serif',
-      fontSize: '19px',
+      fontSize: GAME_W < 700 ? '15px' : '19px',
       color: '#dfe7f0',
       align: 'center',
       lineSpacing: 8
