@@ -108,6 +108,9 @@ export class TitleScene extends Phaser.Scene {
 
     this.input.keyboard?.once('keydown-ENTER', () => this.scene.start('GameScene'));
     this.input.keyboard?.once('keydown-SPACE', () => this.scene.start('GameScene'));
+    if (location.hostname === 'localhost' && new URLSearchParams(location.search).has('qa-game')) {
+      this.time.delayedCall(80, () => this.scene.start('GameScene'));
+    }
   }
 
   makeButton(x: number, y: number, label: string, onClick: () => void) {
