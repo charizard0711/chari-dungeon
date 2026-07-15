@@ -100,7 +100,7 @@ export class GameScene extends Phaser.Scene {
   create() {
     // 状態初期化
     this.player = new Player();
-    if (import.meta.env.DEV && new URLSearchParams(location.search).has('qa-gacha')) {
+    if (location.hostname === 'localhost' && new URLSearchParams(location.search).has('qa-gacha')) {
       this.player.gold = 900;
     }
     this.floor = 1;
