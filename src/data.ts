@@ -172,6 +172,105 @@ export const MONSTER_DEFS: MonsterDef[] = [
     key: 'm_archer', name: 'ボーンアーチャー', hp: 26, atkMin: 7, atkMax: 14, def: 4,
     exp: 9, gold: 10, score: 65, minFloor: 5, maxFloor: 26, behavior: 'ranged', ranged: true, color: 0xd8d2c0
   },
+  // ===== 深層獣群アップデート（新規23種） =====
+  {
+    key: 'm_ember_drake', name: '火鱗の幼竜', hp: 28, atkMin: 5, atkMax: 10, def: 4,
+    exp: 7, gold: 8, score: 55, minFloor: 4, maxFloor: 13, behavior: 'chase', isDragonType: true, color: 0xd84a2a
+  },
+  {
+    key: 'm_frost_wyrm', name: '氷晶ワーム', hp: 34, atkMin: 7, atkMax: 13, def: 5,
+    exp: 9, gold: 10, score: 65, minFloor: 8, maxFloor: 18, behavior: 'loop', ranged: true, isDragonType: true, color: 0x62c8ff
+  },
+  {
+    key: 'm_storm_wyvern', name: '雷翼ワイバーン', hp: 40, atkMin: 9, atkMax: 16, def: 6,
+    exp: 12, gold: 13, score: 80, minFloor: 12, maxFloor: 23, behavior: 'line', ranged: true, isDragonType: true, color: 0x378dff
+  },
+  {
+    key: 'm_brass_dragon', name: '真鍮竜ギアドラス', hp: 58, atkMin: 11, atkMax: 19, def: 13,
+    exp: 17, gold: 20, score: 105, minFloor: 15, maxFloor: 26, behavior: 'slow', isDragonType: true, color: 0xc78a32
+  },
+  {
+    key: 'm_void_drake', name: '虚空ドレイク', hp: 60, atkMin: 14, atkMax: 23, def: 9,
+    exp: 20, gold: 24, score: 130, minFloor: 20, maxFloor: 29, behavior: 'loop', ranged: true,
+    wallPass: true, isDragonType: true, color: 0x7a3bd1
+  },
+  {
+    key: 'm_bone_dragon', name: '骨竜スカルヴァーン', hp: 74, atkMin: 16, atkMax: 26, def: 12,
+    exp: 25, gold: 28, score: 155, minFloor: 23, maxFloor: 29, behavior: 'chase',
+    isElite: true, isDragonType: true, color: 0xd8c7a3
+  },
+  {
+    key: 'm_horn_demon', name: '双角デーモン', hp: 25, atkMin: 5, atkMax: 11, def: 3,
+    exp: 6, gold: 7, score: 48, minFloor: 3, maxFloor: 13, behavior: 'chase', color: 0xc63838
+  },
+  {
+    key: 'm_chain_demon', name: '鎖獄の悪魔', hp: 36, atkMin: 7, atkMax: 14, def: 6,
+    exp: 10, gold: 11, score: 68, minFloor: 7, maxFloor: 19, behavior: 'line', color: 0x7d344f
+  },
+  {
+    key: 'm_flame_gargoyle', name: '焔ガーゴイル', hp: 46, atkMin: 9, atkMax: 17, def: 12,
+    exp: 13, gold: 14, score: 86, minFloor: 11, maxFloor: 22, behavior: 'slow', color: 0x5d5a58
+  },
+  {
+    key: 'm_abyss_hound', name: '奈落の魔犬', hp: 35, atkMin: 10, atkMax: 18, def: 5,
+    exp: 13, gold: 15, score: 88, minFloor: 14, maxFloor: 25, behavior: 'chase', color: 0x31356e
+  },
+  {
+    key: 'm_mask_fiend', name: '仮面の魔人', hp: 42, atkMin: 12, atkMax: 20, def: 6,
+    exp: 16, gold: 18, score: 105, minFloor: 17, maxFloor: 28, behavior: 'ranged',
+    ranged: true, wallPass: true, color: 0x7245a8
+  },
+  {
+    key: 'm_archdemon', name: '大悪魔アスモル', hp: 82, atkMin: 17, atkMax: 28, def: 14,
+    exp: 29, gold: 34, score: 180, minFloor: 24, maxFloor: 29, behavior: 'chase', isElite: true, color: 0xb6292d
+  },
+  {
+    key: 'm_bone_hound', name: '骨牙ハウンド', hp: 22, atkMin: 5, atkMax: 10, def: 2,
+    exp: 6, gold: 6, score: 45, minFloor: 5, maxFloor: 15, behavior: 'chase', color: 0xd8ccb4
+  },
+  {
+    key: 'm_skeleton_mage', name: '骸骨魔導士', hp: 30, atkMin: 7, atkMax: 15, def: 4,
+    exp: 10, gold: 12, score: 72, minFloor: 9, maxFloor: 20, behavior: 'ranged', ranged: true, color: 0x8a58bd
+  },
+  {
+    key: 'm_death_knight', name: '死霊騎士', hp: 52, atkMin: 12, atkMax: 21, def: 13,
+    exp: 18, gold: 20, score: 115, minFloor: 15, maxFloor: 26, behavior: 'chase', color: 0x34394c
+  },
+  {
+    key: 'm_lich', name: 'リッチロード', hp: 66, atkMin: 15, atkMax: 25, def: 10,
+    exp: 24, gold: 30, score: 155, minFloor: 22, maxFloor: 29, behavior: 'ranged',
+    ranged: true, wallPass: true, isElite: true, color: 0x633e9e
+  },
+  {
+    key: 'm_bone_colossus', name: '骨塊コロッサス', hp: 86, atkMin: 15, atkMax: 25, def: 17,
+    exp: 27, gold: 30, score: 170, minFloor: 20, maxFloor: 29, behavior: 'slow', isElite: true, color: 0xc9b995
+  },
+  {
+    key: 'm_grave_crawler', name: '墓這い', hp: 16, atkMin: 4, atkMax: 9, def: 1,
+    exp: 4, gold: 4, score: 34, minFloor: 2, maxFloor: 12, behavior: 'line', color: 0x8b806f
+  },
+  {
+    key: 'm_cerberus', name: '三首獄犬', hp: 68, atkMin: 14, atkMax: 24, def: 10,
+    exp: 22, gold: 25, score: 140, minFloor: 18, maxFloor: 29, behavior: 'chase', isElite: true, color: 0x9e2f28
+  },
+  {
+    key: 'm_hydra', name: '深淵ヒュドラ', hp: 76, atkMin: 15, atkMax: 26, def: 13,
+    exp: 25, gold: 28, score: 158, minFloor: 21, maxFloor: 29, behavior: 'ranged',
+    ranged: true, isDragonType: true, color: 0x363f9d
+  },
+  {
+    key: 'm_crystal_crab', name: '晶甲クラブ', hp: 44, atkMin: 6, atkMax: 12, def: 15,
+    exp: 11, gold: 16, score: 78, minFloor: 7, maxFloor: 18, behavior: 'slow', color: 0x2367a8
+  },
+  {
+    key: 'm_blood_moth', name: '血月モス', hp: 28, atkMin: 8, atkMax: 15, def: 4,
+    exp: 11, gold: 13, score: 76, minFloor: 10, maxFloor: 23, behavior: 'random',
+    ranged: true, wallPass: true, color: 0x9a2f4e
+  },
+  {
+    key: 'm_clockwork_chimera', name: '機巧キマイラ', hp: 78, atkMin: 16, atkMax: 27, def: 15,
+    exp: 27, gold: 32, score: 172, minFloor: 23, maxFloor: 29, behavior: 'line', isElite: true, color: 0xb07b30
+  },
   // ===== 追加モンスター（種類を増やす）=====
   {
     key: 'm_slime', name: 'ネジスライム', hp: 14, atkMin: 2, atkMax: 6, def: 0,

@@ -464,7 +464,7 @@ export class GameScene extends Phaser.Scene {
     const e = new Enemy(def, x, y, hpScale);
     e.shadow = this.add.image(0, 0, 'shadow').setDepth(9.5).setAlpha(0.6);
     e.sprite = this.add.image(0, 0, def.key).setDepth(10).setOrigin(0.5, 0.6);
-    const maxDim = def.isBoss ? 40 : def.isElite ? 30 : 26;
+    const maxDim = def.isBoss ? 40 : def.isElite ? 34 : def.isDragonType ? 30 : 26;
     const tex = this.textures.get(def.key).getSourceImage();
     const sc = maxDim / Math.max(tex.width, tex.height);
     e.sprite.setScale(sc);
@@ -1026,18 +1026,21 @@ export class GameScene extends Phaser.Scene {
     e.animating = true;
     const targetX = mv.x * TILE + TILE / 2;
     const targetY = mv.y * TILE + TILE / 2;
-    const lean = Math.sign(targetX - e.sprite.x) * -4;
+    const flying = /drake|dragon|wyrm|wyvern|moth|fiend|lich/.test(e.def.key);
+    const rushing = /hound|cerberus|crawler/.test(e.def.key);
+    const lean = Math.sign(targetX - e.sprite.x) * (flying ? -2 : -4);
     e.sprite.setAngle(lean);
-    this.stepDust(e.sprite.x, e.sprite.y + 10, 0, 2, 0x516b68);
+    if (!flying) this.stepDust(e.sprite.x, e.sprite.y + 10, 0, rushing ? 3 : 2, 0x516b68);
     this.tweens.add({
       targets: e.sprite,
-      scaleX: e.baseScale * 1.08,
-      scaleY: e.baseScale * 0.9,
+      scaleX: e.baseScale * (rushing ? 1.14 : 1.08),
+      scaleY: e.baseScale * (flying ? 1.04 : 0.9),
       duration: ANIM * 0.5,
       yoyo: true,
       ease: 'Sine.easeInOut'
     });
-    return this.tween(e.sprite, { x: targetX, y: targetY }, ANIM, 'Sine.easeInOut').then(() => {
+    const duration = rushing ? ANIM * 0.76 : e.def.behavior === 'slow' ? ANIM * 1.14 : ANIM;
+    return this.tween(e.sprite, { x: targetX, y: targetY }, duration, flying ? 'Sine.easeOut' : 'Sine.easeInOut').then(() => {
       e.animating = false;
       e.sprite.setScale(e.baseScale).setAngle(0);
     });
@@ -1093,7 +1096,7 @@ export class GameScene extends Phaser.Scene {
       ease: 'Sine.easeInOut'
     });
     return new Promise((resolve) => {
-      const bolt = this.add.image(e.sprite.x, e.sprite.y, 'fx_bolt').setDepth(20);
+      const bolt = this.add.image(e.sprite.x, e.sprite.y, 'fx_bolt').setDepth(20).setTint(e.def.color);
       this.tweens.add({
         targets: bolt, x: this.playerSprite.x, y: this.playerSprite.y, duration: 180,
         onComplete: () => {
@@ -1923,10 +1926,13 @@ export class GameScene extends Phaser.Scene {
     for (const e of this.enemies) {
       if (!e.sprite || !e.sprite.visible) continue;
       if (!e.animating) {
-        const pulse = Math.sin(time * 0.004 + e.bobPhase);
-        e.sprite.scaleX = e.baseScale * (1 - pulse * 0.018);
-        e.sprite.scaleY = e.baseScale * (1 + pulse * 0.045);
-        e.sprite.angle = Math.sin(time * 0.0027 + e.bobPhase) * 1.3;
+        const flying = /drake|dragon|wyrm|wyvern|moth|fiend|lich/.test(e.def.key);
+        const bony = /bone|skeleton|death|grave|lich/.test(e.def.key);
+        const pulse = Math.sin(time * (flying ? 0.0052 : 0.004) + e.bobPhase);
+        e.sprite.scaleX = e.baseScale * (1 - pulse * (bony ? 0.01 : 0.018));
+        e.sprite.scaleY = e.baseScale * (1 + pulse * (flying ? 0.065 : 0.045));
+        const rattle = bony ? Math.sin(time * 0.012 + e.bobPhase) * 0.55 : 0;
+        e.sprite.angle = Math.sin(time * 0.0027 + e.bobPhase) * (flying ? 1.9 : 1.3) + rattle;
       }
       if (e.shadow) { e.shadow.x = e.sprite.x; e.shadow.y = e.sprite.y + 11; }
       if (e.aura) { e.aura.x = e.sprite.x; e.aura.y = e.sprite.y - 6; }
