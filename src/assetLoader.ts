@@ -33,7 +33,10 @@ function pf(dir: string, col: number): [number, number, number, number] {
 
 function playerFrames(): FrameDef[] {
   const out: FrameDef[] = [];
-  const frames: [string, number][] = [['idle', 0], ['walk1', 1], ['walk2', 2], ['atk', 5]];
+  const frames: [string, number][] = [
+    ['idle', 0], ['walk1', 1], ['walk2', 2], ['walk3', 3],
+    ['atkWindup', 4], ['atk', 5]
+  ];
   for (const dir of ['down', 'up', 'left', 'right']) {
     for (const [fr, col] of frames) {
       out.push({ key: `player_${dir}_${fr}`, sheet: 'characters', r: pf(dir, col), mode: 'sprite', size: 36, sizeMode: 'h' });
@@ -115,6 +118,11 @@ const FRAME_DEFS: FrameDef[] = [
   // ---- 宝箱・階段・扉 ----
   { key: 'chest', sheet: 'tiles', r: [30, 588, 135, 692], mode: 'sprite', size: 30 },
   { key: 'chest_open', sheet: 'tiles', r: [163, 585, 275, 692], mode: 'sprite', size: 30 },
+  { key: 'prop_torch', sheet: 'tiles', r: [292, 575, 390, 706], mode: 'sprite', size: 34 },
+  { key: 'prop_lantern', sheet: 'tiles', r: [398, 575, 520, 706], mode: 'sprite', size: 34 },
+  { key: 'prop_crystal', sheet: 'tiles', r: [525, 570, 670, 706], mode: 'sprite', size: 36 },
+  { key: 'prop_barrel', sheet: 'tiles', r: [980, 575, 1110, 706], mode: 'sprite', size: 34 },
+  { key: 'prop_statue', sheet: 'tiles', r: [1115, 565, 1250, 706], mode: 'sprite', size: 36 },
   { key: 'stairs', sheet: 'tiles', r: [878, 95, 982, 205], mode: 'tile' },
   { key: 'door', sheet: 'tiles', r: [1018, 92, 1122, 204], mode: 'tile' }
 ];

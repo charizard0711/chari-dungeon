@@ -22,6 +22,9 @@ interface Chest {
   opened: boolean;
   rare: boolean;   // 赤い宝箱=レア（レアアイテム・大量ゴールド）
   sprite: Phaser.GameObjects.Image;
+  glow?: Phaser.GameObjects.Image;
+  phase: number;
+  baseScale: number;
 }
 
 // tint色を暗くする（壁と道のコントラスト用）
@@ -37,7 +40,27 @@ interface GroundItem {
   y: number;
   kind: ItemKind | 'coin' | 'gem';
   sprite: Phaser.GameObjects.Image;
+  glow?: Phaser.GameObjects.Image;
+  phase: number;
   value?: number;
+}
+
+interface Decoration {
+  x: number;
+  y: number;
+  baseY: number;
+  phase: number;
+  emissive: boolean;
+  sprite: Phaser.GameObjects.Image;
+  glow?: Phaser.GameObjects.Image;
+}
+
+interface AmbientMote {
+  x: number;
+  y: number;
+  baseY: number;
+  phase: number;
+  sprite: Phaser.GameObjects.Arc;
 }
 
 export class GameScene extends Phaser.Scene {
@@ -57,6 +80,8 @@ export class GameScene extends Phaser.Scene {
   enemies: Enemy[] = [];
   chests: Chest[] = [];
   ground: GroundItem[] = [];
+  decorations: Decoration[] = [];
+  ambientMotes: AmbientMote[] = [];
   discovered: Set<string> = new Set();
 
   playerSprite!: Phaser.GameObjects.Image;
@@ -64,6 +89,8 @@ export class GameScene extends Phaser.Scene {
   playerAura?: Phaser.GameObjects.Image; // 武器強化のオーラ（剣が光る演出）
   weaponSprite?: Phaser.GameObjects.Image; // キャラが手に持つ武器（装備で変化）
   stepToggle = false; // 歩行アニメの左右足切り替え
+  stepFrame = 0;
+  playerAttacking = false;
   stairsHint!: Phaser.GameObjects.Text;
   lightRadius = 4;
   shroomTurns = 0;
@@ -110,6 +137,8 @@ export class GameScene extends Phaser.Scene {
     this.gameEnded = false;
     this.discovered = new Set();
     this.dashSteps = 0;
+    this.stepFrame = 0;
+    this.playerAttacking = false;
 
     // シーン再起動時、Phaserはインスタンスを再利用するため
     // 前回の（破棄済み）オブジェクト参照をリセットする
@@ -122,6 +151,8 @@ export class GameScene extends Phaser.Scene {
     this.enemies = [];
     this.chests = [];
     this.ground = [];
+    this.decorations = [];
+    this.ambientMotes = [];
     this.explored = [];
 
     this.cameras.main.setViewport(MAP_X, MAP_Y, MAP_W, MAP_H);
@@ -193,10 +224,14 @@ export class GameScene extends Phaser.Scene {
     this.tileSprites = [];
     for (const e of this.enemies) { if (e.aura) { this.tweens.killTweensOf(e.aura); e.aura.destroy(); } e.sprite.destroy(); e.hpBar?.destroy(); e.shadow?.destroy(); }
     this.enemies = [];
-    for (const c of this.chests) c.sprite.destroy();
+    for (const c of this.chests) { c.sprite.destroy(); c.glow?.destroy(); }
     this.chests = [];
-    for (const gi of this.ground) gi.sprite.destroy();
+    for (const gi of this.ground) { gi.sprite.destroy(); gi.glow?.destroy(); }
     this.ground = [];
+    for (const d of this.decorations) { d.sprite.destroy(); d.glow?.destroy(); }
+    this.decorations = [];
+    for (const m of this.ambientMotes) m.sprite.destroy();
+    this.ambientMotes = [];
 
     this.dungeon = generateDungeon(floor);
     const d = this.dungeon;
@@ -221,6 +256,8 @@ export class GameScene extends Phaser.Scene {
         this.tileSprites[y][x] = spr;
       }
     }
+    this.spawnDecorations(floor);
+    this.spawnAmbientMotes(floor);
 
     // 小さなフロアもビューポート中央に配置し、左右に大きな空白を作らない
     const worldW = d.w * TILE, worldH = d.h * TILE;
@@ -275,6 +312,66 @@ export class GameScene extends Phaser.Scene {
       case 'floor':
       default:
         return `floor${suffix}_${(x + y * 2) % 3}`;
+    }
+  }
+
+  spawnDecorations(floor: number) {
+    const candidates: Vec2[] = [];
+    for (let y = 1; y < this.dungeon.h - 1; y++) {
+      for (let x = 1; x < this.dungeon.w - 1; x++) {
+        if (this.dungeon.tiles[y][x] !== 'wall') continue;
+        const nearFloor = [[0, 1], [1, 0], [-1, 0], [0, -1]].some(([dx, dy]) =>
+          this.dungeon.tiles[y + dy]?.[x + dx] !== 'wall'
+        );
+        if (nearFloor) candidates.push({ x, y });
+      }
+    }
+    Phaser.Utils.Array.Shuffle(candidates);
+    const keys = floor >= 21
+      ? ['prop_crystal', 'prop_statue', 'prop_lantern']
+      : floor >= 11
+        ? ['prop_lantern', 'prop_crystal', 'prop_barrel', 'prop_statue']
+        : ['prop_torch', 'prop_lantern', 'prop_barrel', 'prop_crystal'];
+    const count = Math.min(candidates.length, 7 + Math.floor(floor / 5));
+    for (let i = 0; i < count; i++) {
+      const pos = candidates[i];
+      const key = keys[i % keys.length];
+      if (!this.textures.exists(key)) continue;
+      const emissive = key !== 'prop_barrel' && key !== 'prop_statue';
+      const sprite = this.add.image(pos.x * TILE + TILE / 2, pos.y * TILE + TILE / 2 + 2, key)
+        .setDepth(4).setOrigin(0.5, 0.68).setScale(0.78);
+      const decoration: Decoration = {
+        x: pos.x, y: pos.y, baseY: sprite.y, phase: Math.random() * Math.PI * 2,
+        emissive, sprite
+      };
+      if (emissive) {
+        decoration.glow = this.add.image(sprite.x, sprite.y - 6, 'glow')
+          .setDepth(3.8).setBlendMode(Phaser.BlendModes.ADD)
+          .setTint(key === 'prop_torch' ? 0x58d9ff : 0x67f0e2)
+          .setDisplaySize(34, 34).setAlpha(0.22);
+      }
+      this.decorations.push(decoration);
+    }
+  }
+
+  spawnAmbientMotes(floor: number) {
+    const floorCells: Vec2[] = [];
+    for (let y = 1; y < this.dungeon.h - 1; y++) {
+      for (let x = 1; x < this.dungeon.w - 1; x++) {
+        if (this.dungeon.tiles[y][x] !== 'wall') floorCells.push({ x, y });
+      }
+    }
+    Phaser.Utils.Array.Shuffle(floorCells);
+    const count = Math.min(18, floorCells.length);
+    const color = floor >= 21 ? 0xb47aff : floor >= 11 ? 0x6ce8d8 : 0x65d8ff;
+    for (let i = 0; i < count; i++) {
+      const pos = floorCells[i];
+      const baseY = pos.y * TILE + TILE / 2 - 2 - Math.random() * 10;
+      const sprite = this.add.circle(
+        pos.x * TILE + TILE / 2 + (Math.random() * 18 - 9), baseY,
+        0.7 + Math.random() * 1.1, color, 0.32
+      ).setDepth(4.4).setBlendMode(Phaser.BlendModes.ADD);
+      this.ambientMotes.push({ x: pos.x, y: pos.y, baseY, phase: Math.random() * Math.PI * 2, sprite });
     }
   }
 
@@ -402,10 +499,18 @@ export class GameScene extends Phaser.Scene {
       if (!pos) continue;
       // 25%で赤い宝箱（レア）。深い階ほど少し出やすい
       const rare = Math.random() < 0.22 + Math.min(0.2, floor * 0.01);
-      const spr = this.add.image(0, 0, 'chest').setDepth(6).setOrigin(0.5, 0.6).setScale(0.85);
+      const baseScale = 0.85;
+      const spr = this.add.image(0, 0, 'chest').setDepth(6).setOrigin(0.5, 0.6).setScale(baseScale);
       if (rare) spr.setTint(0xff6b5a); // 赤く染めてレアを示す
       this.placeSprite(spr, pos.x, pos.y);
-      this.chests.push({ x: pos.x, y: pos.y, opened: false, rare, sprite: spr });
+      const glow = rare
+        ? this.add.image(spr.x, spr.y - 4, 'glow').setDepth(5.5).setBlendMode(Phaser.BlendModes.ADD)
+          .setTint(0xff7b52).setDisplaySize(42, 42).setAlpha(0.34)
+        : undefined;
+      this.chests.push({
+        x: pos.x, y: pos.y, opened: false, rare, sprite: spr, glow,
+        phase: Math.random() * Math.PI * 2, baseScale
+      });
     }
   }
 
@@ -421,8 +526,12 @@ export class GameScene extends Phaser.Scene {
       const texKey = kind === 'coin' ? 'coin' : kind === 'gem' ? 'gem' : `i_${kind}`;
       const spr = this.add.image(0, 0, texKey).setDepth(5).setOrigin(0.5, 0.6).setDisplaySize(22, 22);
       this.placeSprite(spr, pos.x, pos.y);
+      const glow = this.add.image(spr.x, spr.y - 2, 'glow').setDepth(4.6)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setTint(kind === 'coin' ? 0xffc45a : kind === 'gem' ? 0x55dfff : 0x88dfd4)
+        .setDisplaySize(28, 28).setAlpha(0.18);
       const value = kind === 'coin' ? 10 + Math.floor(Math.random() * floor * 6) : kind === 'gem' ? 40 + floor * 8 : undefined;
-      this.ground.push({ x: pos.x, y: pos.y, kind, sprite: spr, value });
+      this.ground.push({ x: pos.x, y: pos.y, kind, sprite: spr, glow, phase: Math.random() * Math.PI * 2, value });
     }
   }
 
@@ -495,13 +604,24 @@ export class GameScene extends Phaser.Scene {
           duration: 230, ease: 'Quad.easeOut', onComplete: () => trail.destroy()
         });
       }
+      this.stepDust(this.playerSprite.x, this.playerSprite.y + 11, this.holdBoostTier);
       this.stepToggle = !this.stepToggle;
-      this.setPlayerVisual(dir, this.stepToggle ? 'walk1' : 'walk2');
+      this.stepFrame = (this.stepFrame + 1) % 3;
+      const walkFrames = ['walk1', 'walk2', 'walk3'] as const;
+      this.setPlayerVisual(dir, walkFrames[this.stepFrame]);
       this.player.x = nx;
       this.player.y = ny;
       // 歩行の途中で反対の足に切り替え
-      this.time.delayedCall(moveDuration * 0.48, () => {
-        if (this.player.dir === dir) this.setPlayerVisual(dir, this.stepToggle ? 'walk2' : 'walk1');
+      this.tweens.add({
+        targets: this.playerSprite,
+        scaleX: 0.9,
+        scaleY: 0.79,
+        duration: Math.max(28, moveDuration * 0.5),
+        yoyo: true,
+        ease: 'Sine.easeInOut'
+      });
+      this.time.delayedCall(moveDuration * 0.5, () => {
+        if (this.player.dir === dir) this.setPlayerVisual(dir, walkFrames[(this.stepFrame + 1) % 3]);
       });
       await this.tween(this.playerSprite, {
         x: nx * TILE + TILE / 2, y: ny * TILE + TILE / 2
@@ -603,18 +723,32 @@ export class GameScene extends Phaser.Scene {
         return;
       }
     }
+    this.pickupBurst(gi.sprite.x, gi.sprite.y, gi.kind === 'coin' ? 0xffc45a : 0x64e7dc);
     gi.sprite.destroy();
+    gi.glow?.destroy();
     this.ground = this.ground.filter((g) => g !== gi);
   }
 
   // ============ 戦闘 ============
   async playerAttack(e: Enemy, dir: Dir) {
+    this.playerAttacking = true;
+    this.setPlayerVisual(dir, 'atkWindup');
+    await new Promise<void>((resolve) => this.time.delayedCall(42, () => resolve()));
     this.setPlayerVisual(dir, 'atk');
     Audio.playSe('attack');
     // 敵の方向へ踏み込む（前进→戻る）と斬撃エフェクト
     const [ddx, ddy] = this.dirVec(dir);
     const homeX = this.playerSprite.x, homeY = this.playerSprite.y;
     this.slashFx(e.x, e.y, plusColor(this.player.weapon?.plus ?? 0));
+    if (this.weaponSprite?.visible) {
+      this.tweens.add({
+        targets: this.weaponSprite,
+        angle: this.weaponSprite.angle + (dir === 'left' || dir === 'up' ? -115 : 115),
+        duration: ANIM * 0.45,
+        yoyo: true,
+        ease: 'Cubic.easeOut'
+      });
+    }
     await new Promise<void>((resolve) => {
       this.tweens.add({
         targets: this.playerSprite,
@@ -661,6 +795,7 @@ export class GameScene extends Phaser.Scene {
       this.updatePlayerAura();
     }
 
+    this.playerAttacking = false;
     this.setPlayerVisual(dir, 'idle');
 
     if (e.hp <= 0) {
@@ -703,6 +838,7 @@ export class GameScene extends Phaser.Scene {
       if (Math.random() < 0.08) { this.dropItem(e.x, e.y, 'revive'); this.log('復活のタネがこぼれ落ちた…！', 'special'); }
     }
 
+    this.enemyDefeatFx(e);
     if (e.aura) { this.tweens.killTweensOf(e.aura); e.aura.destroy(); }
     e.sprite.destroy();
     e.hpBar?.destroy();
@@ -731,7 +867,12 @@ export class GameScene extends Phaser.Scene {
     const spr = this.add.image(0, 0, texKey).setDepth(5).setOrigin(0.5, 0.6).setDisplaySize(22, 22);
     this.placeSprite(spr, tx, ty);
     spr.setVisible(!!this.explored[ty]?.[tx]);
-    this.ground.push({ x: tx, y: ty, kind, sprite: spr, value });
+    const glow = this.add.image(spr.x, spr.y - 2, 'glow').setDepth(4.6)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setTint(kind === 'coin' ? 0xffc45a : 0x88dfd4)
+      .setDisplaySize(28, 28).setAlpha(0.18)
+      .setVisible(spr.visible);
+    this.ground.push({ x: tx, y: ty, kind, sprite: spr, glow, phase: Math.random() * Math.PI * 2, value });
   }
 
   damagePlayer(dmg: number, reason: string) {
@@ -876,21 +1017,55 @@ export class GameScene extends Phaser.Scene {
     if (mv) {
       e.x = mv.x;
       e.y = mv.y;
-      return this.tween(e.sprite, { x: mv.x * TILE + TILE / 2, y: mv.y * TILE + TILE / 2 }, ANIM);
+      return this.animateEnemyMove(e, mv);
     }
     return null;
   }
 
+  animateEnemyMove(e: Enemy, mv: Vec2): Promise<void> {
+    e.animating = true;
+    const targetX = mv.x * TILE + TILE / 2;
+    const targetY = mv.y * TILE + TILE / 2;
+    const lean = Math.sign(targetX - e.sprite.x) * -4;
+    e.sprite.setAngle(lean);
+    this.stepDust(e.sprite.x, e.sprite.y + 10, 0, 2, 0x516b68);
+    this.tweens.add({
+      targets: e.sprite,
+      scaleX: e.baseScale * 1.08,
+      scaleY: e.baseScale * 0.9,
+      duration: ANIM * 0.5,
+      yoyo: true,
+      ease: 'Sine.easeInOut'
+    });
+    return this.tween(e.sprite, { x: targetX, y: targetY }, ANIM, 'Sine.easeInOut').then(() => {
+      e.animating = false;
+      e.sprite.setScale(e.baseScale).setAngle(0);
+    });
+  }
+
   enemyAttack(e: Enemy): Promise<void> {
     const res = computeEnemyAttack(this.player, e.def);
+    e.animating = true;
     // 攻撃演出：少し前進
     const ox = e.sprite.x, oy = e.sprite.y;
     const px = this.playerSprite.x, py = this.playerSprite.y;
+    this.tweens.add({
+      targets: e.sprite,
+      scaleX: e.baseScale * 1.16,
+      scaleY: e.baseScale * 0.84,
+      duration: ANIM / 2,
+      yoyo: true,
+      ease: 'Back.easeInOut'
+    });
     return new Promise((resolve) => {
       this.tweens.add({
         targets: e.sprite, x: (ox + px) / 2, y: (oy + py) / 2, duration: ANIM / 2, yoyo: true,
         onComplete: () => {
+          e.animating = false;
+          e.sprite.setScale(e.baseScale).setAngle(0);
           this.damagePlayer(res.damage, `${e.def.name}の攻撃！`);
+          this.hitFx(this.player.x, this.player.y);
+          this.cameras.main.shake(90, 0.004);
           if (res.shieldBroke) {
             // 壊れた盾はその場で消滅し、持っている別の盾に持ち替える
             const bs = this.player.shield!;
@@ -907,11 +1082,23 @@ export class GameScene extends Phaser.Scene {
   }
 
   enemyRanged(e: Enemy): Promise<void> {
+    e.animating = true;
+    this.magicFx(e.x, e.y);
+    this.tweens.add({
+      targets: e.sprite,
+      scaleX: e.baseScale * 0.9,
+      scaleY: e.baseScale * 1.12,
+      duration: 90,
+      yoyo: true,
+      ease: 'Sine.easeInOut'
+    });
     return new Promise((resolve) => {
       const bolt = this.add.image(e.sprite.x, e.sprite.y, 'fx_bolt').setDepth(20);
       this.tweens.add({
         targets: bolt, x: this.playerSprite.x, y: this.playerSprite.y, duration: 180,
         onComplete: () => {
+          e.animating = false;
+          e.sprite.setScale(e.baseScale);
           bolt.destroy();
           const res = computeEnemyAttack(this.player, e.def);
           this.damagePlayer(res.damage, `${e.def.name}の遠距離攻撃！`);
@@ -1050,14 +1237,38 @@ export class GameScene extends Phaser.Scene {
     }
     // 敵・宝箱・アイテム表示
     for (const e of this.enemies) { const v = !!visible[e.y]?.[e.x]; e.sprite.setVisible(v); e.shadow?.setVisible(v); e.aura?.setVisible(v); if (e.hpBar) e.hpBar.setVisible(v); }
-    for (const c of this.chests) c.sprite.setVisible(this.explored[c.y][c.x]);
-    for (const g of this.ground) g.sprite.setVisible(visible[g.y]?.[g.x]);
+    for (const c of this.chests) {
+      const v = this.explored[c.y][c.x];
+      c.sprite.setVisible(v);
+      c.glow?.setVisible(v);
+    }
+    for (const g of this.ground) {
+      const v = !!visible[g.y]?.[g.x];
+      g.sprite.setVisible(v);
+      g.glow?.setVisible(v);
+    }
+    for (const d of this.decorations) {
+      const v = this.explored[d.y]?.[d.x];
+      d.sprite.setVisible(v);
+      d.glow?.setVisible(v);
+    }
+    for (const m of this.ambientMotes) m.sprite.setVisible(!!visible[m.y]?.[m.x]);
   }
 
   // ============ 宝箱 ============
   openChest(c: Chest) {
     c.opened = true;
     c.sprite.setTexture('chest_open');
+    c.glow?.setAlpha(c.rare ? 0.46 : 0.18);
+    this.tweens.add({
+      targets: c.sprite,
+      scaleX: c.baseScale * 1.2,
+      scaleY: c.baseScale * 0.82,
+      duration: 110,
+      yoyo: true,
+      ease: 'Back.easeOut'
+    });
+    this.pickupBurst(c.sprite.x, c.sprite.y - 4, c.rare ? 0xffb35c : 0x66e1d7, c.rare ? 9 : 6);
     if (c.rare) c.sprite.setTint(0xff9a5a);
     this.addScore(c.rare ? 120 : 40);
     Audio.playSe('chest');
@@ -1486,6 +1697,68 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ============ エフェクト ============
+  stepDust(x: number, y: number, boost = 0, count = 3, color = 0x57706e) {
+    const total = count + boost * 2;
+    for (let i = 0; i < total; i++) {
+      const dot = this.add.circle(
+        x + Phaser.Math.Between(-6, 6), y + Phaser.Math.Between(-1, 3),
+        Phaser.Math.FloatBetween(0.7, 1.6),
+        boost > 1 ? 0xffd77b : boost > 0 ? 0x58d9d1 : color,
+        boost > 0 ? 0.7 : 0.4
+      ).setDepth(14).setBlendMode(boost > 0 ? Phaser.BlendModes.ADD : Phaser.BlendModes.NORMAL);
+      this.tweens.add({
+        targets: dot,
+        x: dot.x + Phaser.Math.Between(-8, 8),
+        y: dot.y - Phaser.Math.Between(3, 9),
+        alpha: 0,
+        scale: 0.25,
+        duration: Phaser.Math.Between(180, 320),
+        ease: 'Quad.easeOut',
+        onComplete: () => dot.destroy()
+      });
+    }
+  }
+
+  pickupBurst(x: number, y: number, color: number, count = 6) {
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + Math.random() * 0.25;
+      const spark = this.add.circle(x, y, i % 3 === 0 ? 1.8 : 1.1, color, 0.9)
+        .setDepth(24).setBlendMode(Phaser.BlendModes.ADD);
+      this.tweens.add({
+        targets: spark,
+        x: x + Math.cos(angle) * Phaser.Math.Between(10, 22),
+        y: y + Math.sin(angle) * Phaser.Math.Between(8, 18) - 4,
+        alpha: 0,
+        scale: 0.25,
+        duration: Phaser.Math.Between(260, 430),
+        ease: 'Cubic.easeOut',
+        onComplete: () => spark.destroy()
+      });
+    }
+  }
+
+  enemyDefeatFx(e: Enemy) {
+    const echo = this.add.image(e.sprite.x, e.sprite.y, e.sprite.texture.key)
+      .setDepth(19).setOrigin(e.sprite.originX, e.sprite.originY)
+      .setScale(e.sprite.scaleX, e.sprite.scaleY)
+      .setFlipX(e.sprite.flipX)
+      .setTint(0x9ff8ef)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setAlpha(0.72);
+    this.tweens.add({
+      targets: echo,
+      alpha: 0,
+      scaleX: echo.scaleX * 1.35,
+      scaleY: echo.scaleY * 1.35,
+      angle: Phaser.Math.Between(-10, 10),
+      y: echo.y - 10,
+      duration: 360,
+      ease: 'Cubic.easeOut',
+      onComplete: () => echo.destroy()
+    });
+    this.pickupBurst(e.sprite.x, e.sprite.y - 4, e.def.color || 0x58d9d1, e.def.isBoss ? 14 : 8);
+  }
+
   slashFx(x: number, y: number, tint?: number) {
     const fx = this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, 'fx_slash').setDepth(20);
     if (tint !== undefined && tint !== 0xdfe7f0) fx.setTint(tint);
@@ -1610,14 +1883,17 @@ export class GameScene extends Phaser.Scene {
     this.handleMoveKeys(time);
 
     // プレイヤーの呼吸（立ち止まっているときだけ、ふわっと上下に伸縮）
-    if (!this.gameEnded) {
-      const breathe = this.busy ? 1 : 1 + Math.sin(time * 0.004) * 0.03;
-      ps.scaleY = 0.85 * breathe;
+    if (!this.gameEnded && !this.busy) {
+      const breathe = Math.sin(time * 0.004);
+      ps.scaleX = 0.85 * (1 - breathe * 0.012);
+      ps.scaleY = 0.85 * (1 + breathe * 0.032);
     }
     // 足元の影
     if (this.playerShadow) {
       this.playerShadow.x = ps.x;
       this.playerShadow.y = ps.y + 13;
+      this.playerShadow.setScale(1 + Math.sin(time * 0.004) * 0.035, 1 - Math.sin(time * 0.004) * 0.02);
+      this.playerShadow.setAlpha(0.62 - Math.sin(time * 0.004) * 0.05);
       this.playerShadow.setVisible(!this.gameEnded);
     }
 
@@ -1628,7 +1904,7 @@ export class GameScene extends Phaser.Scene {
       this.playerAura.setScale(pulse);
     }
     // 手持ち武器を「握って構えている」ように向きごとに位置・角度・反転を調整
-    if (this.weaponSprite && this.weaponSprite.visible) {
+    if (this.weaponSprite && this.weaponSprite.visible && !this.playerAttacking) {
       const dir = this.player.dir;
       // ox,oy=手元オフセット / rot=傾き(ラジアン) / flip=左右反転 / behind=キャラの後ろ
       let ox = 8, oy = 6, rot = 0.5, flip = false, behind = false;
@@ -1646,9 +1922,54 @@ export class GameScene extends Phaser.Scene {
     // 敵：ゆらゆらした待機モーション＋影の追従
     for (const e of this.enemies) {
       if (!e.sprite || !e.sprite.visible) continue;
-      e.sprite.scaleY = e.baseScale * (1 + Math.sin(time * 0.004 + e.bobPhase) * 0.035);
+      if (!e.animating) {
+        const pulse = Math.sin(time * 0.004 + e.bobPhase);
+        e.sprite.scaleX = e.baseScale * (1 - pulse * 0.018);
+        e.sprite.scaleY = e.baseScale * (1 + pulse * 0.045);
+        e.sprite.angle = Math.sin(time * 0.0027 + e.bobPhase) * 1.3;
+      }
       if (e.shadow) { e.shadow.x = e.sprite.x; e.shadow.y = e.sprite.y + 11; }
       if (e.aura) { e.aura.x = e.sprite.x; e.aura.y = e.sprite.y - 6; }
+    }
+
+    for (const c of this.chests) {
+      if (!c.sprite.visible) continue;
+      const pulse = Math.sin(time * 0.003 + c.phase);
+      if (!c.opened) c.sprite.setScale(c.baseScale * (1 + pulse * 0.018), c.baseScale * (1 - pulse * 0.012));
+      if (c.glow) {
+        c.glow.setPosition(c.sprite.x, c.sprite.y - 4);
+        c.glow.setAlpha((c.opened ? 0.2 : 0.28) + pulse * 0.08);
+        c.glow.setScale(0.92 + pulse * 0.1);
+      }
+    }
+
+    for (const g of this.ground) {
+      if (!g.sprite.visible) continue;
+      const pulse = Math.sin(time * 0.0042 + g.phase);
+      g.sprite.y = g.y * TILE + TILE / 2 - 2 + pulse * 2.2;
+      g.sprite.angle = Math.sin(time * 0.002 + g.phase) * 2.5;
+      if (g.glow) {
+        g.glow.setPosition(g.sprite.x, g.sprite.y + 1);
+        g.glow.setAlpha(0.16 + pulse * 0.06).setScale(0.9 + pulse * 0.08);
+      }
+    }
+
+    for (const d of this.decorations) {
+      if (!d.sprite.visible) continue;
+      const pulse = Math.sin(time * 0.0034 + d.phase);
+      if (d.emissive) d.sprite.y = d.baseY + pulse * 0.7;
+      if (d.glow) {
+        d.glow.setPosition(d.sprite.x, d.sprite.y - 6);
+        d.glow.setAlpha(0.18 + pulse * 0.09).setScale(0.88 + pulse * 0.1);
+      }
+    }
+
+    for (const m of this.ambientMotes) {
+      if (!m.sprite.visible) continue;
+      const pulse = Math.sin(time * 0.0018 + m.phase);
+      m.sprite.y = m.baseY - ((time * 0.006 + m.phase * 8) % 14);
+      m.sprite.x += Math.sin(time * 0.001 + m.phase) * 0.015;
+      m.sprite.setAlpha(0.12 + (pulse + 1) * 0.13);
     }
   }
   flashSprite(spr: Phaser.GameObjects.Image) {
@@ -1678,7 +1999,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ============ 描画ヘルパー ============
-  setPlayerVisual(dir: Dir, frame: 'idle' | 'walk1' | 'walk2' | 'atk') {
+  setPlayerVisual(dir: Dir, frame: 'idle' | 'walk1' | 'walk2' | 'walk3' | 'atkWindup' | 'atk') {
     this.player.dir = dir;
     // 実アセットには右向きフレームがある。無い場合（procedural時）は左向きを反転
     const key = `player_${dir}_${frame}`;

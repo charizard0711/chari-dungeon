@@ -13,6 +13,7 @@ export class Enemy {
   hpBar!: Phaser.GameObjects.Graphics;
   baseScale = 1;      // 呼吸アニメ用の基準スケール
   bobPhase = 0;       // アイドル揺れの位相
+  animating = false;
   slowToggle = false;     // slow行動用
   freezeTurns = 0;        // 氷結
   sealTurns = 0;          // 封印

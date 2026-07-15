@@ -182,7 +182,7 @@ export function buildTileTextures(scene: Phaser.Scene) {
 
 // ===================== キャラクター =====================
 // 主人公チャリを4方向×フレームで生成
-function playerGrid(dir: string, frame: 'idle' | 'walk1' | 'walk2' | 'atk' | 'hurt' | 'down'): string[] {
+function playerGrid(dir: string, frame: 'idle' | 'walk1' | 'walk2' | 'walk3' | 'atkWindup' | 'atk' | 'hurt' | 'down'): string[] {
   // 10x12 グリッド. h=帽子, f=顔, b=体, s=剣, l=脚, e=瞳
   const B = 'b'; // 青服
   // ベース（下向き）
@@ -201,7 +201,7 @@ function playerGrid(dir: string, frame: 'idle' | 'walk1' | 'walk2' | 'atk' | 'hu
       '.bbbbbb.' + armSwing + '.',
       '.bbbbbb...',
       '.b.bb.b...',
-      (frame === 'walk1' ? '.ll..ll...' : frame === 'walk2' ? '..llll....' : '.ll..ll...'),
+      (frame === 'walk1' ? '.ll..ll...' : frame === 'walk2' ? '..llll....' : frame === 'walk3' ? '.l....l...' : '.ll..ll...'),
       '.kk..kk...',
       '..........'
     ];
@@ -217,7 +217,7 @@ function playerGrid(dir: string, frame: 'idle' | 'walk1' | 'walk2' | 'atk' | 'hu
       '.bbbbbb...',
       '.bbbbbb...',
       '.b.bb.b...',
-      (frame === 'walk1' ? '.ll..ll...' : frame === 'walk2' ? '..llll....' : '.ll..ll...'),
+      (frame === 'walk1' ? '.ll..ll...' : frame === 'walk2' ? '..llll....' : frame === 'walk3' ? '.l....l...' : '.ll..ll...'),
       '.kk..kk...',
       '..........'
     ];
@@ -234,7 +234,7 @@ function playerGrid(dir: string, frame: 'idle' | 'walk1' | 'walk2' | 'atk' | 'hu
     '.bbbbb' + s + '..',
     '.bbbbb....',
     '.bbbb.....',
-    (frame === 'walk1' ? '.ll.ll....' : frame === 'walk2' ? '..llll....' : '.ll.ll....'),
+    (frame === 'walk1' ? '.ll.ll....' : frame === 'walk2' ? '..llll....' : frame === 'walk3' ? '.l...l....' : '.ll.ll....'),
     '.kk.kk....',
     '..........'
   ];
@@ -253,7 +253,7 @@ function buildPlayerTextures(scene: Phaser.Scene) {
   const scale = 3;
   // right は left テクスチャを setFlipX で反転して使うため生成しない
   const dirs = ['down', 'up', 'left'];
-  const frames = ['idle', 'walk1', 'walk2', 'atk'];
+  const frames = ['idle', 'walk1', 'walk2', 'walk3', 'atkWindup', 'atk'];
   for (const dir of dirs) {
     for (const fr of frames) {
       const grid = playerGrid(dir, fr as any);
