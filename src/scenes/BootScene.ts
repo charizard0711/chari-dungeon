@@ -15,6 +15,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image('sheet_monsters', 'assets/monsters.png');
     this.load.image('sheet_items', 'assets/items.png');
     this.load.image('sheet_tiles', 'assets/tiles.png');
+    this.load.image('dungeon_chamber', 'assets/dungeon-chamber.png');
 
     this.load.on('loaderror', (file: Phaser.Loader.File) => {
       console.warn('アセット読み込み失敗:', file.key);
