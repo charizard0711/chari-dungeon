@@ -10,7 +10,7 @@ import { shieldFullName } from '../player';
 import { Audio } from '../audio/manager';
 
 const COLORS: Record<string, string> = {
-  sys: '#dfe7f0', dmg: '#ff6b6b', item: '#5fd07a', gold: '#f5c542', special: '#c58bff'
+  sys: '#d7e3e2', dmg: '#ff7b82', item: '#6fdda8', gold: '#ffd47d', special: '#c9b2ff'
 };
 
 export class UIScene extends Phaser.Scene {
@@ -43,6 +43,13 @@ export class UIScene extends Phaser.Scene {
 
   create() {
     this.gs = this.scene.get('GameScene') as GameScene;
+    if (this.textures.exists('dungeon_chamber')) {
+      this.add.image(GAME_W / 2, GAME_H / 2, 'dungeon_chamber')
+        .setDisplaySize(GAME_W, GAME_H)
+        .setTint(0x5e8583)
+        .setAlpha(.105)
+        .setDepth(-100);
+    }
     // UIScene起動前に発行されたログ（フロア到達など）を復元
     this.logLines = [...(this.gs.logHistory ?? [])];
 
@@ -104,13 +111,15 @@ export class UIScene extends Phaser.Scene {
   // ============ フレーム ============
   panel(x: number, y: number, w: number, h: number, title?: string) {
     const g = this.add.graphics();
-    g.fillStyle(0x141a26, 0.96);
-    g.fillRoundedRect(x, y, w, h, 8);
-    g.lineStyle(2, 0x2f6f6a, 1);
-    g.strokeRoundedRect(x, y, w, h, 8);
+    g.fillStyle(0x071518, 0.92);
+    g.fillRoundedRect(x, y, w, h, 12);
+    g.lineStyle(1, 0x426367, .88);
+    g.strokeRoundedRect(x, y, w, h, 12);
+    g.lineStyle(1, 0xe7b85e, .26);
+    g.lineBetween(x + 14, y + 1, x + Math.min(w - 14, 118), y + 1);
     if (title) {
       this.add.text(x + 12, y + 6, title, {
-        fontFamily: '"Yu Gothic UI"', fontSize: '15px', color: '#3fe0d0', fontStyle: 'bold'
+        fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: '#65dcd4', fontStyle: 'bold', letterSpacing: 1
       });
     }
     return g;
@@ -121,23 +130,26 @@ export class UIScene extends Phaser.Scene {
     // マップが完全に隠れてしまう。マップ部分(176,48,740,520)は透過のまま、
     // 枠線だけを描く。
     const g = this.add.graphics();
-    g.lineStyle(2, 0x2f6f6a, 1);
-    g.strokeRoundedRect(174, 46, 744, 524, 4);
+    g.lineStyle(1, 0x6f8d8e, .8);
+    g.strokeRoundedRect(174, 46, 744, 524, 14);
+    g.lineStyle(1, 0xe7b85e, .45);
+    g.lineBetween(190, 46, 400, 46);
+    g.lineBetween(692, 570, 902, 570);
   }
 
   buildTopBar() {
     this.panel(8, 4, GAME_W - 16, 36);
-    this.add.text(20, 10, 'ちゃりだんじょん', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '20px', color: '#3fe0d0', fontStyle: 'bold'
+    this.add.text(20, 9, 'CHARI  /  DEEP RUN', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#65dcd4', fontStyle: 'bold', letterSpacing: 2
     });
-    this.topText = this.add.text(GAME_W / 2 - 120, 12, '', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '17px', color: '#f5c542'
-    });
+    this.topText = this.add.text(GAME_W - 26, 11, '', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '14px', color: '#f2cf85', fontStyle: 'bold'
+    }).setOrigin(1, 0);
   }
 
   // ============ 左メニュー ============
   buildLeftMenu() {
-    this.panel(8, 48, 160, 512, 'メニュー');
+    this.panel(8, 48, 160, 512, 'NAVIGATION');
     const labels: { t: string; f: () => void }[] = [
       { t: '🧭 探索', f: () => this.setOverlay('none') },
       { t: '⚔ 装備', f: () => this.setOverlay('equip') },
@@ -153,21 +165,21 @@ export class UIScene extends Phaser.Scene {
       y += 48;
     }
     // ヒント
-    this.add.text(16, y + 6, '矢印:移動\nSpace:足踏み\n敵へ進む:攻撃', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#8a97ab', lineSpacing: 4
+    this.add.text(16, y + 6, '矢印: 移動\n長押し: BOOST\n敵へ進む: 攻撃', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#789093', lineSpacing: 5
     });
   }
 
   menuButton(x: number, y: number, w: number, h: number, label: string, onClick: () => void) {
     const g = this.add.graphics();
-    const draw = (c: number) => { g.clear(); g.fillStyle(c, 1); g.fillRoundedRect(x, y, w, h, 6); g.lineStyle(1.5, 0x2f6f6a); g.strokeRoundedRect(x, y, w, h, 6); };
-    draw(0x1c2536);
+    const draw = (c: number, line = 0x315155) => { g.clear(); g.fillStyle(c, .96); g.fillRoundedRect(x, y, w, h, 8); g.lineStyle(1, line, .9); g.strokeRoundedRect(x, y, w, h, 8); };
+    draw(0x0d2226);
     const t = this.add.text(x + 12, y + h / 2, label, {
       fontFamily: '"Yu Gothic UI"', fontSize: '15px', color: '#dfe7f0'
     }).setOrigin(0, 0.5);
     const zone = this.add.zone(x, y, w, h).setOrigin(0).setInteractive({ useHandCursor: true });
-    zone.on('pointerover', () => draw(0x264a48));
-    zone.on('pointerout', () => draw(0x1c2536));
+    zone.on('pointerover', () => draw(0x1d4244, 0x58d9d1));
+    zone.on('pointerout', () => draw(0x0d2226));
     zone.on('pointerdown', () => { Audio.playSe('click'); onClick(); });
     void t;
   }
@@ -416,7 +428,8 @@ export class UIScene extends Phaser.Scene {
     const p = this.gs.player;
     const th = getTheme(this.gs.floor);
 
-    this.topText.setText(`${this.gs.floor}F / 30F  「${th.name}」    スコア: ${this.gs.score}    ターン: ${this.gs.turn}`);
+    const boost = this.gs.holdBoostTier === 2 ? '  ⚡MAX BOOST' : this.gs.holdBoostTier === 1 ? '  ⚡BOOST' : '';
+    this.topText.setText(`${String(this.gs.floor).padStart(2, '0')}F / 30F  ${th.name}   SCORE ${this.gs.score}   TURN ${this.gs.turn}${boost}`);
 
     this.statusText.setText(`${p.name}  Lv.${p.level}   (EXP ${p.exp}/${p.expNext})`);
     this.hpLabel.setText(`HP  ${p.hp} / ${p.hpMax}`);
@@ -442,7 +455,7 @@ export class UIScene extends Phaser.Scene {
       const has = info.tex !== null;
       const rim = info.plus > 0 ? plusColor(info.plus) : 0x2f6f6a;
       slot.bg.clear();
-      slot.bg.fillStyle(0x0f1826, has ? 1 : 0.5).fillRoundedRect(sx, sy, sw, sh, 8);
+      slot.bg.fillStyle(0x0a1c20, has ? .96 : 0.5).fillRoundedRect(sx, sy, sw, sh, 10);
       slot.bg.lineStyle(info.plus > 0 ? 2 : 1.5, rim, has ? 1 : 0.5).strokeRoundedRect(sx, sy, sw, sh, 8);
       if (has) {
         slot.icon.setTexture(info.tex!).setDisplaySize(this.equipIconSize, this.equipIconSize).setVisible(true).setAlpha(1);
@@ -783,26 +796,36 @@ export class UIScene extends Phaser.Scene {
       fontFamily: '"Yu Gothic UI"', fontSize: '16px', color: '#f5c542', fontStyle: 'bold'
     }).setOrigin(1, 0));
 
+    this.overlay.add(this.add.text(x + w / 2, y + 54, 'ARCANE  RELIQUARY', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: '#58d9d1', fontStyle: 'bold', letterSpacing: 4
+    }).setOrigin(0.5));
+
     // 説明
-    this.overlay.add(this.add.text(x + w / 2, y + 70, '古の宝箱に300Gを捧げると、装備やお宝が現れる…', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '15px', color: '#dfe7f0'
+    this.overlay.add(this.add.text(x + w / 2, y + 79, '古の宝箱へ300Gを捧げ、未知のレリックを召喚する', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '15px', color: '#eef3ee', fontStyle: 'bold'
     }).setOrigin(0.5));
 
     // 排出ランク表
     this.overlay.add(this.add.text(x + w / 2, y + 108, [
-      'SS 3%（最高級武器 / 復活のタネ）   S 12%（マジック強化武器・上位盾）',
-      'A 25%（良武器・盾・強化石×2）   B 35%（武器・強化石など）   C 25%（消耗品）'
+      'SS  3%     S  12%     A  25%     B  35%     C  25%',
+      '最高級レリック        強化装備        装備・素材        消耗品'
     ].join('\n'), {
-      fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#8a97ab', align: 'center', lineSpacing: 5
+      fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#859a9c', align: 'center', lineSpacing: 7
     }).setOrigin(0.5));
 
     // 待機中の宝箱（金色の光をまとってふわふわ浮く）
     const idleGlow = this.add.image(x + w / 2, y + h / 2 + 42, 'glow')
       .setBlendMode(Phaser.BlendModes.ADD).setTint(0xf5c542).setAlpha(0.3).setScale(2.4);
+    const idleRing = this.add.circle(x + w / 2, y + h / 2 + 28, 76, 0xe7b85e, .025)
+      .setStrokeStyle(1.5, 0xe7b85e, .5);
+    const idleRing2 = this.add.circle(x + w / 2, y + h / 2 + 28, 100, 0x58d9d1, .015)
+      .setStrokeStyle(1, 0x58d9d1, .25);
     const idle = this.add.image(x + w / 2, y + h / 2 + 28, 'chest').setScale(1.9);
     this.tweens.add({ targets: idle, y: '-=10', duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     this.tweens.add({ targets: idleGlow, alpha: 0.15, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    this.overlay.add([idleGlow, idle]);
+    this.tweens.add({ targets: idleRing, angle: 360, duration: 9000, repeat: -1 });
+    this.tweens.add({ targets: idleRing2, angle: -360, duration: 13000, repeat: -1 });
+    this.overlay.add([idleGlow, idleRing2, idleRing, idle]);
 
     // 回すボタン
     const bw = 260, bh = 54, bx = x + w / 2 - bw / 2, by = y + h - 84;
@@ -811,15 +834,15 @@ export class UIScene extends Phaser.Scene {
     const draw = (c: number) => {
       g.clear();
       g.fillStyle(c, 1).fillRoundedRect(bx, by, bw, bh, 12);
-      g.lineStyle(2.5, afford ? 0xf5c542 : 0x555f70).strokeRoundedRect(bx, by, bw, bh, 12);
+      g.lineStyle(2, afford ? 0xe7b85e : 0x555f70).strokeRoundedRect(bx, by, bw, bh, 12);
     };
-    draw(afford ? 0x2f6f6a : 0x1c2536);
-    const bt = this.add.text(bx + bw / 2, by + bh / 2, '🎲 300Gで回す', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '22px', color: afford ? '#ffffff' : '#5a6577', fontStyle: 'bold'
+    draw(afford ? 0x49361d : 0x142125);
+    const bt = this.add.text(bx + bw / 2, by + bh / 2, '◆  300Gで召喚', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '20px', color: afford ? '#ffe0a0' : '#5a6577', fontStyle: 'bold'
     }).setOrigin(0.5);
     const zone = this.add.zone(bx, by, bw, bh).setOrigin(0).setInteractive({ useHandCursor: true });
-    zone.on('pointerover', () => { if (afford) draw(0x3f8f88); });
-    zone.on('pointerout', () => draw(afford ? 0x2f6f6a : 0x1c2536));
+    zone.on('pointerover', () => { if (afford) draw(0x6a4b22); });
+    zone.on('pointerout', () => draw(afford ? 0x49361d : 0x142125));
     zone.on('pointerdown', () => {
       if (this.gachaAnimating) return;
       Audio.playSe('click');
@@ -857,6 +880,13 @@ export class UIScene extends Phaser.Scene {
     };
     const colHex = '#' + result.color.toString(16).padStart(6, '0');
 
+    const ritualTag = track(this.add.text(cx, my + 30, 'RELIC  SUMMON', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: '#58d9d1', fontStyle: 'bold', letterSpacing: 4
+    }).setOrigin(.5).setDepth(307));
+    const phaseText = track(this.add.text(cx, my + 52, 'SEAL SYNCHRONIZING...', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#8ca2a5', fontStyle: 'bold', letterSpacing: 2
+    }).setOrigin(.5).setDepth(307));
+
     // ---- 暗幕（モーダル内だけ暗くする）----
     const dim = track(this.add.rectangle(cx, my + mh / 2, mw, mh, 0x000000, 0.88).setDepth(300).setAlpha(0));
     this.tweens.add({ targets: dim, alpha: 1, duration: 200 });
@@ -864,6 +894,12 @@ export class UIScene extends Phaser.Scene {
     // ---- 隙間から漏れる光（宝箱の奥で脈動）----
     const leak = track(this.add.image(cx, cy + 40, 'glow').setDepth(301)
       .setBlendMode(Phaser.BlendModes.ADD).setTint(0xfff2c0).setAlpha(0).setScale(0.5));
+    const sealOuter = track(this.add.circle(cx, cy + 18, 104, result.color, .025)
+      .setStrokeStyle(2, result.color, .38).setDepth(301));
+    const sealInner = track(this.add.circle(cx, cy + 18, 78, 0xffffff, .012)
+      .setStrokeStyle(1, 0xffffff, .22).setDepth(301));
+    this.tweens.add({ targets: sealOuter, angle: 360, duration: 9000, repeat: -1 });
+    this.tweens.add({ targets: sealInner, angle: -360, duration: 6500, repeat: -1 });
 
     // ---- 宝箱が空から落ちてくる ----
     const chest = track(this.add.image(cx, -80, 'chest').setDepth(303).setScale(2.4));
@@ -871,6 +907,7 @@ export class UIScene extends Phaser.Scene {
 
     // 着地：土煙＋振動
     this.time.delayedCall(830, () => {
+      phaseText.setText('RESONANCE DETECTED').setColor(colHex);
       Audio.playSe('hit');
       this.cameras.main.shake(180, 0.008);
       for (let i = 0; i < 6; i++) {
@@ -885,6 +922,7 @@ export class UIScene extends Phaser.Scene {
 
     // ---- 震えフェーズ：ガタガタ揺れ、光が漏れ出す ----
     this.time.delayedCall(1050, () => {
+      phaseText.setText('READING RELIC CLASS...');
       Audio.playSe('warp');
       this.tweens.add({ targets: chest, angle: { from: -3.5, to: 3.5 }, duration: 85, yoyo: true, repeat: 13 });
       this.tweens.add({ targets: leak, alpha: 0.85, scale: 2.3, duration: 1100, ease: 'Quad.easeIn' });
@@ -920,6 +958,7 @@ export class UIScene extends Phaser.Scene {
       this.tweens.killTweensOf([chest, leak]);
       chest.setAngle(0).setTexture('chest_open');
       leak.setAlpha(0);
+      phaseText.setText(`${result.rank}  RELIC MANIFESTED`).setColor(colHex);
       Audio.playSe(result.rank === 'SS' ? 'levelup' : result.rank === 'S' ? 'kill' : 'chest');
 
       // 開封の炸裂
@@ -929,6 +968,12 @@ export class UIScene extends Phaser.Scene {
 
       // 品物のY位置（宝箱の上空・モーダル内に収まる固定高さ）
       const itemY = my + 150;
+
+      const rewardCard = track(this.add.graphics().setDepth(302).setAlpha(0));
+      rewardCard.fillStyle(0x071518, .96).fillRoundedRect(cx - 222, my + 68, 444, mh - 116, 18);
+      rewardCard.lineStyle(2, result.color, .72).strokeRoundedRect(cx - 222, my + 68, 444, mh - 116, 18);
+      rewardCard.lineStyle(1, 0xffffff, .1).strokeRoundedRect(cx - 212, my + 78, 424, mh - 136, 14);
+      this.tweens.add({ targets: rewardCard, alpha: 1, duration: 360 });
 
       // 回転する光背レイ（品物の後ろ）
       const rays = track(this.add.graphics().setDepth(304).setBlendMode(Phaser.BlendModes.ADD));
@@ -974,9 +1019,13 @@ export class UIScene extends Phaser.Scene {
       if (nameText.width > 460) nameText.setFontSize(15);
       this.tweens.add({ targets: nameText, alpha: 1, y: chest.y + 56, duration: 350, delay: 500 });
       const hint = track(this.add.text(cx, chest.y + 92, '― クリックで閉じる ―', {
-        fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#8a97ab'
+        fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#e7b85e', fontStyle: 'bold', letterSpacing: 1
       }).setOrigin(0.5).setAlpha(0).setDepth(307));
       this.tweens.add({ targets: hint, alpha: 1, duration: 350, delay: 800 });
+      const acquired = track(this.add.text(cx, my + mh - 38, 'NEW RELIC ACQUIRED', {
+        fontFamily: '"Yu Gothic UI"', fontSize: '9px', color: '#70898b', fontStyle: 'bold', letterSpacing: 3
+      }).setOrigin(.5).setAlpha(0).setDepth(307));
+      this.tweens.add({ targets: acquired, alpha: 1, duration: 350, delay: 650 });
 
       // SS：金の紙吹雪が舞い続ける
       if (result.rank === 'SS') {
@@ -1004,16 +1053,16 @@ export class UIScene extends Phaser.Scene {
     // ---- ランク別のつなぎ演出 ----
     if (high) {
       // S/SS：宝箱が宙に浮いて「静寂」→白フラッシュ→光柱と共に爆発開封
-      this.time.delayedCall(2200, () => {
+      this.time.delayedCall(1800, () => {
         this.tweens.killTweensOf(chest);
         chest.setAngle(0);
         for (const t of timers) t.remove();
         timers.length = 0;
         Audio.playSe('seal');
         // ゆっくり浮き上がる（不穏な静けさ）
-        this.tweens.add({ targets: chest, y: cy - 30, duration: 750, ease: 'Sine.easeOut' });
+        this.tweens.add({ targets: chest, y: cy - 30, duration: 620, ease: 'Sine.easeOut' });
         this.tweens.add({ targets: leak, alpha: 0.12, duration: 450 });
-        this.time.delayedCall(1000, () => {
+        this.time.delayedCall(760, () => {
           // 白フラッシュ＋大振動＋光柱
           const flash = track(this.add.rectangle(cx, my + mh / 2, mw, mh, 0xffffff, 1).setDepth(309).setAlpha(0));
           this.tweens.add({ targets: flash, alpha: 1, duration: 90, yoyo: true, onComplete: () => flash.setAlpha(0) });
@@ -1027,12 +1076,12 @@ export class UIScene extends Phaser.Scene {
           const ring = track(this.add.image(cx, cy - 30, 'glow').setDepth(304)
             .setBlendMode(Phaser.BlendModes.ADD).setTint(result.color).setScale(0.4).setAlpha(0.9));
           this.tweens.add({ targets: ring, scale: 6.0, alpha: 0, duration: 550, ease: 'Quad.easeOut' });
-          this.time.delayedCall(300, reveal);
+          this.time.delayedCall(260, reveal);
         });
       });
     } else if (mid) {
       // A：ひと呼吸ためて色フラッシュ→開封
-      this.time.delayedCall(2200, () => {
+      this.time.delayedCall(1700, () => {
         const flash = track(this.add.rectangle(cx, my + mh / 2, mw, mh, result.color, 1).setDepth(309).setAlpha(0));
         this.tweens.add({ targets: flash, alpha: 0.45, duration: 90, yoyo: true, onComplete: () => flash.setAlpha(0) });
         this.cameras.main.shake(200, 0.006);
@@ -1040,7 +1089,7 @@ export class UIScene extends Phaser.Scene {
       });
     } else {
       // B/C：そのままポンと開封
-      this.time.delayedCall(2250, reveal);
+      this.time.delayedCall(1720, reveal);
     }
   }
 

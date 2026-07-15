@@ -12,7 +12,7 @@ import { bgmForFloor } from '../audio/config';
 // マップ表示ビューポート（画面上の座標。スマホ縦持ちでは縦型レイアウト）
 import { MAP_X, MAP_Y, MAP_W, MAP_H } from '../layout';
 
-const ANIM = 110;
+const ANIM = 116;
 // 探索画面のズーム倍率（大きいほど拡大。1.0=等倍）
 const MAP_ZOOM = 1.15;
 
@@ -88,7 +88,10 @@ export class GameScene extends Phaser.Scene {
   // 長押し移動：押しっぱなしで歩き続ける
   heldDir: Dir | null = null;
   holdRepeatAt = 0; // この時刻を過ぎたらリピート開始（初回の誤連打防止）
+  holdStartedAt = 0;
+  holdBoostTier = 0; // 0=通常 / 1=BOOST / 2=MAX BOOST
   touchDir: Dir | null = null; // スマホ用十字ボタンの押しっぱなし方向（UISceneが設定）
+  boostBadge?: Phaser.GameObjects.Text;
 
   constructor() {
     super('GameScene');
@@ -97,6 +100,9 @@ export class GameScene extends Phaser.Scene {
   create() {
     // 状態初期化
     this.player = new Player();
+    if (import.meta.env.DEV && new URLSearchParams(location.search).has('qa-gacha')) {
+      this.player.gold = 900;
+    }
     this.floor = 1;
     this.turn = 0;
     this.score = 0;
@@ -121,6 +127,19 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setViewport(MAP_X, MAP_Y, MAP_W, MAP_H);
     this.cameras.main.setBackgroundColor('#05070a');
 
+    if (this.textures.exists('dungeon_chamber')) {
+      this.add.image(MAP_W / 2, MAP_H / 2, 'dungeon_chamber')
+        .setScrollFactor(0)
+        .setDisplaySize(MAP_W, MAP_H)
+        .setTint(0x6d9996)
+        .setAlpha(.18)
+        .setDepth(-20);
+    }
+    this.boostBadge = this.add.text(14, MAP_H - 38, '⚡ BOOST', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#061012', fontStyle: 'bold',
+      backgroundColor: '#58d9d1', padding: { x: 9, y: 5 }
+    }).setScrollFactor(0).setDepth(50).setVisible(false);
+
     // 入力
     const kb = this.input.keyboard!;
     this.keys = {
@@ -138,6 +157,8 @@ export class GameScene extends Phaser.Scene {
     kb.on('keydown-ENTER', () => this.tryDescend());
     this.heldDir = null;
     this.holdRepeatAt = 0;
+    this.holdStartedAt = 0;
+    this.holdBoostTier = 0;
     this.touchDir = null;
 
     // UIシーン起動（重ねて表示）
@@ -201,8 +222,11 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // カメラ範囲
-    this.cameras.main.setBounds(0, 0, d.w * TILE, d.h * TILE);
+    // 小さなフロアもビューポート中央に配置し、左右に大きな空白を作らない
+    const worldW = d.w * TILE, worldH = d.h * TILE;
+    const padX = Math.max(0, (MAP_W - worldW) / 2);
+    const padY = Math.max(0, (MAP_H - worldH) / 2);
+    this.cameras.main.setBounds(-padX, -padY, Math.max(MAP_W, worldW), Math.max(MAP_H, worldH));
 
     // プレイヤー配置
     this.player.x = d.start.x;
@@ -460,17 +484,28 @@ export class GameScene extends Phaser.Scene {
       // 移動（歩行アニメを2フレームでめくって滑らかに）
       this.busy = true;
       Audio.playSe('step');
+      const moveDuration = this.currentMoveDuration();
+      if (this.holdBoostTier > 0) {
+        const trail = this.add.image(this.playerSprite.x, this.playerSprite.y, this.playerSprite.texture.key)
+          .setDepth(11).setScale(this.playerSprite.scaleX, this.playerSprite.scaleY)
+          .setFlipX(this.playerSprite.flipX).setAlpha(this.holdBoostTier > 1 ? .38 : .24)
+          .setTint(this.holdBoostTier > 1 ? 0xffd77b : 0x58d9d1);
+        this.tweens.add({
+          targets: trail, alpha: 0, scaleX: trail.scaleX * 1.15, scaleY: trail.scaleY * 1.15,
+          duration: 230, ease: 'Quad.easeOut', onComplete: () => trail.destroy()
+        });
+      }
       this.stepToggle = !this.stepToggle;
       this.setPlayerVisual(dir, this.stepToggle ? 'walk1' : 'walk2');
       this.player.x = nx;
       this.player.y = ny;
       // 歩行の途中で反対の足に切り替え
-      this.time.delayedCall(ANIM * 0.5, () => {
+      this.time.delayedCall(moveDuration * 0.48, () => {
         if (this.player.dir === dir) this.setPlayerVisual(dir, this.stepToggle ? 'walk2' : 'walk1');
       });
       await this.tween(this.playerSprite, {
         x: nx * TILE + TILE / 2, y: ny * TILE + TILE / 2
-      }, ANIM, 'Sine.easeInOut');
+      }, moveDuration, this.holdBoostTier > 0 ? 'Quad.easeOut' : 'Sine.easeInOut');
       this.setPlayerVisual(dir, 'idle');
       this.onEnterTile(nx, ny);
       // 階段を踏んだら確認なしで即降りる（doDescendがbusyを管理）
@@ -489,7 +524,7 @@ export class GameScene extends Phaser.Scene {
           this.player.y = ny2;
           await this.tween(this.playerSprite, {
             x: nx2 * TILE + TILE / 2, y: ny2 * TILE + TILE / 2
-          }, ANIM * 0.6, 'Sine.easeOut');
+          }, moveDuration * 0.55, 'Sine.easeOut');
           this.onEnterTile(nx2, ny2);
           if (this.dungeon.tiles[ny2]?.[nx2] === 'stairs') {
             this.doDescend();
@@ -990,23 +1025,26 @@ export class GameScene extends Phaser.Scene {
         const spr = this.tileSprites[y][x];
         const isWall = d.tiles[y][x] === 'wall';
         if (visible[y][x]) {
-          const firstReveal = !spr.visible;
+          const firstReveal = !spr.visible || spr.alpha < .5;
           spr.setVisible(true);
           spr.setTint(isWall ? darken(this.themeTileTint, 0.45) : this.themeTileTint);
           if (firstReveal) {
-            spr.setAlpha(0);
+            spr.setAlpha(.16);
             this.tweens.add({ targets: spr, alpha: 1, duration: 260, ease: 'Quad.easeOut' });
-          }
+          } else spr.setAlpha(1);
         } else if (this.explored[y][x]) {
-          const firstReveal = !spr.visible;
+          const firstReveal = !spr.visible || spr.alpha < .2;
           spr.setVisible(true);
           spr.setTint(isWall ? 0x1c2229 : 0x35404a);
           if (firstReveal) {
-            spr.setAlpha(0);
-            this.tweens.add({ targets: spr, alpha: 1, duration: 260, ease: 'Quad.easeOut' });
-          }
+            spr.setAlpha(.16);
+            this.tweens.add({ targets: spr, alpha: .75, duration: 260, ease: 'Quad.easeOut' });
+          } else spr.setAlpha(.75);
         } else {
-          spr.setVisible(false);
+          // 未探索部分もごく薄い輪郭だけ残し、マップ全体の形と余白を把握できるようにする
+          spr.setVisible(true);
+          spr.setTint(isWall ? 0x30464a : 0x183034);
+          spr.setAlpha(isWall ? .5 : .34);
         }
       }
     }
@@ -1505,16 +1543,51 @@ export class GameScene extends Phaser.Scene {
       if (k.isDown && (!best || k.timeDown > best[0].timeDown)) best = [k, d];
     }
     const dir = best ? best[1] : this.touchDir;
-    if (!dir) { this.heldDir = null; return; }
+    if (!dir) {
+      this.heldDir = null;
+      this.holdStartedAt = 0;
+      this.setBoostTier(0);
+      return;
+    }
     if (this.heldDir !== dir) {
       // 押した瞬間：即1歩（向き変えも含む）
       this.heldDir = dir;
-      this.holdRepeatAt = time + 260; // 少し待ってからリピート開始
+      this.holdStartedAt = time;
+      this.setBoostTier(0);
+      this.holdRepeatAt = time + 220; // 少し待ってからリピート開始
       this.playerAct('move', dir);
     } else if (time >= this.holdRepeatAt) {
+      const heldFor = time - this.holdStartedAt;
+      this.setBoostTier(heldFor >= 1350 ? 2 : heldFor >= 580 ? 1 : 0);
       // 長押し中：進める時だけ歩く（壁に向かってのログ連打を防ぐ）
-      if (this.canMoveInto(dir)) this.playerAct('move', dir);
+      if (this.canMoveInto(dir)) {
+        this.playerAct('move', dir);
+        this.holdRepeatAt = time + (this.holdBoostTier === 2 ? 54 : this.holdBoostTier === 1 ? 76 : 112);
+      }
     }
+  }
+
+  currentMoveDuration(): number {
+    if (this.holdBoostTier === 2) return 58;
+    if (this.holdBoostTier === 1) return 78;
+    return ANIM;
+  }
+
+  setBoostTier(tier: number) {
+    if (this.holdBoostTier === tier) return;
+    this.holdBoostTier = tier;
+    this.events.emit('refresh');
+    if (!this.boostBadge) return;
+    if (tier === 0) {
+      this.boostBadge.setVisible(false);
+      return;
+    }
+    this.boostBadge
+      .setText(tier === 2 ? '⚡ MAX BOOST' : '⚡ BOOST')
+      .setBackgroundColor(tier === 2 ? '#e7b85e' : '#58d9d1')
+      .setVisible(true)
+      .setScale(.75);
+    this.tweens.add({ targets: this.boostBadge, scale: 1, duration: 190, ease: 'Back.easeOut' });
   }
 
   // その方向に「移動 or 攻撃 or 宝箱」できるか（長押しリピート用）
