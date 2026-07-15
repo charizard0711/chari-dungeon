@@ -4,6 +4,13 @@ import { applyRealAssets } from '../assetLoader';
 import { BGM_DEFS, SE_DEFS, AudioDef } from '../audio/config';
 import { Audio } from '../audio/manager';
 
+const EXPANSION_MONSTER_KEYS = [
+  'm_ember_drake', 'm_frost_wyrm', 'm_storm_wyvern', 'm_brass_dragon', 'm_void_drake', 'm_bone_dragon',
+  'm_horn_demon', 'm_chain_demon', 'm_flame_gargoyle', 'm_abyss_hound', 'm_mask_fiend', 'm_archdemon',
+  'm_bone_hound', 'm_skeleton_mage', 'm_death_knight', 'm_lich', 'm_bone_colossus', 'm_grave_crawler',
+  'm_cerberus', 'm_hydra', 'm_crystal_crab', 'm_blood_moth', 'm_clockwork_chimera'
+] as const;
+
 export class BootScene extends Phaser.Scene {
   constructor() {
     super('BootScene');
@@ -16,6 +23,9 @@ export class BootScene extends Phaser.Scene {
     this.load.image('sheet_items', 'assets/items.png');
     this.load.image('sheet_tiles', 'assets/tiles.png');
     this.load.image('dungeon_chamber', 'assets/dungeon-chamber.png');
+    for (const key of EXPANSION_MONSTER_KEYS) {
+      this.load.image(key, `assets/monsters/${key}.png`);
+    }
 
     this.load.on('loaderror', (file: Phaser.Loader.File) => {
       console.warn('アセット読み込み失敗:', file.key);

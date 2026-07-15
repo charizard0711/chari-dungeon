@@ -294,6 +294,8 @@ function buildPlayerTextures(scene: Phaser.Scene) {
 function buildMonsterTextures(scene: Phaser.Scene) {
   const scale = 2;
   for (const def of MONSTER_DEFS) {
+    // 個別アートがプリロード済みなら、手描きフォールバックで上書きしない。
+    if (scene.textures.exists(def.key)) continue;
     const base = def.color;
     const size = def.isBoss ? 14 : def.isElite ? 12 : 11;
     // シンプルな怪物シルエットをキーごとに少し変える

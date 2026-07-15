@@ -742,16 +742,37 @@ export class UIScene extends Phaser.Scene {
   }
 
   buildCodexOverlay(x: number, y: number, w: number) {
-    let cy = y + 52;
-    const colW = (w - 32) / 2;
+    const columns = w >= 640 ? 4 : 3;
+    const gap = 6;
+    const rowH = 30;
+    const colW = (w - 32 - gap * (columns - 1)) / columns;
+    const startY = y + 50;
     MONSTER_DEFS.forEach((m, i) => {
       const found = this.gs.discovered.has(m.key);
-      const col = i % 2;
-      const px = x + 16 + col * colW;
-      const py = cy + Math.floor(i / 2) * 26;
-      const txt = found ? `${m.name}  HP${m.hp} 攻${m.atkMin}-${m.atkMax} 防${m.def}` : '？？？（未発見）';
-      this.overlay.add(this.add.text(px, py, `・${txt}`, {
-        fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: found ? '#dfe7f0' : '#5a6577'
+      const col = i % columns;
+      const px = x + 16 + col * (colW + gap);
+      const py = startY + Math.floor(i / columns) * rowH;
+      const card = this.add.graphics();
+      card.fillStyle(found ? 0x152235 : 0x111824, 0.92).fillRoundedRect(px, py, colW, rowH - 3, 4);
+      card.lineStyle(1, found ? m.color : 0x2b3442, found ? 0.72 : 0.45)
+        .strokeRoundedRect(px, py, colW, rowH - 3, 4);
+      this.overlay.add(card);
+
+      if (found) {
+        const icon = this.add.image(px + 14, py + 13, m.key).setDisplaySize(24, 24);
+        this.overlay.add(icon);
+      } else {
+        this.overlay.add(this.add.text(px + 14, py + 13, '?', {
+          fontFamily: 'Georgia', fontSize: '15px', color: '#495568', fontStyle: 'bold'
+        }).setOrigin(0.5));
+      }
+
+      const name = found ? m.name : '未発見';
+      this.overlay.add(this.add.text(px + 29, py + 3, name, {
+        fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: found ? '#eef5ff' : '#596579', fontStyle: 'bold'
+      }));
+      this.overlay.add(this.add.text(px + 29, py + 15, found ? `HP${m.hp}  攻${m.atkMin}-${m.atkMax}  防${m.def}` : `???  B${m.minFloor}-${m.maxFloor}`, {
+        fontFamily: '"Yu Gothic UI"', fontSize: '8px', color: found ? '#8fc8d7' : '#465264'
       }));
     });
   }
