@@ -25,7 +25,7 @@ export class UIScene extends Phaser.Scene {
   logTexts: Phaser.GameObjects.Text[] = []; // 固定8行（行ごとに色分け）
   itemContainer!: Phaser.GameObjects.Container;
   overlay!: Phaser.GameObjects.Container;
-  overlayMode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' = 'none';
+  overlayMode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'gacha' | 'pick' = 'none';
   pickSlot = 0; // 'pick'モードで開いている装備スロット（0武器/1盾/2頭/3体）
   gachaAnimating = false; // ガチャ演出中は再描画をブロック
   enemyInfoText!: Phaser.GameObjects.Text;
@@ -111,9 +111,10 @@ export class UIScene extends Phaser.Scene {
   // ============ フレーム ============
   panel(x: number, y: number, w: number, h: number, title?: string) {
     const g = this.add.graphics();
-    g.fillStyle(0x071518, 0.92);
+    g.fillStyle(0x061316, 0.95);
     g.fillRoundedRect(x, y, w, h, 12);
-    g.lineStyle(1, 0x426367, .88);
+    g.fillStyle(0x102a2d, .28).fillRoundedRect(x + 4, y + 4, w - 8, h - 8, 9);
+    g.lineStyle(1.2, 0x426d70, .9);
     g.strokeRoundedRect(x, y, w, h, 12);
     g.lineStyle(1, 0xe7b85e, .26);
     g.lineBetween(x + 14, y + 1, x + Math.min(w - 14, 118), y + 1);
@@ -154,7 +155,6 @@ export class UIScene extends Phaser.Scene {
       { t: '🧭 探索', f: () => this.setOverlay('none') },
       { t: '⚔ 装備', f: () => this.setOverlay('equip') },
       { t: '🎒 所持品', f: () => this.setOverlay('inv') },
-      { t: '🛒 ショップ', f: () => this.setOverlay('shop') },
       { t: '🎰 ガチャ', f: () => this.setOverlay('gacha') },
       { t: '👾 モンスター', f: () => this.setOverlay('codex') },
       { t: '⚙ 設定', f: () => this.showSettings() }
@@ -346,14 +346,13 @@ export class UIScene extends Phaser.Scene {
     const items: { icon: string; label: string; f: () => void }[] = [
       { icon: '⚔', label: '装備', f: () => this.setOverlay('equip') },
       { icon: '🎒', label: '所持品', f: () => this.setOverlay('inv') },
-      { icon: '🛒', label: 'ショップ', f: () => this.setOverlay('shop') },
       { icon: '🎰', label: 'ガチャ', f: () => this.setOverlay('gacha') },
       { icon: '👾', label: '図鑑', f: () => this.setOverlay('codex') },
       { icon: '⚙', label: '設定', f: () => this.showSettings() }
     ];
     this.panel(8, 944, 584, 52);
     items.forEach((it, i) => {
-      const x = 14 + i * 96, y = 948, w = 92, h = 44;
+      const x = 14 + i * 114, y = 948, w = 110, h = 44;
       const g = this.add.graphics();
       const draw = (c: number) => { g.clear(); g.fillStyle(c, 1).fillRoundedRect(x, y, w, h, 6); };
       draw(0x1c2536);
@@ -429,7 +428,8 @@ export class UIScene extends Phaser.Scene {
     const th = getTheme(this.gs.floor);
 
     const boost = this.gs.holdBoostTier === 2 ? '  ⚡MAX BOOST' : this.gs.holdBoostTier === 1 ? '  ⚡BOOST' : '';
-    this.topText.setText(`${String(this.gs.floor).padStart(2, '0')}F / 30F  ${th.name}   SCORE ${this.gs.score}   TURN ${this.gs.turn}${boost}`);
+    const gate = this.gs.floorBossDefeated ? 'GATE OPEN' : 'BOSS LOCK';
+    this.topText.setText(`${String(this.gs.floor).padStart(2, '0')}F / 30F  ${th.name}   ${gate}   SCORE ${this.gs.score}   TURN ${this.gs.turn}${boost}`);
 
     this.statusText.setText(`${p.name}  Lv.${p.level}   (EXP ${p.exp}/${p.expNext})`);
     this.hpLabel.setText(`HP  ${p.hp} / ${p.hpMax}`);
@@ -443,10 +443,10 @@ export class UIScene extends Phaser.Scene {
 
     const w = p.weapon, s = p.shield;
     const slotInfo: { tex: string | null; name: string; sub: string; plus: number }[] = [
-      w ? { tex: w.key, name: w.name, sub: `耐久 ${w.dur}/${w.durMax}`, plus: w.plus }
+      w ? { tex: w.key, name: w.name, sub: `耐久 ${w.dur}/${w.durMax}  強化${Math.round(this.gs.enhanceChance(w.plus) * 100)}%`, plus: w.plus }
         : { tex: null, name: '素手', sub: '', plus: 0 },
       w?.dual ? { tex: w.key, name: w.name, sub: '二刀流・左手', plus: w.plus }
-        : s ? { tex: s.key, name: s.name, sub: `防 +${s.defBonus + s.plus}  耐久 ${s.dur}/${s.durMax}`, plus: s.plus }
+        : s ? { tex: s.key, name: s.name, sub: `防 +${s.defBonus + s.plus}  強化${Math.round(this.gs.enhanceChance(s.plus) * 100)}%`, plus: s.plus }
         : { tex: null, name: 'なし', sub: '', plus: 0 }
     ];
     this.equipSlots.forEach((slot, i) => {
@@ -601,7 +601,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   // ============ オーバーレイ ============
-  setOverlay(mode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick') {
+  setOverlay(mode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'gacha' | 'pick') {
     if (this.gachaAnimating) return; // 演出中は切替禁止
     this.overlayMode = mode;
     if (mode === 'none') { this.overlay.setVisible(false); return; }
@@ -614,8 +614,9 @@ export class UIScene extends Phaser.Scene {
     this.overlay.removeAll(true);
     const { x, y, w, h } = this.L.ov;
     const g = this.add.graphics();
-    g.fillStyle(0x0e1420, 0.98).fillRoundedRect(x, y, w, h, 10);
-    g.lineStyle(2, 0x3fe0d0).strokeRoundedRect(x, y, w, h, 10);
+    g.fillStyle(0x061316, 0.985).fillRoundedRect(x, y, w, h, 14);
+    g.fillStyle(0x143034, .26).fillRoundedRect(x + 5, y + 5, w - 10, h - 10, 10);
+    g.lineStyle(1.5, 0x58d9d1).strokeRoundedRect(x, y, w, h, 14);
     this.overlay.add(g);
 
     const pickTitles = ['⚔ 武器を変更', '🛡 盾を変更'];
@@ -623,7 +624,6 @@ export class UIScene extends Phaser.Scene {
       this.overlayMode === 'equip' ? '⚔ 装備（クリックで装備）' :
       this.overlayMode === 'inv' ? '🎒 所持品' :
       this.overlayMode === 'settings' ? '⚙ 設定（サウンド）' :
-      this.overlayMode === 'shop' ? '🛒 ショップ（クリックで購入）' :
       this.overlayMode === 'gacha' ? '🎰 ダンジョンガチャ' :
       this.overlayMode === 'pick' ? pickTitles[this.pickSlot] :
       '👾 モンスター図鑑';
@@ -636,7 +636,6 @@ export class UIScene extends Phaser.Scene {
     if (this.overlayMode === 'equip') this.buildEquipOverlay(x, y, w);
     else if (this.overlayMode === 'inv') this.buildInvOverlay(x, y, w);
     else if (this.overlayMode === 'settings') this.buildSettingsOverlay(x, y, w);
-    else if (this.overlayMode === 'shop') this.buildShopOverlay(x, y, w);
     else if (this.overlayMode === 'gacha') this.buildGachaOverlay(x, y, w, h);
     else if (this.overlayMode === 'pick') this.buildPickOverlay(x, y, w);
     else this.buildCodexOverlay(x, y, w);
@@ -777,38 +776,6 @@ export class UIScene extends Phaser.Scene {
     });
   }
 
-  // ---- ショップ：ゴールドで消耗品と強化石を購入 ----
-  buildShopOverlay(x: number, y: number, w: number) {
-    // 消耗品に加えて、武器強化石・盾強化石も購入できる
-    const shop: { kind: ItemKind; price: number }[] = [
-      { kind: 'potion', price: 25 },
-      { kind: 'dash', price: 60 },
-      { kind: 'invis', price: 100 },
-      { kind: 'stone', price: 120 },
-      { kind: 'shieldstone', price: 120 }
-    ];
-    // 所持ゴールド表示（右端の✕ボタンと重ならないよう左に寄せる）
-    const goldText = this.add.text(x + w - 60, y + 16, `所持 ${this.gs.player.gold} G`, {
-      fontFamily: '"Yu Gothic UI"', fontSize: '16px', color: '#f5c542', fontStyle: 'bold'
-    }).setOrigin(1, 0);
-    this.overlay.add(goldText);
-
-    let cy = y + 52;
-    shop.forEach((s) => {
-      const def = ITEM_DEFS[s.kind];
-      const afford = this.gs.player.gold >= s.price;
-      const icon = this.add.image(x + 32, cy + 15, def.textureKey).setDisplaySize(28, 28);
-      if (!afford) icon.setAlpha(0.4);
-      const label = `${def.name}  —  ${s.price} G   （${def.desc}）`;
-      const row = this.rowButton(x + 52, cy, w - 68, label, false, () => {
-        if (this.gs.buyItem(s.kind, s.price)) this.setOverlay('shop'); // 買えたら再描画（ゴールド更新）
-      });
-      if (!afford) row.setAlpha(0.55);
-      this.overlay.add([icon, row]);
-      cy += 34;
-    });
-  }
-
   // ============ ガチャ ============
   buildGachaOverlay(x: number, y: number, w: number, h: number) {
     const p = this.gs.player;
@@ -829,7 +796,9 @@ export class UIScene extends Phaser.Scene {
     // 排出ランク表
     this.overlay.add(this.add.text(x + w / 2, y + 108, [
       'SS  3%     S  12%     A  25%     B  35%     C  25%',
-      '最高級レリック        強化装備        装備・素材        消耗品'
+      this.gs.weaponWonThisFloor
+        ? 'この階の武器は取得済み  /  以降は盾・素材・消耗品'
+        : '武器 22%（1階につき最大1本）  /  盾・素材・消耗品'
     ].join('\n'), {
       fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#859a9c', align: 'center', lineSpacing: 7
     }).setOrigin(0.5));

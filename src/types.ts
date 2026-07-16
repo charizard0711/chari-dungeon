@@ -89,6 +89,7 @@ export interface MonsterDef {
   wallPass?: boolean;
   isElite?: boolean;
   isBoss?: boolean;
+  isFloorBoss?: boolean;
   isDragonType?: boolean; // DK特効対象
   color: number;          // 代替ドット絵の基調色
 }

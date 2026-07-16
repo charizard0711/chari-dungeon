@@ -12,6 +12,13 @@ export class TitleScene extends Phaser.Scene {
   create() {
     Audio.playBgm('title');
     const mobile = GAME_W < 700;
+    let starting = false;
+    const startGame = () => {
+      if (starting) return;
+      starting = true;
+      this.cameras.main.fadeOut(180, 2, 7, 8);
+      this.time.delayedCall(190, () => this.scene.start('GameScene'));
+    };
 
     if (this.textures.exists('dungeon_chamber')) {
       this.add.image(GAME_W / 2, GAME_H / 2, 'dungeon_chamber')
@@ -58,7 +65,7 @@ export class TitleScene extends Phaser.Scene {
       letterSpacing: 2
     }).setOrigin(.5);
 
-    this.makeButton(GAME_W / 2, mobile ? 425 : 410, '深層へ降りる', () => this.scene.start('GameScene'));
+    this.makeButton(GAME_W / 2, mobile ? 425 : 410, '深層へ降りる', startGame);
 
     this.add.text(GAME_W / 2, mobile ? 510 : 500, 'HOW TO EXPLORE', {
       fontFamily: FONT,
@@ -106,10 +113,10 @@ export class TitleScene extends Phaser.Scene {
       this.tweens.add({ targets: mote, y: mote.y - 35, alpha: 0, duration: Phaser.Math.Between(2200, 4800), repeat: -1, delay: Phaser.Math.Between(0, 2200) });
     }
 
-    this.input.keyboard?.once('keydown-ENTER', () => this.scene.start('GameScene'));
-    this.input.keyboard?.once('keydown-SPACE', () => this.scene.start('GameScene'));
+    this.input.keyboard?.once('keydown-ENTER', (event: KeyboardEvent) => { event.preventDefault(); startGame(); });
+    this.input.keyboard?.once('keydown-SPACE', (event: KeyboardEvent) => { event.preventDefault(); startGame(); });
     if (location.hostname === 'localhost' && new URLSearchParams(location.search).has('qa-game')) {
-      this.time.delayedCall(80, () => this.scene.start('GameScene'));
+      this.time.delayedCall(80, startGame);
     }
   }
 
@@ -129,9 +136,18 @@ export class TitleScene extends Phaser.Scene {
       fontFamily: FONT, fontSize: '22px', color: '#ffe1a0', fontStyle: 'bold', letterSpacing: 1
     }).setOrigin(.5);
     container.add([bg, text]);
-    container.setSize(w, h).setInteractive(new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h), Phaser.Geom.Rectangle.Contains);
+    container.setSize(w + 28, h + 20).setInteractive(
+      new Phaser.Geom.Rectangle(-w / 2 - 14, -h / 2 - 10, w + 28, h + 20),
+      Phaser.Geom.Rectangle.Contains
+    );
     container.on('pointerover', () => { draw(true); this.tweens.add({ targets: container, scale: 1.035, duration: 120 }); });
     container.on('pointerout', () => { draw(false); this.tweens.add({ targets: container, scale: 1, duration: 120 }); });
-    container.on('pointerdown', () => { Audio.playSe('click'); onClick(); });
+    container.on('pointerdown', () => {
+      this.tweens.add({ targets: container, scale: .985, duration: 45 });
+      Audio.playSe('click');
+      onClick();
+    });
+    // 一部タッチ環境でdownが取りこぼされた場合もupで補完する（開始処理側で二重実行を防止）。
+    container.on('pointerup', onClick);
   }
 }

@@ -3,18 +3,19 @@ import { TILE } from '../textures';
 import { generateDungeon, DungeonData, randomFloor, isWalkable } from '../dungeon';
 import { getTheme, eraSuffix, MONSTER_DEFS, makeItem, plusColor, ITEM_DEFS } from '../data';
 import type { Dir, ItemKind, MonsterDef, TileType, Vec2 } from '../types';
-import { Player, rollWeapon, weaponFullName, makeShield, makeWeapon, rollMagics, shieldFullName } from '../player';
+import { Player, rollWeapon, weaponFullName, makeShield, rollMagics, shieldFullName } from '../player';
 import { Enemy } from '../enemy';
 import { computePlayerAttack, computeEnemyAttack } from '../combat';
 import { Audio } from '../audio/manager';
 import { bgmForFloor } from '../audio/config';
+import { enhancementChance, floorBossMultipliers, WEAPON_GACHA_CHANCE } from '../balance';
 
 // マップ表示ビューポート（画面上の座標。スマホ縦持ちでは縦型レイアウト）
 import { MAP_X, MAP_Y, MAP_W, MAP_H } from '../layout';
 
 const ANIM = 116;
 // 探索画面のズーム倍率（大きいほど拡大。1.0=等倍）
-const MAP_ZOOM = 1.15;
+const MAP_ZOOM = 1.95;
 
 interface Chest {
   x: number;
@@ -74,6 +75,8 @@ export class GameScene extends Phaser.Scene {
   floorDamaged = false;
   busy = false;
   gameEnded = false;
+  floorBossDefeated = false;
+  weaponWonThisFloor = false;
 
   tileSprites: Phaser.GameObjects.Image[][] = [];
   explored: boolean[][] = [];
@@ -135,6 +138,8 @@ export class GameScene extends Phaser.Scene {
     this.score = 0;
     this.busy = false;
     this.gameEnded = false;
+    this.floorBossDefeated = false;
+    this.weaponWonThisFloor = false;
     this.discovered = new Set();
     this.dashSteps = 0;
     this.stepFrame = 0;
@@ -183,9 +188,9 @@ export class GameScene extends Phaser.Scene {
       enter: kb.addKey('ENTER')
     };
     // 矢印はupdate()内でホールド検出（長押しで連続移動できる）
-    kb.on('keydown-SPACE', () => this.onSpace());
+    kb.on('keydown-SPACE', (event: KeyboardEvent) => { event.preventDefault(); this.onSpace(); });
     kb.on('keydown-SHIFT', () => this.playerAct('wait'));
-    kb.on('keydown-ENTER', () => this.tryDescend());
+    kb.on('keydown-ENTER', (event: KeyboardEvent) => { event.preventDefault(); this.tryDescend(); });
     this.heldDir = null;
     this.holdRepeatAt = 0;
     this.holdStartedAt = 0;
@@ -216,6 +221,8 @@ export class GameScene extends Phaser.Scene {
     this.shroomTurns = 0;
     this.smokeTurns = 0;
     this.invisTurns = 0;
+    this.floorBossDefeated = false;
+    this.weaponWonThisFloor = false;
     this.playerSprite?.setAlpha(1);
     this.weaponSprite?.setAlpha(1);
 
@@ -235,6 +242,8 @@ export class GameScene extends Phaser.Scene {
 
     this.dungeon = generateDungeon(floor);
     const d = this.dungeon;
+    // 出口は各階のボスを倒すまで封印された扉として扱う。
+    d.tiles[d.stairs.y][d.stairs.x] = 'door';
 
     // explored初期化
     this.explored = [];
@@ -295,7 +304,7 @@ export class GameScene extends Phaser.Scene {
     this.updateVisibility();
     this.log(`${floor}F「${getTheme(floor).name}」に到達。`, 'sys');
     this.events.emit('floor', floor);
-    // 階層帯に応じたBGM（同じ帯なら継続再生される）
+    // BGMは2階ごとに切り替わる。
     Audio.playBgm(bgmForFloor(floor));
   }
 
@@ -386,18 +395,58 @@ export class GameScene extends Phaser.Scene {
       if (this.distToPlayer(pos.x, pos.y) < 4) continue;
       this.addEnemy(def, pos.x, pos.y, 1 + floor * 0.04);
     }
-    // ボス配置（出口＝階段のそばを守る）
+    // 各階にドラゴン系ボスを1体配置し、出口を封印する。
     if (floor === 30) {
-      // 最終ボス：階段前に鎮座
-      const boss = MONSTER_DEFS.find((m) => m.isBoss)!;
-      const pos = this.nearStairsPosition() ?? { x: this.dungeon.stairs.x, y: this.dungeon.stairs.y - 1 };
-      this.addEnemy(boss, pos.x, pos.y, 1);
+      const finalBase = MONSTER_DEFS.find((m) => m.isBoss)!;
+      const boss: MonsterDef = { ...finalBase, isFloorBoss: true };
+      const pos = this.nearStairsPosition() ?? randomFloor(this.dungeon, this.occupiedPositions());
+      if (pos) this.addEnemy(boss, pos.x, pos.y, 1);
       this.log('★最深部の守護者 コアウォッチャーが階段を封じている！', 'dmg');
-    } else if (floor % 5 === 0) {
-      this.spawnBoss(floor, 'strong'); // 5,10,15,20,25F
-    } else if (floor % 2 === 0) {
-      this.spawnBoss(floor, 'mid');    // 2,4,6,8,...F
+    } else {
+      this.spawnFloorBoss(floor);
     }
+  }
+
+  spawnFloorBoss(floor: number) {
+    const dragonKeys = [
+      'm_ember_drake', 'm_frost_wyrm', 'm_storm_wyvern',
+      'm_brass_dragon', 'm_void_drake', 'm_bone_dragon'
+    ];
+    const bossNames = [
+      'アッシュドラゴン', 'フロストワイバーン', 'ストームドラゴン',
+      'ブラスドラゴン', 'ヴォイドドレイク', 'ボーンドラゴン'
+    ];
+    const index = Math.min(dragonKeys.length - 1, Math.floor((floor - 1) / 5));
+    const base = MONSTER_DEFS.find((m) => m.key === dragonKeys[index]) ?? MONSTER_DEFS[0];
+    const multipliers = floorBossMultipliers(floor);
+    const { softened } = multipliers;
+    const def: MonsterDef = {
+      ...base,
+      name: bossNames[index],
+      hp: Math.max(20, Math.floor(base.hp * multipliers.hp)),
+      atkMin: Math.max(3, Math.floor(base.atkMin * multipliers.attack)),
+      atkMax: Math.max(7, Math.floor(base.atkMax * multipliers.attack)),
+      def: Math.max(1, base.def + multipliers.defenseBonus),
+      exp: Math.max(10, base.exp * 3),
+      gold: Math.max(20, base.gold * 4),
+      score: Math.max(100, base.score * 4),
+      minFloor: floor,
+      maxFloor: floor,
+      isElite: true,
+      isBoss: false,
+      isFloorBoss: true,
+      isDragonType: true
+    };
+    let pos = this.nearStairsPosition();
+    if (!pos || this.distToPlayer(pos.x, pos.y) < 5) {
+      pos = randomFloor(this.dungeon, this.occupiedPositions());
+    }
+    if (!pos) return;
+    const enemy = this.addEnemy(def, pos.x, pos.y, 1);
+    enemy.baseScale *= softened ? 1.22 : 1.38;
+    enemy.sprite.setScale(enemy.baseScale);
+    this.attachAura(enemy, softened ? 34 : 40, softened ? 0xe7b85e : 0xff5a5a);
+    this.log(`${softened ? '◇' : '◆'} フロアボス「${def.name}」が扉を封印している！`, 'dmg');
   }
 
   // 階段に隣接する歩行可能タイル（＝出口を守る位置）を返す
@@ -464,7 +513,7 @@ export class GameScene extends Phaser.Scene {
     const e = new Enemy(def, x, y, hpScale);
     e.shadow = this.add.image(0, 0, 'shadow').setDepth(9.5).setAlpha(0.6);
     e.sprite = this.add.image(0, 0, def.key).setDepth(10).setOrigin(0.5, 0.6);
-    const maxDim = def.isBoss ? 40 : def.isElite ? 34 : def.isDragonType ? 30 : 26;
+    const maxDim = def.isBoss || def.isFloorBoss ? 40 : def.isElite ? 34 : def.isDragonType ? 30 : 26;
     const tex = this.textures.get(def.key).getSourceImage();
     const sc = maxDim / Math.max(tex.width, tex.height);
     e.sprite.setScale(sc);
@@ -586,6 +635,7 @@ export class GameScene extends Phaser.Scene {
       if (!t || !isWalkable(t) || t === 'pit') {
         this.setPlayerVisual(dir, 'idle');
         if (t === 'pit') { this.log('落とし穴だ。ここには進めない。', 'sys'); Audio.playSe('deny'); }
+        if (t === 'door') { this.log('扉はボスの力で封印されている。', 'sys'); Audio.playSe('deny'); }
         this.emitRefresh();
         return;
       }
@@ -815,7 +865,7 @@ export class GameScene extends Phaser.Scene {
     Audio.playSe('kill');
     if (leveled) { this.log(`レベルアップ！ Lv.${this.player.level} になった。`, 'special'); Audio.playSe('levelup'); this.levelupFx(); }
 
-    // ドロップ（全体的に増量）
+    // 装備武器はガチャ限定。敵からは消耗品と素材のみ落ちる。
     if (def.key === 'm_snake' && Math.random() < 0.7) this.dropItem(e.x, e.y, 'oldkey');
     // ゴールドは高確率で多めに
     if (Math.random() < 0.7) this.dropItem(e.x, e.y, 'coin', def.gold * 3 + Math.floor(Math.random() * this.floor * 4));
@@ -823,13 +873,6 @@ export class GameScene extends Phaser.Scene {
     if (Math.random() < 0.4) {
       const pool: ItemKind[] = ['potion', 'smoke', 'stone', 'shieldstone'];
       this.dropItem(e.x, e.y, pool[Math.floor(Math.random() * pool.length)]);
-    }
-    // 装備もまれに落とす（武器の出現は絞りめ）
-    if (Math.random() < 0.08) {
-      const w = rollWeapon(this.floor);
-      this.player.weapons.push(w);
-      this.log(`${def.name}が「${weaponFullName(w)}」を落とした！`, w.magics.length ? 'special' : 'item');
-      Audio.playSe('pickup');
     }
     // エリート/ボスは強化石を確定ドロップ＋超レアで復活の種
     if (def.isElite || def.isBoss) {
@@ -845,21 +888,38 @@ export class GameScene extends Phaser.Scene {
     e.shadow?.destroy();
     this.enemies = this.enemies.filter((x) => x !== e);
 
-    if (def.isBoss) {
-      this.log('コアウォッチャーを撃破！ 最終ゲートが開いた。', 'special');
+    if (def.isFloorBoss) {
+      this.unlockFloorGate(def.name);
     }
   }
 
+  unlockFloorGate(bossName: string) {
+    if (this.floorBossDefeated) return;
+    this.floorBossDefeated = true;
+    const { x, y } = this.dungeon.stairs;
+    this.dungeon.tiles[y][x] = 'stairs';
+    this.tileSprites[y]?.[x]?.setTexture('stairs');
+    Audio.playSe('seal');
+    this.effectFx(x, y, 'fx_magic', 1.8, 620, 0x58d9d1);
+    this.log(`${bossName}を撃破！ 封印の扉が開いた。`, 'special');
+    this.updateVisibility();
+    this.emitRefresh();
+  }
+
   dropItem(x: number, y: number, kind: ItemKind | 'coin', value?: number) {
-    // 既に何か置かれていたら近くの空き床を探す
+    // 壁抜け敵の位置や既に物がある位置には置かず、必ず通行可能な空き床を探す。
     let tx = x, ty = y;
-    if (this.groundAt(tx, ty)) {
+    const startTile = this.dungeon.tiles[ty]?.[tx];
+    const invalidStart = !startTile || !isWalkable(startTile) || startTile === 'pit' || this.groundAt(tx, ty) || this.chestAt(tx, ty);
+    if (invalidStart) {
       const cand = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, 1], [1, -1], [-1, 1]];
       let placed = false;
       for (const [dx, dy] of cand) {
         const nx = x + dx, ny = y + dy;
         const t = this.dungeon.tiles[ny]?.[nx];
-        if (t && isWalkable(t) && t !== 'pit' && !this.groundAt(nx, ny)) { tx = nx; ty = ny; placed = true; break; }
+        if (t && isWalkable(t) && t !== 'pit' && !this.groundAt(nx, ny) && !this.chestAt(nx, ny)) {
+          tx = nx; ty = ny; placed = true; break;
+        }
       }
       if (!placed) return;
     }
@@ -1225,23 +1285,21 @@ export class GameScene extends Phaser.Scene {
         } else if (this.explored[y][x]) {
           const firstReveal = !spr.visible || spr.alpha < .2;
           spr.setVisible(true);
-          spr.setTint(isWall ? 0x1c2229 : 0x35404a);
+          spr.setTint(isWall ? 0x10161a : 0x172126);
           if (firstReveal) {
-            spr.setAlpha(.16);
-            this.tweens.add({ targets: spr, alpha: .75, duration: 260, ease: 'Quad.easeOut' });
-          } else spr.setAlpha(.75);
+            spr.setAlpha(.05);
+            this.tweens.add({ targets: spr, alpha: .18, duration: 260, ease: 'Quad.easeOut' });
+          } else spr.setAlpha(.18);
         } else {
-          // 未探索部分もごく薄い輪郭だけ残し、マップ全体の形と余白を把握できるようにする
-          spr.setVisible(true);
-          spr.setTint(isWall ? 0x30464a : 0x183034);
-          spr.setAlpha(isWall ? .5 : .34);
+          // 未探索部分は完全に隠し、プレイヤー周辺だけを見せる。
+          spr.setVisible(false);
         }
       }
     }
     // 敵・宝箱・アイテム表示
     for (const e of this.enemies) { const v = !!visible[e.y]?.[e.x]; e.sprite.setVisible(v); e.shadow?.setVisible(v); e.aura?.setVisible(v); if (e.hpBar) e.hpBar.setVisible(v); }
     for (const c of this.chests) {
-      const v = this.explored[c.y][c.x];
+      const v = !!visible[c.y]?.[c.x];
       c.sprite.setVisible(v);
       c.glow?.setVisible(v);
     }
@@ -1251,7 +1309,7 @@ export class GameScene extends Phaser.Scene {
       g.glow?.setVisible(v);
     }
     for (const d of this.decorations) {
-      const v = this.explored[d.y]?.[d.x];
+      const v = !!visible[d.y]?.[d.x];
       d.sprite.setVisible(v);
       d.glow?.setVisible(v);
     }
@@ -1279,13 +1337,7 @@ export class GameScene extends Phaser.Scene {
     if (c.rare) {
       // ★赤い宝箱：レア確定＋大量ゴールド
       this.log('★赤い宝箱だ！ レアなお宝が眠っている！', 'special');
-      // マジック付き武器（必ずマジック付きになるまで数回引く）
-      let w = rollWeapon(this.floor + 5);
-      for (let tries = 0; tries < 5 && w.magics.length === 0; tries++) w = rollWeapon(this.floor + 5);
-      this.player.weapons.push(w);
-      this.log(`レア武器「${weaponFullName(w)}」を発見！`, 'special');
-      this.addScore(120);
-      // 上位盾／強化石／魔導書／超レアで復活の種
+      // 武器はガチャ限定。赤い宝箱は上位素材・盾・復活アイテムを抽選する。
       const rr = Math.random();
       if (rr < 0.15) {
         this.player.inventory.push(makeItem('revive'));
@@ -1309,15 +1361,9 @@ export class GameScene extends Phaser.Scene {
       this.log(`さらに${gold}Gを入手！`, 'gold');
       this.effectFx(c.x, c.y, 'fx_levelup', 2.0, 700);
     } else {
-      // 通常宝箱（武器の出現は絞りめ）
+      // 通常宝箱から武器は出ない。消耗品・盾・ゴールドのみ。
       const roll = Math.random();
-      if (roll < 0.22) {
-        const w = rollWeapon(this.floor);
-        this.player.weapons.push(w);
-        const rare = w.magics.length > 0;
-        this.log(`宝箱から「${weaponFullName(w)}」を発見！`, rare ? 'special' : 'item');
-        if (rare) { this.addScore(60); this.log('マジック付き武器だ！ スコア+60', 'special'); }
-      } else if (roll < 0.6) {
+      if (roll < 0.6) {
         const eq = Math.random();
         if (this.floor >= 8 && eq < 0.35) {
           const s = makeShield(this.floor >= 16 ? 's_skull' : 's_crystal');
@@ -1428,19 +1474,23 @@ export class GameScene extends Phaser.Scene {
     Audio.playSe('seal');
   }
 
-  // 強化成功判定：基本70%、対象が+5以上なら50%
-  enhanceSuccess(plus: number): boolean {
-    return Math.random() < (plus >= 5 ? 0.5 : 0.7);
+  enhanceChance(plus: number): number {
+    return enhancementChance(plus);
   }
 
-  // 武器強化石を使う（70%成功で+1、失敗で武器が燃える）。石は必ず消費
+  // 強化成功率：+0は90%、強化値ごとに10ポイント低下し、+6以降は30%固定。
+  enhanceSuccess(plus: number): boolean {
+    return Math.random() < this.enhanceChance(plus);
+  }
+
+  // 武器強化石を使う。石は成否にかかわらず消費。
   useStone(): boolean {
     const w = this.player.weapon;
     if (!w) { this.log('強化する武器を装備していない。', 'sys'); Audio.playSe('deny'); return false; }
     if (this.enhanceSuccess(w.plus ?? 0)) {
       // 成功
       w.plus = (w.plus ?? 0) + 1;
-      this.log(`強化成功！ ${weaponFullName(w)} になった。`, 'special');
+      this.log(`強化成功！ ${weaponFullName(w)}（次回${Math.round(this.enhanceChance(w.plus) * 100)}%）`, 'special');
       Audio.playSe('levelup');
       this.magicFx(this.player.x, this.player.y);
       this.updatePlayerAura();
@@ -1463,13 +1513,13 @@ export class GameScene extends Phaser.Scene {
     return true;
   }
 
-  // 盾強化石を使う（70%成功で盾+1、失敗で盾が壊れる）。石は必ず消費
+  // 盾も武器と同じ成功率カーブを使う。
   useShieldStone(): boolean {
     const s = this.player.shield;
     if (!s) { this.log('強化する盾を装備していない。', 'sys'); Audio.playSe('deny'); return false; }
     if (this.enhanceSuccess(s.plus ?? 0)) {
       s.plus = (s.plus ?? 0) + 1;
-      this.log(`盾の強化成功！ +${s.plus} ${s.name} になった（防御アップ）。`, 'special');
+      this.log(`盾の強化成功！ +${s.plus} ${s.name}（次回${Math.round(this.enhanceChance(s.plus) * 100)}%）`, 'special');
       Audio.playSe('levelup');
       this.magicFx(this.player.x, this.player.y);
       this.effectFx(this.player.x, this.player.y, 'fx_levelup', 1.8, 650);
@@ -1511,89 +1561,55 @@ export class GameScene extends Phaser.Scene {
     let texKey = '';
     const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
 
-    switch (rank) {
-      case 'SS': {
-        if (Math.random() < 0.25) {
-          // 超レア：復活のタネ
+    // 武器はガチャ限定・1階につき最大1本。取得率は全ランク共通で22%。
+    const weaponPrize = !this.weaponWonThisFloor && Math.random() < WEAPON_GACHA_CHANCE;
+    if (weaponPrize) {
+      const floorBonus = rank === 'SS' ? 15 : rank === 'S' ? 10 : rank === 'A' ? 5 : rank === 'B' ? 2 : 0;
+      const w = rollWeapon(this.floor + floorBonus);
+      if ((rank === 'SS' || rank === 'S') && w.magics.length === 0) w.magics = rollMagics(rank === 'SS' ? 2 : 1);
+      if (rank === 'SS') w.plus = Math.max(w.plus, 3);
+      else if (rank === 'S') w.plus = Math.max(w.plus, 1);
+      this.player.weapons.push(w);
+      this.weaponWonThisFloor = true;
+      name = weaponFullName(w);
+      texKey = w.key;
+    } else {
+      switch (rank) {
+        case 'SS': {
           this.player.inventory.push(makeItem('revive'));
-          name = '復活のタネ'; texKey = 'i_revive';
-        } else {
-          // 最高級武器：上位武器＋マジック2つ＋強化+3〜+5
-          const w = makeWeapon(pick(['w_gravity', 'w_gearaxe', 'w_dark', 'w_soulblades']), rollMagics(2));
-          w.plus = 3 + Math.floor(Math.random() * 3);
-          this.player.weapons.push(w);
-          name = weaponFullName(w); texKey = w.key;
+          name = 'リバイブシード'; texKey = 'i_revive';
+          break;
         }
-        break;
-      }
-      case 'S': {
-        const sRoll = Math.random();
-        if (sRoll < 0.5) {
+        case 'S': {
           const s = makeShield('s_skull');
           s.plus = 1 + Math.floor(Math.random() * 2);
           this.player.shields.push(s);
           name = shieldFullName(s); texKey = s.key;
-        } else {
-          const w = makeWeapon(pick(['w_rune', 'w_candle', 'w_dark', 'w_gearaxe', 'w_twin']), rollMagics(Math.random() < 0.5 ? 2 : 1));
-          w.plus = 1 + Math.floor(Math.random() * 2);
-          this.player.weapons.push(w);
-          name = weaponFullName(w); texKey = w.key;
+          break;
         }
-        break;
-      }
-      case 'A': {
-        const roll = Math.random();
-        if (roll < 0.4) {
-          const w = rollWeapon(this.floor + 5);
-          if (w.magics.length === 0) w.magics = rollMagics(1);
-          this.player.weapons.push(w);
-          name = weaponFullName(w); texKey = w.key;
-        } else if (roll < 0.7) {
-          const s = makeShield(this.floor >= 10 ? 's_skull' : 's_crystal');
-          this.player.shields.push(s);
-          name = s.name; texKey = s.key;
-        } else {
+        case 'A': {
           const k = pick(['stone', 'shieldstone'] as const);
           this.player.inventory.push(makeItem(k), makeItem(k));
           name = `${ITEM_DEFS[k].name} ×2`; texKey = `i_${k}`;
+          break;
         }
-        break;
-      }
-      case 'B': {
-        if (Math.random() < 0.5) {
-          const w = rollWeapon(this.floor);
-          this.player.weapons.push(w);
-          name = weaponFullName(w); texKey = w.key;
-        } else {
+        case 'B': {
           const k = pick(['stone', 'shieldstone', 'warp'] as const);
           this.player.inventory.push(makeItem(k));
           name = ITEM_DEFS[k].name; texKey = `i_${k}`;
+          break;
         }
-        break;
-      }
-      case 'C': {
-        const k = pick(['potion', 'smoke'] as const);
-        this.player.inventory.push(makeItem(k));
-        name = ITEM_DEFS[k].name; texKey = `i_${k}`;
-        break;
+        case 'C': {
+          const k = pick(['potion', 'smoke'] as const);
+          this.player.inventory.push(makeItem(k));
+          name = ITEM_DEFS[k].name; texKey = `i_${k}`;
+          break;
+        }
       }
     }
 
     this.log(`ガチャ【${rank}】${name}を手に入れた！`, rank === 'SS' || rank === 'S' ? 'special' : 'item');
     return { rank, color: RANK_COLOR[rank], name, texKey };
-  }
-
-  // ショップ購入（UIから）。成功でtrue
-  buyItem(kind: ItemKind, price: number): boolean {
-    if (this.gameEnded) return false;
-    if (this.player.gold < price) { this.log('ゴールドが足りない。', 'sys'); Audio.playSe('deny'); return false; }
-    if (this.player.inventory.length >= 60) { this.log('持ち物がいっぱいだ。', 'sys'); Audio.playSe('deny'); return false; }
-    this.player.gold -= price;
-    this.player.inventory.push(makeItem(kind));
-    this.log(`${ITEM_DEFS[kind].name}を${price}Gで購入した。`, 'gold');
-    Audio.playSe('coin');
-    this.emitRefresh();
-    return true;
   }
 
   // 装備切替（UIから）
@@ -1630,6 +1646,12 @@ export class GameScene extends Phaser.Scene {
   // 実際の降下処理（busyガードなし。移動から即呼ばれる）
   doDescend() {
     if (this.gameEnded) return;
+    if (!this.floorBossDefeated) {
+      this.log('フロアボスを倒すまで扉は開かない。', 'sys');
+      Audio.playSe('deny');
+      this.busy = false;
+      return;
+    }
     // 階層クリアボーナス
     let bonus = 100 + this.floor * 10;
     let msg = `${this.floor}F クリア！ スコア+${bonus}`;
