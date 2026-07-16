@@ -27,6 +27,8 @@ export interface Magic {
   label: string;
 }
 
+export type EquipmentGrade = 'D' | 'C' | 'B' | 'A' | 'S';
+
 export interface Weapon {
   key: string;       // テクスチャ/種別キー
   name: string;
@@ -35,6 +37,7 @@ export interface Weapon {
   durMax: number;
   dur: number;
   magics: Magic[];
+  grade: EquipmentGrade;
   plus: number;      // 強化値（+1で黄, +2紫, +3青, +4以降赤）。強化石で上昇
   repairUsed?: boolean; // R効果の使用済みフラグ
   dual?: boolean;    // 二刀流（2回攻撃・盾装備不可）
@@ -46,6 +49,7 @@ export interface Shield {
   defBonus: number;
   durMax: number;
   dur: number;
+  grade: EquipmentGrade;
   plus: number;   // 盾強化石で上昇（縦の強化）。+1ごとに防御+1
 }
 
@@ -58,7 +62,6 @@ export type ItemKind =
   | 'revive'      // 復活のタネ
   | 'oldkey'      // 古びた鍵
   | 'floorkey'    // フロアキー
-  | 'map'         // 古地図の巻物
   | 'seal'        // 封印の魔導書
   | 'stone'       // 武器強化石（ダンジョンコアの欠片）＝横の強化
   | 'shieldstone' // 盾強化石＝縦の強化
@@ -91,6 +94,7 @@ export interface MonsterDef {
   isBoss?: boolean;
   isFloorBoss?: boolean;
   isDragonType?: boolean; // DK特効対象
+  bossTint?: number;
   color: number;          // 代替ドット絵の基調色
 }
 

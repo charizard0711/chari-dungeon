@@ -1,14 +1,14 @@
 import Phaser from 'phaser';
 import { TILE } from '../textures';
 import { generateDungeon, DungeonData, randomFloor, isWalkable } from '../dungeon';
-import { getTheme, eraSuffix, MONSTER_DEFS, makeItem, plusColor, ITEM_DEFS } from '../data';
-import type { Dir, ItemKind, MonsterDef, TileType, Vec2 } from '../types';
-import { Player, rollWeapon, weaponFullName, makeShield, rollMagics, shieldFullName } from '../player';
+import { getTheme, eraSuffix, MONSTER_DEFS, makeItem, plusColor, gradeColor, ITEM_DEFS } from '../data';
+import type { Dir, EquipmentGrade, ItemKind, MonsterDef, TileType, Vec2 } from '../types';
+import { Player, rollWeaponByGrade, weaponFullName, makeShield, shieldFullName } from '../player';
 import { Enemy } from '../enemy';
 import { computePlayerAttack, computeEnemyAttack } from '../combat';
 import { Audio } from '../audio/manager';
 import { bgmForFloor } from '../audio/config';
-import { enhancementChance, floorBossMultipliers, WEAPON_GACHA_CHANCE } from '../balance';
+import { enhancementChance } from '../balance';
 
 // マップ表示ビューポート（画面上の座標。スマホ縦持ちでは縦型レイアウト）
 import { MAP_X, MAP_Y, MAP_W, MAP_H } from '../layout';
@@ -16,6 +16,33 @@ import { MAP_X, MAP_Y, MAP_W, MAP_H } from '../layout';
 const ANIM = 116;
 // 探索画面のズーム倍率（大きいほど拡大。1.0=等倍）
 const MAP_ZOOM = 1.95;
+
+const MID_DRAGONS: { key: string; name: string; tint: number }[] = [
+  { key: 'm_ember_drake', name: 'エンバードラゴン', tint: 0xff6a35 },
+  { key: 'm_frost_wyrm', name: 'フロストワイバーン', tint: 0x9ee8ff },
+  { key: 'm_storm_wyvern', name: 'ストームドラゴン', tint: 0x66a5ff },
+  { key: 'm_brass_dragon', name: 'ブラスドレイク', tint: 0xe7b85e },
+  { key: 'm_void_drake', name: 'ヴォイドドラゴン', tint: 0xa06bff },
+  { key: 'm_bone_dragon', name: 'ボーンワイバーン', tint: 0xe0d2b8 },
+  { key: 'm_hydra', name: 'ジェイドヒュドラ', tint: 0x65d58b },
+  { key: 'm_ember_drake', name: 'クリムゾンドレイク', tint: 0xff4055 },
+  { key: 'm_frost_wyrm', name: 'ムーンドラゴン', tint: 0xc6d5ff },
+  { key: 'm_storm_wyvern', name: 'サンダーワイバーン', tint: 0xffdf66 },
+  { key: 'm_brass_dragon', name: 'ゴールドドラゴン', tint: 0xffc857 },
+  { key: 'm_void_drake', name: 'アビスドラゴン', tint: 0x735cff },
+  { key: 'm_bone_dragon', name: 'カースドドラゴン', tint: 0xd19aff },
+  { key: 'm_hydra', name: 'ブラッドヒュドラ', tint: 0xff5f72 },
+  { key: 'm_storm_wyvern', name: 'セレスティアルドラゴン', tint: 0x88eaff }
+];
+
+const MILESTONE_BOSSES: Record<number, { key: string; name: string; tint: number; scale: number; hp: number; atkMin: number; atkMax: number; def: number }> = {
+  5: { key: 'm_archdemon', name: '封印王アウレリウス', tint: 0xffc96b, scale: 1.72, hp: 96, atkMin: 6, atkMax: 11, def: 4 },
+  10: { key: 'm_horn_demon', name: 'グランドバイソン', tint: 0xc98b52, scale: 1.82, hp: 150, atkMin: 9, atkMax: 16, def: 7 },
+  15: { key: 'm_bone_colossus', name: 'ボーンコロッサス', tint: 0xe1d3b9, scale: 1.9, hp: 220, atkMin: 11, atkMax: 19, def: 10 },
+  20: { key: 'm_frost_wyrm', name: 'アズールドラゴン', tint: 0x4fa8ff, scale: 1.85, hp: 310, atkMin: 14, atkMax: 23, def: 12 },
+  25: { key: 'm_brass_dragon', name: 'エンシェントドラゴン', tint: 0xff8c42, scale: 1.92, hp: 410, atkMin: 17, atkMax: 28, def: 15 },
+  30: { key: 'm_hydra', name: 'トライヘッド・ドラゴン', tint: 0xb072ff, scale: 2.05, hp: 580, atkMin: 20, atkMax: 34, def: 18 }
+};
 
 interface Chest {
   x: number;
@@ -46,16 +73,6 @@ interface GroundItem {
   value?: number;
 }
 
-interface Decoration {
-  x: number;
-  y: number;
-  baseY: number;
-  phase: number;
-  emissive: boolean;
-  sprite: Phaser.GameObjects.Image;
-  glow?: Phaser.GameObjects.Image;
-}
-
 interface AmbientMote {
   x: number;
   y: number;
@@ -77,13 +94,16 @@ export class GameScene extends Phaser.Scene {
   gameEnded = false;
   floorBossDefeated = false;
   weaponWonThisFloor = false;
+  reviveSeedSeen = false;
+  shopPurchases = { potion: 0, stone: 0, shieldstone: 0 };
+  clickPathToken = 0;
+  clickPathActive = false;
 
   tileSprites: Phaser.GameObjects.Image[][] = [];
   explored: boolean[][] = [];
   enemies: Enemy[] = [];
   chests: Chest[] = [];
   ground: GroundItem[] = [];
-  decorations: Decoration[] = [];
   ambientMotes: AmbientMote[] = [];
   discovered: Set<string> = new Set();
 
@@ -130,9 +150,10 @@ export class GameScene extends Phaser.Scene {
   create() {
     // 状態初期化
     this.player = new Player();
-    if (location.hostname === 'localhost' && new URLSearchParams(location.search).has('qa-gacha')) {
-      this.player.gold = 900;
-    }
+    const qaParams = new URLSearchParams(location.search);
+    const qaFloor = location.hostname === 'localhost' ? Number(qaParams.get('qa-floor')) : 1;
+    const startFloor = Number.isInteger(qaFloor) && qaFloor >= 1 && qaFloor <= 30 ? qaFloor : 1;
+    if (location.hostname === 'localhost' && qaParams.has('qa-gacha')) this.player.gold = 900;
     this.floor = 1;
     this.turn = 0;
     this.score = 0;
@@ -140,6 +161,10 @@ export class GameScene extends Phaser.Scene {
     this.gameEnded = false;
     this.floorBossDefeated = false;
     this.weaponWonThisFloor = false;
+    this.reviveSeedSeen = false;
+    this.shopPurchases = { potion: 0, stone: 0, shieldstone: 0 };
+    this.clickPathToken = 0;
+    this.clickPathActive = false;
     this.discovered = new Set();
     this.dashSteps = 0;
     this.stepFrame = 0;
@@ -156,7 +181,6 @@ export class GameScene extends Phaser.Scene {
     this.enemies = [];
     this.chests = [];
     this.ground = [];
-    this.decorations = [];
     this.ambientMotes = [];
     this.explored = [];
 
@@ -191,6 +215,8 @@ export class GameScene extends Phaser.Scene {
     kb.on('keydown-SPACE', (event: KeyboardEvent) => { event.preventDefault(); this.onSpace(); });
     kb.on('keydown-SHIFT', () => this.playerAct('wait'));
     kb.on('keydown-ENTER', (event: KeyboardEvent) => { event.preventDefault(); this.tryDescend(); });
+    this.input.off('pointerdown', this.handleMapClick, this);
+    this.input.on('pointerdown', this.handleMapClick, this);
     this.heldDir = null;
     this.holdRepeatAt = 0;
     this.holdStartedAt = 0;
@@ -205,7 +231,7 @@ export class GameScene extends Phaser.Scene {
       backgroundColor: '#000000aa', padding: { x: 4, y: 2 }
     }).setDepth(30).setVisible(false);
 
-    this.buildFloor(1);
+    this.buildFloor(startFloor);
 
     // 少し遅らせてUIに初期表示させる
     this.time.delayedCall(50, () => this.emitRefresh());
@@ -221,8 +247,10 @@ export class GameScene extends Phaser.Scene {
     this.shroomTurns = 0;
     this.smokeTurns = 0;
     this.invisTurns = 0;
-    this.floorBossDefeated = false;
+    this.floorBossDefeated = !this.floorHasGate(floor);
     this.weaponWonThisFloor = false;
+    this.shopPurchases = { potion: 0, stone: 0, shieldstone: 0 };
+    this.clickPathToken++;
     this.playerSprite?.setAlpha(1);
     this.weaponSprite?.setAlpha(1);
 
@@ -235,15 +263,13 @@ export class GameScene extends Phaser.Scene {
     this.chests = [];
     for (const gi of this.ground) { gi.sprite.destroy(); gi.glow?.destroy(); }
     this.ground = [];
-    for (const d of this.decorations) { d.sprite.destroy(); d.glow?.destroy(); }
-    this.decorations = [];
     for (const m of this.ambientMotes) m.sprite.destroy();
     this.ambientMotes = [];
 
     this.dungeon = generateDungeon(floor);
     const d = this.dungeon;
-    // 出口は各階のボスを倒すまで封印された扉として扱う。
-    d.tiles[d.stairs.y][d.stairs.x] = 'door';
+    // 偶数階と5階刻みのボス階だけ出口を封印する。
+    if (!this.floorBossDefeated) d.tiles[d.stairs.y][d.stairs.x] = 'door';
 
     // explored初期化
     this.explored = [];
@@ -265,7 +291,6 @@ export class GameScene extends Phaser.Scene {
         this.tileSprites[y][x] = spr;
       }
     }
-    this.spawnDecorations(floor);
     this.spawnAmbientMotes(floor);
 
     // 小さなフロアもビューポート中央に配置し、左右に大きな空白を作らない
@@ -324,45 +349,6 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  spawnDecorations(floor: number) {
-    const candidates: Vec2[] = [];
-    for (let y = 1; y < this.dungeon.h - 1; y++) {
-      for (let x = 1; x < this.dungeon.w - 1; x++) {
-        if (this.dungeon.tiles[y][x] !== 'wall') continue;
-        const nearFloor = [[0, 1], [1, 0], [-1, 0], [0, -1]].some(([dx, dy]) =>
-          this.dungeon.tiles[y + dy]?.[x + dx] !== 'wall'
-        );
-        if (nearFloor) candidates.push({ x, y });
-      }
-    }
-    Phaser.Utils.Array.Shuffle(candidates);
-    const keys = floor >= 21
-      ? ['prop_crystal', 'prop_statue', 'prop_lantern']
-      : floor >= 11
-        ? ['prop_lantern', 'prop_crystal', 'prop_barrel', 'prop_statue']
-        : ['prop_torch', 'prop_lantern', 'prop_barrel', 'prop_crystal'];
-    const count = Math.min(candidates.length, 7 + Math.floor(floor / 5));
-    for (let i = 0; i < count; i++) {
-      const pos = candidates[i];
-      const key = keys[i % keys.length];
-      if (!this.textures.exists(key)) continue;
-      const emissive = key !== 'prop_barrel' && key !== 'prop_statue';
-      const sprite = this.add.image(pos.x * TILE + TILE / 2, pos.y * TILE + TILE / 2 + 2, key)
-        .setDepth(4).setOrigin(0.5, 0.68).setScale(0.78);
-      const decoration: Decoration = {
-        x: pos.x, y: pos.y, baseY: sprite.y, phase: Math.random() * Math.PI * 2,
-        emissive, sprite
-      };
-      if (emissive) {
-        decoration.glow = this.add.image(sprite.x, sprite.y - 6, 'glow')
-          .setDepth(3.8).setBlendMode(Phaser.BlendModes.ADD)
-          .setTint(key === 'prop_torch' ? 0x58d9ff : 0x67f0e2)
-          .setDisplaySize(34, 34).setAlpha(0.22);
-      }
-      this.decorations.push(decoration);
-    }
-  }
-
   spawnAmbientMotes(floor: number) {
     const floorCells: Vec2[] = [];
     for (let y = 1; y < this.dungeon.h - 1; y++) {
@@ -395,58 +381,80 @@ export class GameScene extends Phaser.Scene {
       if (this.distToPlayer(pos.x, pos.y) < 4) continue;
       this.addEnemy(def, pos.x, pos.y, 1 + floor * 0.04);
     }
-    // 各階にドラゴン系ボスを1体配置し、出口を封印する。
-    if (floor === 30) {
-      const finalBase = MONSTER_DEFS.find((m) => m.isBoss)!;
-      const boss: MonsterDef = { ...finalBase, isFloorBoss: true };
-      const pos = this.nearStairsPosition() ?? randomFloor(this.dungeon, this.occupiedPositions());
-      if (pos) this.addEnemy(boss, pos.x, pos.y, 1);
-      this.log('★最深部の守護者 コアウォッチャーが階段を封じている！', 'dmg');
-    } else {
-      this.spawnFloorBoss(floor);
-    }
+    // 2階ごとに固有ドラゴン中ボス、5階ごとに巨大ボス。
+    if (floor % 2 === 0) this.spawnMidBossDragon(floor);
+    if (floor % 5 === 0) this.spawnMilestoneBoss(floor);
   }
 
-  spawnFloorBoss(floor: number) {
-    const dragonKeys = [
-      'm_ember_drake', 'm_frost_wyrm', 'm_storm_wyvern',
-      'm_brass_dragon', 'm_void_drake', 'm_bone_dragon'
-    ];
-    const bossNames = [
-      'アッシュドラゴン', 'フロストワイバーン', 'ストームドラゴン',
-      'ブラスドラゴン', 'ヴォイドドレイク', 'ボーンドラゴン'
-    ];
-    const index = Math.min(dragonKeys.length - 1, Math.floor((floor - 1) / 5));
-    const base = MONSTER_DEFS.find((m) => m.key === dragonKeys[index]) ?? MONSTER_DEFS[0];
-    const multipliers = floorBossMultipliers(floor);
-    const { softened } = multipliers;
+  floorHasGate(floor: number): boolean {
+    return floor % 2 === 0 || floor % 5 === 0;
+  }
+
+  spawnMidBossDragon(floor: number) {
+    const spec = MID_DRAGONS[(Math.floor(floor / 2) - 1) % MID_DRAGONS.length];
+    const base = MONSTER_DEFS.find((m) => m.key === spec.key) ?? MONSTER_DEFS[0];
     const def: MonsterDef = {
       ...base,
-      name: bossNames[index],
-      hp: Math.max(20, Math.floor(base.hp * multipliers.hp)),
-      atkMin: Math.max(3, Math.floor(base.atkMin * multipliers.attack)),
-      atkMax: Math.max(7, Math.floor(base.atkMax * multipliers.attack)),
-      def: Math.max(1, base.def + multipliers.defenseBonus),
-      exp: Math.max(10, base.exp * 3),
-      gold: Math.max(20, base.gold * 4),
-      score: Math.max(100, base.score * 4),
+      name: spec.name,
+      hp: Math.max(26, Math.floor(base.hp * (1.35 + floor * 0.025))),
+      atkMin: Math.max(3, Math.floor(base.atkMin * (1.04 + floor * 0.008))),
+      atkMax: Math.max(7, Math.floor(base.atkMax * (1.04 + floor * 0.008))),
+      def: Math.max(1, base.def + Math.floor(floor / 10)),
+      exp: Math.max(12, base.exp * 2),
+      gold: Math.max(18, base.gold * 3),
+      score: Math.max(90, base.score * 3),
       minFloor: floor,
       maxFloor: floor,
       isElite: true,
       isBoss: false,
       isFloorBoss: true,
-      isDragonType: true
+      isDragonType: true,
+      bossTint: spec.tint
     };
+    this.placeFloorBoss(def, 1.32, spec.tint, `◆ 中ボス「${def.name}」が扉を封印している！`);
+  }
+
+  spawnMilestoneBoss(floor: number) {
+    const spec = MILESTONE_BOSSES[floor];
+    if (!spec) return;
+    const base = MONSTER_DEFS.find((m) => m.key === spec.key) ?? MONSTER_DEFS[0];
+    const def: MonsterDef = {
+      ...base,
+      name: spec.name,
+      hp: spec.hp,
+      atkMin: spec.atkMin,
+      atkMax: spec.atkMax,
+      def: spec.def,
+      exp: Math.max(30, base.exp * 4),
+      gold: Math.max(45, base.gold * 5),
+      score: Math.max(240, base.score * 6),
+      minFloor: floor,
+      maxFloor: floor,
+      isElite: true,
+      isBoss: floor === 30,
+      isFloorBoss: true,
+      isDragonType: floor >= 20,
+      bossTint: spec.tint
+    };
+    const label = floor === 5
+      ? `★ 塔に封印された古代王「${def.name}」が目覚めた！`
+      : floor === 30
+        ? `★★ 最終巨大ボス「${def.name}」が出口を支配している！`
+        : `★ ${floor}階巨大ボス「${def.name}」が出口を守っている！`;
+    this.placeFloorBoss(def, spec.scale, spec.tint, label);
+  }
+
+  placeFloorBoss(def: MonsterDef, scale: number, tint: number, message: string) {
     let pos = this.nearStairsPosition();
-    if (!pos || this.distToPlayer(pos.x, pos.y) < 5) {
+    if (!pos || this.distToPlayer(pos.x, pos.y) < 5 || this.enemyAt(pos.x, pos.y)) {
       pos = randomFloor(this.dungeon, this.occupiedPositions());
     }
     if (!pos) return;
     const enemy = this.addEnemy(def, pos.x, pos.y, 1);
-    enemy.baseScale *= softened ? 1.22 : 1.38;
+    enemy.baseScale *= scale;
     enemy.sprite.setScale(enemy.baseScale);
-    this.attachAura(enemy, softened ? 34 : 40, softened ? 0xe7b85e : 0xff5a5a);
-    this.log(`${softened ? '◇' : '◆'} フロアボス「${def.name}」が扉を封印している！`, 'dmg');
+    this.attachAura(enemy, 36 * scale, tint);
+    this.log(message, 'dmg');
   }
 
   // 階段に隣接する歩行可能タイル（＝出口を守る位置）を返す
@@ -463,52 +471,6 @@ export class GameScene extends Phaser.Scene {
     return null;
   }
 
-  // 既存モンスターを強化クローンしてボスとして配置
-  spawnBoss(floor: number, kind: 'mid' | 'strong') {
-    const pool = MONSTER_DEFS.filter((m) => m.minFloor <= floor && !m.isBoss);
-    let base = kind === 'strong'
-      ? (MONSTER_DEFS.find((m) => m.key === 'm_guard') ?? pool[0])
-      : (pool.length ? pool[Math.floor(Math.random() * pool.length)] : MONSTER_DEFS[0]);
-    const m = kind === 'strong'
-      ? { hp: 5, atk: 1.6, def: 6, gold: 8, score: 5 }
-      : { hp: 2.8, atk: 1.35, def: 3, gold: 4, score: 3 };
-    const def: MonsterDef = {
-      ...base,
-      name: base.name + (kind === 'strong' ? '（強ボス）' : '（中ボス）'),
-      hp: Math.floor(base.hp * m.hp * (1 + floor * 0.03)),
-      atkMin: Math.ceil(base.atkMin * m.atk),
-      atkMax: Math.ceil(base.atkMax * m.atk),
-      def: base.def + m.def,
-      exp: base.exp * 3,
-      gold: base.gold * m.gold,
-      score: base.score * m.score,
-      isElite: true,
-      isBoss: false,
-      isDragonType: true
-    };
-    // 出口（階段）を守る位置に配置。取れなければプレイヤーから離れた場所へ
-    let pos: Vec2 | null = this.nearStairsPosition();
-    if (pos && this.distToPlayer(pos.x, pos.y) < 6) {
-      // 開始直後に出口が近すぎる稀なケースは別位置に退避
-      pos = null;
-    }
-    if (!pos) {
-      for (let tries = 0; tries < 30; tries++) {
-        const p = randomFloor(this.dungeon, this.occupiedPositions());
-        if (p && this.distToPlayer(p.x, p.y) >= 6) { pos = p; break; }
-      }
-    }
-    if (!pos) pos = randomFloor(this.dungeon, this.occupiedPositions());
-    if (!pos) return;
-    const e = this.addEnemy(def, pos.x, pos.y, 1);
-    // ボスは一回り大きく＋オーラの色で格を表す（中ボス=紫, 強ボス=赤）
-    const grow = kind === 'strong' ? 1.4 : 1.3;
-    e.baseScale *= grow;
-    e.sprite.setScale(e.baseScale);
-    this.attachAura(e, 30 * grow, kind === 'strong' ? 0xff5a5a : 0xb072ff);
-    this.log(kind === 'strong' ? `⚠ 強ボス「${def.name}」が出口を守っている！` : `⚠ 中ボス「${def.name}」が出口付近に現れた！`, 'dmg');
-  }
-
   addEnemy(def: MonsterDef, x: number, y: number, hpScale: number): Enemy {
     const e = new Enemy(def, x, y, hpScale);
     e.shadow = this.add.image(0, 0, 'shadow').setDepth(9.5).setAlpha(0.6);
@@ -517,6 +479,7 @@ export class GameScene extends Phaser.Scene {
     const tex = this.textures.get(def.key).getSourceImage();
     const sc = maxDim / Math.max(tex.width, tex.height);
     e.sprite.setScale(sc);
+    if (def.bossTint) e.sprite.setTint(def.bossTint);
     e.baseScale = sc;
     e.bobPhase = Math.random() * Math.PI * 2;
     this.placeSprite(e.sprite, x, y);
@@ -878,7 +841,11 @@ export class GameScene extends Phaser.Scene {
     if (def.isElite || def.isBoss) {
       const stonePool: ItemKind[] = ['stone', 'shieldstone'];
       this.dropItem(e.x, e.y, stonePool[Math.floor(Math.random() * stonePool.length)]);
-      if (Math.random() < 0.08) { this.dropItem(e.x, e.y, 'revive'); this.log('復活のタネがこぼれ落ちた…！', 'special'); }
+      if (!this.reviveSeedSeen && Math.random() < 0.08) {
+        this.reviveSeedSeen = true;
+        this.dropItem(e.x, e.y, 'revive');
+        this.log('復活のタネがこぼれ落ちた…！ この冒険で現れるのは一度だけだ。', 'special');
+      }
     }
 
     this.enemyDefeatFx(e);
@@ -895,6 +862,11 @@ export class GameScene extends Phaser.Scene {
 
   unlockFloorGate(bossName: string) {
     if (this.floorBossDefeated) return;
+    const remaining = this.enemies.filter((e) => e.def.isFloorBoss);
+    if (remaining.length > 0) {
+      this.log(`${bossName}を撃破！ あと${remaining.length}体のボスが封印を支えている。`, 'special');
+      return;
+    }
     this.floorBossDefeated = true;
     const { x, y } = this.dungeon.stairs;
     this.dungeon.tiles[y][x] = 'stairs';
@@ -907,10 +879,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   dropItem(x: number, y: number, kind: ItemKind | 'coin', value?: number) {
-    // 壁抜け敵の位置や既に物がある位置には置かず、必ず通行可能な空き床を探す。
+    // 壁抜け敵が通行不能マスで倒れた場合は、取りに行けないため即時回収する。
     let tx = x, ty = y;
     const startTile = this.dungeon.tiles[ty]?.[tx];
-    const invalidStart = !startTile || !isWalkable(startTile) || startTile === 'pit' || this.groundAt(tx, ty) || this.chestAt(tx, ty);
+    if (!startTile || !isWalkable(startTile) || startTile === 'pit') {
+      this.collectDropDirectly(kind, value);
+      return;
+    }
+    const invalidStart = !!this.groundAt(tx, ty) || !!this.chestAt(tx, ty);
     if (invalidStart) {
       const cand = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, 1], [1, -1], [-1, 1]];
       let placed = false;
@@ -921,7 +897,10 @@ export class GameScene extends Phaser.Scene {
           tx = nx; ty = ny; placed = true; break;
         }
       }
-      if (!placed) return;
+      if (!placed) {
+        this.collectDropDirectly(kind, value);
+        return;
+      }
     }
     const texKey = kind === 'coin' ? 'coin' : `i_${kind}`;
     const spr = this.add.image(0, 0, texKey).setDepth(5).setOrigin(0.5, 0.6).setDisplaySize(22, 22);
@@ -933,6 +912,25 @@ export class GameScene extends Phaser.Scene {
       .setDisplaySize(28, 28).setAlpha(0.18)
       .setVisible(spr.visible);
     this.ground.push({ x: tx, y: ty, kind, sprite: spr, glow, phase: Math.random() * Math.PI * 2, value });
+  }
+
+  collectDropDirectly(kind: ItemKind | 'coin', value?: number) {
+    if (kind === 'coin') {
+      const gold = value ?? 5;
+      this.player.gold += gold;
+      this.addScore(Math.floor(gold / 2));
+      this.log(`届かない場所のコインを自動回収した (+${gold}G)`, 'gold');
+      Audio.playSe('coin');
+      return;
+    }
+    if (this.player.inventory.length >= 60) {
+      this.log(`${ITEM_DEFS[kind]?.name ?? kind}は持ち物がいっぱいで回収できなかった。`, 'sys');
+      return;
+    }
+    const item = makeItem(kind);
+    this.player.inventory.push(item);
+    this.log(`届かない場所の${item.name}を自動回収した。`, 'item');
+    Audio.playSe('pickup');
   }
 
   damagePlayer(dmg: number, reason: string) {
@@ -1308,11 +1306,6 @@ export class GameScene extends Phaser.Scene {
       g.sprite.setVisible(v);
       g.glow?.setVisible(v);
     }
-    for (const d of this.decorations) {
-      const v = !!visible[d.y]?.[d.x];
-      d.sprite.setVisible(v);
-      d.glow?.setVisible(v);
-    }
     for (const m of this.ambientMotes) m.sprite.setVisible(!!visible[m.y]?.[m.x]);
   }
 
@@ -1339,9 +1332,10 @@ export class GameScene extends Phaser.Scene {
       this.log('★赤い宝箱だ！ レアなお宝が眠っている！', 'special');
       // 武器はガチャ限定。赤い宝箱は上位素材・盾・復活アイテムを抽選する。
       const rr = Math.random();
-      if (rr < 0.15) {
+      if (rr < 0.15 && !this.reviveSeedSeen) {
+        this.reviveSeedSeen = true;
         this.player.inventory.push(makeItem('revive'));
-        this.log('超レア！ 復活のタネが入っていた！', 'special');
+        this.log('超レア！ この冒険で一度だけの復活のタネが入っていた！', 'special');
       } else if (rr < 0.32) {
         this.player.inventory.push(makeItem('stone'), makeItem('stone'));
         this.log('レア！ 武器強化石×2が入っていた！', 'special');
@@ -1370,7 +1364,7 @@ export class GameScene extends Phaser.Scene {
           this.player.shields.push(s);
           this.log(`宝箱から「${s.name}」を発見！`, 'item');
         } else {
-          const kinds: ItemKind[] = ['potion', 'warp', 'map', 'stone', 'shieldstone', 'invis'];
+          const kinds: ItemKind[] = ['potion', 'warp', 'stone', 'shieldstone', 'invis'];
           const k = kinds[Math.floor(Math.random() * kinds.length)];
           this.player.inventory.push(makeItem(k));
           this.log(`宝箱から「${makeItem(k).name}」を入手。`, 'item');
@@ -1402,7 +1396,6 @@ export class GameScene extends Phaser.Scene {
       case 'bomb': this.useBomb(); break;
       case 'warp': this.useWarp(); passTurn = false; break;
       case 'seal': this.useSeal(); break;
-      case 'map': for (let y = 0; y < this.dungeon.h; y++) for (let x = 0; x < this.dungeon.w; x++) this.explored[y][x] = true; this.log('古地図でこの階の地図が判明した。', 'item'); Audio.playSe('pickup'); passTurn = false; break;
       case 'revive': this.log('復活のタネは倒れた時に自動で使われる。', 'sys'); Audio.playSe('deny'); consumed = false; passTurn = false; break;
       case 'oldkey': case 'floorkey': this.log('近くに対応する扉がない。', 'sys'); Audio.playSe('deny'); consumed = false; passTurn = false; break;
       case 'invis': {
@@ -1537,7 +1530,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ============ ガチャ ============
-  // 300Gで1回。SS/S/A/B/C ランクで装備やアイテムが出る。
+  // 300Gで1回。排出は武器か盾のみ。ランクが装備グレードへ直結する。
   // 戻り値はUI演出用（rank/色/名前/アイコン）。ゴールド不足はnull。
   gachaPull(): { rank: 'SS' | 'S' | 'A' | 'B' | 'C'; color: number; name: string; texKey: string } | null {
     if (this.gameEnded) return null;
@@ -1557,16 +1550,17 @@ export class GameScene extends Phaser.Scene {
       SS: 0xffd700, S: 0xff5a5a, A: 0xa06bff, B: 0x4fb0ff, C: 0xb8c2cc
     };
 
+    const gradeByRank: Record<typeof rank, EquipmentGrade> = {
+      SS: 'S', S: 'A', A: 'B', B: 'C', C: 'D'
+    };
+    const grade = gradeByRank[rank];
     let name = '';
     let texKey = '';
-    const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
 
-    // 武器はガチャ限定・1階につき最大1本。取得率は全ランク共通で22%。
-    const weaponPrize = !this.weaponWonThisFloor && Math.random() < WEAPON_GACHA_CHANCE;
+    // 武器は1階につき最大1本。取得済みなら必ず盾になる。
+    const weaponPrize = !this.weaponWonThisFloor && Math.random() < 0.5;
     if (weaponPrize) {
-      const floorBonus = rank === 'SS' ? 15 : rank === 'S' ? 10 : rank === 'A' ? 5 : rank === 'B' ? 2 : 0;
-      const w = rollWeapon(this.floor + floorBonus);
-      if ((rank === 'SS' || rank === 'S') && w.magics.length === 0) w.magics = rollMagics(rank === 'SS' ? 2 : 1);
+      const w = rollWeaponByGrade(grade);
       if (rank === 'SS') w.plus = Math.max(w.plus, 3);
       else if (rank === 'S') w.plus = Math.max(w.plus, 1);
       this.player.weapons.push(w);
@@ -1574,42 +1568,49 @@ export class GameScene extends Phaser.Scene {
       name = weaponFullName(w);
       texKey = w.key;
     } else {
-      switch (rank) {
-        case 'SS': {
-          this.player.inventory.push(makeItem('revive'));
-          name = 'リバイブシード'; texKey = 'i_revive';
-          break;
-        }
-        case 'S': {
-          const s = makeShield('s_skull');
-          s.plus = 1 + Math.floor(Math.random() * 2);
-          this.player.shields.push(s);
-          name = shieldFullName(s); texKey = s.key;
-          break;
-        }
-        case 'A': {
-          const k = pick(['stone', 'shieldstone'] as const);
-          this.player.inventory.push(makeItem(k), makeItem(k));
-          name = `${ITEM_DEFS[k].name} ×2`; texKey = `i_${k}`;
-          break;
-        }
-        case 'B': {
-          const k = pick(['stone', 'shieldstone', 'warp'] as const);
-          this.player.inventory.push(makeItem(k));
-          name = ITEM_DEFS[k].name; texKey = `i_${k}`;
-          break;
-        }
-        case 'C': {
-          const k = pick(['potion', 'smoke'] as const);
-          this.player.inventory.push(makeItem(k));
-          name = ITEM_DEFS[k].name; texKey = `i_${k}`;
-          break;
-        }
-      }
+      const shieldKey = grade === 'D' || grade === 'C' ? 's_gear' : grade === 'B' ? 's_crystal' : 's_skull';
+      const s = makeShield(shieldKey, grade);
+      if (rank === 'SS') s.plus = 2;
+      else if (rank === 'S') s.plus = 1;
+      this.player.shields.push(s);
+      name = shieldFullName(s);
+      texKey = s.key;
     }
 
     this.log(`ガチャ【${rank}】${name}を手に入れた！`, rank === 'SS' || rank === 'S' ? 'special' : 'item');
     return { rank, color: RANK_COLOR[rank], name, texKey };
+  }
+
+  shopRemaining(kind: 'potion' | 'stone' | 'shieldstone'): number {
+    const limit = kind === 'potion' ? 5 : 2;
+    return Math.max(0, limit - this.shopPurchases[kind]);
+  }
+
+  buyItem(kind: 'potion' | 'stone' | 'shieldstone'): boolean {
+    const price = kind === 'potion' ? 25 : 100;
+    if (this.gameEnded) return false;
+    if (this.shopRemaining(kind) <= 0) {
+      this.log(`この階の${ITEM_DEFS[kind].name}は売り切れだ。`, 'sys');
+      Audio.playSe('deny');
+      return false;
+    }
+    if (this.player.gold < price) {
+      this.log(`${ITEM_DEFS[kind].name}を買うゴールドが足りない。`, 'sys');
+      Audio.playSe('deny');
+      return false;
+    }
+    if (this.player.inventory.length >= 60) {
+      this.log('持ち物がいっぱいだ。', 'sys');
+      Audio.playSe('deny');
+      return false;
+    }
+    this.player.gold -= price;
+    this.player.inventory.push(makeItem(kind));
+    this.shopPurchases[kind]++;
+    this.log(`${ITEM_DEFS[kind].name}を${price}Gで購入した。`, 'item');
+    Audio.playSe('coin');
+    this.emitRefresh();
+    return true;
   }
 
   // 装備切替（UIから）
@@ -1809,8 +1810,12 @@ export class GameScene extends Phaser.Scene {
   updatePlayerAura() {
     if (this.playerAura) {
       const plus = this.player.weapon?.plus ?? 0;
-      if (plus > 0) {
-        this.playerAura.setVisible(true).setTint(plusColor(plus)).setAlpha(0.5 + Math.min(0.4, plus * 0.12));
+      const grade = this.player.weapon?.grade ?? 'D';
+      const highGrade = grade === 'A' || grade === 'S';
+      if (plus > 0 || highGrade) {
+        this.playerAura.setVisible(true)
+          .setTint(plus > 0 ? plusColor(plus) : gradeColor(grade))
+          .setAlpha(plus > 0 ? 0.5 + Math.min(0.4, plus * 0.12) : grade === 'S' ? 0.68 : 0.48);
       } else {
         this.playerAura.setVisible(false);
       }
@@ -1819,7 +1824,8 @@ export class GameScene extends Phaser.Scene {
     if (this.weaponSprite) {
       const w = this.player.weapon;
       if (w && this.textures.exists(w.key)) {
-        this.weaponSprite.setVisible(true).setTexture(w.key).setDisplaySize(18, 18);
+        const size = w.grade === 'S' ? 22 : w.grade === 'A' ? 20 : 18;
+        this.weaponSprite.setVisible(true).setTexture(w.key).setDisplaySize(size, size);
         this.weaponSprite.setTint((w.plus ?? 0) > 0 ? plusColor(w.plus) : 0xffffff);
       } else {
         this.weaponSprite.setVisible(false);
@@ -1829,6 +1835,65 @@ export class GameScene extends Phaser.Scene {
 
   // 矢印キーのホールド処理：押した瞬間に1歩、押しっぱなしで歩き続ける
   // （スマホ用十字ボタンの touchDir も同じ仕組みで処理）
+  async handleMapClick(pointer: Phaser.Input.Pointer) {
+    if (pointer.button !== 0 || this.gameEnded || this.busy) return;
+    if (pointer.x < MAP_X || pointer.x >= MAP_X + MAP_W || pointer.y < MAP_Y || pointer.y >= MAP_Y + MAP_H) return;
+    const ui = this.scene.get('UIScene') as any;
+    if (ui?.overlayMode && ui.overlayMode !== 'none') return;
+
+    const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+    const target = { x: Math.floor(world.x / TILE), y: Math.floor(world.y / TILE) };
+    const tile = this.dungeon.tiles[target.y]?.[target.x];
+    if (!tile || !isWalkable(tile) || tile === 'pit') {
+      Audio.playSe('deny');
+      return;
+    }
+
+    const token = ++this.clickPathToken;
+    this.clickPathActive = true;
+    this.setBoostTier(2);
+    this.effectFx(target.x, target.y, 'fx_magic', 0.9, 260, 0x58d9d1);
+
+    while (token === this.clickPathToken && !this.gameEnded && !this.busy) {
+      if (this.player.x === target.x && this.player.y === target.y) break;
+      const path = this.findClickPath(target.x, target.y);
+      if (!path.length) break;
+      await this.playerAct('move', path[0]);
+      if (this.busy) break;
+    }
+
+    if (token === this.clickPathToken) {
+      this.clickPathActive = false;
+      this.setBoostTier(0);
+    }
+  }
+
+  findClickPath(targetX: number, targetY: number): Dir[] {
+    const dirs: { dir: Dir; dx: number; dy: number }[] = [
+      { dir: 'up', dx: 0, dy: -1 }, { dir: 'down', dx: 0, dy: 1 },
+      { dir: 'left', dx: -1, dy: 0 }, { dir: 'right', dx: 1, dy: 0 }
+    ];
+    const queue: { x: number; y: number; path: Dir[] }[] = [{ x: this.player.x, y: this.player.y, path: [] }];
+    const visited = new Set<string>([`${this.player.x},${this.player.y}`]);
+    while (queue.length) {
+      const cur = queue.shift()!;
+      for (const step of dirs) {
+        const nx = cur.x + step.dx, ny = cur.y + step.dy;
+        const key = `${nx},${ny}`;
+        if (visited.has(key)) continue;
+        const tile = this.dungeon.tiles[ny]?.[nx];
+        if (!tile || !isWalkable(tile) || tile === 'pit') continue;
+        const isTarget = nx === targetX && ny === targetY;
+        if (!isTarget && (this.enemyAt(nx, ny) || this.chestAt(nx, ny))) continue;
+        const path = [...cur.path, step.dir];
+        if (isTarget) return path;
+        visited.add(key);
+        queue.push({ x: nx, y: ny, path });
+      }
+    }
+    return [];
+  }
+
   handleMoveKeys(time: number) {
     if (this.busy || this.gameEnded) return;
     const entries: [Phaser.Input.Keyboard.Key, Dir][] = [
@@ -1846,6 +1911,11 @@ export class GameScene extends Phaser.Scene {
       this.holdStartedAt = 0;
       this.setBoostTier(0);
       return;
+    }
+    if (this.clickPathActive) {
+      this.clickPathToken++;
+      this.clickPathActive = false;
+      this.setBoostTier(0);
     }
     if (this.heldDir !== dir) {
       // 押した瞬間：即1歩（向き変えも含む）
@@ -1866,6 +1936,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   currentMoveDuration(): number {
+    if (this.clickPathActive) return 40;
     if (this.holdBoostTier === 2) return 58;
     if (this.holdBoostTier === 1) return 78;
     return ANIM;
@@ -1979,16 +2050,6 @@ export class GameScene extends Phaser.Scene {
       if (g.glow) {
         g.glow.setPosition(g.sprite.x, g.sprite.y + 1);
         g.glow.setAlpha(0.16 + pulse * 0.06).setScale(0.9 + pulse * 0.08);
-      }
-    }
-
-    for (const d of this.decorations) {
-      if (!d.sprite.visible) continue;
-      const pulse = Math.sin(time * 0.0034 + d.phase);
-      if (d.emissive) d.sprite.y = d.baseY + pulse * 0.7;
-      if (d.glow) {
-        d.glow.setPosition(d.sprite.x, d.sprite.y - 6);
-        d.glow.setAlpha(0.18 + pulse * 0.09).setScale(0.88 + pulse * 0.1);
       }
     }
 
