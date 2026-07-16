@@ -1,4 +1,4 @@
-import type { Weapon, Shield, Item, ItemKind, MonsterDef, MagicCode } from './types';
+import type { Weapon, Shield, Item, ItemKind, MonsterDef, MagicCode, EquipmentGrade } from './types';
 
 // ===== 武器定義 =====
 export interface WeaponDef {
@@ -9,23 +9,24 @@ export interface WeaponDef {
   durMax: number;
   minFloor: number;
   rarity: number; // 出現しやすさの重み（小さいほどレア）
+  grade: EquipmentGrade;
   dual?: boolean; // 二刀流（1ターンに2回攻撃・盾装備不可）
 }
 
 export const WEAPON_DEFS: WeaponDef[] = [
-  { key: 'w_screw', name: '螺旋槍スパイラス', atkMin: 5, atkMax: 12, durMax: 40, minFloor: 1, rarity: 10 },
-  { key: 'w_star', name: '流星刃ステラ', atkMin: 7, atkMax: 15, durMax: 35, minFloor: 1, rarity: 8 },
-  { key: 'w_gearhammer', name: '破城鎚ギガギア', atkMin: 10, atkMax: 22, durMax: 55, minFloor: 4, rarity: 6 },
-  { key: 'w_rune', name: '魔紋剣ルーンヴェイン', atkMin: 12, atkMax: 26, durMax: 60, minFloor: 6, rarity: 5 },
-  { key: 'w_vine', name: '茨鞭ローズヴァイン', atkMin: 9, atkMax: 20, durMax: 50, minFloor: 5, rarity: 6 },
-  { key: 'w_candle', name: '灯杖ルミナリア', atkMin: 11, atkMax: 24, durMax: 60, minFloor: 8, rarity: 5 },
-  { key: 'w_compass', name: '羅針槍アジマス', atkMin: 8, atkMax: 18, durMax: 38, minFloor: 3, rarity: 7 },
-  { key: 'w_dark', name: '深淵牙ノクティス', atkMin: 15, atkMax: 30, durMax: 75, minFloor: 12, rarity: 4 },
-  { key: 'w_gearaxe', name: '断罪斧ジャッジガイア', atkMin: 18, atkMax: 36, durMax: 95, minFloor: 15, rarity: 3 },
-  { key: 'w_gravity', name: '重星杖グラビトス', atkMin: 20, atkMax: 44, durMax: 90, minFloor: 20, rarity: 2 },
+  { key: 'w_screw', name: 'スパイラルランス', atkMin: 5, atkMax: 12, durMax: 40, minFloor: 1, rarity: 10, grade: 'D' },
+  { key: 'w_star', name: 'ステラブレード', atkMin: 7, atkMax: 15, durMax: 35, minFloor: 1, rarity: 8, grade: 'D' },
+  { key: 'w_gearhammer', name: 'ギガギアハンマー', atkMin: 10, atkMax: 22, durMax: 55, minFloor: 4, rarity: 6, grade: 'C' },
+  { key: 'w_rune', name: 'ルーンブレード', atkMin: 12, atkMax: 26, durMax: 60, minFloor: 6, rarity: 5, grade: 'B' },
+  { key: 'w_vine', name: 'ローズウィップ', atkMin: 9, atkMax: 20, durMax: 50, minFloor: 5, rarity: 6, grade: 'C' },
+  { key: 'w_candle', name: 'ルミナスタッフ', atkMin: 11, atkMax: 24, durMax: 60, minFloor: 8, rarity: 5, grade: 'B' },
+  { key: 'w_compass', name: 'アジマススピア', atkMin: 8, atkMax: 18, durMax: 38, minFloor: 3, rarity: 7, grade: 'C' },
+  { key: 'w_dark', name: 'ノクティスファング', atkMin: 15, atkMax: 30, durMax: 75, minFloor: 12, rarity: 4, grade: 'A' },
+  { key: 'w_gearaxe', name: 'ジャッジアックス', atkMin: 18, atkMax: 36, durMax: 95, minFloor: 15, rarity: 3, grade: 'A' },
+  { key: 'w_gravity', name: 'グラビティロッド', atkMin: 20, atkMax: 44, durMax: 90, minFloor: 20, rarity: 2, grade: 'S' },
   // ===== 二刀流（レア・2回攻撃・盾装備不可）=====
-  { key: 'w_twin', name: '双牙刃リンクス', atkMin: 8, atkMax: 16, durMax: 80, minFloor: 8, rarity: 2, dual: true },
-  { key: 'w_soulblades', name: '双魂剣ゲミノス', atkMin: 13, atkMax: 24, durMax: 100, minFloor: 16, rarity: 1, dual: true }
+  { key: 'w_twin', name: 'リンクスエッジ', atkMin: 8, atkMax: 16, durMax: 80, minFloor: 8, rarity: 2, grade: 'B', dual: true },
+  { key: 'w_soulblades', name: 'ゲミノスブレード', atkMin: 13, atkMax: 24, durMax: 100, minFloor: 16, rarity: 1, grade: 'S', dual: true }
 ];
 
 // ===== 盾定義 =====
@@ -35,12 +36,13 @@ export interface ShieldDef {
   defBonus: number;
   durMax: number;
   minFloor: number;
+  grade: EquipmentGrade;
 }
 
 export const SHIELD_DEFS: ShieldDef[] = [
-  { key: 's_gear', name: '機装盾ギアヴァルト', defBonus: 2, durMax: 40, minFloor: 1 },
-  { key: 's_crystal', name: '晶盾クリスタリア', defBonus: 4, durMax: 55, minFloor: 8 },
-  { key: 's_skull', name: '死王盾スカルレクス', defBonus: 6, durMax: 70, minFloor: 16 }
+  { key: 's_gear', name: 'ギアシールド', defBonus: 2, durMax: 40, minFloor: 1, grade: 'D' },
+  { key: 's_crystal', name: 'クリスタルシールド', defBonus: 4, durMax: 55, minFloor: 8, grade: 'B' },
+  { key: 's_skull', name: 'スカルシールド', defBonus: 6, durMax: 70, minFloor: 16, grade: 'A' }
 ];
 
 // ===== マジック定義 =====
@@ -86,10 +88,9 @@ export const ITEM_DEFS: Record<ItemKind, Omit<Item, 'kind'>> = {
   revive:  { name: '復活のタネ', desc: '倒れた時に一度だけ復活', textureKey: 'i_revive' },
   oldkey:  { name: '古びた鍵', desc: 'ロックされた扉を開ける', textureKey: 'i_oldkey' },
   floorkey:{ name: 'フロアキー', desc: '特殊な扉を開ける', textureKey: 'i_floorkey' },
-  map:     { name: '古地図の巻物', desc: 'この階のマップを表示する', textureKey: 'i_map' },
   seal:    { name: '封印の魔導書', desc: '周囲の敵を数ターン止める', textureKey: 'i_seal' },
-  stone:   { name: '武器強化石', desc: '武器を+1強化。成功70%(+5〜は50%)、失敗で焼失', textureKey: 'i_stone' },
-  shieldstone: { name: '盾強化石', desc: '盾を+1強化(防御UP)。成功70%、失敗で破壊', textureKey: 'i_shieldstone' },
+  stone:   { name: 'ウェポンストーン', desc: '成功率90%から強化ごとに10%低下（最低30%）', textureKey: 'i_stone' },
+  shieldstone: { name: 'シールドストーン', desc: '成功率90%から強化ごとに10%低下（最低30%）', textureKey: 'i_shieldstone' },
   invis:   { name: '透明ポーション', desc: '20ターンの間、敵から完全に見えなくなる', textureKey: 'i_invis' },
   dash:    { name: '疾風の羽', desc: '20歩の間、1歩で2マス進めるようになる', textureKey: 'i_dash' }
 };
@@ -112,6 +113,14 @@ export function plusColor(plus: number): number {
 
 export function plusColorHex(plus: number): string {
   return '#' + plusColor(plus).toString(16).padStart(6, '0');
+}
+
+export function gradeColor(grade: EquipmentGrade): number {
+  return { D: 0x9ba8b4, C: 0x61c78d, B: 0x56a8ff, A: 0xb57aff, S: 0xffc857 }[grade];
+}
+
+export function gradeColorHex(grade: EquipmentGrade): string {
+  return '#' + gradeColor(grade).toString(16).padStart(6, '0');
 }
 
 export function makeItem(kind: ItemKind): Item {

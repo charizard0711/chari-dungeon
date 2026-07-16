@@ -121,7 +121,7 @@ export function generateDungeon(floor: number): DungeonData {
 }
 
 export function isWalkable(t: TileType): boolean {
-  return t !== 'wall';
+  return t !== 'wall' && t !== 'door';
 }
 
 // ランダムな床タイル位置を返す（迷路の通路も含めた全床から選ぶ）

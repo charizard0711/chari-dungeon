@@ -4,7 +4,7 @@ import { GAME_W, GAME_H } from '../main';
 import { IS_MOBILE, MAP_X, MAP_Y, MAP_W, MAP_H } from '../layout';
 import { durabilityRisk } from '../combat';
 import { weaponFullName } from '../player';
-import { getTheme, MAGIC_DESC, MONSTER_DEFS, ITEM_DEFS, plusColor, plusColorHex, isRareItem } from '../data';
+import { getTheme, MAGIC_DESC, MONSTER_DEFS, ITEM_DEFS, plusColor, plusColorHex, gradeColor, isRareItem } from '../data';
 import type { MagicCode, ItemKind, Item, Dir } from '../types';
 import { shieldFullName } from '../player';
 import { Audio } from '../audio/manager';
@@ -111,9 +111,10 @@ export class UIScene extends Phaser.Scene {
   // ============ フレーム ============
   panel(x: number, y: number, w: number, h: number, title?: string) {
     const g = this.add.graphics();
-    g.fillStyle(0x071518, 0.92);
+    g.fillStyle(0x061316, 0.95);
     g.fillRoundedRect(x, y, w, h, 12);
-    g.lineStyle(1, 0x426367, .88);
+    g.fillStyle(0x102a2d, .28).fillRoundedRect(x + 4, y + 4, w - 8, h - 8, 9);
+    g.lineStyle(1.2, 0x426d70, .9);
     g.strokeRoundedRect(x, y, w, h, 12);
     g.lineStyle(1, 0xe7b85e, .26);
     g.lineBetween(x + 14, y + 1, x + Math.min(w - 14, 118), y + 1);
@@ -165,7 +166,7 @@ export class UIScene extends Phaser.Scene {
       y += 48;
     }
     // ヒント
-    this.add.text(16, y + 6, '矢印: 移動\n長押し: BOOST\n敵へ進む: 攻撃', {
+    this.add.text(16, y + 6, '矢印/クリック: 移動\n長押し: BOOST', {
       fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#789093', lineSpacing: 5
     });
   }
@@ -346,14 +347,14 @@ export class UIScene extends Phaser.Scene {
     const items: { icon: string; label: string; f: () => void }[] = [
       { icon: '⚔', label: '装備', f: () => this.setOverlay('equip') },
       { icon: '🎒', label: '所持品', f: () => this.setOverlay('inv') },
-      { icon: '🛒', label: 'ショップ', f: () => this.setOverlay('shop') },
+      { icon: '🛒', label: '店', f: () => this.setOverlay('shop') },
       { icon: '🎰', label: 'ガチャ', f: () => this.setOverlay('gacha') },
       { icon: '👾', label: '図鑑', f: () => this.setOverlay('codex') },
       { icon: '⚙', label: '設定', f: () => this.showSettings() }
     ];
     this.panel(8, 944, 584, 52);
     items.forEach((it, i) => {
-      const x = 14 + i * 96, y = 948, w = 92, h = 44;
+      const x = 12 + i * 96, y = 948, w = 92, h = 44;
       const g = this.add.graphics();
       const draw = (c: number) => { g.clear(); g.fillStyle(c, 1).fillRoundedRect(x, y, w, h, 6); };
       draw(0x1c2536);
@@ -429,7 +430,8 @@ export class UIScene extends Phaser.Scene {
     const th = getTheme(this.gs.floor);
 
     const boost = this.gs.holdBoostTier === 2 ? '  ⚡MAX BOOST' : this.gs.holdBoostTier === 1 ? '  ⚡BOOST' : '';
-    this.topText.setText(`${String(this.gs.floor).padStart(2, '0')}F / 30F  ${th.name}   SCORE ${this.gs.score}   TURN ${this.gs.turn}${boost}`);
+    const gate = this.gs.floorHasGate(this.gs.floor) ? (this.gs.floorBossDefeated ? 'GATE OPEN' : 'BOSS LOCK') : 'ROUTE OPEN';
+    this.topText.setText(`${String(this.gs.floor).padStart(2, '0')}F / 30F  ${th.name}   ${gate}   SCORE ${this.gs.score}   TURN ${this.gs.turn}${boost}`);
 
     this.statusText.setText(`${p.name}  Lv.${p.level}   (EXP ${p.exp}/${p.expNext})`);
     this.hpLabel.setText(`HP  ${p.hp} / ${p.hpMax}`);
@@ -442,27 +444,27 @@ export class UIScene extends Phaser.Scene {
     this.hpBar.fillStyle(0xff5a5a).fillRect(bx, by, bw * Math.max(0, p.hp / p.hpMax), 14);
 
     const w = p.weapon, s = p.shield;
-    const slotInfo: { tex: string | null; name: string; sub: string; plus: number }[] = [
-      w ? { tex: w.key, name: w.name, sub: `耐久 ${w.dur}/${w.durMax}`, plus: w.plus }
+    const slotInfo: { tex: string | null; name: string; sub: string; plus: number; grade?: 'D' | 'C' | 'B' | 'A' | 'S' }[] = [
+      w ? { tex: w.key, name: `[${w.grade}] ${w.name}`, sub: `耐久 ${w.dur}/${w.durMax}  強化${Math.round(this.gs.enhanceChance(w.plus) * 100)}%`, plus: w.plus, grade: w.grade }
         : { tex: null, name: '素手', sub: '', plus: 0 },
-      w?.dual ? { tex: w.key, name: w.name, sub: '二刀流・左手', plus: w.plus }
-        : s ? { tex: s.key, name: s.name, sub: `防 +${s.defBonus + s.plus}  耐久 ${s.dur}/${s.durMax}`, plus: s.plus }
+      w?.dual ? { tex: w.key, name: `[${w.grade}] ${w.name}`, sub: '二刀流・左手', plus: w.plus, grade: w.grade }
+        : s ? { tex: s.key, name: `[${s.grade}] ${s.name}`, sub: `防 +${s.defBonus + s.plus}  強化${Math.round(this.gs.enhanceChance(s.plus) * 100)}%`, plus: s.plus, grade: s.grade }
         : { tex: null, name: 'なし', sub: '', plus: 0 }
     ];
     this.equipSlots.forEach((slot, i) => {
       const info = slotInfo[i];
       const [sx, sy, sw, sh] = slot.rect;
       const has = info.tex !== null;
-      const rim = info.plus > 0 ? plusColor(info.plus) : 0x2f6f6a;
+      const rim = info.grade ? gradeColor(info.grade) : 0x2f6f6a;
       slot.bg.clear();
       slot.bg.fillStyle(0x0a1c20, has ? .96 : 0.5).fillRoundedRect(sx, sy, sw, sh, 10);
-      slot.bg.lineStyle(info.plus > 0 ? 2 : 1.5, rim, has ? 1 : 0.5).strokeRoundedRect(sx, sy, sw, sh, 8);
+      slot.bg.lineStyle(info.grade === 'S' ? 3 : info.grade === 'A' ? 2.5 : 1.5, rim, has ? 1 : 0.5).strokeRoundedRect(sx, sy, sw, sh, 8);
       if (has) {
         slot.icon.setTexture(info.tex!).setDisplaySize(this.equipIconSize, this.equipIconSize).setVisible(true).setAlpha(1);
       } else {
         slot.icon.setVisible(false);
       }
-      const nameCol = info.plus > 0 ? plusColorHex(info.plus) : '#e6eef7';
+      const nameCol = info.plus > 0 ? plusColorHex(info.plus) : info.grade ? '#' + gradeColor(info.grade).toString(16).padStart(6, '0') : '#e6eef7';
       slot.name.setText(info.name + (info.plus > 0 ? ` +${info.plus}` : '')).setColor(has ? nameCol : '#6b7c8c');
       slot.sub.setText(info.sub);
     });
@@ -614,8 +616,9 @@ export class UIScene extends Phaser.Scene {
     this.overlay.removeAll(true);
     const { x, y, w, h } = this.L.ov;
     const g = this.add.graphics();
-    g.fillStyle(0x0e1420, 0.98).fillRoundedRect(x, y, w, h, 10);
-    g.lineStyle(2, 0x3fe0d0).strokeRoundedRect(x, y, w, h, 10);
+    g.fillStyle(0x061316, 0.985).fillRoundedRect(x, y, w, h, 14);
+    g.fillStyle(0x143034, .26).fillRoundedRect(x + 5, y + 5, w - 10, h - 10, 10);
+    g.lineStyle(1.5, 0x58d9d1).strokeRoundedRect(x, y, w, h, 14);
     this.overlay.add(g);
 
     const pickTitles = ['⚔ 武器を変更', '🛡 盾を変更'];
@@ -623,7 +626,7 @@ export class UIScene extends Phaser.Scene {
       this.overlayMode === 'equip' ? '⚔ 装備（クリックで装備）' :
       this.overlayMode === 'inv' ? '🎒 所持品' :
       this.overlayMode === 'settings' ? '⚙ 設定（サウンド）' :
-      this.overlayMode === 'shop' ? '🛒 ショップ（クリックで購入）' :
+      this.overlayMode === 'shop' ? '🛒 フロアショップ' :
       this.overlayMode === 'gacha' ? '🎰 ダンジョンガチャ' :
       this.overlayMode === 'pick' ? pickTitles[this.pickSlot] :
       '👾 モンスター図鑑';
@@ -656,7 +659,7 @@ export class UIScene extends Phaser.Scene {
       p.weapons.forEach((wp, i) => {
         const equipped = wp === p.weapon;
         const risk = durabilityRisk(wp.dur, wp.durMax);
-        const frameCol = (wp.plus ?? 0) > 0 ? plusColor(wp.plus) : 0x2f6f6a;
+        const frameCol = gradeColor(wp.grade);
         const icon = this.framedIcon(x + 34, cy + 16, wp.key, frameCol);
         const row = this.rowButton(x + 58, cy, w - 74, `${equipped ? '▶ ' : '　'}${weaponFullName(wp)}  攻${wp.atkMin}-${wp.atkMax}  耐久${wp.dur}/${wp.durMax}(${risk.label})`, equipped, () => this.gs.equipWeapon(i));
         this.overlay.add([...icon, row]);
@@ -674,7 +677,7 @@ export class UIScene extends Phaser.Scene {
       p.shields.forEach((sh, i) => {
         const equipped = sh === p.shield;
         const risk = durabilityRisk(sh.dur, sh.durMax);
-        const frameCol = (sh.plus ?? 0) > 0 ? plusColor(sh.plus) : 0x2f6f6a;
+        const frameCol = gradeColor(sh.grade);
         const icon = this.framedIcon(x + 34, cy + 16, sh.key, frameCol);
         const totalDef = sh.defBonus + (sh.plus ?? 0);
         const row = this.rowButton(x + 58, cy, w - 74, `${equipped ? '▶ ' : '　'}${shieldFullName(sh)}  防御+${totalDef}  耐久${sh.dur}/${sh.durMax}(${risk.label})`, equipped, () => this.gs.equipShield(i));
@@ -704,7 +707,7 @@ export class UIScene extends Phaser.Scene {
       const equipped = wp === p.weapon;
       const risk = durabilityRisk(wp.dur, wp.durMax);
       // 枠の色は強化値で変化（+1黄/+2紫/+3青/+4赤、未強化はテール）
-      const frameCol = (wp.plus ?? 0) > 0 ? plusColor(wp.plus) : 0x2f6f6a;
+      const frameCol = gradeColor(wp.grade);
       const icon = this.framedIcon(x + 34, cy + 16, wp.key, frameCol);
       const row = this.rowButton(x + 58, cy, w - 74, `${equipped ? '▶ ' : '　'}${weaponFullName(wp)}  耐久${wp.dur}/${wp.durMax}(${risk.label})`, equipped, () => this.gs.equipWeapon(i));
       this.overlay.add([...icon, row]);
@@ -717,7 +720,7 @@ export class UIScene extends Phaser.Scene {
     p.shields.forEach((sh, i) => {
       const equipped = sh === p.shield;
       const risk = durabilityRisk(sh.dur, sh.durMax);
-      const frameCol = (sh.plus ?? 0) > 0 ? plusColor(sh.plus) : 0x2f6f6a;
+      const frameCol = gradeColor(sh.grade);
       const icon = this.framedIcon(x + 34, cy + 16, sh.key, frameCol);
       const totalDef = sh.defBonus + (sh.plus ?? 0);
       const row = this.rowButton(x + 58, cy, w - 74, `${equipped ? '▶ ' : '　'}${shieldFullName(sh)}  防御+${totalDef}  耐久${sh.dur}/${sh.durMax}(${risk.label})`, equipped, () => this.gs.equipShield(i));
@@ -777,36 +780,41 @@ export class UIScene extends Phaser.Scene {
     });
   }
 
-  // ---- ショップ：ゴールドで消耗品と強化石を購入 ----
+  // ============ フロアショップ ============
   buildShopOverlay(x: number, y: number, w: number) {
-    // 消耗品に加えて、武器強化石・盾強化石も購入できる
-    const shop: { kind: ItemKind; price: number }[] = [
-      { kind: 'potion', price: 25 },
-      { kind: 'dash', price: 60 },
-      { kind: 'invis', price: 100 },
-      { kind: 'stone', price: 120 },
-      { kind: 'shieldstone', price: 120 }
-    ];
-    // 所持ゴールド表示（右端の✕ボタンと重ならないよう左に寄せる）
-    const goldText = this.add.text(x + w - 60, y + 16, `所持 ${this.gs.player.gold} G`, {
+    const p = this.gs.player;
+    this.overlay.add(this.add.text(x + w - 58, y + 16, `所持 ${p.gold} G`, {
       fontFamily: '"Yu Gothic UI"', fontSize: '16px', color: '#f5c542', fontStyle: 'bold'
-    }).setOrigin(1, 0);
-    this.overlay.add(goldText);
+    }).setOrigin(1, 0));
+    this.overlay.add(this.add.text(x + 24, y + 58, '各階で在庫が補充されます。強化石は各2個まで、1個100G。', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: '#9db8b9'
+    }));
 
-    let cy = y + 52;
-    shop.forEach((s) => {
-      const def = ITEM_DEFS[s.kind];
-      const afford = this.gs.player.gold >= s.price;
-      const icon = this.add.image(x + 32, cy + 15, def.textureKey).setDisplaySize(28, 28);
-      if (!afford) icon.setAlpha(0.4);
-      const label = `${def.name}  —  ${s.price} G   （${def.desc}）`;
-      const row = this.rowButton(x + 52, cy, w - 68, label, false, () => {
-        if (this.gs.buyItem(s.kind, s.price)) this.setOverlay('shop'); // 買えたら再描画（ゴールド更新）
+    const rows: { kind: 'potion' | 'stone' | 'shieldstone'; price: number; label: string }[] = [
+      { kind: 'potion', price: 25, label: '回復ポーション　HPを40回復' },
+      { kind: 'stone', price: 100, label: 'ウェポンストーン　装備中の武器を強化' },
+      { kind: 'shieldstone', price: 100, label: 'シールドストーン　装備中の盾を強化' }
+    ];
+    let cy = y + 102;
+    for (const row of rows) {
+      const remaining = this.gs.shopRemaining(row.kind);
+      const color = row.kind === 'potion' ? 0x61c78d : row.kind === 'stone' ? 0xffc857 : 0x56a8ff;
+      const card = this.add.graphics();
+      card.fillStyle(0x111f26, .98).fillRoundedRect(x + 20, cy, w - 40, 88, 10);
+      card.lineStyle(1.5, remaining > 0 ? color : 0x4c5663, .9).strokeRoundedRect(x + 20, cy, w - 40, 88, 10);
+      const icon = this.add.image(x + 62, cy + 44, `i_${row.kind}`).setDisplaySize(48, 48);
+      const title = this.add.text(x + 104, cy + 16, row.label, {
+        fontFamily: '"Yu Gothic UI"', fontSize: '14px', color: '#eef5ff', fontStyle: 'bold'
       });
-      if (!afford) row.setAlpha(0.55);
-      this.overlay.add([icon, row]);
-      cy += 34;
-    });
+      const stock = this.add.text(x + 104, cy + 48, `価格 ${row.price}G　残り ${remaining}`, {
+        fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: remaining > 0 ? '#b8d8d6' : '#ff7b82'
+      });
+      const button = this.rowButton(x + w - 168, cy + 30, 128, remaining > 0 ? '購入する' : '売り切れ', remaining > 0, () => {
+        if (this.gs.buyItem(row.kind)) this.setOverlay('shop');
+      });
+      this.overlay.add([card, icon, title, stock, button]);
+      cy += 102;
+    }
   }
 
   // ============ ガチャ ============
@@ -822,14 +830,17 @@ export class UIScene extends Phaser.Scene {
     }).setOrigin(0.5));
 
     // 説明
-    this.overlay.add(this.add.text(x + w / 2, y + 79, '古の宝箱へ300Gを捧げ、未知のレリックを召喚する', {
+    this.overlay.add(this.add.text(x + w / 2, y + 79, '300Gでグレード付き武器または盾を召喚する', {
       fontFamily: '"Yu Gothic UI"', fontSize: '15px', color: '#eef3ee', fontStyle: 'bold'
     }).setOrigin(0.5));
 
     // 排出ランク表
-    this.overlay.add(this.add.text(x + w / 2, y + 108, [
+    this.overlay.add(this.add.text(x + w / 2, y + 132, [
       'SS  3%     S  12%     A  25%     B  35%     C  25%',
-      '最高級レリック        強化装備        装備・素材        消耗品'
+      '装備グレード:  SS→S　S→A　A→B　B→C　C→D',
+      this.gs.weaponWonThisFloor
+        ? 'この階の武器は取得済み  /  以降は盾のみ排出'
+        : '武器50%・盾50%  /  武器は1階につき最大1本'
     ].join('\n'), {
       fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#859a9c', align: 'center', lineSpacing: 7
     }).setOrigin(0.5));

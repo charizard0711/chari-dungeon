@@ -104,7 +104,6 @@ const FRAME_DEFS: FrameDef[] = [
   { key: 'i_oldkey', sheet: 'items', r: [428, 715, 538, 848], mode: 'sprite', size: 48},
   { key: 'i_floorkey', sheet: 'items', r: [583, 715, 693, 848], mode: 'sprite', size: 48},
   { key: 'i_stone', sheet: 'items', r: [745, 715, 868, 848], mode: 'sprite', size: 48},  // ダンジョンコアの欠片=強化石
-  { key: 'i_map', sheet: 'items', r: [915, 715, 1038, 848], mode: 'sprite', size: 48},
   { key: 'i_seal', sheet: 'items', r: [1085, 715, 1196, 848], mode: 'sprite', size: 48},
 
   // ---- エフェクト（効果シートから切り抜き）----

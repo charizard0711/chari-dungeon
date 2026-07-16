@@ -459,7 +459,6 @@ function buildItemTextures(scene: Phaser.Scene) {
     revive: (g) => { px(g, 11, 8, 2, 12, 0x8a5a2a); px(g, 6, 4, 5, 5, 0x6fae2a); px(g, 13, 4, 5, 5, 0x6fae2a); px(g, 10, 2, 4, 4, 0x9fdf3a); },
     oldkey: (g) => { g.lineStyle(3, 0xc0a040); g.strokeCircle(8, 8, 4); px(g, 9, 10, 3, 10, 0xc0a040); px(g, 12, 16, 4, 3, 0xc0a040); },
     floorkey: (g) => { g.lineStyle(3, 0x4fd0e0); g.strokeCircle(8, 8, 4); px(g, 9, 10, 3, 10, 0x4fd0e0); px(g, 12, 16, 4, 3, 0x4fd0e0); },
-    map: (g) => { px(g, 4, 6, 16, 12, 0xd8c89a); px(g, 4, 6, 16, 2, 0xb0a070); g.lineStyle(1, 0x8a6a3a); g.strokeRect(7, 9, 10, 6); },
     seal: (g) => { px(g, 5, 4, 14, 16, 0x2a2450); px(g, 7, 6, 10, 12, 0x4a3a7a); px(g, 10, 9, 4, 4, 0xa06bff); },
     stone: (g) => { g.fillStyle(0x4fd0e0); g.fillTriangle(12, 2, 20, 12, 12, 22); g.fillTriangle(12, 2, 4, 12, 12, 22); g.fillStyle(0xbfefff, 0.8); g.fillTriangle(12, 5, 16, 12, 12, 12); },
     // 盾強化石：琥珀色の結晶＋盾マーク（縦の強化）

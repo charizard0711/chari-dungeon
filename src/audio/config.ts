@@ -34,10 +34,10 @@ export type BgmName = keyof typeof BGM_DEFS;
 
 // 階層 → BGMトラックのマッピング
 export function bgmForFloor(floor: number): BgmName {
-  if (floor <= 10) return 'ruins';
-  if (floor <= 20) return 'machine';
-  if (floor <= 29) return 'core';
-  return 'final';
+  if (floor >= 30) return 'final';
+  // 2階ごとに曲を切り替える。3曲を循環させ、連続した階層では同じ曲を維持する。
+  const band = Math.floor((Math.max(1, floor) - 1) / 2);
+  return (['ruins', 'machine', 'core'] as const)[band % 3];
 }
 
 // ---- 効果音（システム音）----

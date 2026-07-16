@@ -1,4 +1,4 @@
-import type { Weapon, Shield, Item, Dir, Magic, MagicCode } from './types';
+import type { Weapon, Shield, Item, Dir, Magic, MagicCode, EquipmentGrade } from './types';
 import { WEAPON_DEFS, SHIELD_DEFS, magicLabel, makeItem } from './data';
 
 export class Player {
@@ -101,17 +101,21 @@ export function makeWeapon(key: string, magics: Magic[]): Weapon {
   }
   return {
     key: def.key, name: def.name, atkMin, atkMax,
-    durMax, dur: durMax, magics, plus: 0, dual: def.dual
+    durMax, dur: durMax, magics, grade: def.grade, plus: 0, dual: def.dual
   };
 }
 
-export function makeShield(key: string): Shield {
+export function makeShield(key: string, gradeOverride?: EquipmentGrade): Shield {
   const def = SHIELD_DEFS.find((d) => d.key === key)!;
-  return { key: def.key, name: def.name, defBonus: def.defBonus, durMax: def.durMax, dur: def.durMax, plus: 0 };
+  const grade = gradeOverride ?? def.grade;
+  const gradeIndex = ['D', 'C', 'B', 'A', 'S'].indexOf(grade);
+  const defBonus = Math.max(def.defBonus, 2 + gradeIndex * 2);
+  const durMax = Math.max(def.durMax, 40 + gradeIndex * 15);
+  return { key: def.key, name: def.name, defBonus, durMax, dur: durMax, grade, plus: 0 };
 }
 
 export function shieldFullName(s: Shield): string {
-  return `${(s.plus ?? 0) > 0 ? `+${s.plus} ` : ''}${s.name}`;
+  return `[${s.grade}] ${(s.plus ?? 0) > 0 ? `+${s.plus} ` : ''}${s.name}`;
 }
 
 // ランダムなマジックをn個生成（ガチャ・武器生成で共用）
@@ -151,9 +155,16 @@ export function rollWeapon(floor: number): Weapon {
   return weapon;
 }
 
+export function rollWeaponByGrade(grade: EquipmentGrade): Weapon {
+  const pool = WEAPON_DEFS.filter((d) => d.grade === grade);
+  const picked = pool[Math.floor(Math.random() * pool.length)] ?? WEAPON_DEFS[0];
+  const magicCount = grade === 'S' ? 2 : grade === 'A' ? 1 : grade === 'B' && Math.random() < 0.35 ? 1 : 0;
+  return makeWeapon(picked.key, rollMagics(magicCount));
+}
+
 export function weaponFullName(w: Weapon): string {
   const plus = (w.plus ?? 0) > 0 ? `+${w.plus} ` : '';
   const magic = w.magics.length ? ` [${w.magics.map((m) => m.label).join('')}]` : '';
   const dual = w.dual ? '〔二刀〕' : '';
-  return `${plus}${w.name}${dual}${magic}`;
+  return `[${w.grade}] ${plus}${w.name}${dual}${magic}`;
 }
