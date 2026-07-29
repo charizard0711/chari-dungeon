@@ -19,7 +19,12 @@ const MAP_ZOOM = 1.95;
 // アンチエイリアスとカメラ拡大で生じる細い隙間を隠すため、地形同士を少し重ねる。
 const TERRAIN_RENDER_SIZE = TILE + 1;
 const WALL_VISIBLE_TINT = 0xffffff;
-const WALL_EXPLORED_TINT = 0x4a2b19;
+const WALL_EXPLORED_TINT = 0x10161a;
+const BOSS_ROOM_FLOOR_TINT = 0xd6a85c;
+const BOSS_ROOM_EXPLORED_TINT = 0x49391f;
+const HOLD_FIRST_REPEAT_MS = 145;
+const HOLD_BOOST_MS = 300;
+const HOLD_MAX_BOOST_MS = 820;
 
 // ボスはHPを倍にしつつ、攻撃と防御は控えめに上げる。
 // 全能力を2倍にすると体感難度が約4倍になるため、総合的に約2倍の強さへ寄せる。
@@ -1792,11 +1797,12 @@ export class GameScene extends Phaser.Scene {
       targets: e.sprite,
       scaleX: e.baseScale * (rushing ? 1.14 : 1.08),
       scaleY: e.baseScale * (flying ? 1.04 : 0.9),
-      duration: ANIM * 0.5,
+      duration: this.currentTurnAnimDuration(ANIM * 0.5),
       yoyo: true,
       ease: 'Sine.easeInOut'
     });
-    const duration = rushing ? ANIM * 0.76 : e.def.behavior === 'slow' ? ANIM * 1.14 : ANIM;
+    const baseDuration = rushing ? ANIM * 0.76 : e.def.behavior === 'slow' ? ANIM * 1.14 : ANIM;
+    const duration = this.currentTurnAnimDuration(baseDuration);
     return this.tween(e.sprite, { x: targetX, y: targetY }, duration, flying ? 'Sine.easeOut' : 'Sine.easeInOut').then(() => {
       e.animating = false;
       e.sprite.setScale(e.baseScale).setAngle(0);
@@ -1813,13 +1819,14 @@ export class GameScene extends Phaser.Scene {
       targets: e.sprite,
       scaleX: e.baseScale * 1.16,
       scaleY: e.baseScale * 0.84,
-      duration: ANIM / 2,
+      duration: this.currentTurnAnimDuration(ANIM / 2),
       yoyo: true,
       ease: 'Back.easeInOut'
     });
     return new Promise((resolve) => {
       this.tweens.add({
-        targets: e.sprite, x: (ox + px) / 2, y: (oy + py) / 2, duration: ANIM / 2, yoyo: true,
+        targets: e.sprite, x: (ox + px) / 2, y: (oy + py) / 2,
+        duration: this.currentTurnAnimDuration(ANIM / 2), yoyo: true,
         onComplete: () => {
           e.animating = false;
           e.sprite.setScale(e.baseScale).setAngle(0);
@@ -1848,14 +1855,15 @@ export class GameScene extends Phaser.Scene {
       targets: e.sprite,
       scaleX: e.baseScale * 0.9,
       scaleY: e.baseScale * 1.12,
-      duration: 90,
+      duration: this.currentTurnAnimDuration(90),
       yoyo: true,
       ease: 'Sine.easeInOut'
     });
     return new Promise((resolve) => {
       const bolt = this.add.image(e.sprite.x, e.sprite.y, 'fx_bolt').setDepth(20).setTint(e.def.color);
       this.tweens.add({
-        targets: bolt, x: this.playerSprite.x, y: this.playerSprite.y, duration: 180,
+        targets: bolt, x: this.playerSprite.x, y: this.playerSprite.y,
+        duration: this.currentTurnAnimDuration(180),
         onComplete: () => {
           e.animating = false;
           e.sprite.setScale(e.baseScale);
@@ -1972,10 +1980,12 @@ export class GameScene extends Phaser.Scene {
       for (let x = 0; x < d.w; x++) {
         const spr = this.tileSprites[y][x];
         const isWall = d.tiles[y][x] === 'wall';
+        const room = d.bossRoom;
+        const isBossRoomFloor = !!room && x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h;
         if (visible[y][x]) {
           const firstReveal = !spr.visible || spr.alpha < .5;
           spr.setVisible(true);
-          spr.setTint(isWall ? WALL_VISIBLE_TINT : this.themeTileTint);
+          spr.setTint(isWall ? WALL_VISIBLE_TINT : isBossRoomFloor ? BOSS_ROOM_FLOOR_TINT : this.themeTileTint);
           if (firstReveal) {
             spr.setAlpha(.16);
             this.tweens.add({ targets: spr, alpha: 1, duration: 260, ease: 'Quad.easeOut' });
@@ -1983,7 +1993,7 @@ export class GameScene extends Phaser.Scene {
         } else if (this.explored[y][x]) {
           const firstReveal = !spr.visible || spr.alpha < .2;
           spr.setVisible(true);
-          spr.setTint(isWall ? WALL_EXPLORED_TINT : 0x172126);
+          spr.setTint(isWall ? WALL_EXPLORED_TINT : isBossRoomFloor ? BOSS_ROOM_EXPLORED_TINT : 0x172126);
           if (firstReveal) {
             spr.setAlpha(.05);
             this.tweens.add({ targets: spr, alpha: .18, duration: 260, ease: 'Quad.easeOut' });
@@ -2632,24 +2642,29 @@ export class GameScene extends Phaser.Scene {
       this.heldDir = dir;
       this.holdStartedAt = time;
       this.setBoostTier(0);
-      this.holdRepeatAt = time + 220; // 少し待ってからリピート開始
+      this.holdRepeatAt = time + HOLD_FIRST_REPEAT_MS;
       this.playerAct('move', dir);
     } else if (time >= this.holdRepeatAt) {
       const heldFor = time - this.holdStartedAt;
-      this.setBoostTier(heldFor >= 1350 ? 2 : heldFor >= 580 ? 1 : 0);
+      this.setBoostTier(heldFor >= HOLD_MAX_BOOST_MS ? 2 : heldFor >= HOLD_BOOST_MS ? 1 : 0);
       // 長押し中：進める時だけ歩く（壁に向かってのログ連打を防ぐ）
       if (this.canMoveInto(dir)) {
         this.playerAct('move', dir);
-        this.holdRepeatAt = time + (this.holdBoostTier === 2 ? 54 : this.holdBoostTier === 1 ? 76 : 112);
+        this.holdRepeatAt = time + (this.holdBoostTier === 2 ? 44 : this.holdBoostTier === 1 ? 62 : 96);
       }
     }
   }
 
   currentMoveDuration(): number {
     if (this.clickPathActive) return 40;
-    if (this.holdBoostTier === 2) return 58;
-    if (this.holdBoostTier === 1) return 78;
-    return ANIM;
+    if (this.holdBoostTier === 2) return 44;
+    if (this.holdBoostTier === 1) return 62;
+    return 104;
+  }
+
+  currentTurnAnimDuration(base: number): number {
+    const scale = this.clickPathActive ? 0.48 : this.holdBoostTier === 2 ? 0.44 : this.holdBoostTier === 1 ? 0.64 : 1;
+    return Math.max(28, Math.round(base * scale));
   }
 
   setBoostTier(tier: number) {

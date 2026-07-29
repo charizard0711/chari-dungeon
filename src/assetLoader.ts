@@ -240,41 +240,6 @@ function boostColor(img: ImageData, sat: number, contrast: number) {
 }
 
 // 縁から背景をフラッドフィルで透過（内部の白/明色は保持される）
-// 壁は元絵の凹凸を残したまま、床と見分けやすい暖色の石壁へ統一する。
-function recolorWallBrown(img: ImageData, key: string) {
-  const palettes: Record<string, { shadow: [number, number, number]; mid: [number, number, number]; light: [number, number, number] }> = {
-    wall_1:  { shadow: [50, 29, 17], mid: [126, 75, 38], light: [224, 163, 91] },
-    wall_11: { shadow: [57, 31, 15], mid: [143, 82, 34], light: [232, 171, 79] },
-    wall_21: { shadow: [47, 28, 23], mid: [117, 68, 48], light: [207, 143, 96] },
-    wall_30: { shadow: [43, 24, 17], mid: [109, 58, 31], light: [218, 143, 70] }
-  };
-  const palette = palettes[key] ?? palettes.wall_1;
-  const d = img.data;
-  let minLum = 255;
-  let maxLum = 0;
-
-  for (let i = 0; i < d.length; i += 4) {
-    if (d[i + 3] === 0) continue;
-    const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-    minLum = Math.min(minLum, lum);
-    maxLum = Math.max(maxLum, lum);
-  }
-
-  const range = Math.max(1, maxLum - minLum);
-  const mix = (a: number, b: number, t: number) => Math.round(a + (b - a) * t);
-  for (let i = 0; i < d.length; i += 4) {
-    if (d[i + 3] === 0) continue;
-    const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-    const t = Math.max(0, Math.min(1, (lum - minLum) / range));
-    const from = t < 0.58 ? palette.shadow : palette.mid;
-    const to = t < 0.58 ? palette.mid : palette.light;
-    const localT = t < 0.58 ? t / 0.58 : (t - 0.58) / 0.42;
-    d[i] = mix(from[0], to[0], localT);
-    d[i + 1] = mix(from[1], to[1], localT);
-    d[i + 2] = mix(from[2], to[2], localT);
-  }
-}
-
 function chromaFlood(img: ImageData, bg: [number, number, number], thr: number) {
   const { width: w, height: h, data: d } = img;
   const visited = new Uint8Array(w * h);
@@ -336,8 +301,6 @@ export function applyRealAssets(scene: Phaser.Scene): { applied: number; skipped
 
     // 色をほんの少しだけ整える（やり過ぎるとAIっぽく不自然になるので控えめ）
     boostColor(tight, def.mode === 'tile' ? 1.08 : 1.12, def.mode === 'tile' ? 1.02 : 1.04);
-    if (/^wall_/.test(def.key)) recolorWallBrown(tight, def.key);
-
     // 一時canvasへ
     const tmp = document.createElement('canvas');
     tmp.width = tw; tmp.height = th;
