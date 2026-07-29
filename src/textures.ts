@@ -55,10 +55,10 @@ export function buildTileTextures(scene: Phaser.Scene) {
   }
   // 系統ごとの手続きタイル用パレット（実アセットが読めない時のフォールバック）
   const TILE_PAL: Record<number, { floorColor: number; floorAlt: number; wallColor: number; wallTop: number; accent: number }> = {
-    1:  { floorColor: 0x2a3b34, floorAlt: 0x233029, wallColor: 0x35404f, wallTop: 0x46566a, accent: 0x3fe0d0 },
-    11: { floorColor: 0x22333a, floorAlt: 0x1b2a30, wallColor: 0x2c3d47, wallTop: 0x3a5560, accent: 0x2fd0b0 },
-    21: { floorColor: 0x2e2440, floorAlt: 0x241b33, wallColor: 0x38294f, wallTop: 0x4d3a6b, accent: 0xa06bff },
-    30: { floorColor: 0x241a30, floorAlt: 0x1a1226, wallColor: 0x3a2450, wallTop: 0x5a3a7a, accent: 0xf5c542 },
+    1:  { floorColor: 0x2a3b34, floorAlt: 0x233029, wallColor: 0x7e4b26, wallTop: 0xc28a4d, accent: 0x3fe0d0 },
+    11: { floorColor: 0x22333a, floorAlt: 0x1b2a30, wallColor: 0x8f5222, wallTop: 0xd29a4f, accent: 0x2fd0b0 },
+    21: { floorColor: 0x2e2440, floorAlt: 0x241b33, wallColor: 0x754430, wallTop: 0xb98258, accent: 0xa06bff },
+    30: { floorColor: 0x241a30, floorAlt: 0x1a1226, wallColor: 0x6d3a20, wallTop: 0xb96f37, accent: 0xf5c542 },
   };
   const themeFloors = [1, 11, 21, 30];
   for (const tf of themeFloors) {
@@ -71,10 +71,6 @@ export function buildTileTextures(scene: Phaser.Scene) {
       const base = v % 2 === 0 ? th.floorColor : th.floorAlt;
       px(g, 0, 0, TILE, TILE, base);
       const r = rng(tf * 100 + v + 7);
-      // タイル目地
-      px(g, 0, 0, TILE, 1, shade(base, 0.7));
-      px(g, 0, 0, 1, TILE, shade(base, 0.7));
-      px(g, 0, TILE - 1, TILE, 1, shade(base, 1.25));
       // ノイズ
       for (let i = 0; i < 14; i++) {
         const x = Math.floor(r() * TILE);

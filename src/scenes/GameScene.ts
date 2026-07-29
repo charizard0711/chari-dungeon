@@ -16,6 +16,16 @@ import { MAP_X, MAP_Y, MAP_W, MAP_H } from '../layout';
 const ANIM = 116;
 // 探索画面のズーム倍率（大きいほど拡大。1.0=等倍）
 const MAP_ZOOM = 1.95;
+// アンチエイリアスとカメラ拡大で生じる細い隙間を隠すため、地形同士を少し重ねる。
+const TERRAIN_RENDER_SIZE = TILE + 1;
+const WALL_VISIBLE_TINT = 0xffffff;
+const WALL_EXPLORED_TINT = 0x4a2b19;
+
+// ボスはHPを倍にしつつ、攻撃と防御は控えめに上げる。
+// 全能力を2倍にすると体感難度が約4倍になるため、総合的に約2倍の強さへ寄せる。
+const BOSS_HP_MULTIPLIER = 2;
+const BOSS_ATTACK_MULTIPLIER = 1.35;
+const BOSS_DEFENSE_MULTIPLIER = 1.15;
 
 const MID_DRAGONS: { key: string; name: string; tint: number }[] = [
   { key: 'm_ember_drake', name: 'エンバードラゴン', tint: 0xff6a35 },
@@ -53,14 +63,6 @@ interface Chest {
   glow?: Phaser.GameObjects.Image;
   phase: number;
   baseScale: number;
-}
-
-// tint色を暗くする（壁と道のコントラスト用）
-function darken(color: number, f: number): number {
-  const r = Math.floor(((color >> 16) & 0xff) * f);
-  const g = Math.floor(((color >> 8) & 0xff) * f);
-  const b = Math.floor((color & 0xff) * f);
-  return (r << 16) | (g << 8) | b;
 }
 
 interface GroundItem {
@@ -287,7 +289,9 @@ export class GameScene extends Phaser.Scene {
       for (let x = 0; x < d.w; x++) {
         const t = d.tiles[y][x];
         const key = this.tileTexKey(t, themeSuffix, x, y);
-        const spr = this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, key).setDepth(0);
+        const spr = this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, key)
+          .setDepth(0)
+          .setDisplaySize(TERRAIN_RENDER_SIZE, TERRAIN_RENDER_SIZE);
         this.tileSprites[y][x] = spr;
       }
     }
@@ -396,10 +400,10 @@ export class GameScene extends Phaser.Scene {
     const def: MonsterDef = {
       ...base,
       name: spec.name,
-      hp: Math.max(26, Math.floor(base.hp * (1.35 + floor * 0.025))),
-      atkMin: Math.max(3, Math.floor(base.atkMin * (1.04 + floor * 0.008))),
-      atkMax: Math.max(7, Math.floor(base.atkMax * (1.04 + floor * 0.008))),
-      def: Math.max(1, base.def + Math.floor(floor / 10)),
+      hp: Math.max(52, Math.floor(base.hp * (1.35 + floor * 0.025) * BOSS_HP_MULTIPLIER)),
+      atkMin: Math.max(4, Math.floor(base.atkMin * (1.04 + floor * 0.008) * BOSS_ATTACK_MULTIPLIER)),
+      atkMax: Math.max(9, Math.floor(base.atkMax * (1.04 + floor * 0.008) * BOSS_ATTACK_MULTIPLIER)),
+      def: Math.max(1, Math.ceil((base.def + Math.floor(floor / 10)) * BOSS_DEFENSE_MULTIPLIER)),
       exp: Math.max(12, base.exp * 2),
       gold: Math.max(18, base.gold * 3),
       score: Math.max(90, base.score * 3),
@@ -421,10 +425,10 @@ export class GameScene extends Phaser.Scene {
     const def: MonsterDef = {
       ...base,
       name: spec.name,
-      hp: spec.hp,
-      atkMin: spec.atkMin,
-      atkMax: spec.atkMax,
-      def: spec.def,
+      hp: Math.floor(spec.hp * BOSS_HP_MULTIPLIER),
+      atkMin: Math.floor(spec.atkMin * BOSS_ATTACK_MULTIPLIER),
+      atkMax: Math.floor(spec.atkMax * BOSS_ATTACK_MULTIPLIER),
+      def: Math.ceil(spec.def * BOSS_DEFENSE_MULTIPLIER),
       exp: Math.max(30, base.exp * 4),
       gold: Math.max(45, base.gold * 5),
       score: Math.max(240, base.score * 6),
@@ -1275,7 +1279,7 @@ export class GameScene extends Phaser.Scene {
         if (visible[y][x]) {
           const firstReveal = !spr.visible || spr.alpha < .5;
           spr.setVisible(true);
-          spr.setTint(isWall ? darken(this.themeTileTint, 0.45) : this.themeTileTint);
+          spr.setTint(isWall ? WALL_VISIBLE_TINT : this.themeTileTint);
           if (firstReveal) {
             spr.setAlpha(.16);
             this.tweens.add({ targets: spr, alpha: 1, duration: 260, ease: 'Quad.easeOut' });
@@ -1283,7 +1287,7 @@ export class GameScene extends Phaser.Scene {
         } else if (this.explored[y][x]) {
           const firstReveal = !spr.visible || spr.alpha < .2;
           spr.setVisible(true);
-          spr.setTint(isWall ? 0x10161a : 0x172126);
+          spr.setTint(isWall ? WALL_EXPLORED_TINT : 0x172126);
           if (firstReveal) {
             spr.setAlpha(.05);
             this.tweens.add({ targets: spr, alpha: .18, duration: 260, ease: 'Quad.easeOut' });
