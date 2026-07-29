@@ -17,6 +17,7 @@ export interface DungeonData {
   start: Vec2;
   stairs: Vec2;
   hazards: Vec2[];          // 毒床/落とし穴などのハザード位置
+  bossRoom?: Room;          // ボス階専用の広い戦闘部屋
 }
 
 function irand(min: number, max: number): number {
@@ -25,6 +26,7 @@ function irand(min: number, max: number): number {
 
 // 狭い迷路型マップ：1マス幅の道が中心。部屋はごく小さいものが少しだけ。
 export function generateDungeon(floor: number): DungeonData {
+  const isBossFloor = floor % 2 === 0 || floor % 5 === 0;
   // 迷路のセル数（深い階ほど少しだけ広くなる）
   const cw = 11 + Math.min(4, Math.floor(floor / 6));
   const ch = 8 + Math.min(3, Math.floor(floor / 8));
@@ -82,6 +84,23 @@ export function generateDungeon(floor: number): DungeonData {
     rooms.push({ x: rx, y: ry, w: 3, h: 3, cx: rx + 1, cy: ry + 1 });
   }
 
+  // ボス階は出口付近に広い戦闘部屋を作り、回避ギミックを使える空間を確保する。
+  let bossRoom: Room | undefined;
+  if (isBossFloor) {
+    const bw = floor % 5 === 0 ? 9 : 7;
+    const bh = floor % 5 === 0 ? 7 : 6;
+    const rx = Math.max(2, w - bw - 2);
+    const ry = Math.max(2, Math.floor((h - bh) / 2));
+    for (let y = ry; y < ry + bh; y++) {
+      for (let x = rx; x < rx + bw; x++) tiles[y][x] = 'floor';
+    }
+    bossRoom = {
+      x: rx, y: ry, w: bw, h: bh,
+      cx: rx + Math.floor(bw / 2), cy: ry + Math.floor(bh / 2)
+    };
+    rooms.push(bossRoom);
+  }
+
   // ---- スタートと階段（BFSで一番遠い床に階段＝探索しがいを出す）----
   const start = { x: 1, y: 1 };
   const dist: number[][] = [];
@@ -110,6 +129,7 @@ export function generateDungeon(floor: number): DungeonData {
   for (let i = 0; i < hazardCount; i++) {
     const x = irand(1, w - 2);
     const y = irand(1, h - 2);
+    if (bossRoom && x >= bossRoom.x && x < bossRoom.x + bossRoom.w && y >= bossRoom.y && y < bossRoom.y + bossRoom.h) continue;
     if (tiles[y][x] === 'floor' && !(x === start.x && y === start.y)) {
       const t = hazardTypes[irand(0, hazardTypes.length - 1)];
       tiles[y][x] = t;
@@ -117,7 +137,7 @@ export function generateDungeon(floor: number): DungeonData {
     }
   }
 
-  return { w, h, tiles, rooms, start, stairs, hazards };
+  return { w, h, tiles, rooms, start, stairs, hazards, bossRoom };
 }
 
 export function isWalkable(t: TileType): boolean {
