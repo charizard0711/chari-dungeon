@@ -35,35 +35,28 @@ function carveCell(tiles: TileType[][], x: number, y: number) {
 }
 
 function mazeCellPosition(cellX: number, cellY: number): Vec2 {
-  return { x: 1 + cellX * 3, y: 1 + cellY * 3 };
+  return { x: 1 + cellX * 2, y: 1 + cellY * 2 };
 }
 
 function carveMazeCell(tiles: TileType[][], cellX: number, cellY: number) {
   const position = mazeCellPosition(cellX, cellY);
   carveCell(tiles, position.x, position.y);
-  carveCell(tiles, position.x + 1, position.y);
-  carveCell(tiles, position.x, position.y + 1);
-  carveCell(tiles, position.x + 1, position.y + 1);
 }
 
 function connectMazeCells(tiles: TileType[][], cellX: number, cellY: number, dx: number, dy: number) {
   const position = mazeCellPosition(cellX, cellY);
   if (dx === 1) {
-    carveCell(tiles, position.x + 2, position.y);
-    carveCell(tiles, position.x + 2, position.y + 1);
+    carveCell(tiles, position.x + 1, position.y);
   } else if (dx === -1) {
     carveCell(tiles, position.x - 1, position.y);
-    carveCell(tiles, position.x - 1, position.y + 1);
   } else if (dy === 1) {
-    carveCell(tiles, position.x, position.y + 2);
-    carveCell(tiles, position.x + 1, position.y + 2);
+    carveCell(tiles, position.x, position.y + 1);
   } else if (dy === -1) {
     carveCell(tiles, position.x, position.y - 1);
-    carveCell(tiles, position.x + 1, position.y - 1);
   }
 }
 
-function generateWidePathMaze(tiles: TileType[][], columns: number, rows: number) {
+function generateSinglePathMaze(tiles: TileType[][], columns: number, rows: number) {
   const visited = Array.from({ length: rows }, () => Array<boolean>(columns).fill(false));
   const stack: Vec2[] = [{ x: 0, y: 0 }];
   visited[0][0] = true;
@@ -85,17 +78,6 @@ function generateWidePathMaze(tiles: TileType[][], columns: number, rows: number
     stack.push({ x: next.x, y: next.y });
   }
 
-  // A few loops prevent long dead-end walks while preserving the maze structure.
-  const extraLinks = Math.max(3, Math.floor(columns * rows * 0.1));
-  for (let i = 0; i < extraLinks; i++) {
-    const cellX = irand(0, columns - 1);
-    const cellY = irand(0, rows - 1);
-    const candidates = DIRS.filter(([dx, dy]) => (
-      cellX + dx >= 0 && cellY + dy >= 0 && cellX + dx < columns && cellY + dy < rows
-    ));
-    const [dx, dy] = candidates[irand(0, candidates.length - 1)];
-    connectMazeCells(tiles, cellX, cellY, dx, dy);
-  }
 }
 
 function carveRoom(tiles: TileType[][], room: Room) {
@@ -132,18 +114,17 @@ function farthestReachableFloor(tiles: TileType[][], start: Vec2): Vec2 {
 
 export function generateDungeon(floor: number): DungeonData {
   const isBossFloor = floor % 2 === 0 || floor % 5 === 0;
-  const mazeColumns = 8 + Math.min(3, Math.floor(floor / 8));
-  const mazeRows = 6 + Math.min(2, Math.floor(floor / 10));
-  const mazeWidth = mazeColumns * 3 + 1;
+  const mazeColumns = 11 + Math.min(4, Math.floor(floor / 6));
+  const mazeRows = 8 + Math.min(3, Math.floor(floor / 8));
+  const mazeWidth = mazeColumns * 2 + 1;
   const w = mazeWidth + (isBossFloor ? 8 : 0);
-  const h = mazeRows * 3 + 1;
+  const h = mazeRows * 2 + 1;
   const tiles: TileType[][] = Array.from({ length: h }, () => Array<TileType>(w).fill('wall'));
 
-  // Every logical maze cell is a 2x2 path with only a one-tile wall between paths.
-  // This keeps the maze while avoiding large, block-like wall masses.
-  generateWidePathMaze(tiles, mazeColumns, mazeRows);
+  // Normal floors are a classic one-tile-wide maze. Only boss floors get a room.
+  generateSinglePathMaze(tiles, mazeColumns, mazeRows);
 
-  const start = { x: 2, y: 2 };
+  const start = { x: 1, y: 1 };
   const rooms: Room[] = [];
   let bossRoom: Room | undefined;
   let stairs: Vec2;
@@ -155,7 +136,7 @@ export function generateDungeon(floor: number): DungeonData {
     const entrance = { x: bossRoom.x, y: bossRoom.cy };
     const approach = { x: bossRoom.x - 1, y: bossRoom.cy };
     const staging = { x: bossRoom.x - 2, y: bossRoom.cy };
-    const sourceRow = Math.max(0, Math.min(mazeRows - 1, Math.round((bossRoom.cy - 1) / 3)));
+    const sourceRow = Math.max(0, Math.min(mazeRows - 1, Math.round((bossRoom.cy - 1) / 2)));
     const source = { x: staging.x, y: mazeCellPosition(mazeColumns - 1, sourceRow).y };
     carveThinCorridor(tiles, source, staging);
 

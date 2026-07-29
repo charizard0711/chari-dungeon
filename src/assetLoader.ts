@@ -272,6 +272,8 @@ export function applyRealAssets(scene: Phaser.Scene): { applied: number; skipped
   const THR = 14;
 
   for (const def of ALL_DEFS) {
+    // 床と壁は接続方向別のオートタイルを使うため、素材画像では上書きしない。
+    if (/^(floor|wall)_/.test(def.key)) continue;
     if (!(def.sheet in sheets)) sheets[def.sheet] = prepareSheet(scene, def.sheet);
     const sd = sheets[def.sheet];
     if (!sd) { skipped.push(def.key); continue; }
