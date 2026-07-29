@@ -187,10 +187,12 @@ function songGameover(): Song {
 
 const SONGS: Record<BgmName, () => Song> = {
   title: songTitle,
-  ruins: songRuins,
-  machine: songMachine,
-  core: songCore,
-  final: songFinal,
+  // 実音源が取得できない場合だけ使うフォールバック。
+  floor01: songTitle,
+  floor03: songRuins,
+  floor05: songTitle,
+  floor07: songMachine,
+  floor09: songFinal,
   clear: songClear,
   gameover: songGameover
 };
