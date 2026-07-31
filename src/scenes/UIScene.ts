@@ -56,11 +56,11 @@ export class UIScene extends Phaser.Scene {
     if (IS_MOBILE) {
       // スマホ縦持ち：縦型レイアウト
       this.L = {
-        hpBar: { x: 20, y: 114, w: 560 },
-        items: { x: 18, y: 622, cols: 9 },
-        ov: { x: 10, y: 120, w: 580, h: 760 }
+        hpBar: { x: 20, y: 94, w: 350 },
+        items: { x: 14, y: 584, cols: 6 },
+        ov: { x: 8, y: 48, w: 374, h: 746 }
       };
-      this.equipIconSize = 52;
+      this.equipIconSize = 28;
       this.buildMobileLayout();
     } else {
       // PC：従来レイアウト
@@ -106,6 +106,15 @@ export class UIScene extends Phaser.Scene {
     });
 
     this.refresh();
+
+    // ローカル表示確認用。例: ?mobile=1&qa-game&qa-overlay=settings
+    if (location.hostname === 'localhost') {
+      const qaOverlay = new URLSearchParams(location.search).get('qa-overlay');
+      const allowed = ['equip', 'inv', 'codex', 'settings', 'shop', 'gacha'] as const;
+      if (qaOverlay && allowed.includes(qaOverlay as typeof allowed[number])) {
+        this.time.delayedCall(100, () => this.setOverlay(qaOverlay as typeof allowed[number]));
+      }
+    }
   }
 
   // ============ フレーム ============
@@ -259,63 +268,65 @@ export class UIScene extends Phaser.Scene {
   // ============ スマホ縦型レイアウト ============
   buildMobileLayout() {
     // ---- 上部バー（タイトル＋フロア情報）----
-    this.panel(8, 8, 584, 52);
-    this.add.text(16, 12, 'ちゃりだんじょん', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '17px', color: '#3fe0d0', fontStyle: 'bold'
+    this.panel(8, 8, 374, 38);
+    this.add.text(16, 15, 'CHARI / DEEP RUN', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#3fe0d0', fontStyle: 'bold', letterSpacing: 1
     });
-    this.topText = this.add.text(16, 34, '', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#f5c542'
-    });
+    this.topText = this.add.text(374, 15, '', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#f5c542', fontStyle: 'bold'
+    }).setOrigin(1, 0);
 
     // ---- ステータス ----
-    this.panel(8, 66, 584, 94);
-    const style = { fontFamily: '"Yu Gothic UI"', fontSize: '14px', color: '#dfe7f0' };
-    this.statusText = this.add.text(20, 74, '', style);
-    this.hpLabel = this.add.text(20, 94, '', style);
+    this.panel(8, 52, 374, 58);
+    const style = { fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#dfe7f0' };
+    this.statusText = this.add.text(20, 58, '', style);
+    this.hpLabel = this.add.text(20, 77, '', style);
     this.hpBar = this.add.graphics();
-    this.atkLabel = this.add.text(20, 136, '', { ...style, fontSize: '13px' });
+    this.atkLabel = this.add.text(370, 77, '', { ...style, fontSize: '10px' }).setOrigin(1, 0);
 
     // ---- マップ枠 ----
     const fg = this.add.graphics();
-    fg.lineStyle(2, 0x2f6f6a, 1).strokeRoundedRect(MAP_X - 2, MAP_Y - 2, MAP_W + 4, MAP_H + 4, 4);
+    fg.lineStyle(2, 0x2f6f6a, 1).strokeRoundedRect(MAP_X - 2, MAP_Y - 2, MAP_W + 4, MAP_H + 4, 6);
 
-    // ---- そうび（右カラム・縦2枠）----
-    this.panel(436, MAP_Y, 156, MAP_H, 'そうび');
+    // ---- そうび（マップ下に横2枠）----
+    this.panel(8, 498, 374, 60, 'そうび');
     const tags = ['⚔', '🛡'];
     this.equipSlots = [];
     for (let i = 0; i < 2; i++) {
-      const sx = 444, sy = MAP_Y + 34 + i * 138, sw = 140, sh = 128;
+      const sx = 14 + i * 184, sy = 518, sw = 178, sh = 34;
       const bg = this.add.graphics();
-      const icon = this.add.image(sx + sw / 2, sy + 44, 'coin').setDisplaySize(52, 52);
-      this.add.text(sx + 6, sy + 4, tags[i], { fontFamily: '"Yu Gothic UI"', fontSize: '13px' });
-      const name = this.add.text(sx + sw / 2, sy + 76, '', {
-        fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#dfe7f0', align: 'center',
-        wordWrap: { width: sw - 8 }
-      }).setOrigin(0.5, 0);
-      const sub = this.add.text(sx + sw / 2, sy + sh - 16, '', {
-        fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: '#9fb4c4', align: 'center'
-      }).setOrigin(0.5, 0);
+      const icon = this.add.image(sx + 22, sy + sh / 2, 'coin').setDisplaySize(28, 28);
+      this.add.text(sx + 3, sy + 2, tags[i], { fontFamily: '"Yu Gothic UI"', fontSize: '10px' });
+      const name = this.add.text(sx + 42, sy + 4, '', {
+        fontFamily: '"Yu Gothic UI"', fontSize: '9px', color: '#dfe7f0',
+        wordWrap: { width: sw - 46 }
+      });
+      const sub = this.add.text(sx + 42, sy + 19, '', {
+        fontFamily: '"Yu Gothic UI"', fontSize: '8px', color: '#9fb4c4'
+      });
       this.equipSlots.push({ tag: tags[i], bg, icon, name, sub, rect: [sx, sy, sw, sh] });
       const slotIndex = i;
       const zone = this.add.zone(sx, sy, sw, sh).setOrigin(0).setInteractive({ useHandCursor: true });
       zone.on('pointerdown', () => { Audio.playSe('click'); this.pickSlot = slotIndex; this.setOverlay('pick'); });
     }
 
-    // ---- もちもの（マップ下の横1列）----
-    this.panel(8, 594, 584, 86, 'もちもの（タップで使用）');
+    // ---- もちもの ----
+    this.panel(8, 566, 374, 74, 'もちもの（タップで使用）');
     this.itemContainer = this.add.container(0, 0);
 
-    // ---- 冒険ログ（2行）----
-    this.panel(8, 688, 584, 64, '冒険ログ');
+    // ---- 冒険ログ（最新1行）----
+    this.panel(8, 762, 374, 32);
+    this.add.text(16, 770, 'LOG', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '9px', color: '#65dcd4', fontStyle: 'bold', letterSpacing: 1
+    });
     this.logTexts = [];
-    for (let i = 0; i < 2; i++) {
-      this.logTexts.push(this.add.text(20, 710 + i * 18, '', {
-        fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#dfe7f0'
-      }));
-    }
+    this.logTexts.push(this.add.text(52, 769, '', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#dfe7f0',
+      wordWrap: { width: 320 }
+    }));
 
     // ---- 操作エリア：十字キー＋ターン終了 ----
-    this.buildTouchControls(108, 846, 58, 30);
+    this.buildTouchControls(82, 700, 36, 23);
     this.mobileTurnEndButton();
 
     // ---- 下部ナビ（メニュー）----
@@ -323,7 +334,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   mobileTurnEndButton() {
-    const x = 330, y = 780, w = 254, h = 132;
+    const x = 166, y = 648, w = 216, h = 106;
     const g = this.add.graphics();
     const draw = (c: number) => {
       g.clear();
@@ -331,8 +342,8 @@ export class UIScene extends Phaser.Scene {
       g.lineStyle(2.5, 0x3fe0d0).strokeRoundedRect(x, y, w, h, 12);
     };
     draw(0x2f6f6a);
-    this.add.text(x + w / 2, y + h / 2 - 14, '⏭ ターン終了', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '22px', color: '#ffffff', fontStyle: 'bold'
+    this.add.text(x + w / 2, y + h / 2 - 11, '⏭ ターン終了', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '19px', color: '#ffffff', fontStyle: 'bold'
     }).setOrigin(0.5);
     this.add.text(x + w / 2, y + h / 2 + 20, '（その場で1ターン休む）', {
       fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#bfe8e0'
@@ -352,16 +363,16 @@ export class UIScene extends Phaser.Scene {
       { icon: '👾', label: '図鑑', f: () => this.setOverlay('codex') },
       { icon: '⚙', label: '設定', f: () => this.showSettings() }
     ];
-    this.panel(8, 944, 584, 52);
+    this.panel(8, 800, 374, 36);
     items.forEach((it, i) => {
-      const x = 12 + i * 96, y = 948, w = 92, h = 44;
+      const x = 12 + i * 61, y = 803, w = 57, h = 30;
       const g = this.add.graphics();
       const draw = (c: number) => { g.clear(); g.fillStyle(c, 1).fillRoundedRect(x, y, w, h, 6); };
       draw(0x1c2536);
-      this.add.text(x + w / 2, y + 13, it.icon, { fontSize: '15px' }).setOrigin(0.5);
-      this.add.text(x + w / 2, y + 32, it.label, {
-        fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: '#dfe7f0'
-      }).setOrigin(0.5);
+      this.add.text(x + 13, y + h / 2, it.icon, { fontSize: '12px' }).setOrigin(0.5);
+      this.add.text(x + 25, y + h / 2, it.label, {
+        fontFamily: '"Yu Gothic UI"', fontSize: '8px', color: '#dfe7f0'
+      }).setOrigin(0, 0.5);
       const zone = this.add.zone(x, y, w, h).setOrigin(0).setInteractive({ useHandCursor: true });
       zone.on('pointerdown', () => { draw(0x264a48); Audio.playSe('click'); it.f(); });
       zone.on('pointerup', () => draw(0x1c2536));
@@ -399,6 +410,7 @@ export class UIScene extends Phaser.Scene {
       zone.on('pointerdown', () => { draw(true); onDown(); });
       const release = () => { draw(false); onUp?.(); };
       zone.on('pointerup', release);
+      zone.on('pointerupoutside', release);
       zone.on('pointerout', release);
     };
     const hold = (d: Dir) => () => { this.gs.touchDir = d; };
@@ -431,11 +443,17 @@ export class UIScene extends Phaser.Scene {
 
     const boost = this.gs.holdBoostTier === 2 ? '  ⚡MAX BOOST' : this.gs.holdBoostTier === 1 ? '  ⚡BOOST' : '';
     const gate = this.gs.floorHasGate(this.gs.floor) ? (this.gs.floorBossDefeated ? 'GATE OPEN' : 'BOSS LOCK') : 'ROUTE OPEN';
-    this.topText.setText(`${String(this.gs.floor).padStart(2, '0')}F / 30F  ${th.name}   ${gate}   SCORE ${this.gs.score}   TURN ${this.gs.turn}${boost}`);
+    this.topText.setText(IS_MOBILE
+      ? `${String(this.gs.floor).padStart(2, '0')}F  ${gate === 'BOSS LOCK' ? '🔒BOSS' : 'OPEN'}  ${this.gs.score}pt${boost}`
+      : `${String(this.gs.floor).padStart(2, '0')}F / 30F  ${th.name}   ${gate}   SCORE ${this.gs.score}   TURN ${this.gs.turn}${boost}`);
 
-    this.statusText.setText(`${p.name}  Lv.${p.level}   (EXP ${p.exp}/${p.expNext})`);
+    this.statusText.setText(IS_MOBILE
+      ? `${p.name} Lv.${p.level}  EXP ${p.exp}/${p.expNext}  TURN ${this.gs.turn}`
+      : `${p.name}  Lv.${p.level}   (EXP ${p.exp}/${p.expNext})`);
     this.hpLabel.setText(`HP  ${p.hp} / ${p.hpMax}`);
-    this.atkLabel.setText(`攻撃力 ${p.atkMin}-${p.atkMax}   防御力 ${p.def}   💰 ${p.gold} G`);
+    this.atkLabel.setText(IS_MOBILE
+      ? `攻 ${p.atkMin}-${p.atkMax}  防 ${p.def}  💰${p.gold}`
+      : `攻撃力 ${p.atkMin}-${p.atkMax}   防御力 ${p.def}   💰 ${p.gold} G`);
 
     // HPバー（ラベルの下の固定位置。座標はレイアウト設定から）
     const { x: bx, y: by, w: bw } = this.L.hpBar;
@@ -630,9 +648,15 @@ export class UIScene extends Phaser.Scene {
       this.overlayMode === 'gacha' ? '🎰 ダンジョンガチャ' :
       this.overlayMode === 'pick' ? pickTitles[this.pickSlot] :
       '👾 モンスター図鑑';
-    this.overlay.add(this.add.text(x + 16, y + 12, title, { fontFamily: '"Yu Gothic UI"', fontSize: '18px', color: '#3fe0d0', fontStyle: 'bold' }));
+    this.overlay.add(this.add.text(x + 16, y + 12, title, {
+      fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '15px' : '18px',
+      color: '#3fe0d0', fontStyle: 'bold', wordWrap: { width: w - 72 }
+    }));
     // 閉じるボタン
-    const cb = this.add.text(x + w - 34, y + 10, '✕', { fontFamily: 'sans-serif', fontSize: '22px', color: '#ff6b6b' }).setInteractive({ useHandCursor: true });
+    const cb = this.add.text(x + w - (IS_MOBILE ? 48 : 34), y + (IS_MOBILE ? 2 : 10), '✕', {
+      fontFamily: 'sans-serif', fontSize: IS_MOBILE ? '25px' : '22px', color: '#ff8b8b',
+      padding: IS_MOBILE ? { x: 10, y: 8 } : { x: 0, y: 0 }
+    }).setInteractive({ useHandCursor: true });
     cb.on('pointerdown', () => { Audio.playSe('click'); this.setOverlay('none'); });
     this.overlay.add(cb);
 
@@ -787,7 +811,8 @@ export class UIScene extends Phaser.Scene {
       fontFamily: '"Yu Gothic UI"', fontSize: '16px', color: '#f5c542', fontStyle: 'bold'
     }).setOrigin(1, 0));
     this.overlay.add(this.add.text(x + 24, y + 58, '各階で在庫が補充されます。強化石は各2個まで、1個100G。', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: '#9db8b9'
+      fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '11px' : '13px', color: '#9db8b9',
+      wordWrap: { width: w - 48 }
     }));
 
     const rows: { kind: 'potion' | 'stone' | 'shieldstone'; price: number; label: string }[] = [
@@ -795,25 +820,36 @@ export class UIScene extends Phaser.Scene {
       { kind: 'stone', price: 100, label: 'ウェポンストーン　装備中の武器を強化' },
       { kind: 'shieldstone', price: 100, label: 'シールドストーン　装備中の盾を強化' }
     ];
-    let cy = y + 102;
+    let cy = y + (IS_MOBILE ? 112 : 102);
     for (const row of rows) {
       const remaining = this.gs.shopRemaining(row.kind);
       const color = row.kind === 'potion' ? 0x61c78d : row.kind === 'stone' ? 0xffc857 : 0x56a8ff;
       const card = this.add.graphics();
-      card.fillStyle(0x111f26, .98).fillRoundedRect(x + 20, cy, w - 40, 88, 10);
-      card.lineStyle(1.5, remaining > 0 ? color : 0x4c5663, .9).strokeRoundedRect(x + 20, cy, w - 40, 88, 10);
-      const icon = this.add.image(x + 62, cy + 44, `i_${row.kind}`).setDisplaySize(48, 48);
-      const title = this.add.text(x + 104, cy + 16, row.label, {
-        fontFamily: '"Yu Gothic UI"', fontSize: '14px', color: '#eef5ff', fontStyle: 'bold'
+      const cardH = IS_MOBILE ? 104 : 88;
+      card.fillStyle(0x111f26, .98).fillRoundedRect(x + 20, cy, w - 40, cardH, 10);
+      card.lineStyle(1.5, remaining > 0 ? color : 0x4c5663, .9).strokeRoundedRect(x + 20, cy, w - 40, cardH, 10);
+      const icon = this.add.image(x + (IS_MOBILE ? 54 : 62), cy + cardH / 2, `i_${row.kind}`)
+        .setDisplaySize(IS_MOBILE ? 42 : 48, IS_MOBILE ? 42 : 48);
+      const textX = x + (IS_MOBILE ? 86 : 104);
+      const title = this.add.text(textX, cy + (IS_MOBILE ? 11 : 16), row.label, {
+        fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '12px' : '14px', color: '#eef5ff', fontStyle: 'bold',
+        wordWrap: { width: IS_MOBILE ? w - 118 : w - 210 }
       });
-      const stock = this.add.text(x + 104, cy + 48, `価格 ${row.price}G　残り ${remaining}`, {
-        fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: remaining > 0 ? '#b8d8d6' : '#ff7b82'
+      const stock = this.add.text(textX, cy + (IS_MOBILE ? 49 : 48), `価格 ${row.price}G　残り ${remaining}`, {
+        fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '11px' : '13px', color: remaining > 0 ? '#b8d8d6' : '#ff7b82'
       });
-      const button = this.rowButton(x + w - 168, cy + 30, 128, remaining > 0 ? '購入する' : '売り切れ', remaining > 0, () => {
+      const button = this.rowButton(
+        IS_MOBILE ? textX : x + w - 168,
+        cy + (IS_MOBILE ? 70 : 30),
+        IS_MOBILE ? 126 : 128,
+        remaining > 0 ? '購入する' : '売り切れ',
+        remaining > 0,
+        () => {
         if (this.gs.buyItem(row.kind)) this.setOverlay('shop');
-      });
+        }
+      );
       this.overlay.add([card, icon, title, stock, button]);
-      cy += 102;
+      cy += IS_MOBILE ? 116 : 102;
     }
   }
 
@@ -1179,23 +1215,23 @@ export class UIScene extends Phaser.Scene {
 
     let cy = y + 70;
     for (const row of rows) {
-      const labelText = this.add.text(x + 30, cy + 4, row.label(), {
-        fontFamily: '"Yu Gothic UI"', fontSize: '17px', color: '#dfe7f0'
+      const labelText = this.add.text(x + (IS_MOBILE ? 20 : 30), cy + 4, row.label(), {
+        fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '15px' : '17px', color: '#dfe7f0'
       });
       this.overlay.add(labelText);
 
-      const mkBtn = (bx: number, bw: number, text: () => string, onClick: () => void) => {
+      const mkBtn = (bx: number, by: number, bw: number, text: () => string, onClick: () => void) => {
         const g = this.add.graphics();
         const draw = (c: number) => {
           g.clear();
-          g.fillStyle(c, 1).fillRoundedRect(bx, cy - 4, bw, 38, 6);
-          g.lineStyle(2, 0x3fe0d0).strokeRoundedRect(bx, cy - 4, bw, 38, 6);
+          g.fillStyle(c, 1).fillRoundedRect(bx, by, bw, 38, 6);
+          g.lineStyle(2, 0x3fe0d0).strokeRoundedRect(bx, by, bw, 38, 6);
         };
         draw(0x2f6f6a);
-        const t = this.add.text(bx + bw / 2, cy + 15, text(), {
+        const t = this.add.text(bx + bw / 2, by + 19, text(), {
           fontFamily: '"Yu Gothic UI"', fontSize: '17px', color: '#ffffff', fontStyle: 'bold'
         }).setOrigin(0.5);
-        const zone = this.add.zone(bx, cy - 4, bw, 38).setOrigin(0).setInteractive({ useHandCursor: true });
+        const zone = this.add.zone(bx, by, bw, 38).setOrigin(0).setInteractive({ useHandCursor: true });
         zone.on('pointerover', () => draw(0x3f8f88));
         zone.on('pointerout', () => draw(0x2f6f6a));
         zone.on('pointerdown', () => {
@@ -1207,18 +1243,29 @@ export class UIScene extends Phaser.Scene {
         this.overlay.add(this.add.container(0, 0, [g, t, zone]));
       };
 
-      mkBtn(x + 330, 56, () => '－', row.onMinus);
-      mkBtn(x + 396, 56, () => '＋', row.onPlus);
-      mkBtn(x + 470, 110, row.toggleLabel, row.onToggle);
-      cy += 70;
+      if (IS_MOBILE) {
+        const by = cy + 31;
+        mkBtn(x + 20, by, 58, () => '－', row.onMinus);
+        mkBtn(x + 88, by, 58, () => '＋', row.onPlus);
+        mkBtn(x + w - 144, by, 124, row.toggleLabel, row.onToggle);
+        cy += 92;
+      } else {
+        mkBtn(x + 330, cy - 4, 56, () => '－', row.onMinus);
+        mkBtn(x + 396, cy - 4, 56, () => '＋', row.onPlus);
+        mkBtn(x + 470, cy - 4, 110, row.toggleLabel, row.onToggle);
+        cy += 70;
+      }
     }
 
-    this.overlay.add(this.add.text(x + 30, cy + 14, [
+    this.overlay.add(this.add.text(x + (IS_MOBILE ? 20 : 30), cy + 14, [
       '※ BGMと効果音は別々に調整できます。',
-      '※ 音源ファイル(public/assets/audio/*.mp3)を置くと自動でそちらが使われます。',
-      '   無い場合は内蔵のレトロ風チップチューンが鳴ります。'
+      IS_MOBILE
+        ? '※ 音源がない場合は内蔵チップチューンを再生します。'
+        : '※ 音源ファイル(public/assets/audio/*.mp3)を置くと自動でそちらが使われます。',
+      IS_MOBILE ? '' : '   無い場合は内蔵のレトロ風チップチューンが鳴ります。'
     ].join('\n'), {
-      fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: '#8a97ab', lineSpacing: 6
+      fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '11px' : '13px', color: '#8a97ab', lineSpacing: 6,
+      wordWrap: { width: w - (IS_MOBILE ? 40 : 60) }
     }));
   }
 }

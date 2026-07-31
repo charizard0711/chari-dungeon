@@ -31,11 +31,11 @@ export class TitleScene extends Phaser.Scene {
 
     const shade = this.add.graphics();
     shade.fillStyle(0x020708, .58).fillRect(0, 0, GAME_W, GAME_H);
-    shade.fillStyle(0x061416, .78).fillRoundedRect(mobile ? 34 : GAME_W / 2 - 420, mobile ? 42 : 25, mobile ? GAME_W - 68 : 840, mobile ? 890 : 720, 24);
-    shade.lineStyle(1, 0x618082, .5).strokeRoundedRect(mobile ? 34 : GAME_W / 2 - 420, mobile ? 42 : 25, mobile ? GAME_W - 68 : 840, mobile ? 890 : 720, 24);
-    shade.lineStyle(1, 0xe7b85e, .65).lineBetween(GAME_W / 2 - 180, mobile ? 68 : 60, GAME_W / 2 + 180, mobile ? 68 : 60);
+    shade.fillStyle(0x061416, .78).fillRoundedRect(mobile ? 12 : GAME_W / 2 - 420, mobile ? 12 : 25, mobile ? GAME_W - 24 : 840, mobile ? GAME_H - 24 : 720, 24);
+    shade.lineStyle(1, 0x618082, .5).strokeRoundedRect(mobile ? 12 : GAME_W / 2 - 420, mobile ? 12 : 25, mobile ? GAME_W - 24 : 840, mobile ? GAME_H - 24 : 720, 24);
+    shade.lineStyle(1, 0xe7b85e, .65).lineBetween(GAME_W / 2 - (mobile ? 150 : 180), mobile ? 48 : 60, GAME_W / 2 + (mobile ? 150 : 180), mobile ? 48 : 60);
 
-    this.add.text(GAME_W / 2, mobile ? 88 : 82, 'THE FORGOTTEN DEPTHS  /  SEASON I', {
+    this.add.text(GAME_W / 2, mobile ? 72 : 82, 'THE FORGOTTEN DEPTHS  /  SEASON I', {
       fontFamily: FONT,
       fontSize: mobile ? '11px' : '12px',
       color: '#65dcd4',
@@ -47,7 +47,7 @@ export class TitleScene extends Phaser.Scene {
     const logo = this.add.container(GAME_W / 2, logoY);
     if (this.textures.exists('logo')) {
       const img = this.add.image(0, 0, 'logo');
-      const maxW = mobile ? 470 : 620;
+      const maxW = mobile ? GAME_W - 32 : 620;
       if (img.width > maxW) img.setScale(maxW / img.width);
       logo.add(img);
     } else {
@@ -60,7 +60,7 @@ export class TitleScene extends Phaser.Scene {
 
     this.add.text(GAME_W / 2, mobile ? 346 : 330, '30階層  /  TURN-BASED ROGUELIKE', {
       fontFamily: FONT,
-      fontSize: mobile ? '15px' : '16px',
+      fontSize: mobile ? '14px' : '16px',
       color: '#e7b85e',
       letterSpacing: 2
     }).setOrigin(.5);
@@ -84,7 +84,7 @@ export class TitleScene extends Phaser.Scene {
     const startY = mobile ? 552 : 540;
     controls.forEach((control, i) => {
       const y = startY + i * (mobile ? 62 : 43);
-      const w = mobile ? 450 : 560;
+      const w = mobile ? GAME_W - 40 : 560;
       const row = this.add.graphics();
       row.fillStyle(0x0a1c20, .88).fillRoundedRect(GAME_W / 2 - w / 2, y, w, mobile ? 48 : 34, 9);
       row.lineStyle(1, 0x315155, .7).strokeRoundedRect(GAME_W / 2 - w / 2, y, w, mobile ? 48 : 34, 9);
@@ -96,7 +96,7 @@ export class TitleScene extends Phaser.Scene {
       }).setOrigin(1, .5);
     });
 
-    this.add.text(GAME_W / 2, mobile ? 888 : 735, '30Fの守護者を倒し、忘却の迷宮を踏破せよ', {
+    this.add.text(GAME_W / 2, mobile ? GAME_H - 36 : 735, '30Fの守護者を倒し、忘却の迷宮を踏破せよ', {
       fontFamily: FONT,
       fontSize: mobile ? '13px' : '12px',
       color: '#819698'
@@ -123,7 +123,7 @@ export class TitleScene extends Phaser.Scene {
   makeButton(x: number, y: number, label: string, onClick: () => void) {
     const container = this.add.container(x, y);
     const bg = this.add.graphics();
-    const w = GAME_W < 700 ? 350 : 330;
+    const w = GAME_W < 700 ? Math.min(350, GAME_W - 56) : 330;
     const h = 62;
     const draw = (hover = false) => {
       bg.clear();

@@ -21,6 +21,7 @@ export class EndScene extends Phaser.Scene {
   }
 
   create(stats: EndStats) {
+    const mobile = GAME_W < 700;
     this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x0b0e14);
 
     // パーティクル風の装飾
@@ -33,24 +34,27 @@ export class EndScene extends Phaser.Scene {
 
     const titleColor = stats.cleared ? '#f5c542' : '#ff6b6b';
     const titleText = stats.cleared ? '🎉 ダンジョン制覇！ 🎉' : 'GAME OVER';
-    const title = this.add.text(GAME_W / 2, 130, titleText, {
-      fontFamily: '"Yu Gothic UI"', fontSize: '58px', color: titleColor, fontStyle: 'bold'
-    }).setOrigin(0.5);
-    title.setStroke('#000000', 8);
+    const title = this.add.text(GAME_W / 2, mobile ? 102 : 130, titleText, {
+      fontFamily: '"Yu Gothic UI"', fontSize: mobile ? '34px' : '58px', color: titleColor, fontStyle: 'bold'
+    }).setOrigin(0.5).setWordWrapWidth(GAME_W - 32);
+    title.setStroke('#000000', mobile ? 5 : 8);
     this.tweens.add({ targets: title, scale: 1.06, yoyo: true, repeat: -1, duration: 1000 });
 
     if (stats.cleared) {
-      this.add.text(GAME_W / 2, 195, 'チャリはダンジョンコアへ到達した！', {
-        fontFamily: '"Yu Gothic UI"', fontSize: '22px', color: '#3fe0d0'
-      }).setOrigin(0.5);
+      this.add.text(GAME_W / 2, mobile ? 160 : 195, 'チャリはダンジョンコアへ到達した！', {
+        fontFamily: '"Yu Gothic UI"', fontSize: mobile ? '16px' : '22px', color: '#3fe0d0'
+      }).setOrigin(0.5).setWordWrapWidth(GAME_W - 36);
     } else {
-      this.add.text(GAME_W / 2, 195, `${stats.floor}F でチャリは力尽きた…`, {
-        fontFamily: '"Yu Gothic UI"', fontSize: '22px', color: '#dfe7f0'
-      }).setOrigin(0.5);
+      this.add.text(GAME_W / 2, mobile ? 160 : 195, `${stats.floor}F でチャリは力尽きた…`, {
+        fontFamily: '"Yu Gothic UI"', fontSize: mobile ? '16px' : '22px', color: '#dfe7f0'
+      }).setOrigin(0.5).setWordWrapWidth(GAME_W - 36);
     }
 
     // スコアパネル
-    const px = GAME_W / 2 - 260, py = 250, pw = 520, ph = 300;
+    const px = mobile ? 18 : GAME_W / 2 - 260;
+    const py = mobile ? 210 : 250;
+    const pw = mobile ? GAME_W - 36 : 520;
+    const ph = mobile ? 380 : 300;
     const panel = this.add.graphics();
     panel.fillStyle(0x141a26, 0.96).fillRoundedRect(px, py, pw, ph, 12);
     panel.lineStyle(3, 0x3fe0d0).strokeRoundedRect(px, py, pw, ph, 12);
@@ -63,14 +67,14 @@ export class EndScene extends Phaser.Scene {
       ['総ターン数', `${stats.turns}`],
       ['モンスター図鑑', `${stats.discovered} / ${stats.totalMonsters}`]
     ];
-    let ry = py + 28;
+    let ry = py + (mobile ? 34 : 28);
     for (const [k, v] of rows) {
-      this.add.text(px + 40, ry, k, { fontFamily: '"Yu Gothic UI"', fontSize: '19px', color: '#8a97ab' });
-      this.add.text(px + pw - 40, ry, v, { fontFamily: '"Yu Gothic UI"', fontSize: '19px', color: '#dfe7f0' }).setOrigin(1, 0);
-      ry += 34;
+      this.add.text(px + (mobile ? 24 : 40), ry, k, { fontFamily: '"Yu Gothic UI"', fontSize: mobile ? '16px' : '19px', color: '#8a97ab' });
+      this.add.text(px + pw - (mobile ? 24 : 40), ry, v, { fontFamily: '"Yu Gothic UI"', fontSize: mobile ? '16px' : '19px', color: '#dfe7f0' }).setOrigin(1, 0);
+      ry += mobile ? 42 : 34;
     }
     // スコア大表示
-    this.add.text(px + pw / 2, py + ph - 46, 'SCORE', { fontFamily: '"Yu Gothic UI"', fontSize: '18px', color: '#f5c542' }).setOrigin(0.5);
+    this.add.text(px + pw / 2, py + ph - 54, 'SCORE', { fontFamily: '"Yu Gothic UI"', fontSize: '18px', color: '#f5c542' }).setOrigin(0.5);
     const scoreText = this.add.text(px + pw / 2, py + ph - 16, '0', {
       fontFamily: '"Yu Gothic UI"', fontSize: '40px', color: '#f5c542', fontStyle: 'bold'
     }).setOrigin(0.5);
@@ -82,14 +86,14 @@ export class EndScene extends Phaser.Scene {
     });
 
     // ボタン
-    this.makeButton(GAME_W / 2, 610, '🔄 もう一度挑戦', () => this.scene.start('GameScene'));
-    this.makeButton(GAME_W / 2, 680, '🏠 タイトルへ', () => this.scene.start('TitleScene'));
+    this.makeButton(GAME_W / 2, mobile ? 670 : 610, '🔄 もう一度挑戦', () => this.scene.start('GameScene'));
+    this.makeButton(GAME_W / 2, mobile ? 742 : 680, '🏠 タイトルへ', () => this.scene.start('TitleScene'));
 
     this.input.keyboard?.once('keydown-ENTER', () => this.scene.start('GameScene'));
   }
 
   makeButton(x: number, y: number, label: string, onClick: () => void) {
-    const w = 280, h = 50;
+    const w = Math.min(280, GAME_W - 60), h = 50;
     const g = this.add.graphics();
     const draw = (c: number) => { g.clear(); g.fillStyle(c, 1).fillRoundedRect(x - w / 2, y - h / 2, w, h, 10); g.lineStyle(2, 0x3fe0d0).strokeRoundedRect(x - w / 2, y - h / 2, w, h, 10); };
     draw(0x2f6f6a);
