@@ -445,7 +445,7 @@ export class GameScene extends Phaser.Scene {
 
   tileTexKey(t: TileType, suffix: string, x: number, y: number): string {
     switch (t) {
-      case 'wall': return `wall${suffix}_m${this.terrainConnectionMask(x, y)}`;
+      case 'wall': return `wall${suffix}_m${this.terrainConnectionMask(x, y)}_v${(x * 13 + y * 7) % 3}`;
       case 'stairs': return 'stairs';
       case 'door': return 'door';
       case 'water': return `water${suffix}`;
