@@ -78,7 +78,7 @@ export class TitleScene extends Phaser.Scene {
     const controls = [
       { key: 'MOVE', value: '矢印キー / 十字ボタン' },
       { key: 'BOOST', value: '長押しで移動速度アップ' },
-      { key: 'BATTLE', value: '敵へ進むと自動攻撃' },
+      { key: 'BATTLE', value: '敵へ進むと攻撃 / Fで必殺技' },
       { key: 'ITEM', value: 'クリック / タップで使用' }
     ];
     const startY = mobile ? 552 : 540;

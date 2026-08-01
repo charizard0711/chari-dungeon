@@ -36,6 +36,7 @@ export class UIScene extends Phaser.Scene {
     ov: { x: number; y: number; w: number; h: number };
   };
   equipIconSize = 60;
+  beamButtonDraw?: (hover?: boolean) => void;
 
   constructor() {
     super('UIScene');
@@ -175,9 +176,10 @@ export class UIScene extends Phaser.Scene {
       y += 48;
     }
     // ヒント
-    this.add.text(16, y + 6, '矢印/クリック: 移動\n長押し: BOOST', {
+    this.add.text(16, y + 6, '矢印/クリック: 移動\n長押し: BOOST\nF: 必殺技', {
       fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#789093', lineSpacing: 5
     });
+    this.buildBeamSkillButton(16, 472, 144, 72);
   }
 
   menuButton(x: number, y: number, w: number, h: number, label: string, onClick: () => void) {
@@ -323,9 +325,13 @@ export class UIScene extends Phaser.Scene {
       wordWrap: { width: 320 }
     }));
 
-    // ---- 操作エリア：移動必須の四方向キー ----
-    this.panel(8, 646, 374, 116, '移動（行動するとターン進行）');
-    this.buildTouchControls(195, 704, 34, 24);
+    // ---- 操作エリア：四方向キー＋撃破チャージ式必殺技 ----
+    this.panel(8, 646, 374, 116);
+    this.add.text(16, 652, 'MOVE', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '9px', color: '#65dcd4', fontStyle: 'bold', letterSpacing: 1
+    });
+    this.buildTouchControls(78, 704, 34, 24);
+    this.buildBeamSkillButton(150, 670, 220, 72);
 
     // ---- 下部ナビ（メニュー）----
     this.buildMobileNav();
@@ -394,6 +400,32 @@ export class UIScene extends Phaser.Scene {
     mkButton(gap, 0, 0, hold('right'), release);
   }
 
+  buildBeamSkillButton(x: number, y: number, w: number, h: number) {
+    const g = this.add.graphics();
+    const text = this.add.text(x + w / 2, y + h / 2, '', {
+      fontFamily: '"Yu Gothic UI"', fontSize: w >= 200 ? '15px' : '12px',
+      color: '#dfe7f0', fontStyle: 'bold', align: 'center', lineSpacing: 3
+    }).setOrigin(0.5);
+    const draw = (hover = false) => {
+      const ready = this.gs.skillCharge >= this.gs.skillChargeMax;
+      g.clear();
+      g.fillStyle(ready ? (hover ? 0x176e91 : 0x104b69) : (hover ? 0x243345 : 0x182331), 1)
+        .fillRoundedRect(x, y, w, h, 10);
+      g.lineStyle(ready ? 2.5 : 1.5, ready ? 0x7de7ff : 0x47616d, ready ? 1 : 0.8)
+        .strokeRoundedRect(x, y, w, h, 10);
+      text.setText(ready
+        ? '❄ アイスビーム\nREADY!  正面3マス'
+        : `❄ アイスビーム\nCHARGE ${this.gs.skillCharge}/${this.gs.skillChargeMax}`
+      ).setColor(ready ? '#d9faff' : '#91a8b4');
+    };
+    this.beamButtonDraw = draw;
+    draw(false);
+    const zone = this.add.zone(x, y, w, h).setOrigin(0).setInteractive({ useHandCursor: true });
+    zone.on('pointerover', () => draw(true));
+    zone.on('pointerout', () => draw(false));
+    zone.on('pointerdown', () => { Audio.playSe('click'); this.gs.useBeamSkill(); });
+  }
+
   // ============ リフレッシュ ============
   refresh() {
     const p = this.gs.player;
@@ -412,6 +444,7 @@ export class UIScene extends Phaser.Scene {
     this.atkLabel.setText(IS_MOBILE
       ? `攻 ${p.atkMin}-${p.atkMax}  防 ${p.def}  💰${p.gold}`
       : `攻撃力 ${p.atkMin}-${p.atkMax}   防御力 ${p.def}   💰 ${p.gold} G`);
+    this.beamButtonDraw?.(false);
 
     // HPバー（ラベルの下の固定位置。座標はレイアウト設定から）
     const { x: bx, y: by, w: bw } = this.L.hpBar;
@@ -599,7 +632,7 @@ export class UIScene extends Phaser.Scene {
 
     const pickTitles = ['⚔ 武器を変更', '🛡 盾を変更'];
     const title =
-      this.overlayMode === 'equip' ? '⚔ 装備（クリックで装備）' :
+      this.overlayMode === 'equip' ? '⚔ 装備・売却' :
       this.overlayMode === 'inv' ? '🎒 所持品' :
       this.overlayMode === 'settings' ? '⚙ 設定（サウンド）' :
       this.overlayMode === 'shop' ? '🛒 フロアショップ' :
@@ -691,8 +724,16 @@ export class UIScene extends Phaser.Scene {
       // 枠の色は強化値で変化（+1黄/+2紫/+3青/+4赤、未強化はテール）
       const frameCol = gradeColor(wp.grade);
       const icon = this.framedIcon(x + 34, cy + 16, wp.key, frameCol);
-      const row = this.rowButton(x + 58, cy, w - 74, `${equipped ? '▶ ' : '　'}${weaponFullName(wp)}  耐久${wp.dur}/${wp.durMax}(${risk.label})`, equipped, () => this.gs.equipWeapon(i));
-      this.overlay.add([...icon, row]);
+      const sellW = IS_MOBILE ? 86 : 98;
+      const row = this.rowButton(x + 58, cy, w - 80 - sellW, `${equipped ? '▶ ' : '　'}${weaponFullName(wp)}  耐久${wp.dur}/${wp.durMax}(${risk.label})`, equipped, () => this.gs.equipWeapon(i));
+      const sell = this.rowButton(
+        x + w - sellW - 10, cy, sellW,
+        equipped ? '装備中' : `${IS_MOBILE ? '売' : '売却'} ${this.gs.weaponSellPrice(wp)}G`,
+        false,
+        () => this.gs.sellWeapon(i),
+        !equipped
+      );
+      this.overlay.add([...icon, row, sell]);
       cy += 38;
     });
     cy += 10;
@@ -705,8 +746,16 @@ export class UIScene extends Phaser.Scene {
       const frameCol = gradeColor(sh.grade);
       const icon = this.framedIcon(x + 34, cy + 16, sh.key, frameCol);
       const totalDef = sh.defBonus + (sh.plus ?? 0);
-      const row = this.rowButton(x + 58, cy, w - 74, `${equipped ? '▶ ' : '　'}${shieldFullName(sh)}  防御+${totalDef}  耐久${sh.dur}/${sh.durMax}(${risk.label})`, equipped, () => this.gs.equipShield(i));
-      this.overlay.add([...icon, row]);
+      const sellW = IS_MOBILE ? 86 : 98;
+      const row = this.rowButton(x + 58, cy, w - 80 - sellW, `${equipped ? '▶ ' : '　'}${shieldFullName(sh)}  防御+${totalDef}  耐久${sh.dur}/${sh.durMax}(${risk.label})`, equipped, () => this.gs.equipShield(i));
+      const sell = this.rowButton(
+        x + w - sellW - 10, cy, sellW,
+        equipped ? '装備中' : `${IS_MOBILE ? '売' : '売却'} ${this.gs.shieldSellPrice(sh)}G`,
+        false,
+        () => this.gs.sellShield(i),
+        !equipped
+      );
+      this.overlay.add([...icon, row, sell]);
       cy += 38;
     });
 
@@ -1119,13 +1168,13 @@ export class UIScene extends Phaser.Scene {
     }
   }
 
-  rowButton(x: number, y: number, w: number, label: string, highlight: boolean, onClick: () => void) {
+  rowButton(x: number, y: number, w: number, label: string, highlight: boolean, onClick: () => void, enabled = true) {
     const c = this.add.container(0, 0);
     const g = this.add.graphics();
-    const base = highlight ? 0x264a48 : 0x1c2536;
+    const base = !enabled ? 0x141a22 : highlight ? 0x264a48 : 0x1c2536;
     g.fillStyle(base, 1).fillRoundedRect(x, y, w, 28, 5);
-    g.lineStyle(1, 0x2f6f6a).strokeRoundedRect(x, y, w, 28, 5);
-    const t = this.add.text(x + 10, y + 14, label, { fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: '#dfe7f0' }).setOrigin(0, 0.5);
+    g.lineStyle(1, enabled ? 0x2f6f6a : 0x303946).strokeRoundedRect(x, y, w, 28, 5);
+    const t = this.add.text(x + 10, y + 14, label, { fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: enabled ? '#dfe7f0' : '#66727e' }).setOrigin(0, 0.5);
     // 枠からはみ出す場合は末尾を「…」に切り詰める
     if (t.width > w - 18) {
       let s = label;
@@ -1134,11 +1183,15 @@ export class UIScene extends Phaser.Scene {
         t.setText(s + '…');
       }
     }
-    const zone = this.add.zone(x, y, w, 28).setOrigin(0).setInteractive({ useHandCursor: true });
-    zone.on('pointerover', () => { g.clear(); g.fillStyle(0x3f8f88, 1).fillRoundedRect(x, y, w, 28, 5); g.lineStyle(1, 0x3fe0d0).strokeRoundedRect(x, y, w, 28, 5); });
-    zone.on('pointerout', () => { g.clear(); g.fillStyle(base, 1).fillRoundedRect(x, y, w, 28, 5); g.lineStyle(1, 0x2f6f6a).strokeRoundedRect(x, y, w, 28, 5); });
-    zone.on('pointerdown', onClick);
-    c.add([g, t, zone]);
+    if (enabled) {
+      const zone = this.add.zone(x, y, w, 28).setOrigin(0).setInteractive({ useHandCursor: true });
+      zone.on('pointerover', () => { g.clear(); g.fillStyle(0x3f8f88, 1).fillRoundedRect(x, y, w, 28, 5); g.lineStyle(1, 0x3fe0d0).strokeRoundedRect(x, y, w, 28, 5); });
+      zone.on('pointerout', () => { g.clear(); g.fillStyle(base, 1).fillRoundedRect(x, y, w, 28, 5); g.lineStyle(1, 0x2f6f6a).strokeRoundedRect(x, y, w, 28, 5); });
+      zone.on('pointerdown', onClick);
+      c.add([g, t, zone]);
+    } else {
+      c.add([g, t]);
+    }
     return c;
   }
 
