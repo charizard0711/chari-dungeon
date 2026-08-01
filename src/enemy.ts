@@ -16,6 +16,7 @@ export class Enemy {
   animating = false;
   slowToggle = false;     // slow行動用
   freezeTurns = 0;        // 氷結
+  freezeFx?: Phaser.GameObjects.Container;
   sealTurns = 0;          // 封印
   poisonTurns = 0;        // 被毒
   loopDir = 0;            // ループ移動方向index

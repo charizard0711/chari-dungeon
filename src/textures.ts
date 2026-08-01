@@ -54,56 +54,176 @@ export function buildTileTextures(scene: Phaser.Scene) {
     break; // テーマは4種のみ生成
   }
   // 系統ごとの手続きタイル用パレット（実アセットが読めない時のフォールバック）
-  const TILE_PAL: Record<number, { floorColor: number; floorAlt: number; wallColor: number; wallTop: number; accent: number }> = {
-    1:  { floorColor: 0x2a3b34, floorAlt: 0x233029, wallColor: 0x35404f, wallTop: 0x46566a, accent: 0x3fe0d0 },
-    11: { floorColor: 0x22333a, floorAlt: 0x1b2a30, wallColor: 0x2c3d47, wallTop: 0x3a5560, accent: 0x2fd0b0 },
-    21: { floorColor: 0x2e2440, floorAlt: 0x241b33, wallColor: 0x38294f, wallTop: 0x4d3a6b, accent: 0xa06bff },
-    30: { floorColor: 0x241a30, floorAlt: 0x1a1226, wallColor: 0x3a2450, wallTop: 0x5a3a7a, accent: 0xf5c542 },
+  const TILE_PAL: Record<number, { floorColor: number; wallColor: number; wallTop: number; accent: number }> = {
+    1:  { floorColor: 0x666b59, wallColor: 0x35404f, wallTop: 0x46566a, accent: 0x3fe0d0 },
+    11: { floorColor: 0x5d6d6a, wallColor: 0x2c3d47, wallTop: 0x3a5560, accent: 0x2fd0b0 },
+    21: { floorColor: 0x685d73, wallColor: 0x38294f, wallTop: 0x4d3a6b, accent: 0xa06bff },
+    30: { floorColor: 0x62556d, wallColor: 0x3a2450, wallTop: 0x5a3a7a, accent: 0xf5c542 },
   };
   const themeFloors = [1, 11, 21, 30];
   for (const tf of themeFloors) {
     const th = TILE_PAL[tf];
     const suffix = `_${tf}`;
 
-    // 床（2バリエーション）
-    for (let v = 0; v < 3; v++) {
+    // 接続方向別の床パーツ。ビットは上=1、右=2、下=4、左=8。
+    // 壁に接する外周だけを描き、道同士の境界には線を入れない。
+    for (let mask = 0; mask < 16; mask++) {
+      for (let variant = 0; variant < 3; variant++) {
+        const g = scene.add.graphics();
+        const random = rng(tf * 1000 + mask * 73 + variant * 211);
+        const base = shade(th.floorColor, variant === 1 ? 0.97 : variant === 2 ? 1.02 : 1);
+        const grit = shade(base, 0.72);
+        const worn = shade(base, 1.13);
+        const edgeShadow = shade(base, 0.42);
+
+        // 一枚の石床として全面を塗る。中央レーンや明るい縁は作らない。
+        px(g, 0, 0, TILE, TILE, base);
+        g.fillStyle(grit, 0.08);
+        for (let i = 0; i < 4; i++) {
+          g.fillEllipse(
+            3 + Math.floor(random() * 26),
+            3 + Math.floor(random() * 26),
+            5 + Math.floor(random() * 9),
+            2 + Math.floor(random() * 5),
+          );
+        }
+        g.fillStyle(worn, 0.12);
+        for (let i = 0; i < 5; i++) {
+          g.fillRect(2 + Math.floor(random() * 28), 2 + Math.floor(random() * 28), 1, 1);
+        }
+
+        // 壁に接する側だけへ薄い落ち影を置き、道同士の継ぎ目は描かない。
+        if (!(mask & 1)) { px(g, 0, 0, TILE, 2, edgeShadow, 0.7); px(g, 0, 2, TILE, 2, edgeShadow, 0.28); }
+        if (!(mask & 2)) { px(g, TILE - 2, 0, 2, TILE, edgeShadow, 0.7); px(g, TILE - 4, 0, 2, TILE, edgeShadow, 0.28); }
+        if (!(mask & 4)) { px(g, 0, TILE - 2, TILE, 2, edgeShadow, 0.7); px(g, 0, TILE - 4, TILE, 2, edgeShadow, 0.28); }
+        if (!(mask & 8)) { px(g, 0, 0, 2, TILE, edgeShadow, 0.7); px(g, 2, 0, 2, TILE, edgeShadow, 0.28); }
+
+        // 草ではなく、踏み固められた泥染みと細い擦れ傷を控えめに重ねる。
+        const dirt = shade(th.floorColor, 0.43);
+        g.fillStyle(dirt, 0.2);
+        for (let i = 0; i < variant; i++) {
+          const x = 5 + Math.floor(random() * 22);
+          const y = 5 + Math.floor(random() * 22);
+          g.fillEllipse(x, y, 3 + Math.floor(random() * 6), 2 + Math.floor(random() * 4));
+        }
+        if (variant === 2) {
+          g.lineStyle(1, dirt, 0.34);
+          const sx = 7 + Math.floor(random() * 14);
+          const sy = 7 + Math.floor(random() * 14);
+          g.beginPath();
+          g.moveTo(sx, sy);
+          g.lineTo(sx + 4, sy + 2);
+          g.lineTo(sx + 7, sy + 1);
+          g.strokePath();
+        }
+
+        const key = `floor${suffix}_m${mask}_v${variant}`;
+        g.generateTexture(key, TILE, TILE);
+        scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+        g.destroy();
+      }
+    }
+
+    // ボス部屋は大きな一枚床として見せるため、マスごとの道路模様を入れない。
+    {
       const g = scene.add.graphics();
-      const base = v % 2 === 0 ? th.floorColor : th.floorAlt;
-      px(g, 0, 0, TILE, TILE, base);
-      const r = rng(tf * 100 + v + 7);
-      // タイル目地
-      px(g, 0, 0, TILE, 1, shade(base, 0.7));
-      px(g, 0, 0, 1, TILE, shade(base, 0.7));
-      px(g, 0, TILE - 1, TILE, 1, shade(base, 1.25));
-      // ノイズ
-      for (let i = 0; i < 14; i++) {
-        const x = Math.floor(r() * TILE);
-        const y = Math.floor(r() * TILE);
-        px(g, x, y, 2, 2, shade(base, r() > 0.5 ? 1.2 : 0.82), 0.6);
-      }
-      // たまにアクセントの光苔
-      if (v === 2) {
-        px(g, 8, 20, 3, 3, th.accent, 0.5);
-        px(g, 22, 10, 2, 2, th.accent, 0.5);
-      }
-      g.generateTexture(`floor${suffix}_${v}`, TILE, TILE);
+      px(g, 0, 0, TILE, TILE, shade(th.floorColor, 0.86));
+      px(g, 0, 0, TILE, 2, shade(th.floorColor, 1.08), 0.35);
+      const key = `bossfloor${suffix}`;
+      g.generateTexture(key, TILE, TILE);
+      scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
       g.destroy();
     }
 
-    // 壁
-    {
-      const g = scene.add.graphics();
-      px(g, 0, 0, TILE, TILE, th.wallColor);
-      px(g, 0, 0, TILE, 8, th.wallTop);
-      // レンガ目地
-      px(g, 0, 8, TILE, 1, shade(th.wallColor, 0.6));
-      px(g, 0, 20, TILE, 1, shade(th.wallColor, 0.6));
-      px(g, 10, 8, 1, 12, shade(th.wallColor, 0.6));
-      px(g, 22, 20, 1, 12, shade(th.wallColor, 0.6));
-      px(g, 0, 20, 1, 12, shade(th.wallColor, 0.6));
-      px(g, 0, TILE - 2, TILE, 2, shade(th.wallColor, 0.5));
-      g.generateTexture(`wall${suffix}`, TILE, TILE);
-      g.destroy();
+    // 重厚な石積み壁。通路側には壁面＋笠石、曲がり角には補強柱を描く。
+    for (let mask = 0; mask < 16; mask++) {
+      for (let variant = 0; variant < 3; variant++) {
+        const g = scene.add.graphics();
+        const random = rng(tf * 1907 + mask * 137 + variant * 293);
+        const mortar = shade(th.wallColor, 0.32);
+        const deepShadow = shade(th.wallColor, 0.22);
+        const faceShadow = shade(th.wallColor, 0.5);
+        const capBase = shade(th.wallTop, 0.96);
+        const capLight = shade(th.wallTop, 1.28);
+        const capShade = shade(th.wallTop, 0.6);
+
+        px(g, 0, 0, TILE, TILE, mortar);
+
+        // 大判ブロックを互い違いに積み、各石に上光と下影を与える。
+        for (let row = 0; row < 4; row++) {
+          const top = row * 8;
+          const offset = ((row + variant) % 2) * 7 - 7;
+          for (let x = offset; x < TILE; x += 14) {
+            const width = 13;
+            const stoneFactor = 0.82 + random() * 0.28;
+            const stone = shade(th.wallColor, stoneFactor);
+            px(g, x + 1, top + 1, width - 1, 6, stone);
+            px(g, x + 2, top + 1, width - 3, 1, shade(stone, 1.22), 0.75);
+            px(g, x + 1, top + 6, width - 1, 1, shade(stone, 0.48), 0.82);
+            if (random() > 0.58) px(g, x + 4 + Math.floor(random() * 5), top + 3, 2, 1, shade(stone, 0.58), 0.5);
+          }
+        }
+
+        // 控えめなひび割れと古い目地汚れ。
+        g.lineStyle(1, deepShadow, 0.65);
+        const crackX = 9 + variant * 6;
+        const crackY = 10 + ((mask + variant) % 2) * 8;
+        g.beginPath();
+        g.moveTo(crackX, crackY);
+        g.lineTo(crackX + 3, crackY + 2);
+        g.lineTo(crackX + 1, crackY + 5);
+        g.strokePath();
+        px(g, 3 + variant * 8, 23, 6, 1, shade(th.accent, 0.42), 0.18);
+
+        const drawHorizontalCap = (y: number, floorSide: 'top' | 'bottom') => {
+          const faceY = floorSide === 'top' ? y : y + 6;
+          const capY = floorSide === 'top' ? y + 5 : y;
+          px(g, 0, faceY, TILE, 5, faceShadow);
+          px(g, 0, floorSide === 'top' ? faceY : faceY + 3, TILE, 2, deepShadow, 0.82);
+          px(g, 0, capY, TILE, 6, capBase);
+          px(g, 0, capY, TILE, 1, capLight, 0.9);
+          px(g, 0, capY + 5, TILE, 1, capShade, 0.95);
+          for (let x = 8 - variant * 3; x < TILE; x += 11) px(g, x, capY + 1, 1, 5, mortar, 0.9);
+        };
+        const drawVerticalCap = (x: number, floorSide: 'left' | 'right') => {
+          const faceX = floorSide === 'left' ? x : x + 6;
+          const capX = floorSide === 'left' ? x + 5 : x;
+          px(g, faceX, 0, 5, TILE, faceShadow);
+          px(g, floorSide === 'left' ? faceX : faceX + 3, 0, 2, TILE, deepShadow, 0.82);
+          px(g, capX, 0, 6, TILE, capBase);
+          px(g, capX, 0, 1, TILE, capLight, 0.9);
+          px(g, capX + 5, 0, 1, TILE, capShade, 0.95);
+          for (let y = 8 + variant * 2; y < TILE; y += 11) px(g, capX + 1, y, 5, 1, mortar, 0.9);
+        };
+        const drawPillar = (x: number, y: number, showRune: boolean) => {
+          px(g, x, y, 11, 11, deepShadow, 0.95);
+          px(g, x + 1, y + 1, 9, 9, capShade);
+          px(g, x + 2, y + 2, 7, 7, capBase);
+          px(g, x + 2, y + 2, 7, 1, capLight, 0.95);
+          px(g, x + 2, y + 8, 7, 1, deepShadow, 0.9);
+          px(g, x + 8, y + 2, 1, 7, capShade, 0.9);
+          if (showRune) {
+            px(g, x + 4, y + 4, 3, 3, th.accent, 0.34);
+            px(g, x + 5, y + 4, 1, 3, shade(th.accent, 1.45), 0.9);
+          }
+        };
+
+        if (mask & 1) drawHorizontalCap(0, 'top');
+        if (mask & 2) drawVerticalCap(TILE - 11, 'right');
+        if (mask & 4) drawHorizontalCap(TILE - 11, 'bottom');
+        if (mask & 8) drawVerticalCap(0, 'left');
+
+        const showRune = (variant + mask + tf) % 3 === 0;
+        if ((mask & 1) && (mask & 8)) drawPillar(0, 0, showRune);
+        if ((mask & 1) && (mask & 2)) drawPillar(TILE - 11, 0, showRune);
+        if ((mask & 4) && (mask & 8)) drawPillar(0, TILE - 11, showRune);
+        if ((mask & 4) && (mask & 2)) drawPillar(TILE - 11, TILE - 11, showRune);
+
+        const key = `wall${suffix}_m${mask}_v${variant}`;
+        g.generateTexture(key, TILE, TILE);
+        scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+        g.destroy();
+      }
     }
 
     // 水

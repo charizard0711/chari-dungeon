@@ -16,14 +16,12 @@ export interface AudioDef {
 export const BGM_DEFS = {
   // タイトル画面：明るく不思議なレトロBGM
   title:    { key: 'bgm_title',    path: 'assets/audio/bgm_title.mp3',    volume: 0.5,  loop: true },
-  // 1F〜10F：探索感のある16bit風ダンジョンBGM
-  ruins:    { key: 'bgm_ruins',    path: 'assets/audio/bgm_ruins.mp3',    volume: 0.5,  loop: true },
-  // 11F〜20F：歯車・機械迷宮っぽい緊張感のあるBGM
-  machine:  { key: 'bgm_machine',  path: 'assets/audio/bgm_machine.mp3',  volume: 0.5,  loop: true },
-  // 21F〜29F：深層コアの危険な雰囲気のBGM
-  core:     { key: 'bgm_core',     path: 'assets/audio/bgm_core.mp3',     volume: 0.5,  loop: true },
-  // 30F：最深部・ラスボス前の緊張感あるBGM
-  final:    { key: 'bgm_final',    path: 'assets/audio/bgm_final.mp3',    volume: 0.55, loop: true },
+  // ダンジョン：明るい冒険曲を2階ごとに切り替え、10階で一巡する
+  floor01:  { key: 'bgm_floor01',  path: 'assets/audio/bgm_floors_01_02.wav', volume: 0.5, loop: true },
+  floor03:  { key: 'bgm_floor03',  path: 'assets/audio/bgm_floors_03_04.wav', volume: 0.5, loop: true },
+  floor05:  { key: 'bgm_floor05',  path: 'assets/audio/bgm_floors_05_06.wav', volume: 0.5, loop: true },
+  floor07:  { key: 'bgm_floor07',  path: 'assets/audio/bgm_floors_07_08.wav', volume: 0.5, loop: true },
+  floor09:  { key: 'bgm_floor09',  path: 'assets/audio/bgm_floors_09_10.wav', volume: 0.5, loop: true },
   // クリア：短い勝利ジングル
   clear:    { key: 'bgm_clear',    path: 'assets/audio/bgm_clear.mp3',    volume: 0.6,  loop: false },
   // ゲームオーバー：短い敗北ジングル
@@ -34,10 +32,9 @@ export type BgmName = keyof typeof BGM_DEFS;
 
 // 階層 → BGMトラックのマッピング
 export function bgmForFloor(floor: number): BgmName {
-  if (floor >= 30) return 'final';
-  // 2階ごとに曲を切り替える。3曲を循環させ、連続した階層では同じ曲を維持する。
+  // 2階ごとに曲を切り替え、5曲を循環させる（29F〜30Fは「黄金のゴール」）。
   const band = Math.floor((Math.max(1, floor) - 1) / 2);
-  return (['ruins', 'machine', 'core'] as const)[band % 3];
+  return (['floor01', 'floor03', 'floor05', 'floor07', 'floor09'] as const)[band % 5];
 }
 
 // ---- 効果音（システム音）----

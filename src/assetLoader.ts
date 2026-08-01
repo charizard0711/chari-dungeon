@@ -165,6 +165,12 @@ function tileDefs(): FrameDef[] {
 
 const ALL_DEFS = [...FRAME_DEFS, ...tileDefs()];
 
+// タイル素材の外周には、素材シート上で単体表示するための暗い縁が入っている。
+// ゲーム内では隣接タイル同士を連続して見せたい地形だけ、縁を少しクロップする。
+function shouldCropTerrainEdge(key: string): boolean {
+  return /^(floor|wall|water|poison|cracked)/.test(key);
+}
+
 // ========================================================================
 // 画素処理
 // ========================================================================
@@ -266,6 +272,8 @@ export function applyRealAssets(scene: Phaser.Scene): { applied: number; skipped
   const THR = 14;
 
   for (const def of ALL_DEFS) {
+    // 床と壁は接続方向別のオートタイルを使うため、素材画像では上書きしない。
+    if (/^(floor|wall)_/.test(def.key)) continue;
     if (!(def.sheet in sheets)) sheets[def.sheet] = prepareSheet(scene, def.sheet);
     const sd = sheets[def.sheet];
     if (!sd) { skipped.push(def.key); continue; }
@@ -295,7 +303,6 @@ export function applyRealAssets(scene: Phaser.Scene): { applied: number; skipped
 
     // 色をほんの少しだけ整える（やり過ぎるとAIっぽく不自然になるので控えめ）
     boostColor(tight, def.mode === 'tile' ? 1.08 : 1.12, def.mode === 'tile' ? 1.02 : 1.04);
-
     // 一時canvasへ
     const tmp = document.createElement('canvas');
     tmp.width = tw; tmp.height = th;
@@ -324,7 +331,20 @@ export function applyRealAssets(scene: Phaser.Scene): { applied: number; skipped
     // 高解像度の元絵をスムーズに縮小（元アセットの質感を保つ）
     cctx.imageSmoothingEnabled = true;
     (cctx as any).imageSmoothingQuality = 'high';
-    cctx.drawImage(tmp, 0, 0, tw, th, 0, 0, dw, dh);
+    const edgeCrop = def.mode === 'tile' && shouldCropTerrainEdge(def.key)
+      ? Math.max(1, Math.round(Math.min(tw, th) * 0.035))
+      : 0;
+    cctx.drawImage(
+      tmp,
+      edgeCrop,
+      edgeCrop,
+      tw - edgeCrop * 2,
+      th - edgeCrop * 2,
+      0,
+      0,
+      dw,
+      dh
+    );
     canvasTex.refresh();
     applied++;
   }

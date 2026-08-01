@@ -62,7 +62,8 @@ export class BootScene extends Phaser.Scene {
   private async filterExistingAudio(defs: AudioDef[]): Promise<AudioDef[]> {
     const results = await Promise.all(defs.map(async (def) => {
       try {
-        const res = await fetch(def.path, { method: 'GET' });
+        // 大きなBGMを存在確認だけで二重ダウンロードしない。
+        const res = await fetch(def.path, { method: 'HEAD' });
         const ct = res.headers.get('content-type') || '';
         if (res.ok && ct.startsWith('audio')) return def;
       } catch {
