@@ -563,6 +563,7 @@ function monsterGrid(key: string, size: number): string[] {
 
 // ===================== アイテム / 武器 / 盾 =====================
 function iconTexture(scene: Phaser.Scene, key: string, draw: (g: Phaser.GameObjects.Graphics) => void, size = 24) {
+  if (scene.textures.exists(key)) return;
   const g = scene.add.graphics();
   draw(g);
   g.generateTexture(key, size, size);

@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { TILE } from '../textures';
 import { generateDungeon, DungeonData, randomFloor, isWalkable } from '../dungeon';
 import type { BossRoomZone } from '../dungeon';
-import { getTheme, eraSuffix, MONSTER_DEFS, makeItem, plusColor, gradeColor, ITEM_DEFS } from '../data';
+import { getTheme, eraSuffix, MONSTER_DEFS, makeItem, gradeColor, ITEM_DEFS, ELEMENT_INFO, monsterElement } from '../data';
 import type { Dir, EquipmentGrade, ItemKind, MonsterDef, Shield, TileType, Vec2, Weapon } from '../types';
 import { Player, rollWeaponByGrade, weaponFullName, makeShield, shieldFullName } from '../player';
 import { Enemy } from '../enemy';
@@ -240,7 +240,7 @@ export class GameScene extends Phaser.Scene {
     if (location.hostname === 'localhost' && qaParams.has('qa-gacha')) this.player.gold = 900;
     if (location.hostname === 'localhost' && qaParams.has('qa-equipment')) {
       this.player.weapons.push(rollWeaponByGrade('B'));
-      this.player.shields.push(makeShield('s_crystal', 'B'));
+      this.player.shields.push(makeShield('s_crystal', 'B', true));
     }
     if (this.qaBossMode) { this.player.hpMax = 999; this.player.hp = 999; }
     this.floor = 1;
@@ -1488,6 +1488,23 @@ export class GameScene extends Phaser.Scene {
         this.busy = false;
         return;
       }
+      // 弓は向いている方向の3マス先まで、最初の敵へ矢を放つ。
+      if (this.player.weapon?.weaponType === 'bow') {
+        for (let distance = 2; distance <= 3; distance++) {
+          const tx = this.player.x + dx * distance;
+          const ty = this.player.y + dy * distance;
+          const tile = this.dungeon.tiles[ty]?.[tx];
+          if (!tile || !isWalkable(tile) || tile === 'pit') break;
+          const rangedEnemy = this.enemyAt(tx, ty);
+          if (rangedEnemy) {
+            this.busy = true;
+            await this.playerAttack(rangedEnemy, dir, true);
+            await this.finishTurn();
+            this.busy = false;
+            return;
+          }
+        }
+      }
       // 宝箱があれば開ける
       const chest = this.chestAt(nx, ny);
       if (chest && !chest.opened) {
@@ -1669,7 +1686,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ============ 戦闘 ============
-  async playerAttack(e: Enemy, dir: Dir) {
+  async playerAttack(e: Enemy, dir: Dir, ranged = false) {
     this.playerAttacking = true;
     this.setPlayerVisual(dir, 'atkWindup');
     await new Promise<void>((resolve) => this.time.delayedCall(42, () => resolve()));
@@ -1678,7 +1695,19 @@ export class GameScene extends Phaser.Scene {
     // 敵の方向へ踏み込む（前进→戻る）と斬撃エフェクト
     const [ddx, ddy] = this.dirVec(dir);
     const homeX = this.playerSprite.x, homeY = this.playerSprite.y;
-    this.slashFx(e.x, e.y, plusColor(this.player.weapon?.plus ?? 0));
+    const elementColor = this.player.weapon?.element ? ELEMENT_INFO[this.player.weapon.element].color : 0xdfe7f0;
+    if (ranged) {
+      const arrow = this.add.image(this.playerSprite.x, this.playerSprite.y, 'fx_bolt')
+        .setDepth(20).setTint(elementColor).setScale(0.82);
+      arrow.setRotation(Phaser.Math.Angle.Between(this.playerSprite.x, this.playerSprite.y, e.sprite.x, e.sprite.y));
+      await new Promise<void>((resolve) => this.tweens.add({
+        targets: arrow, x: e.sprite.x, y: e.sprite.y, duration: 180, ease: 'Quad.easeIn',
+        onComplete: () => { arrow.destroy(); resolve(); }
+      }));
+      this.effectFx(e.x, e.y, 'fx_magic', 1.0, 220, elementColor);
+    } else {
+      this.slashFx(e.x, e.y, elementColor);
+    }
     if (this.weaponSprite?.visible) {
       this.tweens.add({
         targets: this.weaponSprite,
@@ -1688,16 +1717,18 @@ export class GameScene extends Phaser.Scene {
         ease: 'Cubic.easeOut'
       });
     }
-    await new Promise<void>((resolve) => {
-      this.tweens.add({
-        targets: this.playerSprite,
-        x: homeX + ddx * 10, y: homeY + ddy * 10,
-        duration: ANIM * 0.45, yoyo: true, ease: 'Quad.easeOut',
-        onComplete: () => { this.playerSprite.x = homeX; this.playerSprite.y = homeY; resolve(); }
+    if (!ranged) {
+      await new Promise<void>((resolve) => {
+        this.tweens.add({
+          targets: this.playerSprite,
+          x: homeX + ddx * 10, y: homeY + ddy * 10,
+          duration: ANIM * 0.45, yoyo: true, ease: 'Quad.easeOut',
+          onComplete: () => { this.playerSprite.x = homeX; this.playerSprite.y = homeY; resolve(); }
+        });
       });
-    });
+    }
 
-    const res = computePlayerAttack(this.player, e.def);
+    const res = computePlayerAttack(this.player, e.def, !ranged && dir === e.facing);
     const bossState = this.bossStates.get(e);
     if (bossState?.kind === 'seal_king' && bossState.seals.length > 0) {
       res.damage = Math.max(1, Math.floor(res.damage * 0.35));
@@ -1710,7 +1741,7 @@ export class GameScene extends Phaser.Scene {
     // 二刀流：2撃目の斬撃を少し遅らせて重ねる
     if (res.hits >= 2) {
       this.time.delayedCall(130, () => {
-        this.slashFx(e.x, e.y, plusColor(this.player.weapon?.plus ?? 0));
+        this.slashFx(e.x, e.y, elementColor);
         Audio.playSe('hit');
       });
     }
@@ -2243,6 +2274,10 @@ export class GameScene extends Phaser.Scene {
         break;
     }
     if (mv) {
+      const moveDx = mv.x - e.x;
+      const moveDy = mv.y - e.y;
+      if (Math.abs(moveDx) > Math.abs(moveDy)) e.facing = moveDx > 0 ? 'right' : 'left';
+      else if (moveDy !== 0) e.facing = moveDy > 0 ? 'down' : 'up';
       e.x = mv.x;
       e.y = mv.y;
       return this.animateEnemyMove(e, mv);
@@ -2277,6 +2312,8 @@ export class GameScene extends Phaser.Scene {
 
   enemyAttack(e: Enemy): Promise<void> {
     const res = computeEnemyAttack(this.player, e.def);
+    const enemyElement = monsterElement(e.def);
+    const enemyElementInfo = ELEMENT_INFO[enemyElement];
     e.animating = true;
     // 攻撃演出：少し前進
     const ox = e.sprite.x, oy = e.sprite.y;
@@ -2296,7 +2333,8 @@ export class GameScene extends Phaser.Scene {
         onComplete: () => {
           e.animating = false;
           e.sprite.setScale(e.baseScale).setAngle(0);
-          this.damagePlayer(res.damage, `${e.def.name}の攻撃！`);
+          this.damagePlayer(res.damage, `${e.def.name}の${enemyElementInfo.name}属性攻撃！`);
+          this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.4, 360, enemyElementInfo.color);
           this.hitFx(this.player.x, this.player.y);
           this.cameras.main.shake(90, 0.004);
           if (res.shieldBroke) {
@@ -2316,7 +2354,9 @@ export class GameScene extends Phaser.Scene {
 
   enemyRanged(e: Enemy): Promise<void> {
     e.animating = true;
-    this.magicFx(e.x, e.y);
+    const enemyElement = monsterElement(e.def);
+    const enemyElementInfo = ELEMENT_INFO[enemyElement];
+    this.effectFx(e.x, e.y, 'fx_magic', 2.0, 600, enemyElementInfo.color);
     this.tweens.add({
       targets: e.sprite,
       scaleX: e.baseScale * 0.9,
@@ -2326,7 +2366,7 @@ export class GameScene extends Phaser.Scene {
       ease: 'Sine.easeInOut'
     });
     return new Promise((resolve) => {
-      const bolt = this.add.image(e.sprite.x, e.sprite.y, 'fx_bolt').setDepth(20).setTint(e.def.color);
+      const bolt = this.add.image(e.sprite.x, e.sprite.y, 'fx_bolt').setDepth(20).setTint(enemyElementInfo.color);
       this.tweens.add({
         targets: bolt, x: this.playerSprite.x, y: this.playerSprite.y,
         duration: this.currentTurnAnimDuration(180),
@@ -2335,7 +2375,8 @@ export class GameScene extends Phaser.Scene {
           e.sprite.setScale(e.baseScale);
           bolt.destroy();
           const res = computeEnemyAttack(this.player, e.def);
-          this.damagePlayer(res.damage, `${e.def.name}の遠距離攻撃！`);
+          this.damagePlayer(res.damage, `${e.def.name}の${enemyElementInfo.name}属性遠距離攻撃！`);
+          this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.45, 360, enemyElementInfo.color);
           resolve();
         }
       });
@@ -2530,7 +2571,7 @@ export class GameScene extends Phaser.Scene {
         this.player.inventory.push(makeItem('stone'), makeItem('stone'));
         this.log('レア！ 武器強化石×2が入っていた！', 'special');
       } else if (rr < 0.55) {
-        const s = makeShield(this.floor >= 12 ? 's_skull' : 's_crystal');
+        const s = makeShield(this.floor >= 12 ? 's_skull' : 's_crystal', undefined, true);
         this.player.shields.push(s);
         this.log(`さらに「${s.name}」も入っていた！`, 'item');
       } else {
@@ -2550,7 +2591,7 @@ export class GameScene extends Phaser.Scene {
       if (roll < 0.6) {
         const eq = Math.random();
         if (this.floor >= 8 && eq < 0.35) {
-          const s = makeShield(this.floor >= 16 ? 's_skull' : 's_crystal');
+          const s = makeShield(this.floor >= 16 ? 's_skull' : 's_crystal', undefined, true);
           this.player.shields.push(s);
           this.log(`宝箱から「${s.name}」を発見！`, 'item');
         } else {
@@ -2723,7 +2764,7 @@ export class GameScene extends Phaser.Scene {
   // ============ ガチャ ============
   // 300Gで1回。排出は武器か盾のみ。ランクが装備グレードへ直結する。
   // 戻り値はUI演出用（rank/色/名前/アイコン）。ゴールド不足はnull。
-  gachaPull(): { rank: 'SS' | 'S' | 'A' | 'B' | 'C'; color: number; name: string; texKey: string } | null {
+  gachaPull(): { rank: 'SS' | 'S' | 'A' | 'B' | 'C'; color: number; name: string; texKey: string; hasEffect: boolean } | null {
     if (this.gameEnded) return null;
     if (this.player.gold < 300) {
       this.log('ゴールドが足りない。（ガチャは300G）', 'sys');
@@ -2747,6 +2788,7 @@ export class GameScene extends Phaser.Scene {
     const grade = gradeByRank[rank];
     let name = '';
     let texKey = '';
+    let hasEffect = false;
 
     // 武器は1階につき最大1本。取得済みなら必ず盾になる。
     const weaponPrize = !this.weaponWonThisFloor && Math.random() < 0.5;
@@ -2758,9 +2800,10 @@ export class GameScene extends Phaser.Scene {
       this.weaponWonThisFloor = true;
       name = weaponFullName(w);
       texKey = w.key;
+      hasEffect = !!w.passive;
     } else {
       const shieldKey = grade === 'D' || grade === 'C' ? 's_gear' : grade === 'B' ? 's_crystal' : 's_skull';
-      const s = makeShield(shieldKey, grade);
+      const s = makeShield(shieldKey, grade, true);
       if (rank === 'SS') s.plus = 2;
       else if (rank === 'S') s.plus = 1;
       this.player.shields.push(s);
@@ -2769,7 +2812,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.log(`ガチャ【${rank}】${name}を手に入れた！`, rank === 'SS' || rank === 'S' ? 'special' : 'item');
-    return { rank, color: RANK_COLOR[rank], name, texKey };
+    return { rank, color: RANK_COLOR[rank], name, texKey, hasEffect };
   }
 
   shopRemaining(kind: 'potion' | 'stone' | 'shieldstone'): number {
@@ -3045,16 +3088,18 @@ export class GameScene extends Phaser.Scene {
   magicFx(x: number, y: number) { this.effectFx(x, y, 'fx_magic', 2.0, 600); }
   poisonFx(x: number, y: number) { this.effectFx(x, y, 'fx_poison', 1.5, 500); }
 
-  // 強化オーラ＆手持ち武器の色・表示を更新
+  // 強化値は輝きの強さだけを上げ、武器色は属性だけで変える。
   updatePlayerAura() {
     if (this.playerAura) {
       const plus = this.player.weapon?.plus ?? 0;
       const grade = this.player.weapon?.grade ?? 'D';
+      const element = this.player.weapon?.element;
       const highGrade = grade === 'A' || grade === 'S';
-      if (plus > 0 || highGrade) {
+      if (plus > 0 || highGrade || element) {
         this.playerAura.setVisible(true)
-          .setTint(plus > 0 ? plusColor(plus) : gradeColor(grade))
-          .setAlpha(plus > 0 ? 0.5 + Math.min(0.4, plus * 0.12) : grade === 'S' ? 0.68 : 0.48);
+          .setTint(element ? ELEMENT_INFO[element].color : gradeColor(grade))
+          .setAlpha(Math.min(0.92, 0.34 + plus * 0.12 + (highGrade ? 0.14 : 0)))
+          .setScale(0.9 + Math.min(0.35, plus * 0.06));
       } else {
         this.playerAura.setVisible(false);
       }
@@ -3065,7 +3110,7 @@ export class GameScene extends Phaser.Scene {
       if (w && this.textures.exists(w.key)) {
         const size = w.grade === 'S' ? 22 : w.grade === 'A' ? 20 : 18;
         this.weaponSprite.setVisible(true).setTexture(w.key).setDisplaySize(size, size);
-        this.weaponSprite.setTint((w.plus ?? 0) > 0 ? plusColor(w.plus) : 0xffffff);
+        this.weaponSprite.setTint(w.element ? ELEMENT_INFO[w.element].color : 0xffffff);
       } else {
         this.weaponSprite.setVisible(false);
       }

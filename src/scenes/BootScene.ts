@@ -11,6 +11,8 @@ const EXPANSION_MONSTER_KEYS = [
   'm_cerberus', 'm_hydra', 'm_crystal_crab', 'm_blood_moth', 'm_clockwork_chimera'
 ] as const;
 
+const WEAPON_ART_KEYS = ['w_dagger', 'w_longsword', 'w_lance', 'w_bow', 'w_dual_sword', 'w_twin_daggers'] as const;
+
 export class BootScene extends Phaser.Scene {
   constructor() {
     super('BootScene');
@@ -23,6 +25,9 @@ export class BootScene extends Phaser.Scene {
     this.load.image('sheet_items', 'assets/items.png');
     this.load.image('sheet_tiles', 'assets/tiles.png');
     this.load.image('dungeon_chamber', 'assets/dungeon-chamber.png');
+    for (const key of WEAPON_ART_KEYS) {
+      this.load.image(key, `assets/weapons/${key.slice(2)}.png`);
+    }
     for (const key of EXPANSION_MONSTER_KEYS) {
       this.load.image(key, `assets/monsters/${key}.png`);
     }

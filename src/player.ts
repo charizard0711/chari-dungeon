@@ -1,5 +1,14 @@
-import type { Weapon, Shield, Item, Dir, Magic, MagicCode, EquipmentGrade } from './types';
-import { WEAPON_DEFS, SHIELD_DEFS, magicLabel, makeItem } from './data';
+import type { Weapon, Shield, Item, Dir, Magic, MagicCode, EquipmentGrade, WeaponPassive, WeaponType } from './types';
+import { WEAPON_DEFS, SHIELD_DEFS, magicLabel, makeItem, randomElement, ELEMENT_INFO } from './data';
+
+const WEAPON_PASSIVES: Record<WeaponType, WeaponPassive> = {
+  dagger: { key: 'backstab', name: '背面急所', description: 'クリティカルダメージ+10%' },
+  longsword: { key: 'sturdy', name: '剣身防御', description: '受けるダメージ-5%' },
+  lance: { key: 'pierce', name: '貫通', description: '敵の防御を8%無視' },
+  bow: { key: 'eagle_eye', name: '鷹の目', description: 'クリティカル率+4%' },
+  dual_sword: { key: 'twin_edge', name: '双刃', description: '2撃目の威力+8%' },
+  twin_daggers: { key: 'blood_edge', name: '吸命刃', description: '与ダメージの3%回復' }
+};
 
 export class Player {
   name = 'チャリ';
@@ -27,7 +36,7 @@ export class Player {
   reviveReady = false; // 復活のタネ所持で有効化されるフラグ（アイテム所持で判定）
 
   constructor() {
-    this.weapon = makeWeapon('w_screw', []);
+    this.weapon = makeWeapon('w_dagger', []);
     this.weapons.push(this.weapon);
     this.shield = makeShield('s_gear');
     this.shields.push(this.shield);
@@ -101,21 +110,29 @@ export function makeWeapon(key: string, magics: Magic[]): Weapon {
   }
   return {
     key: def.key, name: def.name, atkMin, atkMax,
-    durMax, dur: durMax, magics, grade: def.grade, plus: 0, dual: def.dual
+    durMax, dur: durMax, magics, grade: def.grade, plus: 0, dual: def.dual,
+    weaponType: def.weaponType, ss: def.ss
   };
 }
 
-export function makeShield(key: string, gradeOverride?: EquipmentGrade): Shield {
+export function makeShield(key: string, gradeOverride?: EquipmentGrade, withRandomElement = false): Shield {
   const def = SHIELD_DEFS.find((d) => d.key === key)!;
   const grade = gradeOverride ?? def.grade;
   const gradeIndex = ['D', 'C', 'B', 'A', 'S'].indexOf(grade);
   const defBonus = Math.max(def.defBonus, 2 + gradeIndex * 2);
   const durMax = Math.max(def.durMax, 40 + gradeIndex * 15);
-  return { key: def.key, name: def.name, defBonus, durMax, dur: durMax, grade, plus: 0 };
+  return { key: def.key, name: def.name, defBonus, durMax, dur: durMax, grade, plus: 0, element: withRandomElement ? randomElement() : undefined };
 }
 
 export function shieldFullName(s: Shield): string {
-  return `[${s.grade}] ${(s.plus ?? 0) > 0 ? `+${s.plus} ` : ''}${s.name}`;
+  const element = s.element ? `【${ELEMENT_INFO[s.element].name}】` : '';
+  return `[${s.grade}] ${element}${(s.plus ?? 0) > 0 ? `+${s.plus} ` : ''}${s.name}`;
+}
+
+function addRandomLootTraits(weapon: Weapon): Weapon {
+  weapon.element = randomElement();
+  if (Math.random() < 0.62) weapon.passive = { ...WEAPON_PASSIVES[weapon.weaponType] };
+  return weapon;
 }
 
 // ランダムなマジックをn個生成（ガチャ・武器生成で共用）
@@ -152,19 +169,21 @@ export function rollWeapon(floor: number): Weapon {
     const r = Math.random();
     weapon.plus = r < 0.65 ? 1 : r < 0.9 ? 2 : 3;
   }
-  return weapon;
+  return addRandomLootTraits(weapon);
 }
 
 export function rollWeaponByGrade(grade: EquipmentGrade): Weapon {
   const pool = WEAPON_DEFS.filter((d) => d.grade === grade);
   const picked = pool[Math.floor(Math.random() * pool.length)] ?? WEAPON_DEFS[0];
   const magicCount = grade === 'S' ? 2 : grade === 'A' ? 1 : grade === 'B' && Math.random() < 0.35 ? 1 : 0;
-  return makeWeapon(picked.key, rollMagics(magicCount));
+  return addRandomLootTraits(makeWeapon(picked.key, rollMagics(magicCount)));
 }
 
 export function weaponFullName(w: Weapon): string {
   const plus = (w.plus ?? 0) > 0 ? `+${w.plus} ` : '';
   const magic = w.magics.length ? ` [${w.magics.map((m) => m.label).join('')}]` : '';
   const dual = w.dual ? '〔二刀〕' : '';
-  return `[${w.grade}] ${plus}${w.name}${dual}${magic}`;
+  const element = w.element ? `【${ELEMENT_INFO[w.element].name}】` : '';
+  const passive = w.passive ? `〈${w.passive.name}〉` : '';
+  return `[${w.ss ? 'SS' : w.grade}] ${element}${plus}${w.name}${dual}${passive}${magic}`;
 }

@@ -4,7 +4,7 @@ import { GAME_W, GAME_H } from '../main';
 import { IS_MOBILE, MAP_X, MAP_Y, MAP_W, MAP_H } from '../layout';
 import { durabilityRisk } from '../combat';
 import { weaponFullName } from '../player';
-import { getTheme, MAGIC_DESC, MONSTER_DEFS, ITEM_DEFS, plusColor, plusColorHex, gradeColor, isRareItem } from '../data';
+import { getTheme, MAGIC_DESC, MONSTER_DEFS, ITEM_DEFS, plusColor, plusColorHex, gradeColor, isRareItem, ELEMENT_INFO, monsterElement } from '../data';
 import type { MagicCode, ItemKind, Item, Dir } from '../types';
 import { shieldFullName } from '../player';
 import { Audio } from '../audio/manager';
@@ -453,10 +453,10 @@ export class UIScene extends Phaser.Scene {
     this.hpBar.fillStyle(0xff5a5a).fillRect(bx, by, bw * Math.max(0, p.hp / p.hpMax), 14);
 
     const w = p.weapon, s = p.shield;
-    const slotInfo: { tex: string | null; name: string; sub: string; plus: number; grade?: 'D' | 'C' | 'B' | 'A' | 'S' }[] = [
-      w ? { tex: w.key, name: `[${w.grade}] ${w.name}`, sub: `耐久 ${w.dur}/${w.durMax}  強化${Math.round(this.gs.enhanceChance(w.plus) * 100)}%`, plus: w.plus, grade: w.grade }
+    const slotInfo: { tex: string | null; name: string; sub: string; plus: number; grade?: 'D' | 'C' | 'B' | 'A' | 'S'; passive?: boolean }[] = [
+      w ? { tex: w.key, name: `[${w.ss ? 'SS' : w.grade}] ${w.name}`, sub: `耐久 ${w.dur}/${w.durMax}  強化${Math.round(this.gs.enhanceChance(w.plus) * 100)}%`, plus: w.plus, grade: w.grade, passive: !!w.passive }
         : { tex: null, name: '素手', sub: '', plus: 0 },
-      w?.dual ? { tex: w.key, name: `[${w.grade}] ${w.name}`, sub: '二刀流・左手', plus: w.plus, grade: w.grade }
+      w?.dual ? { tex: w.key, name: `[${w.ss ? 'SS' : w.grade}] ${w.name}`, sub: '二刀流・左手', plus: w.plus, grade: w.grade, passive: !!w.passive }
         : s ? { tex: s.key, name: `[${s.grade}] ${s.name}`, sub: `防 +${s.defBonus + s.plus}  強化${Math.round(this.gs.enhanceChance(s.plus) * 100)}%`, plus: s.plus, grade: s.grade }
         : { tex: null, name: 'なし', sub: '', plus: 0 }
     ];
@@ -464,7 +464,7 @@ export class UIScene extends Phaser.Scene {
       const info = slotInfo[i];
       const [sx, sy, sw, sh] = slot.rect;
       const has = info.tex !== null;
-      const rim = info.grade ? gradeColor(info.grade) : 0x2f6f6a;
+      const rim = info.passive ? 0xff3f4f : info.grade ? gradeColor(info.grade) : 0x2f6f6a;
       slot.bg.clear();
       slot.bg.fillStyle(0x0a1c20, has ? .96 : 0.5).fillRoundedRect(sx, sy, sw, sh, 10);
       slot.bg.lineStyle(info.grade === 'S' ? 3 : info.grade === 'A' ? 2.5 : 1.5, rim, has ? 1 : 0.5).strokeRoundedRect(sx, sy, sw, sh, 8);
@@ -674,7 +674,7 @@ export class UIScene extends Phaser.Scene {
       p.weapons.forEach((wp, i) => {
         const equipped = wp === p.weapon;
         const risk = durabilityRisk(wp.dur, wp.durMax);
-        const frameCol = gradeColor(wp.grade);
+        const frameCol = wp.passive ? 0xff3f4f : gradeColor(wp.grade);
         const icon = this.framedIcon(x + 34, cy + 16, wp.key, frameCol);
         const row = this.rowButton(x + 58, cy, w - 74, `${equipped ? '▶ ' : '　'}${weaponFullName(wp)}  攻${wp.atkMin}-${wp.atkMax}  耐久${wp.dur}/${wp.durMax}(${risk.label})`, equipped, () => this.gs.equipWeapon(i));
         this.overlay.add([...icon, row]);
@@ -722,7 +722,7 @@ export class UIScene extends Phaser.Scene {
       const equipped = wp === p.weapon;
       const risk = durabilityRisk(wp.dur, wp.durMax);
       // 枠の色は強化値で変化（+1黄/+2紫/+3青/+4赤、未強化はテール）
-      const frameCol = gradeColor(wp.grade);
+      const frameCol = wp.passive ? 0xff3f4f : gradeColor(wp.grade);
       const icon = this.framedIcon(x + 34, cy + 16, wp.key, frameCol);
       const sellW = IS_MOBILE ? 86 : 98;
       const row = this.rowButton(x + 58, cy, w - 80 - sellW, `${equipped ? '▶ ' : '　'}${weaponFullName(wp)}  耐久${wp.dur}/${wp.durMax}(${risk.label})`, equipped, () => this.gs.equipWeapon(i));
@@ -805,7 +805,9 @@ export class UIScene extends Phaser.Scene {
       this.overlay.add(this.add.text(px + 29, py + 3, name, {
         fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: found ? '#eef5ff' : '#596579', fontStyle: 'bold'
       }));
-      this.overlay.add(this.add.text(px + 29, py + 15, found ? `HP${m.hp}  攻${m.atkMin}-${m.atkMax}  防${m.def}` : `???  B${m.minFloor}-${m.maxFloor}`, {
+      const element = monsterElement(m);
+      const weakness = ELEMENT_INFO[element].weakTo;
+      this.overlay.add(this.add.text(px + 29, py + 15, found ? `${ELEMENT_INFO[element].name}/弱${ELEMENT_INFO[weakness].name} HP${m.hp} 攻${m.atkMin}-${m.atkMax}` : `???  B${m.minFloor}-${m.maxFloor}`, {
         fontFamily: '"Yu Gothic UI"', fontSize: '8px', color: found ? '#8fc8d7' : '#465264'
       }));
     });
@@ -935,7 +937,7 @@ export class UIScene extends Phaser.Scene {
   //    A: 色フラッシュで開封 / B・C: ポンと開封
   //  ④開いた宝箱から品物が飛び出し、回転光背＋ランク印がドン。SSは金吹雪
   // ============================================================
-  playGachaAnimation(result: { rank: 'SS' | 'S' | 'A' | 'B' | 'C'; color: number; name: string; texKey: string }) {
+  playGachaAnimation(result: { rank: 'SS' | 'S' | 'A' | 'B' | 'C'; color: number; name: string; texKey: string; hasEffect: boolean }) {
     this.gachaAnimating = true;
     // モーダル（ガチャウィンドウ）の矩形。演出はすべてこの中で完結させる
     const { x: mx, y: my, w: mw, h: mh } = this.L.ov;
@@ -1067,6 +1069,11 @@ export class UIScene extends Phaser.Scene {
       const halo = track(this.add.image(cx, itemY, 'glow').setDepth(305)
         .setBlendMode(Phaser.BlendModes.ADD).setTint(result.color).setAlpha(0).setScale(1.6));
       this.tweens.add({ targets: halo, alpha: 0.5, duration: 500, delay: 200 });
+      if (result.hasEffect) {
+        const effectFrame = track(this.add.graphics().setDepth(306).setAlpha(0));
+        effectFrame.lineStyle(4, 0xff3f4f, 1).strokeRoundedRect(cx - 48, itemY - 48, 96, 96, 12);
+        this.tweens.add({ targets: effectFrame, alpha: 1, duration: 300, delay: 300 });
+      }
       const icon = track(this.add.image(cx, chest.y - 6, result.texKey).setDepth(306).setDisplaySize(22, 22).setAlpha(0));
       this.tweens.add({
         targets: icon, y: itemY, displayWidth: 78, displayHeight: 78, alpha: 1,

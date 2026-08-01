@@ -1,4 +1,4 @@
-import type { Weapon, Shield, Item, ItemKind, MonsterDef, MagicCode, EquipmentGrade } from './types';
+import type { Weapon, Shield, Item, ItemKind, MonsterDef, MagicCode, EquipmentGrade, Element, WeaponType } from './types';
 
 // ===== 武器定義 =====
 export interface WeaponDef {
@@ -11,23 +11,43 @@ export interface WeaponDef {
   rarity: number; // 出現しやすさの重み（小さいほどレア）
   grade: EquipmentGrade;
   dual?: boolean; // 二刀流（1ターンに2回攻撃・盾装備不可）
+  weaponType: WeaponType;
+  ss?: boolean;
 }
 
 export const WEAPON_DEFS: WeaponDef[] = [
-  { key: 'w_screw', name: 'スパイラルランス', atkMin: 5, atkMax: 12, durMax: 40, minFloor: 1, rarity: 10, grade: 'D' },
-  { key: 'w_star', name: 'ステラブレード', atkMin: 7, atkMax: 15, durMax: 35, minFloor: 1, rarity: 8, grade: 'D' },
-  { key: 'w_gearhammer', name: 'ギガギアハンマー', atkMin: 10, atkMax: 22, durMax: 55, minFloor: 4, rarity: 6, grade: 'C' },
-  { key: 'w_rune', name: 'ルーンブレード', atkMin: 12, atkMax: 26, durMax: 60, minFloor: 6, rarity: 5, grade: 'B' },
-  { key: 'w_vine', name: 'ローズウィップ', atkMin: 9, atkMax: 20, durMax: 50, minFloor: 5, rarity: 6, grade: 'C' },
-  { key: 'w_candle', name: 'ルミナスタッフ', atkMin: 11, atkMax: 24, durMax: 60, minFloor: 8, rarity: 5, grade: 'B' },
-  { key: 'w_compass', name: 'アジマススピア', atkMin: 8, atkMax: 18, durMax: 38, minFloor: 3, rarity: 7, grade: 'C' },
-  { key: 'w_dark', name: 'ノクティスファング', atkMin: 15, atkMax: 30, durMax: 75, minFloor: 12, rarity: 4, grade: 'A' },
-  { key: 'w_gearaxe', name: 'ジャッジアックス', atkMin: 18, atkMax: 36, durMax: 95, minFloor: 15, rarity: 3, grade: 'A' },
-  { key: 'w_gravity', name: 'グラビティロッド', atkMin: 20, atkMax: 44, durMax: 90, minFloor: 20, rarity: 2, grade: 'S' },
-  // ===== 二刀流（レア・2回攻撃・盾装備不可）=====
-  { key: 'w_twin', name: 'リンクスエッジ', atkMin: 8, atkMax: 16, durMax: 80, minFloor: 8, rarity: 2, grade: 'B', dual: true },
-  { key: 'w_soulblades', name: 'ゲミノスブレード', atkMin: 13, atkMax: 24, durMax: 100, minFloor: 16, rarity: 1, grade: 'S', dual: true }
+  { key: 'w_dagger', name: '短剣', atkMin: 6, atkMax: 14, durMax: 150, minFloor: 1, rarity: 10, grade: 'D', weaponType: 'dagger' },
+  { key: 'w_longsword', name: 'ロングソード', atkMin: 9, atkMax: 19, durMax: 225, minFloor: 1, rarity: 9, grade: 'C', weaponType: 'longsword' },
+  { key: 'w_lance', name: 'ランス', atkMin: 10, atkMax: 21, durMax: 165, minFloor: 3, rarity: 7, grade: 'B', weaponType: 'lance' },
+  { key: 'w_bow', name: '弓', atkMin: 9, atkMax: 20, durMax: 150, minFloor: 4, rarity: 5, grade: 'A', weaponType: 'bow' },
+  { key: 'w_dual_sword', name: 'デュアルソード', atkMin: 7, atkMax: 14, durMax: 180, minFloor: 8, rarity: 2, grade: 'S', weaponType: 'dual_sword', dual: true, ss: true },
+  { key: 'w_twin_daggers', name: '短剣二刀', atkMin: 6, atkMax: 12, durMax: 165, minFloor: 12, rarity: 1, grade: 'S', weaponType: 'twin_daggers', dual: true, ss: true }
 ];
+
+export const ELEMENT_INFO: Record<Element, { name: string; color: number; weakTo: Element }> = {
+  fire: { name: '火', color: 0xff5a36, weakTo: 'water' },
+  thunder: { name: '雷', color: 0xffe348, weakTo: 'ice' },
+  water: { name: '水', color: 0x3fa9ff, weakTo: 'thunder' },
+  ice: { name: '氷', color: 0x82e9ff, weakTo: 'fire' }
+};
+
+export function randomElement(): Element {
+  const values: Element[] = ['fire', 'thunder', 'water', 'ice'];
+  return values[Math.floor(Math.random() * values.length)];
+}
+
+export function elementMultiplier(attack: Element | undefined, defend: Element | undefined): number {
+  if (!attack || !defend) return 1;
+  return ELEMENT_INFO[defend].weakTo === attack ? 1.5 : attack === defend ? 0.75 : 1;
+}
+
+export function monsterElement(def: MonsterDef): Element {
+  if (def.element) return def.element;
+  const values: Element[] = ['fire', 'thunder', 'water', 'ice'];
+  let seed = 0;
+  for (let i = 0; i < def.key.length; i++) seed += def.key.charCodeAt(i);
+  return values[seed % values.length];
+}
 
 // ===== 盾定義 =====
 export interface ShieldDef {

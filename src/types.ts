@@ -29,6 +29,15 @@ export interface Magic {
 
 export type EquipmentGrade = 'D' | 'C' | 'B' | 'A' | 'S';
 
+export type Element = 'fire' | 'thunder' | 'water' | 'ice';
+export type WeaponType = 'dagger' | 'longsword' | 'lance' | 'bow' | 'dual_sword' | 'twin_daggers';
+
+export interface WeaponPassive {
+  key: 'backstab' | 'sturdy' | 'pierce' | 'eagle_eye' | 'twin_edge' | 'blood_edge';
+  name: string;
+  description: string;
+}
+
 export interface Weapon {
   key: string;       // テクスチャ/種別キー
   name: string;
@@ -41,6 +50,10 @@ export interface Weapon {
   plus: number;      // 強化値（+1で黄, +2紫, +3青, +4以降赤）。強化石で上昇
   repairUsed?: boolean; // R効果の使用済みフラグ
   dual?: boolean;    // 二刀流（2回攻撃・盾装備不可）
+  weaponType: WeaponType;
+  element?: Element;
+  passive?: WeaponPassive;
+  ss?: boolean;
 }
 
 export interface Shield {
@@ -51,6 +64,7 @@ export interface Shield {
   dur: number;
   grade: EquipmentGrade;
   plus: number;   // 盾強化石で上昇（縦の強化）。+1ごとに防御+1
+  element?: Element;
 }
 
 export type ItemKind =
@@ -96,6 +110,7 @@ export interface MonsterDef {
   isDragonType?: boolean; // DK特効対象
   bossTint?: number;
   color: number;          // 代替ドット絵の基調色
+  element?: Element;
 }
 
 export type MonsterBehavior =
