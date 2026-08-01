@@ -261,8 +261,6 @@ export class UIScene extends Phaser.Scene {
     // アイテム欄
     this.panel(716, 568, GAME_W - 724, 184, '所持アイテム（クリックで使用）');
     this.itemContainer = this.add.container(0, 0);
-    // ターン終了ボタン
-    this.turnEndButton();
   }
 
   // ============ スマホ縦型レイアウト ============
@@ -325,33 +323,12 @@ export class UIScene extends Phaser.Scene {
       wordWrap: { width: 320 }
     }));
 
-    // ---- 操作エリア：十字キー＋ターン終了 ----
-    this.buildTouchControls(82, 700, 36, 23);
-    this.mobileTurnEndButton();
+    // ---- 操作エリア：移動必須の四方向キー ----
+    this.panel(8, 646, 374, 116, '移動（行動するとターン進行）');
+    this.buildTouchControls(195, 704, 34, 24);
 
     // ---- 下部ナビ（メニュー）----
     this.buildMobileNav();
-  }
-
-  mobileTurnEndButton() {
-    const x = 166, y = 648, w = 216, h = 106;
-    const g = this.add.graphics();
-    const draw = (c: number) => {
-      g.clear();
-      g.fillStyle(c, 1).fillRoundedRect(x, y, w, h, 12);
-      g.lineStyle(2.5, 0x3fe0d0).strokeRoundedRect(x, y, w, h, 12);
-    };
-    draw(0x2f6f6a);
-    this.add.text(x + w / 2, y + h / 2 - 11, '⏭ ターン終了', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '19px', color: '#ffffff', fontStyle: 'bold'
-    }).setOrigin(0.5);
-    this.add.text(x + w / 2, y + h / 2 + 20, '（その場で1ターン休む）', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#bfe8e0'
-    }).setOrigin(0.5);
-    const zone = this.add.zone(x, y, w, h).setOrigin(0).setInteractive({ useHandCursor: true });
-    zone.on('pointerover', () => draw(0x3f8f88));
-    zone.on('pointerout', () => draw(0x2f6f6a));
-    zone.on('pointerdown', () => { Audio.playSe('click'); this.gs.playerAct('wait'); });
   }
 
   buildMobileNav() {
@@ -383,29 +360,25 @@ export class UIScene extends Phaser.Scene {
   // ---- タッチ操作：十字ボタン（スマホ=操作エリア、タッチPC=マップ左下に重ねる）----
   // 押しっぱなしで歩き続ける（GameScene.touchDir 経由でキーボード長押しと同じ扱い）
   buildTouchControls(cx: number, cy: number, gap: number, R: number) {
-    const mkButton = (dx: number, dy: number, angleDeg: number | null, onDown: () => void, onUp?: () => void) => {
+    const mkButton = (dx: number, dy: number, angleDeg: number, onDown: () => void, onUp?: () => void) => {
       const bx = cx + dx, by = cy + dy;
       const g = this.add.graphics().setDepth(60);
       const draw = (active: boolean) => {
         g.clear();
         g.fillStyle(active ? 0x2f6f6a : 0x0e1420, active ? 0.9 : 0.5).fillCircle(bx, by, R);
         g.lineStyle(2, 0x3fe0d0, 0.75).strokeCircle(bx, by, R);
-        if (angleDeg !== null) {
-          // 進行方向を指す三角矢印
-          const a = Phaser.Math.DegToRad(angleDeg);
-          const pt = (r: number, da: number): [number, number] =>
-            [bx + Math.cos(a + da) * r, by + Math.sin(a + da) * r];
-          const [x1, y1] = pt(14, 0);
-          const [x2, y2] = pt(12, 2.5);
-          const [x3, y3] = pt(12, -2.5);
-          g.fillStyle(0xdfe7f0, 0.95).fillTriangle(x1, y1, x2, y2, x3, y3);
-        } else {
-          // 中央ボタン＝足踏み（1ターン休む）
-          g.fillStyle(0xdfe7f0, 0.9).fillCircle(bx, by, 7);
-        }
+        // 進行方向を指す三角矢印
+        const a = Phaser.Math.DegToRad(angleDeg);
+        const pt = (r: number, da: number): [number, number] =>
+          [bx + Math.cos(a + da) * r, by + Math.sin(a + da) * r];
+        const [x1, y1] = pt(14, 0);
+        const [x2, y2] = pt(12, 2.5);
+        const [x3, y3] = pt(12, -2.5);
+        g.fillStyle(0xdfe7f0, 0.95).fillTriangle(x1, y1, x2, y2, x3, y3);
       };
       draw(false);
-      const zone = this.add.zone(bx - R - 8, by - R - 8, (R + 8) * 2, (R + 8) * 2)
+      const hitRadius = R + 4;
+      const zone = this.add.zone(bx - hitRadius, by - hitRadius, hitRadius * 2, hitRadius * 2)
         .setOrigin(0).setInteractive().setDepth(61);
       zone.on('pointerdown', () => { draw(true); onDown(); });
       const release = () => { draw(false); onUp?.(); };
@@ -419,21 +392,6 @@ export class UIScene extends Phaser.Scene {
     mkButton(0, gap, 90, hold('down'), release);
     mkButton(-gap, 0, 180, hold('left'), release);
     mkButton(gap, 0, 0, hold('right'), release);
-    mkButton(0, 0, null, () => { Audio.playSe('click'); this.gs.playerAct('wait'); });
-  }
-
-  turnEndButton() {
-    const x = GAME_W - 168, y = 712, w = 150, h = 34;
-    const g = this.add.graphics();
-    const draw = (c: number) => { g.clear(); g.fillStyle(c, 1); g.fillRoundedRect(x, y, w, h, 6); g.lineStyle(2, 0x3fe0d0); g.strokeRoundedRect(x, y, w, h, 6); };
-    draw(0x2f6f6a);
-    this.add.text(x + w / 2, y + h / 2, '⏭ ターン終了', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '15px', color: '#ffffff', fontStyle: 'bold'
-    }).setOrigin(0.5);
-    const zone = this.add.zone(x, y, w, h).setOrigin(0).setInteractive({ useHandCursor: true });
-    zone.on('pointerover', () => draw(0x3f8f88));
-    zone.on('pointerout', () => draw(0x2f6f6a));
-    zone.on('pointerdown', () => { Audio.playSe('click'); this.gs.playerAct('wait'); });
   }
 
   // ============ リフレッシュ ============

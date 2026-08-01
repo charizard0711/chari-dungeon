@@ -193,8 +193,6 @@ export class GameScene extends Phaser.Scene {
     down: Phaser.Input.Keyboard.Key;
     left: Phaser.Input.Keyboard.Key;
     right: Phaser.Input.Keyboard.Key;
-    wait: Phaser.Input.Keyboard.Key;
-    wait2: Phaser.Input.Keyboard.Key;
     enter: Phaser.Input.Keyboard.Key;
   };
 
@@ -276,13 +274,9 @@ export class GameScene extends Phaser.Scene {
       down: kb.addKey('DOWN'),
       left: kb.addKey('LEFT'),
       right: kb.addKey('RIGHT'),
-      wait: kb.addKey('SPACE'),
-      wait2: kb.addKey('SHIFT'),
       enter: kb.addKey('ENTER')
     };
     // 矢印はupdate()内でホールド検出（長押しで連続移動できる）
-    kb.on('keydown-SPACE', (event: KeyboardEvent) => { event.preventDefault(); this.onSpace(); });
-    kb.on('keydown-SHIFT', () => this.playerAct('wait'));
     kb.on('keydown-ENTER', (event: KeyboardEvent) => { event.preventDefault(); this.tryDescend(); });
     this.input.off('pointerdown', this.handleMapClick, this);
     this.input.on('pointerdown', this.handleMapClick, this);
@@ -301,16 +295,6 @@ export class GameScene extends Phaser.Scene {
     }).setDepth(30).setVisible(false);
 
     this.buildFloor(startFloor);
-
-    const qaTurns = this.qaBossMode ? Number(qaParams.get('qa-turns')) : 0;
-    if (Number.isInteger(qaTurns) && qaTurns > 0 && qaTurns <= 20) {
-      this.time.delayedCall(260, async () => {
-        for (let i = 0; i < qaTurns && !this.gameEnded; i++) {
-          await this.playerAct('wait');
-          await new Promise<void>((resolve) => this.time.delayedCall(180, () => resolve()));
-        }
-      });
-    }
 
     // 少し遅らせてUIに初期表示させる
     this.time.delayedCall(50, () => this.emitRefresh());
@@ -1274,15 +1258,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ============ プレイヤー行動 ============
-  onSpace() {
-    // 階段は踏んだ時点で自動で降りるので、Spaceは常に足踏み
-    this.playerAct('wait');
-  }
-
-  async playerAct(action: 'move' | 'wait', dir?: Dir) {
+  async playerAct(dir: Dir) {
     if (this.busy || this.gameEnded) return;
 
-    if (action === 'move' && dir) {
       this.player.dir = dir;
       const [dx, dy] = this.dirVec(dir);
       const nx = this.player.x + dx;
@@ -1403,14 +1381,6 @@ export class GameScene extends Phaser.Scene {
       }
       await this.finishTurn();
       this.busy = false;
-    } else {
-      // 足踏み
-      this.busy = true;
-      this.setPlayerVisual(this.player.dir, 'idle');
-      this.player.heal(1); // 休息で微回復
-      await this.finishTurn();
-      this.busy = false;
-    }
   }
 
   onEnterTile(x: number, y: number) {
@@ -2661,7 +2631,7 @@ export class GameScene extends Phaser.Scene {
       if (this.player.x === target.x && this.player.y === target.y) break;
       const path = this.findClickPath(target.x, target.y);
       if (!path.length) break;
-      await this.playerAct('move', path[0]);
+      await this.playerAct(path[0]);
       if (this.busy) break;
     }
 
@@ -2727,13 +2697,13 @@ export class GameScene extends Phaser.Scene {
       this.holdStartedAt = time;
       this.setBoostTier(0);
       this.holdRepeatAt = time + HOLD_FIRST_REPEAT_MS;
-      this.playerAct('move', dir);
+      this.playerAct(dir);
     } else if (time >= this.holdRepeatAt) {
       const heldFor = time - this.holdStartedAt;
       this.setBoostTier(heldFor >= HOLD_MAX_BOOST_MS ? 2 : heldFor >= HOLD_BOOST_MS ? 1 : 0);
       // 長押し中：進める時だけ歩く（壁に向かってのログ連打を防ぐ）
       if (this.canMoveInto(dir)) {
-        this.playerAct('move', dir);
+        this.playerAct(dir);
         this.holdRepeatAt = time + (this.holdBoostTier === 2 ? 44 : this.holdBoostTier === 1 ? 62 : 96);
       }
     }
