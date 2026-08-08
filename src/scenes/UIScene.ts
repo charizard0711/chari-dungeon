@@ -548,7 +548,7 @@ export class UIScene extends Phaser.Scene {
       const drawBg = (fill: number, line: number, lw = 1.5) => { bg.clear(); bg.fillStyle(fill, 1).fillRoundedRect(cx, cy, 54, 54, 6); bg.lineStyle(lw, line).strokeRoundedRect(cx, cy, 54, 54, 6); };
       drawBg(0x1c2536, frameCol, rare ? 2.5 : 1.5);
       // 枠だけ＋アイコン（名前は省略／カーソルでツールチップ表示）
-      const icon = this.add.image(cx + 27, cy + 27, grp.item.textureKey).setDisplaySize(36, 36);
+      const icon = this.add.image(cx + 27, cy + 27, grp.item.textureKey).setDisplaySize(48, 48);
       this.itemContainer.add([bg, icon]);
       // ×N（2個以上のとき）
       if (grp.count > 1) {
