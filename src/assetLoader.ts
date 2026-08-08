@@ -103,7 +103,7 @@ const FRAME_DEFS: FrameDef[] = [
   { key: 'gem', sheet: 'items', r: [268, 715, 378, 848], mode: 'sprite', size: 48},
   { key: 'i_oldkey', sheet: 'items', r: [428, 715, 538, 848], mode: 'sprite', size: 48},
   { key: 'i_floorkey', sheet: 'items', r: [583, 715, 693, 848], mode: 'sprite', size: 48},
-  { key: 'i_stone', sheet: 'items', r: [745, 715, 868, 848], mode: 'sprite', size: 48},  // ダンジョンコアの欠片=強化石
+  // i_stone / i_shieldstone / i_invis / i_dash は専用のオリジナル画像を使用する。
   { key: 'i_seal', sheet: 'items', r: [1085, 715, 1196, 848], mode: 'sprite', size: 48},
 
   // ---- エフェクト（効果シートから切り抜き）----

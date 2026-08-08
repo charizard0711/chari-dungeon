@@ -12,16 +12,31 @@ export interface WeaponDef {
   grade: EquipmentGrade;
   dual?: boolean; // 二刀流（1ターンに2回攻撃・盾装備不可）
   weaponType: WeaponType;
+  element: Element;
   ss?: boolean;
 }
 
 export const WEAPON_DEFS: WeaponDef[] = [
-  { key: 'w_dagger', name: '短剣', atkMin: 6, atkMax: 14, durMax: 150, minFloor: 1, rarity: 10, grade: 'D', weaponType: 'dagger' },
-  { key: 'w_longsword', name: 'ロングソード', atkMin: 9, atkMax: 19, durMax: 225, minFloor: 1, rarity: 9, grade: 'C', weaponType: 'longsword' },
-  { key: 'w_lance', name: 'ランス', atkMin: 10, atkMax: 21, durMax: 165, minFloor: 3, rarity: 7, grade: 'B', weaponType: 'lance' },
-  { key: 'w_bow', name: '弓', atkMin: 9, atkMax: 20, durMax: 150, minFloor: 4, rarity: 5, grade: 'A', weaponType: 'bow' },
-  { key: 'w_dual_sword', name: 'デュアルソード', atkMin: 7, atkMax: 14, durMax: 180, minFloor: 8, rarity: 2, grade: 'S', weaponType: 'dual_sword', dual: true, ss: true },
-  { key: 'w_twin_daggers', name: '短剣二刀', atkMin: 6, atkMax: 12, durMax: 165, minFloor: 12, rarity: 1, grade: 'S', weaponType: 'twin_daggers', dual: true, ss: true }
+  // 属性は後付け抽選せず、武器の種類・名前・専用アートに固定する。
+  { key: 'w_dagger_fire', name: '焔牙カグツチ', atkMin: 6, atkMax: 14, durMax: 120, minFloor: 1, rarity: 10, grade: 'D', weaponType: 'dagger', element: 'fire' },
+  { key: 'w_dagger_water', name: '潮刃ミナヅキ', atkMin: 6, atkMax: 14, durMax: 120, minFloor: 1, rarity: 10, grade: 'D', weaponType: 'dagger', element: 'water' },
+  { key: 'w_dagger_thunder', name: '雷針イカヅチ', atkMin: 7, atkMax: 15, durMax: 114, minFloor: 1, rarity: 9, grade: 'D', weaponType: 'dagger', element: 'thunder' },
+  { key: 'w_dagger_ice', name: '氷晶シラユキ', atkMin: 6, atkMax: 14, durMax: 126, minFloor: 1, rarity: 9, grade: 'D', weaponType: 'dagger', element: 'ice' },
+
+  { key: 'w_longsword_fire', name: '獄炎剣ヴォルガ', atkMin: 9, atkMax: 19, durMax: 180, minFloor: 3, rarity: 8, grade: 'C', weaponType: 'longsword', element: 'fire' },
+  { key: 'w_longsword_water', name: '海淵剣ネレイス', atkMin: 9, atkMax: 18, durMax: 192, minFloor: 3, rarity: 8, grade: 'C', weaponType: 'longsword', element: 'water' },
+  { key: 'w_longsword_thunder', name: '迅雷剣ヴァジュラ', atkMin: 11, atkMax: 22, durMax: 168, minFloor: 8, rarity: 6, grade: 'B', weaponType: 'longsword', element: 'thunder' },
+  { key: 'w_longsword_ice', name: '凍界剣グレイシア', atkMin: 10, atkMax: 21, durMax: 186, minFloor: 8, rarity: 6, grade: 'B', weaponType: 'longsword', element: 'ice' },
+
+  { key: 'w_bow_fire', name: '炎翼弓フェニクス', atkMin: 11, atkMax: 23, durMax: 126, minFloor: 13, rarity: 4, grade: 'A', weaponType: 'bow', element: 'fire' },
+  { key: 'w_bow_water', name: '蒼流弓アクエリア', atkMin: 10, atkMax: 22, durMax: 138, minFloor: 13, rarity: 4, grade: 'A', weaponType: 'bow', element: 'water' },
+  { key: 'w_bow_thunder', name: '雷鳴弓テンペスト', atkMin: 12, atkMax: 24, durMax: 120, minFloor: 13, rarity: 3, grade: 'A', weaponType: 'bow', element: 'thunder' },
+  { key: 'w_bow_ice', name: '氷月弓ルナフロスト', atkMin: 11, atkMax: 23, durMax: 132, minFloor: 13, rarity: 3, grade: 'A', weaponType: 'bow', element: 'ice' },
+
+  { key: 'w_dual_sword_fire', name: '双炎刃イグニス', atkMin: 8, atkMax: 16, durMax: 144, minFloor: 21, rarity: 2, grade: 'S', weaponType: 'dual_sword', element: 'fire', dual: true, ss: true },
+  { key: 'w_dual_sword_water', name: '双潮刃リヴァイア', atkMin: 8, atkMax: 15, durMax: 156, minFloor: 21, rarity: 2, grade: 'S', weaponType: 'dual_sword', element: 'water', dual: true, ss: true },
+  { key: 'w_dual_sword_thunder', name: '双雷刃ライキリ', atkMin: 9, atkMax: 17, durMax: 138, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'dual_sword', element: 'thunder', dual: true, ss: true },
+  { key: 'w_dual_sword_ice', name: '双氷刃フロストバイト', atkMin: 8, atkMax: 16, durMax: 150, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'dual_sword', element: 'ice', dual: true, ss: true }
 ];
 
 export const ELEMENT_INFO: Record<Element, { name: string; color: number; weakTo: Element }> = {
@@ -109,8 +124,8 @@ export const ITEM_DEFS: Record<ItemKind, Omit<Item, 'kind'>> = {
   oldkey:  { name: '古びた鍵', desc: 'ロックされた扉を開ける', textureKey: 'i_oldkey' },
   floorkey:{ name: 'フロアキー', desc: '特殊な扉を開ける', textureKey: 'i_floorkey' },
   seal:    { name: '封印の魔導書', desc: '周囲の敵を数ターン止める', textureKey: 'i_seal' },
-  stone:   { name: 'ウェポンストーン', desc: '成功率90%から強化ごとに10%低下（最低30%）', textureKey: 'i_stone' },
-  shieldstone: { name: 'シールドストーン', desc: '成功率90%から強化ごとに10%低下（最低30%）', textureKey: 'i_shieldstone' },
+  stone:   { name: '武器強化スクロール', desc: '装備中の武器を強化。成功率90%から強化ごとに10%低下（最低30%）', textureKey: 'i_stone' },
+  shieldstone: { name: '防具強化スクロール', desc: '装備中の盾を強化。成功率90%から強化ごとに10%低下（最低30%）', textureKey: 'i_shieldstone' },
   invis:   { name: '透明ポーション', desc: '20ターンの間、敵から完全に見えなくなる', textureKey: 'i_invis' },
   dash:    { name: '疾風の羽', desc: '20歩の間、1歩で2マス進めるようになる', textureKey: 'i_dash' }
 };

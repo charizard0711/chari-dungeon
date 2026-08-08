@@ -36,7 +36,7 @@ export class Player {
   reviveReady = false; // 復活のタネ所持で有効化されるフラグ（アイテム所持で判定）
 
   constructor() {
-    this.weapon = makeWeapon('w_dagger', []);
+    this.weapon = makeWeapon('w_dagger_fire', []);
     this.weapons.push(this.weapon);
     this.shield = makeShield('s_gear');
     this.shields.push(this.shield);
@@ -111,7 +111,7 @@ export function makeWeapon(key: string, magics: Magic[]): Weapon {
   return {
     key: def.key, name: def.name, atkMin, atkMax,
     durMax, dur: durMax, magics, grade: def.grade, plus: 0, dual: def.dual,
-    weaponType: def.weaponType, ss: def.ss
+    weaponType: def.weaponType, element: def.element, ss: def.ss
   };
 }
 
@@ -130,7 +130,6 @@ export function shieldFullName(s: Shield): string {
 }
 
 function addRandomLootTraits(weapon: Weapon): Weapon {
-  weapon.element = randomElement();
   if (Math.random() < 0.62) weapon.passive = { ...WEAPON_PASSIVES[weapon.weaponType] };
   return weapon;
 }
@@ -183,7 +182,6 @@ export function weaponFullName(w: Weapon): string {
   const plus = (w.plus ?? 0) > 0 ? `+${w.plus} ` : '';
   const magic = w.magics.length ? ` [${w.magics.map((m) => m.label).join('')}]` : '';
   const dual = w.dual ? '〔二刀〕' : '';
-  const element = w.element ? `【${ELEMENT_INFO[w.element].name}】` : '';
   const passive = w.passive ? `〈${w.passive.name}〉` : '';
-  return `[${w.ss ? 'SS' : w.grade}] ${element}${plus}${w.name}${dual}${passive}${magic}`;
+  return `[${w.ss ? 'SS' : w.grade}] ${plus}${w.name}${dual}${passive}${magic}`;
 }

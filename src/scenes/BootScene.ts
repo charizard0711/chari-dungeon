@@ -11,7 +11,31 @@ const EXPANSION_MONSTER_KEYS = [
   'm_cerberus', 'm_hydra', 'm_crystal_crab', 'm_blood_moth', 'm_clockwork_chimera'
 ] as const;
 
-const WEAPON_ART_KEYS = ['w_dagger', 'w_longsword', 'w_lance', 'w_bow', 'w_dual_sword', 'w_twin_daggers'] as const;
+const WEAPON_ART = {
+  w_dagger_fire: 'assets/weapons/affinities/dagger_fire.png',
+  w_dagger_water: 'assets/weapons/affinities/dagger_water.png',
+  w_dagger_thunder: 'assets/weapons/affinities/dagger_thunder.png',
+  w_dagger_ice: 'assets/weapons/affinities/dagger_ice.png',
+  w_longsword_fire: 'assets/weapons/affinities/longsword_fire.png',
+  w_longsword_water: 'assets/weapons/affinities/longsword_water.png',
+  w_longsword_thunder: 'assets/weapons/affinities/longsword_thunder.png',
+  w_longsword_ice: 'assets/weapons/affinities/longsword_ice.png',
+  w_bow_fire: 'assets/weapons/affinities/bow_fire.png',
+  w_bow_water: 'assets/weapons/affinities/bow_water.png',
+  w_bow_thunder: 'assets/weapons/affinities/bow_thunder.png',
+  w_bow_ice: 'assets/weapons/affinities/bow_ice.png',
+  w_dual_sword_fire: 'assets/weapons/affinities/dual_sword_fire.png',
+  w_dual_sword_water: 'assets/weapons/affinities/dual_sword_water.png',
+  w_dual_sword_thunder: 'assets/weapons/affinities/dual_sword_thunder.png',
+  w_dual_sword_ice: 'assets/weapons/affinities/dual_sword_ice.png'
+} as const;
+
+const ORIGINAL_ITEM_ART = {
+  i_stone: 'assets/items/weapon-enhancement-scroll.png',
+  i_shieldstone: 'assets/items/armor-enhancement-scroll.png',
+  i_invis: 'assets/items/invisibility-potion.png',
+  i_dash: 'assets/items/gale-feather.png'
+} as const;
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -25,8 +49,12 @@ export class BootScene extends Phaser.Scene {
     this.load.image('sheet_items', 'assets/items.png');
     this.load.image('sheet_tiles', 'assets/tiles.png');
     this.load.image('dungeon_chamber', 'assets/dungeon-chamber.png');
-    for (const key of WEAPON_ART_KEYS) {
-      this.load.image(key, `assets/weapons/${key.slice(2)}.png`);
+    this.load.image('title_screen_v2', 'assets/title-screen-v2.png');
+    for (const [key, path] of Object.entries(ORIGINAL_ITEM_ART)) {
+      this.load.image(key, path);
+    }
+    for (const [key, path] of Object.entries(WEAPON_ART)) {
+      this.load.image(key, path);
     }
     for (const key of EXPANSION_MONSTER_KEYS) {
       this.load.image(key, `assets/monsters/${key}.png`);

@@ -581,9 +581,16 @@ function buildItemTextures(scene: Phaser.Scene) {
     oldkey: (g) => { g.lineStyle(3, 0xc0a040); g.strokeCircle(8, 8, 4); px(g, 9, 10, 3, 10, 0xc0a040); px(g, 12, 16, 4, 3, 0xc0a040); },
     floorkey: (g) => { g.lineStyle(3, 0x4fd0e0); g.strokeCircle(8, 8, 4); px(g, 9, 10, 3, 10, 0x4fd0e0); px(g, 12, 16, 4, 3, 0x4fd0e0); },
     seal: (g) => { px(g, 5, 4, 14, 16, 0x2a2450); px(g, 7, 6, 10, 12, 0x4a3a7a); px(g, 10, 9, 4, 4, 0xa06bff); },
-    stone: (g) => { g.fillStyle(0x4fd0e0); g.fillTriangle(12, 2, 20, 12, 12, 22); g.fillTriangle(12, 2, 4, 12, 12, 22); g.fillStyle(0xbfefff, 0.8); g.fillTriangle(12, 5, 16, 12, 12, 12); },
-    // 盾強化石：琥珀色の結晶＋盾マーク（縦の強化）
-    shieldstone: (g) => { g.fillStyle(0xf5a030); g.fillTriangle(12, 2, 20, 12, 12, 22); g.fillTriangle(12, 2, 4, 12, 12, 22); g.fillStyle(0xffe0a0, 0.85); g.fillTriangle(12, 5, 16, 12, 12, 12); g.fillStyle(0x8a5a1a, 0.9); g.fillRect(10, 10, 4, 4); },
+    // 武器強化スクロール：赤い羊皮紙＋剣のルーン
+    stone: (g) => {
+      px(g, 5, 4, 14, 16, 0x651b2a); px(g, 4, 3, 16, 4, 0xa52d3d); px(g, 4, 18, 16, 3, 0x8c2434);
+      px(g, 11, 7, 2, 9, 0xffd06a); px(g, 8, 14, 8, 2, 0xffd06a); px(g, 11, 16, 2, 3, 0xd98235);
+    },
+    // 防具強化スクロール：青い羊皮紙＋盾のルーン
+    shieldstone: (g) => {
+      px(g, 5, 4, 14, 16, 0x173c87); px(g, 4, 3, 16, 4, 0x276ad2); px(g, 4, 18, 16, 3, 0x2054b1);
+      g.lineStyle(2, 0xbfefff, 1); g.beginPath(); g.moveTo(8, 9); g.lineTo(12, 7); g.lineTo(16, 9); g.lineTo(15, 15); g.lineTo(12, 18); g.lineTo(9, 15); g.closePath(); g.strokePath();
+    },
     // 透明ポーション：ガラス瓶の輪郭だけが見え、中身が透けている
     invis: (g) => {
       px(g, 9, 2, 6, 4, 0x8a6a4a);                                 // コルク栓
