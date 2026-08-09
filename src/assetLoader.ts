@@ -85,11 +85,6 @@ const FRAME_DEFS: FrameDef[] = [
   { key: 'w_gearaxe', sheet: 'items', r: [1172, 58, 1288, 198], mode: 'sprite', size: 48},
   { key: 'w_gravity', sheet: 'items', r: [1307, 58, 1423, 198], mode: 'sprite', size: 48},
 
-  // ---- 盾 ----
-  { key: 's_gear', sheet: 'items', r: [38, 318, 140, 445], mode: 'sprite', size: 48},
-  { key: 's_crystal', sheet: 'items', r: [168, 318, 270, 445], mode: 'sprite', size: 48},
-  { key: 's_skull', sheet: 'items', r: [298, 318, 402, 445], mode: 'sprite', size: 48},
-
   // ---- 消耗品 ----
   { key: 'i_potion', sheet: 'items', r: [85, 505, 196, 645], mode: 'sprite', size: 48},
   { key: 'i_shroom', sheet: 'items', r: [415, 505, 526, 645], mode: 'sprite', size: 48},

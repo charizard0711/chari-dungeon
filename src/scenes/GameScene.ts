@@ -4,7 +4,7 @@ import { generateDungeon, generateBossArena, DungeonData, randomFloor, isWalkabl
 import type { BossRoomZone } from '../dungeon';
 import { getTheme, eraSuffix, MONSTER_DEFS, makeItem, gradeColor, ITEM_DEFS, ELEMENT_INFO, monsterElement } from '../data';
 import type { Dir, EquipmentGrade, ItemKind, MonsterDef, Shield, TileType, Vec2, Weapon } from '../types';
-import { Player, rollWeaponByGrade, weaponFullName, makeShield, shieldFullName, makeWeapon } from '../player';
+import { Player, rollWeaponByGrade, rollShield, rollShieldByGrade, weaponFullName, shieldFullName, makeWeapon, makeShield } from '../player';
 import { Enemy } from '../enemy';
 import { computePlayerAttack, computeEnemyAttack } from '../combat';
 import { Audio } from '../audio/manager';
@@ -245,8 +245,15 @@ export class GameScene extends Phaser.Scene {
       : undefined;
     if (location.hostname === 'localhost' && qaParams.has('qa-gacha')) this.player.gold = 1500;
     if (location.hostname === 'localhost' && qaParams.has('qa-equipment')) {
-      while (this.player.weapons.length < EQUIPMENT_LIMIT) this.player.weapons.push(rollWeaponByGrade('B'));
-      while (this.player.shields.length < EQUIPMENT_LIMIT) this.player.shields.push(makeShield('s_crystal', 'B', true));
+      const weaponKeys = ['w_iron_dagger', 'w_knight_sword', 'w_bone_lance', 'w_royal_bow', 'w_grand_breaker'];
+      const shieldKeys = [
+        's_iron_round', 's_mirror_silver', 's_thorn_guard', 's_chrono_guard', 's_seraph_guard',
+        's_flame_aegis', 's_tidal_aegis', 's_storm_aegis', 's_frost_aegis'
+      ];
+      this.player.weapons = weaponKeys.map((key) => makeWeapon(key, []));
+      this.player.weapon = this.player.weapons[this.player.weapons.length - 1];
+      this.player.shields = shieldKeys.map((key) => makeShield(key));
+      this.player.shield = this.player.shields[3];
     }
     if (this.qaBossMode) { this.player.hpMax = 999; this.player.hp = 999; }
     this.floor = 1;
@@ -333,6 +340,24 @@ export class GameScene extends Phaser.Scene {
     }).setDepth(30).setVisible(false);
 
     this.buildFloor(startFloor, this.qaBossMode);
+    if (location.hostname === 'localhost' && qaParams.has('qa-knockback')) {
+      const target = [
+        { x: this.player.x + 1, y: this.player.y },
+        { x: this.player.x, y: this.player.y + 1 },
+        { x: this.player.x - 1, y: this.player.y },
+        { x: this.player.x, y: this.player.y - 1 }
+      ].find((pos) => {
+        const tile = this.dungeon.tiles[pos.y]?.[pos.x];
+        return !!tile && isWalkable(tile) && !this.enemyAt(pos.x, pos.y) && !this.chestAt(pos.x, pos.y);
+      });
+      if (target) {
+        const dummyDef: MonsterDef = {
+          ...MONSTER_DEFS[0], key: 'qa_knockback_dummy', name: 'ノックバック試験体', hp: 999,
+          atkMin: 0, atkMax: 0, def: 0, exp: 0, gold: 0, score: 0
+        };
+        this.addEnemy(dummyDef, target.x, target.y, 1);
+      }
+    }
     if (location.hostname === 'localhost' && qaParams.has('qa-one-hit-boss')) {
       for (const enemy of this.enemies) {
         if (enemy.def.isFloorBoss) {
@@ -1333,7 +1358,7 @@ export class GameScene extends Phaser.Scene {
   damagePlayerFromBoss(e: Enemy, factor: number, label: string) {
     const result = computeEnemyAttack(this.player, e.def);
     const damage = Math.max(1, Math.floor(result.damage * factor));
-    this.damagePlayer(damage, label);
+    this.damagePlayer(damage, label, e);
     if (result.shieldBroke) this.handleShieldBreak();
     this.hitFx(this.player.x, this.player.y);
   }
@@ -1761,6 +1786,12 @@ export class GameScene extends Phaser.Scene {
     }
 
     const res = computePlayerAttack(this.player, e.def, !ranged && dir === e.facing);
+    const attackingWeapon = this.player.weapon;
+    let knockbackReady = false;
+    if (attackingWeapon?.passive?.key === 'knockback') {
+      attackingWeapon.specialCounter = (attackingWeapon.specialCounter ?? 0) + 1;
+      knockbackReady = attackingWeapon.specialCounter % 3 === 0;
+    }
     const bossState = this.bossStates.get(e);
     if (bossState?.kind === 'seal_king' && bossState.seals.length > 0) {
       res.damage = Math.max(1, Math.floor(res.damage * 0.35));
@@ -1783,6 +1814,14 @@ export class GameScene extends Phaser.Scene {
     this.log(msg, res.crit ? 'special' : 'dmg');
     this.hitFx(e.x, e.y);
     this.flashSprite(e.sprite);
+
+    if (knockbackReady && e.hp > 0) {
+      const pushed = await this.knockbackEnemy(e, ddx, ddy);
+      this.log(
+        pushed ? `三撃破砕！ ${e.def.name}を1マス押し戻した！` : `三撃破砕！ ${e.def.name}は壁際で踏みとどまった！`,
+        'special'
+      );
+    }
 
     if (res.drain > 0) { this.player.heal(res.drain); this.log(`HPを${res.drain}吸収した。`, 'special'); }
     if (res.poison) { e.poisonTurns = 3; this.log(`${e.def.name}に毒を与えた。`, 'special'); this.poisonFx(e.x, e.y); }
@@ -1936,6 +1975,18 @@ export class GameScene extends Phaser.Scene {
     this.emitRefresh();
   }
 
+  async knockbackEnemy(e: Enemy, dx: number, dy: number): Promise<boolean> {
+    const nx = e.x + dx;
+    const ny = e.y + dy;
+    if (!this.passable(e, nx, ny)) return false;
+    e.x = nx;
+    e.y = ny;
+    this.effectFx(nx, ny, 'fx_hit', 1.35, 260, 0xffd477);
+    await this.tween(e.sprite, { x: nx * TILE + TILE / 2, y: ny * TILE + TILE / 2 }, 130, 'Back.easeOut');
+    this.drawEnemyHp(e);
+    return true;
+  }
+
   spawnBossRewardChest() {
     if (!this.inBossRoom || this.chests.some((chest) => chest.bossReward)) return;
     const room = this.dungeon.bossRoom;
@@ -2019,13 +2070,69 @@ export class GameScene extends Phaser.Scene {
     Audio.playSe('pickup');
   }
 
-  damagePlayer(dmg: number, reason: string) {
-    this.player.hp -= dmg;
-    this.floorDamaged = true;
-    if (reason) this.log(`${reason} ${dmg}ダメージ！`, 'dmg');
-    Audio.playSe('hurt');
-    this.cameras.main.shake(120, 0.008);
+  damagePlayer(dmg: number, reason: string, attacker?: Enemy) {
+    const shieldResult = this.resolveShieldDefense(dmg, attacker);
+    dmg = shieldResult.damage;
+
+    if (shieldResult.message) this.log(shieldResult.message, 'special');
+    if (dmg > 0) {
+      this.player.hp -= dmg;
+      this.floorDamaged = true;
+      if (reason) this.log(`${reason} ${dmg}ダメージ！`, 'dmg');
+      Audio.playSe('hurt');
+      this.cameras.main.shake(120, 0.008);
+    } else {
+      this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.5, 380, 0xbfefff);
+      Audio.playSe('hit');
+    }
+
+    if (shieldResult.heal > 0 && this.player.hp > 0) {
+      this.player.heal(shieldResult.heal);
+      this.log(`聖域再生でHPを${shieldResult.heal}回復した。`, 'special');
+      this.effectFx(this.player.x, this.player.y, 'fx_heal', 1.4, 420);
+    }
+
+    if (shieldResult.reflect > 0 && attacker?.alive) {
+      attacker.hp -= shieldResult.reflect;
+      this.log(`反射棘が${attacker.def.name}へ${shieldResult.reflect}ダメージを返した！`, 'special');
+      this.hitFx(attacker.x, attacker.y);
+      if (attacker.hp <= 0) this.killEnemy(attacker, 0);
+      else this.drawEnemyHp(attacker);
+    }
+
     if (this.player.hp <= 0) this.handlePlayerDown();
+  }
+
+  resolveShieldDefense(damage: number, attacker?: Enemy): { damage: number; heal: number; reflect: number; message?: string } {
+    const shield = this.player.shield;
+    if (!shield || !attacker || !shield.passive) return { damage, heal: 0, reflect: 0 };
+
+    const passive = shield.passive;
+    let adjusted = damage;
+    let heal = 0;
+    let reflect = 0;
+    let message: string | undefined;
+
+    if (passive.key === 'brace' && damage >= 10) {
+      adjusted = Math.max(1, Math.floor(damage * 0.8));
+      message = `${shield.name}の踏ん張りでダメージを軽減！`;
+    } else if (passive.key === 'mirror' && Math.random() < 0.15) {
+      adjusted = 0;
+      message = `${shield.name}が攻撃を映し、完全に無効化！`;
+    } else if (passive.key === 'thorns') {
+      reflect = Math.max(1, Math.floor(damage * 0.25));
+    } else if (passive.key === 'perfect_guard') {
+      shield.guardCounter = (shield.guardCounter ?? 0) + 1;
+      if (shield.guardCounter % 5 === 0) {
+        adjusted = 0;
+        message = `${shield.name}の時止め防御！ 5回目の攻撃を完全に無効化！`;
+      }
+    } else if (passive.key === 'recovery') {
+      shield.guardCounter = (shield.guardCounter ?? 0) + 1;
+      if (shield.guardCounter % 4 === 0) heal = 6;
+    }
+
+    return { damage: adjusted, heal, reflect, message };
   }
 
   handlePlayerDown() {
@@ -2233,7 +2340,7 @@ export class GameScene extends Phaser.Scene {
         onComplete: () => {
           e.animating = false;
           e.sprite.setScale(e.baseScale).setAngle(0);
-          this.damagePlayer(res.damage, `${e.def.name}の${enemyElementInfo.name}属性攻撃！`);
+          this.damagePlayer(res.damage, `${e.def.name}の${enemyElementInfo.name}属性攻撃！`, e);
           this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.4, 360, enemyElementInfo.color);
           this.hitFx(this.player.x, this.player.y);
           this.cameras.main.shake(90, 0.004);
@@ -2275,7 +2382,7 @@ export class GameScene extends Phaser.Scene {
           e.sprite.setScale(e.baseScale);
           bolt.destroy();
           const res = computeEnemyAttack(this.player, e.def);
-          this.damagePlayer(res.damage, `${e.def.name}の${enemyElementInfo.name}属性遠距離攻撃！`);
+          this.damagePlayer(res.damage, `${e.def.name}の${enemyElementInfo.name}属性遠距離攻撃！`, e);
           this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.45, 360, enemyElementInfo.color);
           resolve();
         }
@@ -2483,7 +2590,7 @@ export class GameScene extends Phaser.Scene {
         this.player.inventory.push(makeItem('revive'));
         this.log('復活のタネが入っていた！', 'special');
       } else if (rewardRoll < 0.28 && !this.pendingEquipment) {
-        const shield = makeShield(this.floor >= 16 ? 's_skull' : this.floor >= 8 ? 's_crystal' : 's_gear', undefined, true);
+        const shield = rollShield(this.floor);
         if (this.receiveShield(shield, '緑のボス宝箱')) this.log(`${shieldFullName(shield)}を入手！`, 'item');
       } else if (rewardRoll < 0.55) {
         this.player.inventory.push(makeItem('stone'), makeItem('shieldstone'));
@@ -2524,7 +2631,7 @@ export class GameScene extends Phaser.Scene {
         this.player.inventory.push(makeItem('stone'), makeItem('stone'));
         this.log('レア！ 武器強化スクロール×2が入っていた！', 'special');
       } else if (rr < 0.55) {
-        const s = makeShield(this.floor >= 12 ? 's_skull' : 's_crystal', undefined, true);
+        const s = rollShield(Math.max(8, this.floor));
         if (this.receiveShield(s, '赤い宝箱')) this.log(`さらに「${s.name}」も入っていた！`, 'item');
       } else {
         this.player.inventory.push(makeItem('stone'));
@@ -2543,7 +2650,7 @@ export class GameScene extends Phaser.Scene {
       if (roll < 0.6) {
         const eq = Math.random();
         if (this.floor >= 8 && eq < 0.35) {
-          const s = makeShield(this.floor >= 16 ? 's_skull' : 's_crystal', undefined, true);
+          const s = rollShield(this.floor);
           if (this.receiveShield(s, '宝箱')) this.log(`宝箱から「${s.name}」を発見！`, 'item');
         } else {
           const kinds: ItemKind[] = ['potion', 'warp', 'stone', 'shieldstone', 'invis'];
@@ -2810,15 +2917,14 @@ export class GameScene extends Phaser.Scene {
       hasEffect = !!w.passive;
       elementColor = w.element ? ELEMENT_INFO[w.element].color : undefined;
     } else {
-      const shieldKey = grade === 'D' || grade === 'C' ? 's_gear' : grade === 'B' ? 's_crystal' : 's_skull';
-      const s = makeShield(shieldKey, grade, true);
+      const s = rollShieldByGrade(grade);
       if (rank === 'SS') s.plus = 2;
       else if (rank === 'S') s.plus = 1;
       this.receiveShield(s, 'ガチャ');
       name = shieldFullName(s);
       texKey = s.key;
       elementColor = s.element ? ELEMENT_INFO[s.element].color : undefined;
-      tintIcon = true;
+      hasEffect = !!s.passive;
     }
 
     this.log(`ガチャ【${rank}】${name}を引き当てた！`, rank === 'SS' || rank === 'S' ? 'special' : 'item');

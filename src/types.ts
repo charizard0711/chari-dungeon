@@ -33,7 +33,7 @@ export type Element = 'fire' | 'thunder' | 'water' | 'ice';
 export type WeaponType = 'dagger' | 'longsword' | 'lance' | 'bow' | 'dual_sword' | 'twin_daggers';
 
 export interface WeaponPassive {
-  key: 'backstab' | 'sturdy' | 'pierce' | 'eagle_eye' | 'twin_edge' | 'blood_edge';
+  key: 'backstab' | 'sturdy' | 'pierce' | 'eagle_eye' | 'twin_edge' | 'blood_edge' | 'knockback';
   name: string;
   description: string;
 }
@@ -54,6 +54,13 @@ export interface Weapon {
   element?: Element;
   passive?: WeaponPassive;
   ss?: boolean;
+  specialCounter?: number;
+}
+
+export interface ShieldPassive {
+  key: 'brace' | 'mirror' | 'thorns' | 'perfect_guard' | 'recovery' | 'element_guard';
+  name: string;
+  description: string;
 }
 
 export interface Shield {
@@ -65,6 +72,8 @@ export interface Shield {
   grade: EquipmentGrade;
   plus: number;   // 防具強化スクロールで上昇（縦の強化）。+1ごとに防御+1
   element?: Element;
+  passive?: ShieldPassive;
+  guardCounter?: number;
 }
 
 export type ItemKind =

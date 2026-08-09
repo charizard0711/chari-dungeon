@@ -65,7 +65,7 @@ export class UIScene extends Phaser.Scene {
         items: { x: 14, y: 584, cols: 6 },
         ov: { x: 8, y: 48, w: 374, h: 746 }
       };
-      this.equipIconSize = 28;
+      this.equipIconSize = 32;
       this.buildMobileLayout();
     } else {
       // PC：従来レイアウト
@@ -74,7 +74,7 @@ export class UIScene extends Phaser.Scene {
         items: { x: 730, y: 596, cols: 8 },
         ov: { x: 200, y: 80, w: 680, h: 460 }
       };
-      this.equipIconSize = 60;
+      this.equipIconSize = 92;
       this.buildFrames();
       this.buildTopBar();
       this.buildLeftMenu();
@@ -435,10 +435,14 @@ export class UIScene extends Phaser.Scene {
   }
 
   shieldEffectText(shield: Shield, compact = false): string {
-    if (!shield.element) return 'なし';
-    return compact
-      ? `${ELEMENT_INFO[shield.element].name}属性防御`
-      : `${ELEMENT_INFO[shield.element].name}属性防御（弱点1.5倍・同属性0.75倍）`;
+    const effects: string[] = [];
+    if (shield.element) {
+      effects.push(compact
+        ? `${ELEMENT_INFO[shield.element].name}属性防御`
+        : `${ELEMENT_INFO[shield.element].name}属性防御（同属性0.75倍・弱点1.5倍）`);
+    }
+    if (shield.passive) effects.push(compact ? shield.passive.name : `${shield.passive.name}: ${shield.passive.description}`);
+    return effects.length ? effects.join(' / ') : 'なし';
   }
 
   // ============ リフレッシュ ============
@@ -495,9 +499,7 @@ export class UIScene extends Phaser.Scene {
       slot.bg.lineStyle(info.grade === 'S' ? 3 : info.grade === 'A' ? 2.5 : 1.5, rim, has ? 1 : 0.5).strokeRoundedRect(sx, sy, sw, sh, 8);
       if (has) {
         slot.icon.setTexture(info.tex!).setDisplaySize(this.equipIconSize, this.equipIconSize).setVisible(true).setAlpha(1);
-        const weaponSlot = i === 0 || !!w?.dual;
-        if (info.element && !weaponSlot) slot.icon.setTintFill(ELEMENT_INFO[info.element].color);
-        else slot.icon.clearTint();
+        slot.icon.clearTint();
       } else {
         slot.icon.setVisible(false);
       }
@@ -762,7 +764,7 @@ export class UIScene extends Phaser.Scene {
         const risk = durabilityRisk(sh.dur, sh.durMax);
         const elementColor = this.elementColor(sh.element);
         const frameCol = elementColor ?? gradeColor(sh.grade);
-        const icon = this.framedIcon(x + 34, cy + 16, sh.key, frameCol, 36, elementColor);
+        const icon = this.framedIcon(x + 34, cy + 16, sh.key, frameCol, 36);
         const totalDef = sh.defBonus + (sh.plus ?? 0);
         const row = this.rowButton(x + 58, cy, w - 74, `${equipped ? '▶ ' : '　'}${shieldFullName(sh)}  防御+${totalDef}  耐久${sh.dur}/${sh.durMax}(${risk.label})  効果:${this.shieldEffectText(sh, true)}`, equipped, () => this.gs.equipShield(i));
         this.overlay.add([...icon, row]);
@@ -777,7 +779,7 @@ export class UIScene extends Phaser.Scene {
     const hs = box / 2;
     g.fillStyle(0x10161f, 1).fillRoundedRect(cx - hs, cy - hs, box, box, 6);
     g.lineStyle(2.5, frameColor).strokeRoundedRect(cx - hs, cy - hs, box, box, 6);
-    const icon = this.add.image(cx, cy, texKey).setDisplaySize(box - 8, box - 8);
+    const icon = this.add.image(cx, cy, texKey).setDisplaySize(box - 2, box - 2);
     if (tintColor !== undefined) icon.setTintFill(tintColor);
     return [g, icon];
   }
@@ -832,7 +834,7 @@ export class UIScene extends Phaser.Scene {
         const risk = durabilityRisk(sh.dur, sh.durMax);
         const totalDef = sh.defBonus + (sh.plus ?? 0);
         const elementColor = this.elementColor(sh.element);
-        const icon = this.framedIcon(x + 34, cy + 14, sh.key, elementColor ?? gradeColor(sh.grade), 34, elementColor);
+        const icon = this.framedIcon(x + 34, cy + 14, sh.key, elementColor ?? gradeColor(sh.grade), 34);
         const row = this.rowButton(x + 56, cy, w - 78 - sellW, `🛡 ${equipped ? '▶ ' : ''}${shieldFullName(sh)}  防御+${totalDef}  耐久${sh.dur}/${sh.durMax}(${risk.label})  効果:${this.shieldEffectText(sh, true)}`, equipped, () => this.gs.equipShield(entry.index));
         const sell = this.rowButton(x + w - sellW - 10, cy, sellW,
           equipped ? '装備中' : `${IS_MOBILE ? '売' : '売却'} ${this.gs.shieldSellPrice(sh)}G`, false,

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { MONSTER_DEFS, WEAPON_DEFS } from './data';
+import { MONSTER_DEFS, SHIELD_DEFS, WEAPON_DEFS } from './data';
 import type { ItemKind } from './types';
 
 export const TILE = 32;
@@ -655,9 +655,11 @@ function buildWeaponTextures(scene: Phaser.Scene) {
     });
   }
   // 盾
-  const shields: Record<string, number> = { s_gear: 0x9a8a6a, s_crystal: 0x4fb0ff, s_skull: 0x8a4a6a };
-  for (const [k, c] of Object.entries(shields)) {
-    iconTexture(scene, k, (g) => {
+  const elementColors = { fire: 0xff5a36, thunder: 0xffe348, water: 0x3fa9ff, ice: 0x82e9ff } as const;
+  const gradeColors = { D: 0x8c929c, C: 0xbac5d1, B: 0x8d596e, A: 0xcaa34b, S: 0xf2e7bf } as const;
+  for (const def of SHIELD_DEFS) {
+    const c = def.element ? elementColors[def.element] : gradeColors[def.grade];
+    iconTexture(scene, def.key, (g) => {
       g.fillStyle(c); g.fillRoundedRect(5, 3, 14, 16, 3);
       g.fillStyle(shade(c, 0.6)); g.fillRoundedRect(8, 6, 8, 10, 2);
       px(g, 11, 9, 2, 4, 0xffffff, 0.6);

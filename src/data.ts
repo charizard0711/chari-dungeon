@@ -1,4 +1,4 @@
-import type { Weapon, Shield, Item, ItemKind, MonsterDef, MagicCode, EquipmentGrade, Element, WeaponType } from './types';
+import type { Weapon, Shield, Item, ItemKind, MonsterDef, MagicCode, EquipmentGrade, Element, WeaponType, WeaponPassive, ShieldPassive } from './types';
 
 // ===== 武器定義 =====
 export interface WeaponDef {
@@ -12,7 +12,8 @@ export interface WeaponDef {
   grade: EquipmentGrade;
   dual?: boolean; // 二刀流（1ターンに2回攻撃・盾装備不可）
   weaponType: WeaponType;
-  element: Element;
+  element?: Element;
+  passive?: WeaponPassive;
   ss?: boolean;
 }
 
@@ -36,7 +37,18 @@ export const WEAPON_DEFS: WeaponDef[] = [
   { key: 'w_dual_sword_fire', name: '双炎刃イグニス', atkMin: 8, atkMax: 16, durMax: 144, minFloor: 21, rarity: 2, grade: 'S', weaponType: 'dual_sword', element: 'fire', dual: true, ss: true },
   { key: 'w_dual_sword_water', name: '双潮刃リヴァイア', atkMin: 8, atkMax: 15, durMax: 156, minFloor: 21, rarity: 2, grade: 'S', weaponType: 'dual_sword', element: 'water', dual: true, ss: true },
   { key: 'w_dual_sword_thunder', name: '双雷刃ライキリ', atkMin: 9, atkMax: 17, durMax: 138, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'dual_sword', element: 'thunder', dual: true, ss: true },
-  { key: 'w_dual_sword_ice', name: '双氷刃フロストバイト', atkMin: 8, atkMax: 16, durMax: 150, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'dual_sword', element: 'ice', dual: true, ss: true }
+  { key: 'w_dual_sword_ice', name: '双氷刃フロストバイト', atkMin: 8, atkMax: 16, durMax: 150, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'dual_sword', element: 'ice', dual: true, ss: true },
+
+  // 無属性武器。属性相性に左右されず、各ランクで安定して扱える。
+  { key: 'w_iron_dagger', name: '黒鉄の短剣', atkMin: 5, atkMax: 12, durMax: 150, minFloor: 1, rarity: 14, grade: 'D', weaponType: 'dagger' },
+  { key: 'w_knight_sword', name: '騎士剣アルディオン', atkMin: 8, atkMax: 17, durMax: 210, minFloor: 3, rarity: 11, grade: 'C', weaponType: 'longsword' },
+  { key: 'w_bone_lance', name: '白骨槍グレイヴ', atkMin: 10, atkMax: 20, durMax: 174, minFloor: 8, rarity: 7, grade: 'B', weaponType: 'lance' },
+  { key: 'w_royal_bow', name: '王弓レガリア', atkMin: 11, atkMax: 24, durMax: 150, minFloor: 13, rarity: 4, grade: 'A', weaponType: 'bow' },
+  {
+    key: 'w_grand_breaker', name: '破城大剣グランバスター', atkMin: 14, atkMax: 29, durMax: 225,
+    minFloor: 21, rarity: 1, grade: 'S', weaponType: 'longsword',
+    passive: { key: 'knockback', name: '三撃破砕', description: '3回目の攻撃ごとに敵を1マス押し戻す' }
+  }
 ];
 
 export const ELEMENT_INFO: Record<Element, { name: string; color: number; weakTo: Element }> = {
@@ -71,13 +83,52 @@ export interface ShieldDef {
   defBonus: number;
   durMax: number;
   minFloor: number;
+  rarity: number;
   grade: EquipmentGrade;
+  element?: Element;
+  passive: ShieldPassive;
 }
 
 export const SHIELD_DEFS: ShieldDef[] = [
-  { key: 's_gear', name: 'ギアシールド', defBonus: 2, durMax: 40, minFloor: 1, grade: 'D' },
-  { key: 's_crystal', name: 'クリスタルシールド', defBonus: 4, durMax: 55, minFloor: 8, grade: 'B' },
-  { key: 's_skull', name: 'スカルシールド', defBonus: 6, durMax: 70, minFloor: 16, grade: 'A' }
+  // 無属性盾5種：すべて形と固有効果が異なる。
+  {
+    key: 's_iron_round', name: '黒鉄の円盾', defBonus: 2, durMax: 65, minFloor: 1, rarity: 14, grade: 'D',
+    passive: { key: 'brace', name: '踏ん張り', description: '10以上の攻撃ダメージを20%軽減' }
+  },
+  {
+    key: 's_mirror_silver', name: '鏡銀の盾', defBonus: 3, durMax: 55, minFloor: 3, rarity: 10, grade: 'C',
+    passive: { key: 'mirror', name: '鏡避け', description: '15%の確率で攻撃を完全に無効化' }
+  },
+  {
+    key: 's_thorn_guard', name: '反撃盾ヴァイン', defBonus: 4, durMax: 70, minFloor: 8, rarity: 6, grade: 'B',
+    passive: { key: 'thorns', name: '反射棘', description: '受けた攻撃ダメージの25%を敵へ返す' }
+  },
+  {
+    key: 's_chrono_guard', name: '時守りの盾クロノス', defBonus: 5, durMax: 75, minFloor: 14, rarity: 3, grade: 'A',
+    passive: { key: 'perfect_guard', name: '時止め防御', description: '5回に1回、敵の攻撃を完全に無効化' }
+  },
+  {
+    key: 's_seraph_guard', name: '聖域盾セラフィム', defBonus: 6, durMax: 90, minFloor: 21, rarity: 1, grade: 'S',
+    passive: { key: 'recovery', name: '聖域再生', description: '4回攻撃を受けるごとにHPを6回復' }
+  },
+
+  // 属性盾4種：色替えではなく、属性ごとに専用の形・名前・原画を持つ。
+  {
+    key: 's_flame_aegis', name: '炎獄盾イグナード', defBonus: 3, durMax: 60, minFloor: 4, rarity: 8, grade: 'C', element: 'fire',
+    passive: { key: 'element_guard', name: '火炎障壁', description: '火属性の攻撃に強い' }
+  },
+  {
+    key: 's_tidal_aegis', name: '海淵盾ネレイア', defBonus: 3, durMax: 64, minFloor: 4, rarity: 8, grade: 'C', element: 'water',
+    passive: { key: 'element_guard', name: '水流障壁', description: '水属性の攻撃に強い' }
+  },
+  {
+    key: 's_storm_aegis', name: '雷皇盾ヴォルテクス', defBonus: 4, durMax: 62, minFloor: 8, rarity: 6, grade: 'B', element: 'thunder',
+    passive: { key: 'element_guard', name: '雷電障壁', description: '雷属性の攻撃に強い' }
+  },
+  {
+    key: 's_frost_aegis', name: '氷城盾グレイシア', defBonus: 4, durMax: 70, minFloor: 8, rarity: 6, grade: 'B', element: 'ice',
+    passive: { key: 'element_guard', name: '氷雪障壁', description: '氷属性の攻撃に強い' }
+  }
 ];
 
 // ===== マジック定義 =====

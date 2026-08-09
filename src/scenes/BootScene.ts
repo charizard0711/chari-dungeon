@@ -27,7 +27,24 @@ const WEAPON_ART = {
   w_dual_sword_fire: 'assets/weapons/affinities/dual_sword_fire.png',
   w_dual_sword_water: 'assets/weapons/affinities/dual_sword_water.png',
   w_dual_sword_thunder: 'assets/weapons/affinities/dual_sword_thunder.png',
-  w_dual_sword_ice: 'assets/weapons/affinities/dual_sword_ice.png'
+  w_dual_sword_ice: 'assets/weapons/affinities/dual_sword_ice.png',
+  w_iron_dagger: 'assets/weapons/neutral/iron_dagger.png',
+  w_knight_sword: 'assets/weapons/neutral/knight_sword.png',
+  w_bone_lance: 'assets/weapons/neutral/bone_lance.png',
+  w_royal_bow: 'assets/weapons/neutral/royal_bow.png',
+  w_grand_breaker: 'assets/weapons/neutral/grand_breaker.png'
+} as const;
+
+const SHIELD_ART = {
+  s_iron_round: 'assets/shields/neutral/iron_round.png',
+  s_mirror_silver: 'assets/shields/neutral/mirror_silver.png',
+  s_thorn_guard: 'assets/shields/neutral/thorn_guard.png',
+  s_chrono_guard: 'assets/shields/neutral/chrono_guard.png',
+  s_seraph_guard: 'assets/shields/neutral/seraph_guard.png',
+  s_flame_aegis: 'assets/shields/elemental/flame_aegis.png',
+  s_tidal_aegis: 'assets/shields/elemental/tidal_aegis.png',
+  s_storm_aegis: 'assets/shields/elemental/storm_aegis.png',
+  s_frost_aegis: 'assets/shields/elemental/frost_aegis.png'
 } as const;
 
 const ORIGINAL_ITEM_ART = {
@@ -54,6 +71,9 @@ export class BootScene extends Phaser.Scene {
       this.load.image(key, path);
     }
     for (const [key, path] of Object.entries(WEAPON_ART)) {
+      this.load.image(key, path);
+    }
+    for (const [key, path] of Object.entries(SHIELD_ART)) {
       this.load.image(key, path);
     }
     for (const key of EXPANSION_MONSTER_KEYS) {

@@ -1,5 +1,5 @@
 import type { Weapon, Shield, Item, Dir, Magic, MagicCode, EquipmentGrade, WeaponPassive, WeaponType } from './types';
-import { WEAPON_DEFS, SHIELD_DEFS, magicLabel, makeItem, randomElement, ELEMENT_INFO } from './data';
+import { WEAPON_DEFS, SHIELD_DEFS, magicLabel, makeItem, ELEMENT_INFO } from './data';
 
 const WEAPON_PASSIVES: Record<WeaponType, WeaponPassive> = {
   dagger: { key: 'backstab', name: '背面急所', description: 'クリティカルダメージ+10%' },
@@ -38,7 +38,7 @@ export class Player {
   constructor() {
     this.weapon = makeWeapon('w_dagger_fire', []);
     this.weapons.push(this.weapon);
-    this.shield = makeShield('s_gear');
+    this.shield = makeShield('s_iron_round');
     this.shields.push(this.shield);
     // 初期アイテム
     this.inventory.push(makeItem('potion'));
@@ -111,17 +111,22 @@ export function makeWeapon(key: string, magics: Magic[]): Weapon {
   return {
     key: def.key, name: def.name, atkMin, atkMax,
     durMax, dur: durMax, magics, grade: def.grade, plus: 0, dual: def.dual,
-    weaponType: def.weaponType, element: def.element, ss: def.ss
+    weaponType: def.weaponType, element: def.element, ss: def.ss,
+    passive: def.passive ? { ...def.passive } : undefined,
+    specialCounter: 0
   };
 }
 
-export function makeShield(key: string, gradeOverride?: EquipmentGrade, withRandomElement = false): Shield {
+export function makeShield(key: string, gradeOverride?: EquipmentGrade): Shield {
   const def = SHIELD_DEFS.find((d) => d.key === key)!;
   const grade = gradeOverride ?? def.grade;
   const gradeIndex = ['D', 'C', 'B', 'A', 'S'].indexOf(grade);
   const defBonus = Math.max(def.defBonus, 2 + gradeIndex * 2);
   const durMax = Math.max(def.durMax, 40 + gradeIndex * 15);
-  return { key: def.key, name: def.name, defBonus, durMax, dur: durMax, grade, plus: 0, element: withRandomElement ? randomElement() : undefined };
+  return {
+    key: def.key, name: def.name, defBonus, durMax, dur: durMax, grade, plus: 0,
+    element: def.element, passive: { ...def.passive }, guardCounter: 0
+  };
 }
 
 export function shieldFullName(s: Shield): string {
@@ -130,7 +135,7 @@ export function shieldFullName(s: Shield): string {
 }
 
 function addRandomLootTraits(weapon: Weapon): Weapon {
-  if (Math.random() < 0.62) weapon.passive = { ...WEAPON_PASSIVES[weapon.weaponType] };
+  if (!weapon.passive && Math.random() < 0.62) weapon.passive = { ...WEAPON_PASSIVES[weapon.weaponType] };
   return weapon;
 }
 
@@ -184,4 +189,22 @@ export function weaponFullName(w: Weapon): string {
   const dual = w.dual ? '〔二刀〕' : '';
   const passive = w.passive ? `〈${w.passive.name}〉` : '';
   return `[${w.ss ? 'SS' : w.grade}] ${plus}${w.name}${dual}${passive}${magic}`;
+}
+
+export function rollShield(floor: number): Shield {
+  const pool = SHIELD_DEFS.filter((d) => d.minFloor <= floor);
+  const totalWeight = pool.reduce((sum, def) => sum + def.rarity, 0);
+  let roll = Math.random() * totalWeight;
+  let picked = pool[0] ?? SHIELD_DEFS[0];
+  for (const def of pool) {
+    roll -= def.rarity;
+    if (roll <= 0) { picked = def; break; }
+  }
+  return makeShield(picked.key);
+}
+
+export function rollShieldByGrade(grade: EquipmentGrade): Shield {
+  const pool = SHIELD_DEFS.filter((d) => d.grade === grade);
+  const picked = pool[Math.floor(Math.random() * pool.length)] ?? SHIELD_DEFS[0];
+  return makeShield(picked.key, grade);
 }
