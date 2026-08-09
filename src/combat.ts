@@ -1,5 +1,6 @@
 import type { Weapon, Shield, MonsterDef } from './types';
 import { Player } from './player';
+import { elementMultiplier, monsterElement } from './data';
 
 export interface AttackResult {
   damage: number;
@@ -19,19 +20,31 @@ function irand(min: number, max: number): number {
 }
 
 // プレイヤー→敵 の攻撃計算
-export function computePlayerAttack(p: Player, def: MonsterDef): AttackResult {
+export function computePlayerAttack(p: Player, def: MonsterDef, backstab = false): AttackResult {
   const w = p.weapon;
   // 二刀流は2回斬る（1振りごとにダメージを算出して合算）
   const hits = w?.dual ? 2 : 1;
   let dmg = 0;
   for (let i = 0; i < hits; i++) {
-    dmg += Math.max(1, irand(p.atkMin, p.atkMax) - Math.floor(def.def * 0.6));
+    const armorPierce = w?.passive?.key === 'pierce' ? 0.08 : 0;
+    let hitDamage = Math.max(1, irand(p.atkMin, p.atkMax) - Math.floor(def.def * (1 - armorPierce) * 0.6));
+    if (i === 1 && w?.passive?.key === 'twin_edge') hitDamage = Math.floor(hitDamage * 1.08);
+    dmg += hitDamage;
   }
+
+  dmg = Math.max(1, Math.floor(dmg * elementMultiplier(w?.element, monsterElement(def))));
+  if (w?.passive?.key === 'heavy_strike') dmg = Math.max(1, Math.floor(dmg * 1.06));
 
   let crit = false;
   const cMagic = p.hasMagic('C');
-  const critChance = 0.05 + (cMagic ? 0.15 : 0);
-  if (Math.random() < critChance) { crit = true; dmg = Math.floor(dmg * 1.8); }
+  const innateCrit = w?.weaponType === 'lance' ? 0.08 : 0;
+  const passiveCrit = w?.passive?.key === 'eagle_eye' ? 0.04 : 0;
+  const daggerBackstab = w?.weaponType === 'dagger' && backstab;
+  const critChance = 0.05 + innateCrit + passiveCrit + (cMagic ? 0.15 : 0);
+  if (daggerBackstab || Math.random() < critChance) {
+    crit = true;
+    dmg = Math.floor(dmg * (w?.passive?.key === 'backstab' ? 1.9 : 1.8));
+  }
 
   // ファイア
   let fire = 0;
@@ -45,6 +58,7 @@ export function computePlayerAttack(p: Player, def: MonsterDef): AttackResult {
   // ドレイン
   let drain = 0;
   if (p.hasMagic('D')) { drain = Math.floor(dmg * 0.3); }
+  if (w?.passive?.key === 'blood_edge') drain += Math.max(1, Math.floor(dmg * 0.03));
 
   const poison = !!p.hasMagic('P') && Math.random() < 0.5;
   const freeze = !!p.hasMagic('I') && Math.random() < 0.15;
@@ -83,6 +97,8 @@ export interface DefendResult {
 export function computeEnemyAttack(p: Player, def: MonsterDef): DefendResult {
   let dmg = irand(def.atkMin, def.atkMax);
   dmg = Math.max(1, dmg - Math.floor(p.def * 0.7));
+  dmg = Math.max(1, Math.floor(dmg * elementMultiplier(monsterElement(def), p.shield?.element)));
+  if (p.weapon?.passive?.key === 'sturdy') dmg = Math.max(1, Math.floor(dmg * 0.95));
 
   let shieldBroke = false;
   const s = p.shield;

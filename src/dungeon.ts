@@ -142,95 +142,18 @@ function removeUnreachableFloors(tiles: TileType[][], start: Vec2) {
   }
 }
 
-export function generateDungeon(floor: number, forcedBossRoomZone?: BossRoomZone): DungeonData {
-  const isBossFloor = floor % 2 === 0 || floor % 5 === 0;
+export function generateDungeon(floor: number, _forcedBossRoomZone?: BossRoomZone): DungeonData {
   const mazeColumns = 11 + Math.min(4, Math.floor(floor / 6));
   const mazeRows = 8 + Math.min(3, Math.floor(floor / 8));
-  const mazeWidth = mazeColumns * 2 + 1;
-  const mazeHeight = mazeRows * 2 + 1;
-  const margin = isBossFloor ? 8 : 0;
-  const w = mazeWidth + margin * 2;
-  const h = mazeHeight + margin * 2;
+  const w = mazeColumns * 2 + 1;
+  const h = mazeRows * 2 + 1;
   const tiles: TileType[][] = Array.from({ length: h }, () => Array<TileType>(w).fill('wall'));
 
-  // 迷路本体は中央へ配置し、ボス階では外周4方向にも部屋を置ける余白を確保する。
-  const mazeTiles: TileType[][] = Array.from({ length: mazeHeight }, () => Array<TileType>(mazeWidth).fill('wall'));
-  generateSinglePathMaze(mazeTiles, mazeColumns, mazeRows);
-  for (let y = 0; y < mazeHeight; y++) {
-    for (let x = 0; x < mazeWidth; x++) tiles[y + margin][x + margin] = mazeTiles[y][x];
-  }
-
-  const start = { x: margin + 1, y: margin + 1 };
-  const rooms: Room[] = [];
-  let bossRoom: Room | undefined;
-  let bossRoomZone: BossRoomZone | undefined;
-  let bossEntrance: Vec2 | undefined;
-  let bossEntry: Vec2 | undefined;
-  let stairs: Vec2;
-
-  if (isBossFloor) {
-    const zones: BossRoomZone[] = ['north', 'south', 'east', 'west', 'center'];
-    bossRoomZone = forcedBossRoomZone && zones.includes(forcedBossRoomZone)
-      ? forcedBossRoomZone
-      : zones[irand(0, zones.length - 1)];
-    const roomX = bossRoomZone === 'west' ? 1
-      : bossRoomZone === 'east' ? w - 7
-      : Math.floor((w - 6) / 2);
-    const roomY = bossRoomZone === 'north' ? 1
-      : bossRoomZone === 'south' ? h - 7
-      : Math.floor((h - 6) / 2);
-    bossRoom = roomAt(roomX, roomY, 6, 6);
-    carveRoom(tiles, bossRoom);
-
-    const entrySide: 'left' | 'right' | 'top' | 'bottom' =
-      bossRoomZone === 'west' ? 'right' : bossRoomZone === 'north' ? 'bottom' : bossRoomZone === 'south' ? 'top' : 'left';
-    const entrance = entrySide === 'left' ? { x: bossRoom.x, y: bossRoom.cy }
-      : entrySide === 'right' ? { x: bossRoom.x + bossRoom.w - 1, y: bossRoom.cy }
-      : entrySide === 'top' ? { x: bossRoom.cx, y: bossRoom.y }
-      : { x: bossRoom.cx, y: bossRoom.y + bossRoom.h - 1 };
-    const approach = entrySide === 'left' ? { x: entrance.x - 1, y: entrance.y }
-      : entrySide === 'right' ? { x: entrance.x + 1, y: entrance.y }
-      : entrySide === 'top' ? { x: entrance.x, y: entrance.y - 1 }
-      : { x: entrance.x, y: entrance.y + 1 };
-    const staging = entrySide === 'left' ? { x: entrance.x - 2, y: entrance.y }
-      : entrySide === 'right' ? { x: entrance.x + 2, y: entrance.y }
-      : entrySide === 'top' ? { x: entrance.x, y: entrance.y - 2 }
-      : { x: entrance.x, y: entrance.y + 2 };
-    const source = bossRoomZone === 'east'
-      ? { x: margin + mazeWidth - 2, y: nearestMazeCoordinate(staging.y, margin, mazeRows) }
-      : bossRoomZone === 'west'
-        ? { x: margin + 1, y: nearestMazeCoordinate(staging.y, margin, mazeRows) }
-        : bossRoomZone === 'north'
-          ? { x: nearestMazeCoordinate(staging.x, margin, mazeColumns), y: margin + 1 }
-          : bossRoomZone === 'south'
-            ? { x: nearestMazeCoordinate(staging.x, margin, mazeColumns), y: margin + mazeHeight - 2 }
-            : { ...start };
-    carveThinCorridor(tiles, source, staging);
-
-    // 闘技場の外周を封鎖し、選ばれた方角に入口を1つだけ残す。
-    for (let y = bossRoom.y - 1; y <= bossRoom.y + bossRoom.h; y++) {
-      for (let x = bossRoom.x - 1; x <= bossRoom.x + bossRoom.w; x++) {
-        const onRing = x === bossRoom.x - 1 || x === bossRoom.x + bossRoom.w
-          || y === bossRoom.y - 1 || y === bossRoom.y + bossRoom.h;
-        if (onRing && !(x === approach.x && y === approach.y)) tiles[y][x] = 'wall';
-      }
-    }
-    tiles[staging.y][staging.x] = 'floor';
-    tiles[approach.y][approach.x] = 'floor';
-    tiles[entrance.y][entrance.x] = 'floor';
-    bossEntrance = approach;
-    bossEntry = entrance;
-    rooms.push(bossRoom);
-    stairs = entrySide === 'left' ? { x: bossRoom.x + bossRoom.w - 2, y: bossRoom.cy }
-      : entrySide === 'right' ? { x: bossRoom.x + 1, y: bossRoom.cy }
-      : entrySide === 'top' ? { x: bossRoom.cx, y: bossRoom.y + bossRoom.h - 2 }
-      : { x: bossRoom.cx, y: bossRoom.y + 1 };
-    removeUnreachableFloors(tiles, start);
-  } else {
-    stairs = farthestReachableFloor(tiles, start);
-  }
-
-  tiles[stairs.y][stairs.x] = 'stairs';
+  generateSinglePathMaze(tiles, mazeColumns, mazeRows);
+  const start = { x: 1, y: 1 };
+  const stairs = farthestReachableFloor(tiles, start);
+  // 通常迷宮の出口は階段ではなく、専用のN.5Fボス部屋へ通じる扉。
+  tiles[stairs.y][stairs.x] = 'door';
 
   const hazards: Vec2[] = [];
   const hazardTypes: TileType[] = ['poison', 'cracked', 'rune', 'water'];
@@ -238,7 +161,6 @@ export function generateDungeon(floor: number, forcedBossRoomZone?: BossRoomZone
   for (let i = 0; i < hazardCount; i++) {
     const x = irand(1, w - 2);
     const y = irand(1, h - 2);
-    if (bossRoom && x >= bossRoom.x && x < bossRoom.x + bossRoom.w && y >= bossRoom.y && y < bossRoom.y + bossRoom.h) continue;
     if (tiles[y][x] === 'floor' && !(x === start.x && y === start.y)) {
       const type = hazardTypes[irand(0, hazardTypes.length - 1)];
       tiles[y][x] = type;
@@ -246,7 +168,37 @@ export function generateDungeon(floor: number, forcedBossRoomZone?: BossRoomZone
     }
   }
 
-  return { w, h, tiles, rooms, start, stairs, hazards, bossRoom, bossRoomZone, bossEntrance, bossEntry };
+  return { w, h, tiles, rooms: [], start, stairs, hazards };
+}
+
+// 迷路と完全に分離された「N.5F」ボス専用アリーナ。
+export function generateBossArena(floor: number): DungeonData {
+  const isSuper = floor % 10 === 0;
+  const isStrong = floor % 5 === 0;
+  const w = isSuper ? 23 : isStrong ? 21 : 17;
+  const h = isSuper ? 17 : isStrong ? 15 : 13;
+  const tiles: TileType[][] = Array.from({ length: h }, () => Array<TileType>(w).fill('wall'));
+  const bossRoom = roomAt(1, 1, w - 2, h - 2);
+  carveRoom(tiles, bossRoom);
+
+  // 中央を広く保ち、四隅の柱だけでボス攻撃を避ける駆け引きを作る。
+  const pillarInset = isSuper ? 4 : 3;
+  const pillars: Vec2[] = [
+    { x: pillarInset, y: pillarInset },
+    { x: w - 1 - pillarInset, y: pillarInset },
+    { x: pillarInset, y: h - 1 - pillarInset },
+    { x: w - 1 - pillarInset, y: h - 1 - pillarInset }
+  ];
+  for (const pillar of pillars) tiles[pillar.y][pillar.x] = 'wall';
+
+  const start = { x: Math.floor(w / 2), y: h - 2 };
+  const stairs = { x: Math.floor(w / 2), y: 1 };
+  tiles[start.y][start.x] = 'floor';
+  tiles[stairs.y][stairs.x] = 'door';
+  return {
+    w, h, tiles, rooms: [bossRoom], start, stairs, hazards: [], bossRoom,
+    bossRoomZone: 'center'
+  };
 }
 
 export function isWalkable(tile: TileType): boolean {

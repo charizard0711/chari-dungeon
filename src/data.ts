@@ -1,4 +1,4 @@
-import type { Weapon, Shield, Item, ItemKind, MonsterDef, MagicCode, EquipmentGrade } from './types';
+import type { Weapon, Shield, Item, ItemKind, MonsterDef, MagicCode, EquipmentGrade, Element, WeaponType, WeaponPassive, ShieldPassive } from './types';
 
 // ===== 武器定義 =====
 export interface WeaponDef {
@@ -11,23 +11,94 @@ export interface WeaponDef {
   rarity: number; // 出現しやすさの重み（小さいほどレア）
   grade: EquipmentGrade;
   dual?: boolean; // 二刀流（1ターンに2回攻撃・盾装備不可）
+  weaponType: WeaponType;
+  element?: Element;
+  passive?: WeaponPassive;
+  ss?: boolean;
 }
 
 export const WEAPON_DEFS: WeaponDef[] = [
-  { key: 'w_screw', name: 'スパイラルランス', atkMin: 5, atkMax: 12, durMax: 40, minFloor: 1, rarity: 10, grade: 'D' },
-  { key: 'w_star', name: 'ステラブレード', atkMin: 7, atkMax: 15, durMax: 35, minFloor: 1, rarity: 8, grade: 'D' },
-  { key: 'w_gearhammer', name: 'ギガギアハンマー', atkMin: 10, atkMax: 22, durMax: 55, minFloor: 4, rarity: 6, grade: 'C' },
-  { key: 'w_rune', name: 'ルーンブレード', atkMin: 12, atkMax: 26, durMax: 60, minFloor: 6, rarity: 5, grade: 'B' },
-  { key: 'w_vine', name: 'ローズウィップ', atkMin: 9, atkMax: 20, durMax: 50, minFloor: 5, rarity: 6, grade: 'C' },
-  { key: 'w_candle', name: 'ルミナスタッフ', atkMin: 11, atkMax: 24, durMax: 60, minFloor: 8, rarity: 5, grade: 'B' },
-  { key: 'w_compass', name: 'アジマススピア', atkMin: 8, atkMax: 18, durMax: 38, minFloor: 3, rarity: 7, grade: 'C' },
-  { key: 'w_dark', name: 'ノクティスファング', atkMin: 15, atkMax: 30, durMax: 75, minFloor: 12, rarity: 4, grade: 'A' },
-  { key: 'w_gearaxe', name: 'ジャッジアックス', atkMin: 18, atkMax: 36, durMax: 95, minFloor: 15, rarity: 3, grade: 'A' },
-  { key: 'w_gravity', name: 'グラビティロッド', atkMin: 20, atkMax: 44, durMax: 90, minFloor: 20, rarity: 2, grade: 'S' },
-  // ===== 二刀流（レア・2回攻撃・盾装備不可）=====
-  { key: 'w_twin', name: 'リンクスエッジ', atkMin: 8, atkMax: 16, durMax: 80, minFloor: 8, rarity: 2, grade: 'B', dual: true },
-  { key: 'w_soulblades', name: 'ゲミノスブレード', atkMin: 13, atkMax: 24, durMax: 100, minFloor: 16, rarity: 1, grade: 'S', dual: true }
+  // 属性は後付け抽選せず、武器の種類・名前・専用アートに固定する。
+  { key: 'w_dagger_fire', name: '焔牙カグツチ', atkMin: 6, atkMax: 14, durMax: 120, minFloor: 1, rarity: 10, grade: 'D', weaponType: 'dagger', element: 'fire' },
+  { key: 'w_dagger_water', name: '潮刃ミナヅキ', atkMin: 6, atkMax: 14, durMax: 120, minFloor: 1, rarity: 10, grade: 'D', weaponType: 'dagger', element: 'water' },
+  { key: 'w_dagger_thunder', name: '雷針イカヅチ', atkMin: 7, atkMax: 15, durMax: 114, minFloor: 1, rarity: 9, grade: 'D', weaponType: 'dagger', element: 'thunder' },
+  { key: 'w_dagger_ice', name: '氷晶シラユキ', atkMin: 6, atkMax: 14, durMax: 126, minFloor: 1, rarity: 9, grade: 'D', weaponType: 'dagger', element: 'ice' },
+
+  { key: 'w_longsword_fire', name: '獄炎剣ヴォルガ', atkMin: 9, atkMax: 19, durMax: 180, minFloor: 3, rarity: 8, grade: 'C', weaponType: 'longsword', element: 'fire' },
+  { key: 'w_longsword_water', name: '海淵剣ネレイス', atkMin: 9, atkMax: 18, durMax: 192, minFloor: 3, rarity: 8, grade: 'C', weaponType: 'longsword', element: 'water' },
+  { key: 'w_longsword_thunder', name: '迅雷剣ヴァジュラ', atkMin: 11, atkMax: 22, durMax: 168, minFloor: 8, rarity: 6, grade: 'B', weaponType: 'longsword', element: 'thunder' },
+  { key: 'w_longsword_ice', name: '凍界剣グレイシア', atkMin: 10, atkMax: 21, durMax: 186, minFloor: 8, rarity: 6, grade: 'B', weaponType: 'longsword', element: 'ice' },
+
+  { key: 'w_bow_fire', name: '炎翼弓フェニクス', atkMin: 11, atkMax: 23, durMax: 126, minFloor: 13, rarity: 4, grade: 'A', weaponType: 'bow', element: 'fire' },
+  { key: 'w_bow_water', name: '蒼流弓アクエリア', atkMin: 10, atkMax: 22, durMax: 138, minFloor: 13, rarity: 4, grade: 'A', weaponType: 'bow', element: 'water' },
+  { key: 'w_bow_thunder', name: '雷鳴弓テンペスト', atkMin: 12, atkMax: 24, durMax: 120, minFloor: 13, rarity: 3, grade: 'A', weaponType: 'bow', element: 'thunder' },
+  { key: 'w_bow_ice', name: '氷月弓ルナフロスト', atkMin: 11, atkMax: 23, durMax: 132, minFloor: 13, rarity: 3, grade: 'A', weaponType: 'bow', element: 'ice' },
+
+  { key: 'w_dual_sword_fire', name: '双炎刃イグニス', atkMin: 8, atkMax: 16, durMax: 144, minFloor: 21, rarity: 2, grade: 'S', weaponType: 'dual_sword', element: 'fire', dual: true, ss: true },
+  { key: 'w_dual_sword_water', name: '双潮刃リヴァイア', atkMin: 8, atkMax: 15, durMax: 156, minFloor: 21, rarity: 2, grade: 'S', weaponType: 'dual_sword', element: 'water', dual: true, ss: true },
+  { key: 'w_dual_sword_thunder', name: '双雷刃ライキリ', atkMin: 9, atkMax: 17, durMax: 138, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'dual_sword', element: 'thunder', dual: true, ss: true },
+  { key: 'w_dual_sword_ice', name: '双氷刃フロストバイト', atkMin: 8, atkMax: 16, durMax: 150, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'dual_sword', element: 'ice', dual: true, ss: true },
+
+  // 無属性武器。属性相性に左右されず、各ランクで安定して扱える。
+  { key: 'w_iron_dagger', name: '黒鉄の短剣', atkMin: 5, atkMax: 12, durMax: 150, minFloor: 1, rarity: 14, grade: 'D', weaponType: 'dagger' },
+  { key: 'w_shadow_stiletto', name: '影縫いのスティレット', atkMin: 7, atkMax: 15, durMax: 132, minFloor: 3, rarity: 10, grade: 'C', weaponType: 'dagger' },
+  { key: 'w_sawtooth_dirk', name: '鋸刃のダーク', atkMin: 9, atkMax: 18, durMax: 138, minFloor: 8, rarity: 6, grade: 'B', weaponType: 'dagger' },
+  { key: 'w_moon_fang', name: '月牙の短剣', atkMin: 11, atkMax: 22, durMax: 144, minFloor: 13, rarity: 3, grade: 'A', weaponType: 'dagger' },
+  { key: 'w_assassin_requiem', name: '暗殺刃レクイエム', atkMin: 13, atkMax: 25, durMax: 156, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'dagger' },
+
+  { key: 'w_soldier_blade', name: '兵士の直剣', atkMin: 6, atkMax: 14, durMax: 180, minFloor: 1, rarity: 14, grade: 'D', weaponType: 'longsword' },
+  { key: 'w_knight_sword', name: '騎士剣アルディオン', atkMin: 8, atkMax: 17, durMax: 210, minFloor: 3, rarity: 11, grade: 'C', weaponType: 'longsword' },
+  { key: 'w_rune_saber', name: 'ルーン鋼剣', atkMin: 10, atkMax: 21, durMax: 198, minFloor: 8, rarity: 6, grade: 'B', weaponType: 'longsword' },
+  { key: 'w_paladin_edge', name: '聖騎士剣ルミナス', atkMin: 12, atkMax: 25, durMax: 216, minFloor: 13, rarity: 3, grade: 'A', weaponType: 'longsword' },
+  { key: 'w_black_oath', name: '黒誓剣モルドレッド', atkMin: 15, atkMax: 29, durMax: 228, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'longsword' },
+
+  { key: 'w_iron_pike', name: '鉄兵のパイク', atkMin: 6, atkMax: 15, durMax: 160, minFloor: 1, rarity: 13, grade: 'D', weaponType: 'lance' },
+  { key: 'w_royal_spear', name: '王衛槍レオニス', atkMin: 8, atkMax: 18, durMax: 174, minFloor: 3, rarity: 9, grade: 'C', weaponType: 'lance' },
+  { key: 'w_bone_lance', name: '白骨槍グレイヴ', atkMin: 10, atkMax: 20, durMax: 174, minFloor: 8, rarity: 7, grade: 'B', weaponType: 'lance' },
+  { key: 'w_drill_lance', name: '穿城槍ドリルギア', atkMin: 12, atkMax: 26, durMax: 186, minFloor: 13, rarity: 3, grade: 'A', weaponType: 'lance' },
+  { key: 'w_dragon_lance', name: '竜穿槍バハムート', atkMin: 15, atkMax: 30, durMax: 204, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'lance' },
+
+  { key: 'w_hunter_bow', name: '狩人の長弓', atkMin: 5, atkMax: 13, durMax: 126, minFloor: 1, rarity: 13, grade: 'D', weaponType: 'bow' },
+  { key: 'w_composite_bow', name: '複合弓ファルコン', atkMin: 8, atkMax: 17, durMax: 138, minFloor: 3, rarity: 9, grade: 'C', weaponType: 'bow' },
+  { key: 'w_blackwood_bow', name: '黒檀弓ナイトレイ', atkMin: 10, atkMax: 21, durMax: 144, minFloor: 8, rarity: 6, grade: 'B', weaponType: 'bow' },
+  { key: 'w_royal_bow', name: '王弓レガリア', atkMin: 11, atkMax: 24, durMax: 150, minFloor: 13, rarity: 4, grade: 'A', weaponType: 'bow' },
+  { key: 'w_siege_arbalest', name: '攻城弩バリスタ', atkMin: 14, atkMax: 29, durMax: 168, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'bow' },
+
+  { key: 'w_rusted_greatsword', name: '錆びた大剣', atkMin: 7, atkMax: 16, durMax: 195, minFloor: 1, rarity: 12, grade: 'D', weaponType: 'greatsword' },
+  { key: 'w_executioner_blade', name: '断罪の処刑剣', atkMin: 10, atkMax: 21, durMax: 210, minFloor: 3, rarity: 8, grade: 'C', weaponType: 'greatsword' },
+  { key: 'w_titan_cleaver', name: '巨人断ちタイタンクリーバー', atkMin: 12, atkMax: 25, durMax: 225, minFloor: 8, rarity: 5, grade: 'B', weaponType: 'greatsword' },
+  { key: 'w_holy_greatsword', name: '聖堂大剣カテドラル', atkMin: 14, atkMax: 28, durMax: 240, minFloor: 13, rarity: 2, grade: 'A', weaponType: 'greatsword' },
+  {
+    key: 'w_grand_breaker', name: '破城大剣グランバスター', atkMin: 14, atkMax: 29, durMax: 225,
+    minFloor: 21, rarity: 1, grade: 'S', weaponType: 'greatsword',
+    passive: { key: 'knockback', name: '三撃破砕', description: '3回目の攻撃ごとに敵を1マス押し戻す' }
+  }
 ];
+
+export const ELEMENT_INFO: Record<Element, { name: string; color: number; weakTo: Element }> = {
+  fire: { name: '火', color: 0xff5a36, weakTo: 'water' },
+  thunder: { name: '雷', color: 0xffe348, weakTo: 'ice' },
+  water: { name: '水', color: 0x3fa9ff, weakTo: 'thunder' },
+  ice: { name: '氷', color: 0x82e9ff, weakTo: 'fire' }
+};
+
+export function randomElement(): Element {
+  const values: Element[] = ['fire', 'thunder', 'water', 'ice'];
+  return values[Math.floor(Math.random() * values.length)];
+}
+
+export function elementMultiplier(attack: Element | undefined, defend: Element | undefined): number {
+  if (!attack || !defend) return 1;
+  return ELEMENT_INFO[defend].weakTo === attack ? 1.5 : attack === defend ? 0.75 : 1;
+}
+
+export function monsterElement(def: MonsterDef): Element {
+  if (def.element) return def.element;
+  const values: Element[] = ['fire', 'thunder', 'water', 'ice'];
+  let seed = 0;
+  for (let i = 0; i < def.key.length; i++) seed += def.key.charCodeAt(i);
+  return values[seed % values.length];
+}
 
 // ===== 盾定義 =====
 export interface ShieldDef {
@@ -36,13 +107,52 @@ export interface ShieldDef {
   defBonus: number;
   durMax: number;
   minFloor: number;
+  rarity: number;
   grade: EquipmentGrade;
+  element?: Element;
+  passive: ShieldPassive;
 }
 
 export const SHIELD_DEFS: ShieldDef[] = [
-  { key: 's_gear', name: 'ギアシールド', defBonus: 2, durMax: 40, minFloor: 1, grade: 'D' },
-  { key: 's_crystal', name: 'クリスタルシールド', defBonus: 4, durMax: 55, minFloor: 8, grade: 'B' },
-  { key: 's_skull', name: 'スカルシールド', defBonus: 6, durMax: 70, minFloor: 16, grade: 'A' }
+  // 無属性盾5種：すべて形と固有効果が異なる。
+  {
+    key: 's_iron_round', name: '黒鉄の円盾', defBonus: 2, durMax: 65, minFloor: 1, rarity: 14, grade: 'D',
+    passive: { key: 'brace', name: '踏ん張り', description: '10以上の攻撃ダメージを20%軽減' }
+  },
+  {
+    key: 's_mirror_silver', name: '鏡銀の盾', defBonus: 3, durMax: 55, minFloor: 3, rarity: 10, grade: 'C',
+    passive: { key: 'mirror', name: '鏡避け', description: '15%の確率で攻撃を完全に無効化' }
+  },
+  {
+    key: 's_thorn_guard', name: '反撃盾ヴァイン', defBonus: 4, durMax: 70, minFloor: 8, rarity: 6, grade: 'B',
+    passive: { key: 'thorns', name: '反射棘', description: '受けた攻撃ダメージの25%を敵へ返す' }
+  },
+  {
+    key: 's_chrono_guard', name: '時守りの盾クロノス', defBonus: 5, durMax: 75, minFloor: 14, rarity: 3, grade: 'A',
+    passive: { key: 'perfect_guard', name: '時止め防御', description: '5回に1回、敵の攻撃を完全に無効化' }
+  },
+  {
+    key: 's_seraph_guard', name: '聖域盾セラフィム', defBonus: 6, durMax: 90, minFloor: 21, rarity: 1, grade: 'S',
+    passive: { key: 'recovery', name: '聖域再生', description: '4回攻撃を受けるごとにHPを6回復' }
+  },
+
+  // 属性盾4種：色替えではなく、属性ごとに専用の形・名前・原画を持つ。
+  {
+    key: 's_flame_aegis', name: '炎獄盾イグナード', defBonus: 3, durMax: 60, minFloor: 4, rarity: 8, grade: 'C', element: 'fire',
+    passive: { key: 'element_guard', name: '火炎障壁', description: '火属性の攻撃に強い' }
+  },
+  {
+    key: 's_tidal_aegis', name: '海淵盾ネレイア', defBonus: 3, durMax: 64, minFloor: 4, rarity: 8, grade: 'C', element: 'water',
+    passive: { key: 'element_guard', name: '水流障壁', description: '水属性の攻撃に強い' }
+  },
+  {
+    key: 's_storm_aegis', name: '雷皇盾ヴォルテクス', defBonus: 4, durMax: 62, minFloor: 8, rarity: 6, grade: 'B', element: 'thunder',
+    passive: { key: 'element_guard', name: '雷電障壁', description: '雷属性の攻撃に強い' }
+  },
+  {
+    key: 's_frost_aegis', name: '氷城盾グレイシア', defBonus: 4, durMax: 70, minFloor: 8, rarity: 6, grade: 'B', element: 'ice',
+    passive: { key: 'element_guard', name: '氷雪障壁', description: '氷属性の攻撃に強い' }
+  }
 ];
 
 // ===== マジック定義 =====
@@ -89,8 +199,8 @@ export const ITEM_DEFS: Record<ItemKind, Omit<Item, 'kind'>> = {
   oldkey:  { name: '古びた鍵', desc: 'ロックされた扉を開ける', textureKey: 'i_oldkey' },
   floorkey:{ name: 'フロアキー', desc: '特殊な扉を開ける', textureKey: 'i_floorkey' },
   seal:    { name: '封印の魔導書', desc: '周囲の敵を数ターン止める', textureKey: 'i_seal' },
-  stone:   { name: 'ウェポンストーン', desc: '成功率90%から強化ごとに10%低下（最低30%）', textureKey: 'i_stone' },
-  shieldstone: { name: 'シールドストーン', desc: '成功率90%から強化ごとに10%低下（最低30%）', textureKey: 'i_shieldstone' },
+  stone:   { name: '武器強化スクロール', desc: '装備中の武器を強化。成功率90%から強化ごとに10%低下（最低30%）', textureKey: 'i_stone' },
+  shieldstone: { name: '防具強化スクロール', desc: '装備中の盾を強化。成功率90%から強化ごとに10%低下（最低30%）', textureKey: 'i_shieldstone' },
   invis:   { name: '透明ポーション', desc: '20ターンの間、敵から完全に見えなくなる', textureKey: 'i_invis' },
   dash:    { name: '疾風の羽', desc: '20歩の間、1歩で2マス進めるようになる', textureKey: 'i_dash' }
 };

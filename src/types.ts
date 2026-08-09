@@ -29,6 +29,15 @@ export interface Magic {
 
 export type EquipmentGrade = 'D' | 'C' | 'B' | 'A' | 'S';
 
+export type Element = 'fire' | 'thunder' | 'water' | 'ice';
+export type WeaponType = 'dagger' | 'longsword' | 'lance' | 'bow' | 'greatsword' | 'dual_sword' | 'twin_daggers';
+
+export interface WeaponPassive {
+  key: 'backstab' | 'sturdy' | 'pierce' | 'eagle_eye' | 'heavy_strike' | 'twin_edge' | 'blood_edge' | 'knockback';
+  name: string;
+  description: string;
+}
+
 export interface Weapon {
   key: string;       // テクスチャ/種別キー
   name: string;
@@ -38,9 +47,20 @@ export interface Weapon {
   dur: number;
   magics: Magic[];
   grade: EquipmentGrade;
-  plus: number;      // 強化値（+1で黄, +2紫, +3青, +4以降赤）。強化石で上昇
+  plus: number;      // 強化値（+1で黄, +2紫, +3青, +4以降赤）。武器強化スクロールで上昇
   repairUsed?: boolean; // R効果の使用済みフラグ
   dual?: boolean;    // 二刀流（2回攻撃・盾装備不可）
+  weaponType: WeaponType;
+  element?: Element;
+  passive?: WeaponPassive;
+  ss?: boolean;
+  specialCounter?: number;
+}
+
+export interface ShieldPassive {
+  key: 'brace' | 'mirror' | 'thorns' | 'perfect_guard' | 'recovery' | 'element_guard';
+  name: string;
+  description: string;
 }
 
 export interface Shield {
@@ -50,7 +70,10 @@ export interface Shield {
   durMax: number;
   dur: number;
   grade: EquipmentGrade;
-  plus: number;   // 盾強化石で上昇（縦の強化）。+1ごとに防御+1
+  plus: number;   // 防具強化スクロールで上昇（縦の強化）。+1ごとに防御+1
+  element?: Element;
+  passive?: ShieldPassive;
+  guardCounter?: number;
 }
 
 export type ItemKind =
@@ -63,8 +86,8 @@ export type ItemKind =
   | 'oldkey'      // 古びた鍵
   | 'floorkey'    // フロアキー
   | 'seal'        // 封印の魔導書
-  | 'stone'       // 武器強化石（ダンジョンコアの欠片）＝横の強化
-  | 'shieldstone' // 盾強化石＝縦の強化
+  | 'stone'       // 武器強化スクロール＝横の強化（保存互換のためIDは維持）
+  | 'shieldstone' // 防具強化スクロール＝縦の強化（保存互換のためIDは維持）
   | 'invis'       // 透明ポーション（20ターン敵から見えなくなる）
   | 'dash';       // 疾風の羽（20歩の間、1歩で2マス進める）
 
@@ -96,6 +119,7 @@ export interface MonsterDef {
   isDragonType?: boolean; // DK特効対象
   bossTint?: number;
   color: number;          // 代替ドット絵の基調色
+  element?: Element;
 }
 
 export type MonsterBehavior =

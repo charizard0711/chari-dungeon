@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { MonsterDef } from './types';
+import type { Dir, MonsterDef } from './types';
 
 export class Enemy {
   def: MonsterDef;
@@ -21,6 +21,7 @@ export class Enemy {
   poisonTurns = 0;        // 被毒
   loopDir = 0;            // ループ移動方向index
   lineDir: { x: number; y: number } | null = null;
+  facing: Dir = 'down';
 
   constructor(def: MonsterDef, x: number, y: number, hpScale: number) {
     this.def = def;
