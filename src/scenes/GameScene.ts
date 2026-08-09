@@ -245,7 +245,13 @@ export class GameScene extends Phaser.Scene {
       : undefined;
     if (location.hostname === 'localhost' && qaParams.has('qa-gacha')) this.player.gold = 1500;
     if (location.hostname === 'localhost' && qaParams.has('qa-equipment')) {
-      const weaponKeys = ['w_iron_dagger', 'w_knight_sword', 'w_bone_lance', 'w_royal_bow', 'w_grand_breaker'];
+      const weaponKeys = [
+        'w_iron_dagger', 'w_shadow_stiletto', 'w_sawtooth_dirk', 'w_moon_fang', 'w_assassin_requiem',
+        'w_soldier_blade', 'w_knight_sword', 'w_rune_saber', 'w_paladin_edge', 'w_black_oath',
+        'w_iron_pike', 'w_royal_spear', 'w_bone_lance', 'w_drill_lance', 'w_dragon_lance',
+        'w_hunter_bow', 'w_composite_bow', 'w_blackwood_bow', 'w_royal_bow', 'w_siege_arbalest',
+        'w_rusted_greatsword', 'w_executioner_blade', 'w_titan_cleaver', 'w_holy_greatsword', 'w_grand_breaker'
+      ];
       const shieldKeys = [
         's_iron_round', 's_mirror_silver', 's_thorn_guard', 's_chrono_guard', 's_seraph_guard',
         's_flame_aegis', 's_tidal_aegis', 's_storm_aegis', 's_frost_aegis'

@@ -30,10 +30,10 @@ export interface Magic {
 export type EquipmentGrade = 'D' | 'C' | 'B' | 'A' | 'S';
 
 export type Element = 'fire' | 'thunder' | 'water' | 'ice';
-export type WeaponType = 'dagger' | 'longsword' | 'lance' | 'bow' | 'dual_sword' | 'twin_daggers';
+export type WeaponType = 'dagger' | 'longsword' | 'lance' | 'bow' | 'greatsword' | 'dual_sword' | 'twin_daggers';
 
 export interface WeaponPassive {
-  key: 'backstab' | 'sturdy' | 'pierce' | 'eagle_eye' | 'twin_edge' | 'blood_edge' | 'knockback';
+  key: 'backstab' | 'sturdy' | 'pierce' | 'eagle_eye' | 'heavy_strike' | 'twin_edge' | 'blood_edge' | 'knockback';
   name: string;
   description: string;
 }

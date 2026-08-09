@@ -33,6 +33,7 @@ export function computePlayerAttack(p: Player, def: MonsterDef, backstab = false
   }
 
   dmg = Math.max(1, Math.floor(dmg * elementMultiplier(w?.element, monsterElement(def))));
+  if (w?.passive?.key === 'heavy_strike') dmg = Math.max(1, Math.floor(dmg * 1.06));
 
   let crit = false;
   const cMagic = p.hasMagic('C');

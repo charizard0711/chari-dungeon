@@ -6,6 +6,7 @@ const WEAPON_PASSIVES: Record<WeaponType, WeaponPassive> = {
   longsword: { key: 'sturdy', name: '剣身防御', description: '受けるダメージ-5%' },
   lance: { key: 'pierce', name: '貫通', description: '敵の防御を8%無視' },
   bow: { key: 'eagle_eye', name: '鷹の目', description: 'クリティカル率+4%' },
+  greatsword: { key: 'heavy_strike', name: '重撃', description: '与えるダメージ+6%' },
   dual_sword: { key: 'twin_edge', name: '双刃', description: '2撃目の威力+8%' },
   twin_daggers: { key: 'blood_edge', name: '吸命刃', description: '与ダメージの3%回復' }
 };

@@ -41,12 +41,36 @@ export const WEAPON_DEFS: WeaponDef[] = [
 
   // 無属性武器。属性相性に左右されず、各ランクで安定して扱える。
   { key: 'w_iron_dagger', name: '黒鉄の短剣', atkMin: 5, atkMax: 12, durMax: 150, minFloor: 1, rarity: 14, grade: 'D', weaponType: 'dagger' },
+  { key: 'w_shadow_stiletto', name: '影縫いのスティレット', atkMin: 7, atkMax: 15, durMax: 132, minFloor: 3, rarity: 10, grade: 'C', weaponType: 'dagger' },
+  { key: 'w_sawtooth_dirk', name: '鋸刃のダーク', atkMin: 9, atkMax: 18, durMax: 138, minFloor: 8, rarity: 6, grade: 'B', weaponType: 'dagger' },
+  { key: 'w_moon_fang', name: '月牙の短剣', atkMin: 11, atkMax: 22, durMax: 144, minFloor: 13, rarity: 3, grade: 'A', weaponType: 'dagger' },
+  { key: 'w_assassin_requiem', name: '暗殺刃レクイエム', atkMin: 13, atkMax: 25, durMax: 156, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'dagger' },
+
+  { key: 'w_soldier_blade', name: '兵士の直剣', atkMin: 6, atkMax: 14, durMax: 180, minFloor: 1, rarity: 14, grade: 'D', weaponType: 'longsword' },
   { key: 'w_knight_sword', name: '騎士剣アルディオン', atkMin: 8, atkMax: 17, durMax: 210, minFloor: 3, rarity: 11, grade: 'C', weaponType: 'longsword' },
+  { key: 'w_rune_saber', name: 'ルーン鋼剣', atkMin: 10, atkMax: 21, durMax: 198, minFloor: 8, rarity: 6, grade: 'B', weaponType: 'longsword' },
+  { key: 'w_paladin_edge', name: '聖騎士剣ルミナス', atkMin: 12, atkMax: 25, durMax: 216, minFloor: 13, rarity: 3, grade: 'A', weaponType: 'longsword' },
+  { key: 'w_black_oath', name: '黒誓剣モルドレッド', atkMin: 15, atkMax: 29, durMax: 228, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'longsword' },
+
+  { key: 'w_iron_pike', name: '鉄兵のパイク', atkMin: 6, atkMax: 15, durMax: 160, minFloor: 1, rarity: 13, grade: 'D', weaponType: 'lance' },
+  { key: 'w_royal_spear', name: '王衛槍レオニス', atkMin: 8, atkMax: 18, durMax: 174, minFloor: 3, rarity: 9, grade: 'C', weaponType: 'lance' },
   { key: 'w_bone_lance', name: '白骨槍グレイヴ', atkMin: 10, atkMax: 20, durMax: 174, minFloor: 8, rarity: 7, grade: 'B', weaponType: 'lance' },
+  { key: 'w_drill_lance', name: '穿城槍ドリルギア', atkMin: 12, atkMax: 26, durMax: 186, minFloor: 13, rarity: 3, grade: 'A', weaponType: 'lance' },
+  { key: 'w_dragon_lance', name: '竜穿槍バハムート', atkMin: 15, atkMax: 30, durMax: 204, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'lance' },
+
+  { key: 'w_hunter_bow', name: '狩人の長弓', atkMin: 5, atkMax: 13, durMax: 126, minFloor: 1, rarity: 13, grade: 'D', weaponType: 'bow' },
+  { key: 'w_composite_bow', name: '複合弓ファルコン', atkMin: 8, atkMax: 17, durMax: 138, minFloor: 3, rarity: 9, grade: 'C', weaponType: 'bow' },
+  { key: 'w_blackwood_bow', name: '黒檀弓ナイトレイ', atkMin: 10, atkMax: 21, durMax: 144, minFloor: 8, rarity: 6, grade: 'B', weaponType: 'bow' },
   { key: 'w_royal_bow', name: '王弓レガリア', atkMin: 11, atkMax: 24, durMax: 150, minFloor: 13, rarity: 4, grade: 'A', weaponType: 'bow' },
+  { key: 'w_siege_arbalest', name: '攻城弩バリスタ', atkMin: 14, atkMax: 29, durMax: 168, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'bow' },
+
+  { key: 'w_rusted_greatsword', name: '錆びた大剣', atkMin: 7, atkMax: 16, durMax: 195, minFloor: 1, rarity: 12, grade: 'D', weaponType: 'greatsword' },
+  { key: 'w_executioner_blade', name: '断罪の処刑剣', atkMin: 10, atkMax: 21, durMax: 210, minFloor: 3, rarity: 8, grade: 'C', weaponType: 'greatsword' },
+  { key: 'w_titan_cleaver', name: '巨人断ちタイタンクリーバー', atkMin: 12, atkMax: 25, durMax: 225, minFloor: 8, rarity: 5, grade: 'B', weaponType: 'greatsword' },
+  { key: 'w_holy_greatsword', name: '聖堂大剣カテドラル', atkMin: 14, atkMax: 28, durMax: 240, minFloor: 13, rarity: 2, grade: 'A', weaponType: 'greatsword' },
   {
     key: 'w_grand_breaker', name: '破城大剣グランバスター', atkMin: 14, atkMax: 29, durMax: 225,
-    minFloor: 21, rarity: 1, grade: 'S', weaponType: 'longsword',
+    minFloor: 21, rarity: 1, grade: 'S', weaponType: 'greatsword',
     passive: { key: 'knockback', name: '三撃破砕', description: '3回目の攻撃ごとに敵を1マス押し戻す' }
   }
 ];
