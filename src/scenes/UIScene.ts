@@ -39,6 +39,9 @@ export class UIScene extends Phaser.Scene {
   equipIconSize = 60;
   equipScrollIndex = 0;
   equipScrollMax = 0;
+  inventoryTab: 'all' | 'equip' | 'items' = 'all';
+  inventoryScrollIndex = 0;
+  inventoryScrollMax = 0;
   secretDirection: 'left' | 'right' | null = null;
   secretAlternatingPresses = 0;
 
@@ -104,6 +107,7 @@ export class UIScene extends Phaser.Scene {
 
     const onWheel = (_pointer: Phaser.Input.Pointer, _objects: Phaser.GameObjects.GameObject[], _dx: number, dy: number) => {
       if (this.overlayMode === 'equip' && dy !== 0) this.scrollEquipment(dy > 0 ? 1 : -1);
+      if (this.overlayMode === 'inv' && dy !== 0) this.scrollInventory(dy > 0 ? 1 : -1);
     };
     const onSecretKey = (event: KeyboardEvent) => this.handleEquipmentSecret(event);
     this.input.on('wheel', onWheel);
@@ -176,8 +180,7 @@ export class UIScene extends Phaser.Scene {
     this.panel(8, 48, 160, 512, 'NAVIGATION');
     const labels: { t: string; f: () => void }[] = [
       { t: '🧭 探索', f: () => this.setOverlay('none') },
-      { t: '⚔ 装備', f: () => this.setOverlay('equip') },
-      { t: '🎒 所持品', f: () => this.setOverlay('inv') },
+      { t: '🎒 所持品・装備', f: () => this.openInventory() },
       { t: '🛒 ショップ', f: () => this.setOverlay('shop') },
       { t: '🎰 ガチャ', f: () => this.setOverlay('gacha') },
       { t: '👾 モンスター', f: () => this.setOverlay('codex') },
@@ -274,7 +277,7 @@ export class UIScene extends Phaser.Scene {
       }));
     }
     // アイテム欄
-    this.panel(716, 568, GAME_W - 724, 184, '所持アイテム（クリックで使用）');
+    this.panel(716, 568, GAME_W - 724, 184, 'クイックアイテム（クリックで使用）');
     this.itemContainer = this.add.container(0, 0);
   }
 
@@ -325,7 +328,7 @@ export class UIScene extends Phaser.Scene {
     }
 
     // ---- もちもの ----
-    this.panel(8, 566, 374, 74, 'もちもの（タップで使用）');
+    this.panel(8, 566, 374, 74, 'クイックアイテム（タップで使用）');
     this.itemContainer = this.add.container(0, 0);
 
     // ---- 冒険ログ（最新1行）----
@@ -355,8 +358,7 @@ export class UIScene extends Phaser.Scene {
 
   buildMobileNav() {
     const items: { icon: string; label: string; f: () => void }[] = [
-      { icon: '⚔', label: '装備', f: () => this.setOverlay('equip') },
-      { icon: '🎒', label: '所持品', f: () => this.setOverlay('inv') },
+      { icon: '🎒', label: '所持品', f: () => this.openInventory() },
       { icon: '🛒', label: '店', f: () => this.setOverlay('shop') },
       { icon: '🎰', label: 'ガチャ', f: () => this.setOverlay('gacha') },
       { icon: '👾', label: '図鑑', f: () => this.setOverlay('codex') },
@@ -364,7 +366,7 @@ export class UIScene extends Phaser.Scene {
     ];
     this.panel(8, 800, 374, 36);
     items.forEach((it, i) => {
-      const x = 12 + i * 61, y = 803, w = 57, h = 30;
+      const x = 12 + i * 72, y = 803, w = 68, h = 30;
       const g = this.add.graphics();
       const draw = (c: number) => { g.clear(); g.fillStyle(c, 1).fillRoundedRect(x, y, w, h, 6); };
       draw(0x1c2536);
@@ -642,6 +644,20 @@ export class UIScene extends Phaser.Scene {
   }
 
   // ============ オーバーレイ ============
+  openInventory(tab: 'all' | 'equip' | 'items' = 'all') {
+    this.inventoryTab = tab;
+    this.inventoryScrollIndex = 0;
+    this.setOverlay('inv');
+  }
+
+  setInventoryTab(tab: 'all' | 'equip' | 'items') {
+    if (this.inventoryTab === tab) return;
+    Audio.playSe('click');
+    this.inventoryTab = tab;
+    this.inventoryScrollIndex = 0;
+    this.rebuildOverlay();
+  }
+
   setOverlay(mode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick') {
     if (this.gachaAnimating) return; // 演出中は切替禁止
     if (this.gs.pendingEquipment && mode !== 'equip') mode = 'equip';
@@ -664,7 +680,9 @@ export class UIScene extends Phaser.Scene {
   }
 
   handleEquipmentSecret(event: KeyboardEvent) {
-    if (this.overlayMode !== 'equip' || event.repeat || this.gs.secretDualUnlocked) return;
+    const equipmentListVisible = this.overlayMode === 'equip'
+      || this.overlayMode === 'inv' && this.inventoryTab === 'equip';
+    if (!equipmentListVisible || event.repeat || this.gs.secretDualUnlocked) return;
     const direction = event.code === 'ArrowLeft' ? 'left' : event.code === 'ArrowRight' ? 'right' : null;
     if (!direction) return;
     event.preventDefault();
@@ -686,6 +704,14 @@ export class UIScene extends Phaser.Scene {
     this.rebuildOverlay();
   }
 
+  scrollInventory(delta: number) {
+    if (this.overlayMode !== 'inv' || this.inventoryScrollMax <= 0) return;
+    const next = Phaser.Math.Clamp(this.inventoryScrollIndex + delta, 0, this.inventoryScrollMax);
+    if (next === this.inventoryScrollIndex) return;
+    this.inventoryScrollIndex = next;
+    this.rebuildOverlay();
+  }
+
   rebuildOverlay() {
     if (this.gachaAnimating) return; // 演出中に消さない
     this.overlay.removeAll(true);
@@ -699,7 +725,7 @@ export class UIScene extends Phaser.Scene {
     const pickTitles = ['⚔ 武器を変更', '🛡 盾を変更'];
     const title =
       this.overlayMode === 'equip' ? (this.gs.pendingEquipment ? '⚠ 装備上限：売却が必要' : '⚔ 装備・売却') :
-      this.overlayMode === 'inv' ? '🎒 所持品' :
+      this.overlayMode === 'inv' ? '🎒 所持品・装備' :
       this.overlayMode === 'settings' ? '⚙ 設定（サウンド）' :
       this.overlayMode === 'shop' ? '🛒 フロアショップ' :
       this.overlayMode === 'gacha' ? '🎰 ダンジョンガチャ' :
@@ -721,7 +747,7 @@ export class UIScene extends Phaser.Scene {
     this.overlay.add(cb);
 
     if (this.overlayMode === 'equip') this.buildEquipOverlay(x, y, w, h);
-    else if (this.overlayMode === 'inv') this.buildInvOverlay(x, y, w);
+    else if (this.overlayMode === 'inv') this.buildUnifiedInventoryOverlay(x, y, w, h);
     else if (this.overlayMode === 'settings') this.buildSettingsOverlay(x, y, w);
     else if (this.overlayMode === 'shop') this.buildShopOverlay(x, y, w);
     else if (this.overlayMode === 'gacha') this.buildGachaOverlay(x, y, w, h);
@@ -849,6 +875,182 @@ export class UIScene extends Phaser.Scene {
       const down = this.rowButton(x + w / 2 + 38, navY, 54, '▼', false, () => { Audio.playSe('click'); this.scrollEquipment(1); }, this.equipScrollIndex < this.equipScrollMax);
       const rangeEnd = Math.min(entries.length, this.equipScrollIndex + visibleCount);
       const page = this.add.text(x + w / 2, navY + 14, `${this.equipScrollIndex + 1}-${rangeEnd} / ${entries.length}`, {
+        fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#9fb4c4'
+      }).setOrigin(0.5);
+      this.overlay.add([up, page, down]);
+    }
+  }
+
+  buildUnifiedInventoryOverlay(x: number, y: number, w: number, h: number) {
+    const p = this.gs.player;
+    const tabGap = 6;
+    const tabW = (w - 32 - tabGap * 2) / 3;
+    const tabs: { key: 'all' | 'equip' | 'items'; label: string }[] = [
+      { key: 'all', label: 'すべて' },
+      { key: 'equip', label: '装備' },
+      { key: 'items', label: '道具' }
+    ];
+    tabs.forEach((tab, index) => {
+      const button = this.rowButton(
+        x + 16 + index * (tabW + tabGap), y + 44, tabW, tab.label,
+        this.inventoryTab === tab.key,
+        () => this.setInventoryTab(tab.key)
+      );
+      this.overlay.add(button);
+    });
+
+    const armorNames: Record<string, string> = {
+      leather: '旅人の革鎧', chain: '冒険者の鎖帷子', plate: '騎士の板金鎧',
+      arcane: '星詠みの魔導装束', dragon: '古竜の竜鱗鎧'
+    };
+    const summaryY = y + 80;
+    const cardGap = 6;
+    const cardW = (w - 32 - cardGap * 2) / 3;
+    const bodyTexture = `player_${this.gs.playerGender}_${this.gs.playerArmor}`;
+    const equippedCards: {
+      label: string;
+      name: string;
+      sub: string;
+      texture?: string;
+      frame?: number;
+      color: number;
+      slot?: number;
+    }[] = [
+      {
+        label: '⚔ 武器',
+        name: p.weapon ? weaponFullName(p.weapon) : '素手',
+        sub: p.weapon ? `攻${p.weapon.atkMin}-${p.weapon.atkMax}　耐久${p.weapon.dur}/${p.weapon.durMax}` : '装備なし',
+        texture: p.weapon?.key,
+        color: p.weapon ? this.elementColor(p.weapon.element) ?? gradeColor(p.weapon.grade) : 0x36585d,
+        slot: 0
+      },
+      {
+        label: '🛡 盾',
+        name: p.weapon?.dual ? '二刀流中' : p.shield ? shieldFullName(p.shield) : '装備なし',
+        sub: p.weapon?.dual ? '盾は装備できない' : p.shield ? `防+${p.shield.defBonus + p.shield.plus}　耐久${p.shield.dur}/${p.shield.durMax}` : '装備なし',
+        texture: p.weapon?.dual ? p.weapon.key : p.shield?.key,
+        color: p.weapon?.dual
+          ? this.elementColor(p.weapon.element) ?? gradeColor(p.weapon.grade)
+          : p.shield ? this.elementColor(p.shield.element) ?? gradeColor(p.shield.grade) : 0x36585d,
+        slot: 1
+      },
+      {
+        label: '◆ 体防具',
+        name: armorNames[this.gs.playerArmor] ?? '体防具',
+        sub: '現在の外見装備',
+        texture: bodyTexture,
+        frame: 0,
+        color: 0x76a9d8
+      }
+    ];
+
+    equippedCards.forEach((card, index) => {
+      const px = x + 16 + index * (cardW + cardGap);
+      const bg = this.add.graphics();
+      bg.fillStyle(0x0a1c20, 0.98).fillRoundedRect(px, summaryY, cardW, 72, 7);
+      bg.lineStyle(1.5, card.color, 0.95).strokeRoundedRect(px, summaryY, cardW, 72, 7);
+      const label = this.add.text(px + 8, summaryY + 5, card.label, {
+        fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '9px' : '11px', color: '#8fded8', fontStyle: 'bold'
+      });
+      const name = this.add.text(px + 48, summaryY + 25, card.name, {
+        fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '8px' : '11px', color: '#eef6f7', fontStyle: 'bold',
+        wordWrap: { width: cardW - 54 }
+      }).setOrigin(0, 0.5);
+      const sub = this.add.text(px + 48, summaryY + 50, card.sub, {
+        fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '7px' : '9px', color: '#9fb4c4',
+        wordWrap: { width: cardW - 54 }
+      }).setOrigin(0, 0.5);
+      this.overlay.add([bg, label, name, sub]);
+      if (card.texture && this.textures.exists(card.texture)) {
+        const icon = this.add.image(px + 27, summaryY + 43, card.texture, card.frame)
+          .setDisplaySize(IS_MOBILE ? 34 : 40, IS_MOBILE ? 34 : 40);
+        this.overlay.add(icon);
+      }
+      if (card.slot !== undefined) {
+        const zone = this.add.zone(px, summaryY, cardW, 72).setOrigin(0).setInteractive({ useHandCursor: true });
+        zone.on('pointerdown', () => {
+          Audio.playSe('click');
+          this.pickSlot = card.slot!;
+          this.setOverlay('pick');
+        });
+        this.overlay.add(zone);
+      }
+    });
+
+    type UnifiedEntry =
+      | { type: 'weapon'; item: Weapon; index: number }
+      | { type: 'shield'; item: Shield; index: number }
+      | { type: 'item'; group: { kind: ItemKind; item: Item; count: number; firstIndex: number } };
+    const equipmentEntries: UnifiedEntry[] = [
+      ...p.weapons.map((item, index) => ({ type: 'weapon' as const, item, index })),
+      ...p.shields.map((item, index) => ({ type: 'shield' as const, item, index }))
+    ];
+    const itemEntries: UnifiedEntry[] = this.stackInventory(p.inventory)
+      .map((group) => ({ type: 'item' as const, group }));
+    const entries = this.inventoryTab === 'equip' ? equipmentEntries
+      : this.inventoryTab === 'items' ? itemEntries
+      : [...equipmentEntries, ...itemEntries];
+
+    const listTitle = this.inventoryTab === 'equip'
+      ? `所持装備　武器 ${p.weapons.length}/${EQUIPMENT_LIMIT}　盾 ${p.shields.length}/${EQUIPMENT_LIMIT}`
+      : this.inventoryTab === 'items'
+        ? `道具　${p.inventory.length}/60`
+        : `所持品一覧　装備 ${equipmentEntries.length}　道具 ${p.inventory.length}`;
+    this.overlay.add(this.add.text(x + 16, y + 160, listTitle, {
+      fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '10px' : '12px', color: '#b8d8d6'
+    }));
+
+    const listY = y + 181;
+    const visibleCount = Math.max(4, Math.floor((h - 223) / 36));
+    this.inventoryScrollMax = Math.max(0, entries.length - visibleCount);
+    this.inventoryScrollIndex = Phaser.Math.Clamp(this.inventoryScrollIndex, 0, this.inventoryScrollMax);
+
+    if (!entries.length) {
+      this.overlay.add(this.add.text(x + 20, listY + 8, '（この分類には何もありません）', {
+        fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: '#8a97ab'
+      }));
+    }
+
+    entries.slice(this.inventoryScrollIndex, this.inventoryScrollIndex + visibleCount).forEach((entry, visibleIndex) => {
+      const cy = listY + visibleIndex * 36;
+      const actionW = IS_MOBILE ? 72 : 94;
+      if (entry.type === 'weapon') {
+        const wp = entry.item;
+        const equipped = wp === p.weapon;
+        const risk = durabilityRisk(wp.dur, wp.durMax);
+        const icon = this.framedIcon(x + 33, cy + 14, wp.key, this.elementColor(wp.element) ?? gradeColor(wp.grade), 32);
+        const row = this.rowButton(x + 54, cy, w - 76 - actionW, `⚔ ${equipped ? '▶ ' : ''}${weaponFullName(wp)}　耐久${wp.dur}/${wp.durMax}(${risk.label})　${this.weaponEffectText(wp, true)}`, equipped, () => this.gs.equipWeapon(entry.index));
+        const action = this.rowButton(x + w - actionW - 10, cy, actionW,
+          equipped ? '装備中' : `売却 ${this.gs.weaponSellPrice(wp)}G`, false,
+          () => this.gs.sellWeapon(entry.index), !equipped);
+        this.overlay.add([...icon, row, action]);
+      } else if (entry.type === 'shield') {
+        const sh = entry.item;
+        const equipped = sh === p.shield;
+        const risk = durabilityRisk(sh.dur, sh.durMax);
+        const icon = this.framedIcon(x + 33, cy + 14, sh.key, this.elementColor(sh.element) ?? gradeColor(sh.grade), 32);
+        const row = this.rowButton(x + 54, cy, w - 76 - actionW, `🛡 ${equipped ? '▶ ' : ''}${shieldFullName(sh)}　防+${sh.defBonus + sh.plus}　耐久${sh.dur}/${sh.durMax}(${risk.label})`, equipped, () => this.gs.equipShield(entry.index));
+        const action = this.rowButton(x + w - actionW - 10, cy, actionW,
+          equipped ? '装備中' : `売却 ${this.gs.shieldSellPrice(sh)}G`, false,
+          () => this.gs.sellShield(entry.index), !equipped);
+        this.overlay.add([...icon, row, action]);
+      } else {
+        const group = entry.group;
+        const count = group.count > 1 ? ` ×${group.count}` : '';
+        const icon = this.framedIcon(x + 33, cy + 14, group.item.textureKey, isRareItem(group.kind) ? 0xff5f67 : 0x2f6f6a, 32);
+        const use = () => { this.gs.useItem(group.firstIndex); this.setOverlay('inv'); };
+        const row = this.rowButton(x + 54, cy, w - 76 - actionW, `${group.item.name}${count}　—　${group.item.desc}`, false, use);
+        const action = this.rowButton(x + w - actionW - 10, cy, actionW, '使用', false, use);
+        this.overlay.add([...icon, row, action]);
+      }
+    });
+
+    if (this.inventoryScrollMax > 0) {
+      const navY = y + h - 38;
+      const up = this.rowButton(x + w / 2 - 92, navY, 54, '▲', false, () => { Audio.playSe('click'); this.scrollInventory(-1); }, this.inventoryScrollIndex > 0);
+      const down = this.rowButton(x + w / 2 + 38, navY, 54, '▼', false, () => { Audio.playSe('click'); this.scrollInventory(1); }, this.inventoryScrollIndex < this.inventoryScrollMax);
+      const rangeEnd = Math.min(entries.length, this.inventoryScrollIndex + visibleCount);
+      const page = this.add.text(x + w / 2, navY + 14, `${this.inventoryScrollIndex + 1}-${rangeEnd} / ${entries.length}`, {
         fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#9fb4c4'
       }).setOrigin(0.5);
       this.overlay.add([up, page, down]);

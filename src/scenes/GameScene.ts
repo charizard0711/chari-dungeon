@@ -10,6 +10,18 @@ import { computePlayerAttack, computeEnemyAttack } from '../combat';
 import { Audio } from '../audio/manager';
 import { bgmForFloor } from '../audio/config';
 import { enhancementChance, EQUIPMENT_LIMIT } from '../balance';
+import {
+  DEFAULT_PLAYER_ARMOR,
+  getSelectedGender,
+  isPlayerArmor,
+  isPlayerGender,
+  playerFrameIndex,
+  playerSheetKey,
+  PlayerArmor,
+  PlayerGender,
+  PlayerVisualFrame,
+  setSelectedGender
+} from '../playerAppearance';
 
 // マップ表示ビューポート（画面上の座標。スマホ縦持ちでは縦型レイアウト）
 import { MAP_X, MAP_Y, MAP_W, MAP_H } from '../layout';
@@ -201,6 +213,9 @@ export class GameScene extends Phaser.Scene {
   stepToggle = false; // 歩行アニメの左右足切り替え
   stepFrame = 0;
   playerAttacking = false;
+  playerGender: PlayerGender = getSelectedGender();
+  playerArmor: PlayerArmor = DEFAULT_PLAYER_ARMOR;
+  playerAnimToken = 0;
   stairsHint!: Phaser.GameObjects.Text;
   lightRadius = 4;
   shroomTurns = 0;
@@ -236,6 +251,15 @@ export class GameScene extends Phaser.Scene {
     // 状態初期化
     this.player = new Player();
     const qaParams = new URLSearchParams(location.search);
+    const qaGender = qaParams.get('qa-gender');
+    this.playerGender = location.hostname === 'localhost' && isPlayerGender(qaGender)
+      ? qaGender
+      : getSelectedGender();
+    setSelectedGender(this.playerGender);
+    const qaArmor = qaParams.get('qa-armor');
+    this.playerArmor = location.hostname === 'localhost' && isPlayerArmor(qaArmor)
+      ? qaArmor
+      : DEFAULT_PLAYER_ARMOR;
     const qaFloor = location.hostname === 'localhost' ? Number(qaParams.get('qa-floor')) : 1;
     const startFloor = Number.isInteger(qaFloor) && qaFloor >= 1 && qaFloor <= 30 ? qaFloor : 1;
     this.qaBossMode = location.hostname === 'localhost' && qaParams.has('qa-boss');
@@ -284,6 +308,7 @@ export class GameScene extends Phaser.Scene {
     this.dashSteps = 0;
     this.stepFrame = 0;
     this.playerAttacking = false;
+    this.playerAnimToken = 0;
 
     // シーン再起動時、Phaserはインスタンスを再利用するため
     // 前回の（破棄済み）オブジェクト参照をリセットする
@@ -346,6 +371,13 @@ export class GameScene extends Phaser.Scene {
     }).setDepth(30).setVisible(false);
 
     this.buildFloor(startFloor, this.qaBossMode);
+    if (location.hostname === 'localhost' && qaParams.has('qa-hurt')) {
+      this.time.delayedCall(260, () => this.damagePlayer(8, 'QA被弾テスト'));
+    }
+    if (location.hostname === 'localhost' && qaParams.has('qa-death')) {
+      this.player.hp = 1;
+      this.time.delayedCall(260, () => this.damagePlayer(8, 'QA死亡テスト'));
+    }
     if (location.hostname === 'localhost' && qaParams.has('qa-knockback')) {
       const target = [
         { x: this.player.x + 1, y: this.player.y },
@@ -392,6 +424,9 @@ export class GameScene extends Phaser.Scene {
       this.bossRewardClaimed = false;
       this.weaponWonThisFloor = false;
       this.shopPurchases = { potion: 0, stone: 0, shieldstone: 0 };
+    } else {
+      // フィールド中ボスの任意報酬と、強ボス部屋の必須報酬は別扱い。
+      this.bossRewardClaimed = false;
     }
     this.floorBossDefeated = false;
     this.bossEntranceClosed = false;
@@ -463,7 +498,9 @@ export class GameScene extends Phaser.Scene {
       this.playerShadow = this.add.image(0, 0, 'shadow').setDepth(10.5).setAlpha(0.7);
       // 強化オーラ（プレイヤーの足元。tintで強化色に光る）
       this.playerAura = this.add.image(0, 0, 'glow').setDepth(11).setVisible(false);
-      this.playerSprite = this.add.image(0, 0, 'player_down_idle').setDepth(12).setScale(0.85).setOrigin(0.5, 0.6);
+      const playerSheet = playerSheetKey(this.playerGender, this.playerArmor);
+      this.playerSprite = this.add.image(0, 0, playerSheet, playerFrameIndex('down', 'idle'))
+        .setDepth(12).setScale(0.85).setOrigin(0.5, 0.6);
       // キャラが手に持つ武器（装備中の武器で絵が変わる）
       this.weaponSprite = this.add.image(0, 0, 'w_screw').setDepth(13).setDisplaySize(18, 18).setVisible(false);
     }
@@ -498,9 +535,12 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.updateVisibility();
-    this.log(bossRoom
-      ? `${floor}.5F ボス部屋へ転送された。中ボスと配下を倒せ！`
-      : `${floor}F「${getTheme(floor).name}」に到達。奥の扉は${floor}.5Fへ通じている。`, 'sys');
+    const floorIntro = bossRoom
+      ? `${floor}.5F 強ボス部屋へ転送された。ボスと配下を倒せ！`
+      : floor % 5 === 0
+        ? `${floor}F「${getTheme(floor).name}」に到達。4×4の出口部屋は${floor}.5Fへ通じ、中ボスは迷宮内のどこかにいる。`
+        : `${floor}F「${getTheme(floor).name}」に到達。4×4の出口部屋からいつでも次へ進める。中ボスは迷宮内のどこかにいる。`;
+    this.log(floorIntro, 'sys');
     this.events.emit('floor', floor);
     // BGMは2階ごとに切り替わる。
     Audio.playBgm(bgmForFloor(floor));
@@ -589,9 +629,9 @@ export class GameScene extends Phaser.Scene {
         if (!pos || this.distToPlayer(pos.x, pos.y) < 4) continue;
         this.addEnemy(def, pos.x, pos.y, 1 + floor * 0.035);
       }
-      // 全階に中ボス。5階刻みは強ボス、10階刻みは超ボスも同時出現する。
-      this.spawnMidBossDragon(floor);
+      // 分離部屋に置くのは5階刻みの強ボスだけ。通常の中ボスはフィールド側にいる。
       if (floor % 5 === 0) this.spawnMilestoneBoss(floor);
+      else this.spawnMidBossDragon(floor, false); // QAで通常階のボス部屋を直接開いた場合の保険
       return;
     }
     const arenaCells = this.bossRoomCells();
@@ -604,13 +644,14 @@ export class GameScene extends Phaser.Scene {
       if (this.distToPlayer(pos.x, pos.y) < 4) continue;
       this.addEnemy(def, pos.x, pos.y, 1 + floor * 0.04);
     }
+    this.spawnMidBossDragon(floor, true);
   }
 
-  floorHasGate(_floor: number): boolean {
-    return true;
+  floorHasGate(floor: number): boolean {
+    return floor % 5 === 0;
   }
 
-  spawnMidBossDragon(floor: number) {
+  spawnMidBossDragon(floor: number, fieldPlacement: boolean) {
     const spec = MID_DRAGONS[(floor - 1) % MID_DRAGONS.length];
     const base = MONSTER_DEFS.find((m) => m.key === spec.key) ?? MONSTER_DEFS[0];
     const def: MonsterDef = {
@@ -631,7 +672,10 @@ export class GameScene extends Phaser.Scene {
       isDragonType: true,
       bossTint: spec.tint
     };
-    this.placeFloorBoss(def, 1.32, spec.tint, `◆ ${floor}.5F 中ボス「${def.name}」が現れた！`, this.midBossGimmick(base.key));
+    const message = fieldPlacement
+      ? `◆ ${floor}F 中ボス「${def.name}」が迷宮内のどこかに現れた！ 倒さなくても出口は使える。`
+      : `◆ ${floor}.5F 中ボス「${def.name}」が現れた！`;
+    this.placeFloorBoss(def, 1.32, spec.tint, message, this.midBossGimmick(base.key), fieldPlacement);
   }
 
   spawnMilestoneBoss(floor: number) {
@@ -662,9 +706,16 @@ export class GameScene extends Phaser.Scene {
     this.placeFloorBoss(def, spec.scale, spec.tint, label, this.milestoneGimmick(floor));
   }
 
-  placeFloorBoss(def: MonsterDef, scale: number, tint: number, message: string, gimmick: BossGimmickKind) {
-    let pos = this.bossArenaPosition();
-    if (!pos) pos = this.nearStairsPosition();
+  placeFloorBoss(
+    def: MonsterDef,
+    scale: number,
+    tint: number,
+    message: string,
+    gimmick: BossGimmickKind,
+    fieldPlacement = false
+  ) {
+    let pos = fieldPlacement ? this.randomFieldBossPosition() : this.bossArenaPosition();
+    if (!fieldPlacement && !pos) pos = this.nearStairsPosition();
     if (!pos || this.distToPlayer(pos.x, pos.y) < 5 || this.enemyAt(pos.x, pos.y)) {
       pos = randomFloor(this.dungeon, this.occupiedPositions());
     }
@@ -800,6 +851,22 @@ export class GameScene extends Phaser.Scene {
     return null;
   }
 
+  randomFieldBossPosition(): Vec2 | null {
+    const exitRoom = this.dungeon.exitRoom;
+    const outsideExitRoom = (pos: Vec2) => !exitRoom || !(
+      pos.x >= exitRoom.x - 1 && pos.x < exitRoom.x + exitRoom.w + 1
+      && pos.y >= exitRoom.y - 1 && pos.y < exitRoom.y + exitRoom.h + 1
+    );
+    for (let tries = 0; tries < 80; tries++) {
+      const pos = randomFloor(this.dungeon, this.occupiedPositions());
+      if (!pos || !outsideExitRoom(pos)) continue;
+      if (this.distToPlayer(pos.x, pos.y) < 6) continue;
+      if (Math.abs(pos.x - this.dungeon.stairs.x) + Math.abs(pos.y - this.dungeon.stairs.y) < 6) continue;
+      return pos;
+    }
+    return null;
+  }
+
   addEnemy(def: MonsterDef, x: number, y: number, hpScale: number): Enemy {
     const e = new Enemy(def, x, y, hpScale);
     e.shadow = this.add.image(0, 0, 'shadow').setDepth(9.5).setAlpha(0.6);
@@ -872,7 +939,8 @@ export class GameScene extends Phaser.Scene {
 
   validBossTile(x: number, y: number): boolean {
     const tile = this.dungeon.tiles[y]?.[x];
-    return this.isInsideBossRoom(x, y) && !!tile && isWalkable(tile) && tile !== 'pit' && tile !== 'stairs';
+    const insideGimmickArea = this.dungeon.bossRoom ? this.isInsideBossRoom(x, y) : true;
+    return insideGimmickArea && !!tile && isWalkable(tile) && tile !== 'pit' && tile !== 'stairs';
   }
 
   uniqueBossTiles(tiles: Vec2[]): Vec2[] {
@@ -903,9 +971,12 @@ export class GameScene extends Phaser.Scene {
 
   bossRoomLine(horizontal: boolean, coordinate: number): Vec2[] {
     const room = this.dungeon.bossRoom;
-    if (!room) return [];
     const tiles: Vec2[] = [];
-    if (horizontal) {
+    if (!room && horizontal) {
+      for (let x = 1; x < this.dungeon.w - 1; x++) tiles.push({ x, y: coordinate });
+    } else if (!room) {
+      for (let y = 1; y < this.dungeon.h - 1; y++) tiles.push({ x: coordinate, y });
+    } else if (horizontal) {
       for (let x = room.x; x < room.x + room.w; x++) tiles.push({ x, y: coordinate });
     } else {
       for (let y = room.y; y < room.y + room.h; y++) tiles.push({ x: coordinate, y });
@@ -931,7 +1002,7 @@ export class GameScene extends Phaser.Scene {
 
   findBossDestination(e: Enemy, edge = false): Vec2 | null {
     const room = this.dungeon.bossRoom;
-    if (!room) return null;
+    if (!room) return this.randomFieldBossPosition();
     const candidates: Vec2[] = edge
       ? [
           { x: room.x + 1, y: this.player.y }, { x: room.x + room.w - 2, y: this.player.y },
@@ -1592,7 +1663,12 @@ export class GameScene extends Phaser.Scene {
       Audio.playSe('step');
       const moveDuration = this.currentMoveDuration();
       if (this.holdBoostTier > 0) {
-        const trail = this.add.image(this.playerSprite.x, this.playerSprite.y, this.playerSprite.texture.key)
+        const trail = this.add.image(
+          this.playerSprite.x,
+          this.playerSprite.y,
+          this.playerSprite.texture.key,
+          this.playerSprite.frame.name
+        )
           .setDepth(11).setScale(this.playerSprite.scaleX, this.playerSprite.scaleY)
           .setFlipX(this.playerSprite.flipX).setAlpha(this.holdBoostTier > 1 ? .38 : .24)
           .setTint(this.holdBoostTier > 1 ? 0xffd77b : 0x58d9d1);
@@ -1750,10 +1826,27 @@ export class GameScene extends Phaser.Scene {
 
   // ============ 戦闘 ============
   async playerAttack(e: Enemy, dir: Dir, ranged = false) {
+    this.playerAnimToken++;
     this.playerAttacking = true;
+    this.playerSprite.setAngle(0).setScale(0.85);
     this.setPlayerVisual(dir, 'atkWindup');
-    await new Promise<void>((resolve) => this.time.delayedCall(42, () => resolve()));
+    this.tweens.add({
+      targets: this.playerSprite,
+      scaleX: 0.79,
+      scaleY: 0.91,
+      duration: 58,
+      ease: 'Quad.easeOut'
+    });
+    await new Promise<void>((resolve) => this.time.delayedCall(58, () => resolve()));
     this.setPlayerVisual(dir, 'atk');
+    this.tweens.add({
+      targets: this.playerSprite,
+      scaleX: 0.91,
+      scaleY: 0.80,
+      duration: 72,
+      yoyo: true,
+      ease: 'Sine.easeInOut'
+    });
     Audio.playSe('attack');
     // 敵の方向へ踏み込む（前进→戻る）と斬撃エフェクト
     const [ddx, ddy] = this.dirVec(dir);
@@ -1848,6 +1941,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.playerAttacking = false;
+    this.tweens.killTweensOf(this.playerSprite);
+    this.playerSprite.setAngle(0).setScale(0.85);
     this.setPlayerVisual(dir, 'idle');
 
     if (e.hp <= 0) {
@@ -1906,7 +2001,7 @@ export class GameScene extends Phaser.Scene {
     this.enemies = this.enemies.filter((x) => x !== e);
 
     if (def.isFloorBoss) {
-      this.unlockFloorGate(def.name);
+      this.unlockFloorGate(def.name, { x: e.x, y: e.y });
     }
   }
 
@@ -1966,7 +2061,7 @@ export class GameScene extends Phaser.Scene {
     else e.sprite.clearTint();
   }
 
-  unlockFloorGate(bossName: string) {
+  unlockFloorGate(bossName: string, defeatedAt?: Vec2) {
     if (this.floorBossDefeated) return;
     const remaining = this.enemies.filter((e) => e.def.isFloorBoss);
     if (remaining.length > 0) {
@@ -1975,8 +2070,10 @@ export class GameScene extends Phaser.Scene {
     }
     this.floorBossDefeated = true;
     Audio.playSe('seal');
-    this.spawnBossRewardChest();
-    this.log(`${bossName}を撃破！ 中央に緑の宝箱が出現した。`, 'special');
+    this.spawnBossRewardChest(defeatedAt);
+    this.log(this.inBossRoom
+      ? `${bossName}を撃破！ 中央に緑の宝箱が出現した。`
+      : `${bossName}を撃破！ 近くに緑の宝箱が出現した。出口はいつでも使える。`, 'special');
     this.updateVisibility();
     this.emitRefresh();
   }
@@ -1993,12 +2090,16 @@ export class GameScene extends Phaser.Scene {
     return true;
   }
 
-  spawnBossRewardChest() {
-    if (!this.inBossRoom || this.chests.some((chest) => chest.bossReward)) return;
+  spawnBossRewardChest(defeatedAt?: Vec2) {
+    if (this.chests.some((chest) => chest.bossReward)) return;
     const room = this.dungeon.bossRoom;
     const candidates: Vec2[] = room ? [
       { x: room.cx, y: room.cy + 1 }, { x: room.cx - 1, y: room.cy + 1 },
       { x: room.cx + 1, y: room.cy + 1 }, { x: room.cx, y: room.cy + 2 }
+    ] : defeatedAt ? [
+      { ...defeatedAt },
+      { x: defeatedAt.x + 1, y: defeatedAt.y }, { x: defeatedAt.x - 1, y: defeatedAt.y },
+      { x: defeatedAt.x, y: defeatedAt.y + 1 }, { x: defeatedAt.x, y: defeatedAt.y - 1 }
     ] : [];
     const valid = (pos: Vec2) => {
       const tile = this.dungeon.tiles[pos.y]?.[pos.x];
@@ -2087,6 +2188,7 @@ export class GameScene extends Phaser.Scene {
       if (reason) this.log(`${reason} ${dmg}ダメージ！`, 'dmg');
       Audio.playSe('hurt');
       this.cameras.main.shake(120, 0.008);
+      this.playPlayerHurt();
     } else {
       this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.5, 380, 0xbfefff);
       Audio.playSe('hit');
@@ -2151,6 +2253,56 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.gameOver(false);
+  }
+
+  playPlayerHurt() {
+    if (!this.playerSprite || this.gameEnded) return;
+    const token = ++this.playerAnimToken;
+    const sprite = this.playerSprite;
+    const homeX = sprite.x;
+    this.tweens.killTweensOf(sprite);
+    sprite.setAngle(0).setScale(0.85);
+    this.setPlayerVisual(this.player.dir, 'hurt');
+    sprite.setTintFill(0xfff0ec);
+    this.tweens.add({
+      targets: sprite,
+      x: homeX + (this.player.dir === 'left' ? 3 : this.player.dir === 'right' ? -3 : 2),
+      angle: this.player.dir === 'left' ? 7 : -7,
+      scaleX: 0.91,
+      scaleY: 0.77,
+      duration: 58,
+      yoyo: true,
+      ease: 'Sine.easeOut',
+      onComplete: () => {
+        sprite.x = homeX;
+        sprite.setAngle(0).setScale(0.85).clearTint();
+        if (token === this.playerAnimToken && !this.gameEnded && !this.playerAttacking) {
+          this.setPlayerVisual(this.player.dir, 'idle');
+        }
+      }
+    });
+  }
+
+  playPlayerDeath() {
+    const token = ++this.playerAnimToken;
+    const sprite = this.playerSprite;
+    this.tweens.killTweensOf(sprite);
+    sprite.clearTint().setAngle(0).setScale(0.85);
+    this.setPlayerVisual(this.player.dir, 'hurt');
+    this.tweens.add({
+      targets: sprite,
+      scaleX: 0.93,
+      scaleY: 0.72,
+      angle: this.player.dir === 'left' ? -6 : 6,
+      duration: 130,
+      ease: 'Quad.easeIn',
+      onComplete: () => {
+        if (token !== this.playerAnimToken) return;
+        this.setPlayerVisual(this.player.dir, 'down');
+        sprite.setAngle(0).setScale(0.85);
+        this.tweens.add({ targets: sprite, y: sprite.y + 2, duration: 100, ease: 'Sine.easeOut' });
+      }
+    });
   }
 
   // ============ 敵ターン ============
@@ -2577,7 +2729,7 @@ export class GameScene extends Phaser.Scene {
       this.log('◆ 緑のボス宝箱を開封！', 'special');
 
       // 5階刻みの強ボス／超ボス部屋だけが武器を排出する。
-      if (this.floor % 5 === 0) {
+      if (this.inBossRoom && this.floor % 5 === 0) {
         const grade: EquipmentGrade = this.floor >= 25 ? 'S'
           : this.floor >= 15 ? 'A'
           : this.floor >= 10 ? 'B'
@@ -2617,12 +2769,16 @@ export class GameScene extends Phaser.Scene {
       this.player.gold += gold;
       this.addScore(gold);
       this.log(`さらに${gold}Gを入手！`, 'gold');
-      this.bossRewardClaimed = true;
-      const { x, y } = this.dungeon.stairs;
-      this.dungeon.tiles[y][x] = 'stairs';
-      this.tileSprites[y]?.[x]?.setTexture('stairs');
-      this.effectFx(x, y, 'fx_magic', 2.0, 760, 0x54ff92);
-      this.log('緑の光が出口の封印を解いた。', 'special');
+      if (this.inBossRoom) {
+        this.bossRewardClaimed = true;
+        const { x, y } = this.dungeon.stairs;
+        this.dungeon.tiles[y][x] = 'stairs';
+        this.tileSprites[y]?.[x]?.setTexture('stairs');
+        this.effectFx(x, y, 'fx_magic', 2.0, 760, 0x54ff92);
+        this.log('緑の光が出口の封印を解いた。', 'special');
+      } else {
+        this.log('中ボスの任意報酬を回収した。出口の階段は最初から使える。', 'special');
+      }
       this.updateVisibility();
     } else if (c.rare) {
       // ★赤い宝箱：レア確定＋大量ゴールド
@@ -3072,7 +3228,7 @@ export class GameScene extends Phaser.Scene {
   // 実際の降下処理（busyガードなし。移動から即呼ばれる）
   doDescend() {
     if (this.gameEnded) return;
-    if (!this.inBossRoom || !this.floorBossDefeated || !this.bossRewardClaimed) {
+    if (this.inBossRoom && (!this.floorBossDefeated || !this.bossRewardClaimed)) {
       this.log('ボス部屋の緑の宝箱を開けるまで次の階へは進めない。', 'sys');
       Audio.playSe('deny');
       this.busy = false;
@@ -3122,8 +3278,8 @@ export class GameScene extends Phaser.Scene {
       Audio.playBgm('clear'); // 勝利ジングル
     } else {
       this.log('チャリは力尽きた…', 'dmg');
-      this.setPlayerVisual('down', 'idle');
-      this.playerSprite.setTexture('player_down');
+      this.playerAttacking = false;
+      this.playPlayerDeath();
       this.weaponSprite?.setVisible(false);
       this.playerAura?.setVisible(false);
       Audio.playBgm('gameover'); // 敗北ジングル
@@ -3533,9 +3689,24 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ============ 描画ヘルパー ============
-  setPlayerVisual(dir: Dir, frame: 'idle' | 'walk1' | 'walk2' | 'walk3' | 'atkWindup' | 'atk') {
+  setPlayerVisual(dir: Dir, frame: PlayerVisualFrame) {
     this.player.dir = dir;
-    // 実アセットには右向きフレームがある。無い場合（procedural時）は左向きを反転
+    const sheetKey = playerSheetKey(this.playerGender, this.playerArmor);
+    if (this.textures.exists(sheetKey)) {
+      this.playerSprite.setTexture(sheetKey, playerFrameIndex(dir, frame));
+      this.playerSprite.setFlipX(false);
+      return;
+    }
+
+    // 新シートが読めない環境では従来素材へフォールバックする。
+    if (frame === 'hurt') {
+      this.playerSprite.setTexture('player_hurt').setFlipX(dir === 'right');
+      return;
+    }
+    if (frame === 'down') {
+      this.playerSprite.setTexture('player_down').setFlipX(false);
+      return;
+    }
     const key = `player_${dir}_${frame}`;
     if (this.textures.exists(key)) {
       this.playerSprite.setTexture(key);

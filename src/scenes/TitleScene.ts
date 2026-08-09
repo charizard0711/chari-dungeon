@@ -1,10 +1,20 @@
 import Phaser from 'phaser';
 import { GAME_W, GAME_H } from '../main';
 import { Audio } from '../audio/manager';
+import {
+  getSelectedGender,
+  isPlayerGender,
+  playerFrameIndex,
+  playerSheetKey,
+  PlayerGender,
+  setSelectedGender
+} from '../playerAppearance';
 
 const FONT = '"Yu Gothic UI", "Meiryo", sans-serif';
 
 export class TitleScene extends Phaser.Scene {
+  private selectedGender: PlayerGender = getSelectedGender();
+
   constructor() {
     super('TitleScene');
   }
@@ -12,6 +22,13 @@ export class TitleScene extends Phaser.Scene {
   create() {
     // ローカルQAだけを無音にする。通常プレイのサウンド設定には影響させない。
     const qaParams = new URLSearchParams(location.search);
+    const qaGender = qaParams.get('qa-gender');
+    if (location.hostname === 'localhost' && isPlayerGender(qaGender)) {
+      this.selectedGender = qaGender;
+      setSelectedGender(qaGender);
+    } else {
+      this.selectedGender = getSelectedGender();
+    }
     if (location.hostname === 'localhost' && qaParams.has('qa-silent')) {
       Audio.bgmOn = false;
       Audio.seOn = false;
@@ -22,6 +39,7 @@ export class TitleScene extends Phaser.Scene {
     const startGame = () => {
       if (starting) return;
       starting = true;
+      setSelectedGender(this.selectedGender);
       this.cameras.main.fadeOut(180, 2, 7, 8);
       this.time.delayedCall(190, () => this.scene.start('GameScene'));
     };
@@ -44,6 +62,8 @@ export class TitleScene extends Phaser.Scene {
 
     const art = this.add.image(GAME_W / 2, GAME_H / 2, 'title_screen_v2');
     art.setScale(Math.max(GAME_W / art.width, GAME_H / art.height));
+
+    this.createGenderSelector(GAME_H * 0.64);
 
     // 画像内の開始ボタンへ操作領域とホバー発光だけを重ねる。
     const buttonY = GAME_H * 0.806;
@@ -126,9 +146,10 @@ export class TitleScene extends Phaser.Scene {
       letterSpacing: 1
     }).setOrigin(0.5);
 
-    this.makeButton(GAME_W / 2, 520, '深層へ降りる', startGame);
+    this.createGenderSelector(468, true);
+    this.makeButton(GAME_W / 2, 600, '深層へ降りる', startGame);
     const help = this.createHelpOverlay();
-    this.add.text(GAME_W / 2, 602, '遊び方', {
+    this.add.text(GAME_W / 2, 678, '遊び方', {
       fontFamily: FONT,
       fontSize: '15px',
       color: '#d5c08b',
@@ -180,6 +201,87 @@ export class TitleScene extends Phaser.Scene {
     dismiss.on('pointerdown', () => overlay.setVisible(false));
     overlay.add([dismiss, panel, title, copy, close]);
     return overlay;
+  }
+
+  private createGenderSelector(y: number, compact = false) {
+    const cardW = compact ? 116 : 126;
+    const cardH = compact ? 96 : 104;
+    const gap = compact ? 10 : 16;
+    const centerOffset = (cardW + gap) / 2;
+    const cards: {
+      gender: PlayerGender;
+      container: Phaser.GameObjects.Container;
+      background: Phaser.GameObjects.Graphics;
+      portrait: Phaser.GameObjects.Image;
+    }[] = [];
+
+    this.add.text(GAME_W / 2, y - cardH / 2 - 20, '冒険者を選ぶ', {
+      fontFamily: FONT,
+      fontSize: compact ? '13px' : '14px',
+      color: '#d5c08b',
+      fontStyle: 'bold',
+      letterSpacing: 1
+    }).setOrigin(0.5).setDepth(4).setStroke('#020708', 4);
+
+    const refresh = () => {
+      for (const card of cards) {
+        const selected = card.gender === this.selectedGender;
+        card.background.clear();
+        card.background.fillStyle(selected ? 0x092b30 : 0x07161a, selected ? 0.96 : 0.88)
+          .fillRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 10);
+        card.background.lineStyle(2, selected ? 0x67f3ef : 0x53686b, selected ? 1 : 0.72)
+          .strokeRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 10);
+        if (selected) {
+          card.background.fillStyle(0x58d9d1, 0.09)
+            .fillRoundedRect(-cardW / 2 + 5, -cardH / 2 + 5, cardW - 10, cardH - 10, 7);
+        }
+        card.portrait.setAlpha(selected ? 1 : 0.72);
+        this.tweens.add({ targets: card.container, scale: selected ? 1.04 : 1, duration: 120, ease: 'Quad.easeOut' });
+      }
+    };
+
+    const choose = (gender: PlayerGender) => {
+      if (this.selectedGender === gender) return;
+      this.selectedGender = gender;
+      setSelectedGender(gender);
+      Audio.playSe('click');
+      refresh();
+    };
+
+    const options: { gender: PlayerGender; label: string; x: number }[] = [
+      { gender: 'male', label: '男性', x: GAME_W / 2 - centerOffset },
+      { gender: 'female', label: '女性', x: GAME_W / 2 + centerOffset }
+    ];
+    for (const option of options) {
+      const container = this.add.container(option.x, y).setDepth(4);
+      const background = this.add.graphics();
+      const portrait = this.add.image(
+        0,
+        compact ? -9 : -11,
+        playerSheetKey(option.gender),
+        playerFrameIndex('down', 'idle')
+      ).setScale(compact ? 1.62 : 1.78);
+      const label = this.add.text(0, cardH / 2 - 13, option.label, {
+        fontFamily: FONT,
+        fontSize: compact ? '13px' : '14px',
+        color: '#f4dfaa',
+        fontStyle: 'bold'
+      }).setOrigin(0.5);
+      container.add([background, portrait, label]);
+      container.setSize(cardW, cardH).setInteractive({ useHandCursor: true });
+      container.on('pointerdown', () => choose(option.gender));
+      cards.push({ gender: option.gender, container, background, portrait });
+    }
+
+    const chooseMale = () => choose('male');
+    const chooseFemale = () => choose('female');
+    this.input.keyboard?.on('keydown-LEFT', chooseMale);
+    this.input.keyboard?.on('keydown-RIGHT', chooseFemale);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.input.keyboard?.off('keydown-LEFT', chooseMale);
+      this.input.keyboard?.off('keydown-RIGHT', chooseFemale);
+    });
+    refresh();
   }
 
   makeButton(x: number, y: number, label: string, onClick: () => void) {

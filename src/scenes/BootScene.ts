@@ -3,6 +3,7 @@ import { buildAllTextures } from '../textures';
 import { applyRealAssets } from '../assetLoader';
 import { BGM_DEFS, SE_DEFS, AudioDef } from '../audio/config';
 import { Audio } from '../audio/manager';
+import { PLAYER_SHEETS } from '../playerAppearance';
 
 const EXPANSION_MONSTER_KEYS = [
   'm_ember_drake', 'm_frost_wyrm', 'm_storm_wyvern', 'm_brass_dragon', 'm_void_drake', 'm_bone_dragon',
@@ -87,6 +88,9 @@ export class BootScene extends Phaser.Scene {
     this.load.image('sheet_tiles', 'assets/tiles.png');
     this.load.image('dungeon_chamber', 'assets/dungeon-chamber.png');
     this.load.image('title_screen_v2', 'assets/title-screen-v2.png');
+    for (const sheet of PLAYER_SHEETS) {
+      this.load.spritesheet(sheet.key, sheet.path, { frameWidth: 40, frameHeight: 40 });
+    }
     for (const [key, path] of Object.entries(ORIGINAL_ITEM_ART)) {
       this.load.image(key, path);
     }

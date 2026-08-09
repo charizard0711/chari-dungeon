@@ -17,6 +17,7 @@ export interface DungeonData {
   start: Vec2;
   stairs: Vec2;
   hazards: Vec2[];
+  exitRoom?: Room;
   bossRoom?: Room;
   bossRoomZone?: BossRoomZone;
   bossEntrance?: Vec2;
@@ -151,9 +152,18 @@ export function generateDungeon(floor: number, _forcedBossRoomZone?: BossRoomZon
 
   generateSinglePathMaze(tiles, mazeColumns, mazeRows);
   const start = { x: 1, y: 1 };
-  const stairs = farthestReachableFloor(tiles, start);
-  // 通常迷宮の出口は階段ではなく、専用のN.5Fボス部屋へ通じる扉。
-  tiles[stairs.y][stairs.x] = 'door';
+  const exitAnchor = farthestReachableFloor(tiles, start);
+  const exitRoom = roomAt(
+    Math.max(1, Math.min(w - 5, exitAnchor.x - 1)),
+    Math.max(1, Math.min(h - 5, exitAnchor.y - 1)),
+    4,
+    4
+  );
+  carveRoom(tiles, exitRoom);
+  carveThinCorridor(tiles, exitAnchor, { x: exitRoom.cx, y: exitRoom.cy });
+  const stairs = { x: exitRoom.cx, y: exitRoom.cy };
+  // 通常階はそのまま次へ進める階段。5階刻みだけは強ボス部屋への扉になる。
+  tiles[stairs.y][stairs.x] = floor % 5 === 0 ? 'door' : 'stairs';
 
   const hazards: Vec2[] = [];
   const hazardTypes: TileType[] = ['poison', 'cracked', 'rune', 'water'];
@@ -161,14 +171,16 @@ export function generateDungeon(floor: number, _forcedBossRoomZone?: BossRoomZon
   for (let i = 0; i < hazardCount; i++) {
     const x = irand(1, w - 2);
     const y = irand(1, h - 2);
-    if (tiles[y][x] === 'floor' && !(x === start.x && y === start.y)) {
+    const insideExitRoom = x >= exitRoom.x && x < exitRoom.x + exitRoom.w
+      && y >= exitRoom.y && y < exitRoom.y + exitRoom.h;
+    if (tiles[y][x] === 'floor' && !insideExitRoom && !(x === start.x && y === start.y)) {
       const type = hazardTypes[irand(0, hazardTypes.length - 1)];
       tiles[y][x] = type;
       if (type === 'poison' || type === 'cracked') hazards.push({ x, y });
     }
   }
 
-  return { w, h, tiles, rooms: [], start, stairs, hazards };
+  return { w, h, tiles, rooms: [exitRoom], start, stairs, hazards, exitRoom };
 }
 
 // 迷路と完全に分離された「N.5F」ボス専用アリーナ。
