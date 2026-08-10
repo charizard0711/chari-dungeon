@@ -241,15 +241,15 @@ export function makeItem(kind: ItemKind): Item {
 const MONSTER_ELEMENTS: Record<string, Element> = {
   m_mush: 'fire', m_mole: 'thunder', m_jelly: 'water', m_ghost: 'ice',
   m_gear: 'thunder', m_vine: 'water', m_mud: 'water', m_moss: 'water',
-  m_bat: 'ice', m_imp: 'thunder', m_snake: 'water', m_skel: 'fire', m_archer: 'ice',
+  m_bat: 'ice', m_imp: 'thunder', m_snake: 'water', m_skel: 'ice', m_archer: 'thunder',
   m_ember_drake: 'fire', m_frost_wyrm: 'ice', m_storm_wyvern: 'thunder',
   m_brass_dragon: 'fire', m_void_drake: 'thunder', m_bone_dragon: 'ice',
   m_horn_demon: 'fire', m_chain_demon: 'thunder', m_flame_gargoyle: 'fire',
   m_abyss_hound: 'ice', m_mask_fiend: 'thunder', m_archdemon: 'fire',
-  m_bone_hound: 'ice', m_skeleton_mage: 'ice', m_death_knight: 'thunder',
-  m_lich: 'ice', m_bone_colossus: 'ice', m_grave_crawler: 'water',
+  m_bone_hound: 'thunder', m_skeleton_mage: 'ice', m_death_knight: 'thunder',
+  m_lich: 'ice', m_bone_colossus: 'fire', m_grave_crawler: 'water',
   m_cerberus: 'fire', m_hydra: 'water', m_crystal_crab: 'ice', m_blood_moth: 'fire',
-  m_clockwork_chimera: 'thunder', m_slime: 'water', m_beetle: 'thunder',
+  m_clockwork_chimera: 'thunder', m_slime: 'thunder', m_beetle: 'thunder',
   m_wisp: 'fire', m_spider: 'water', m_golem: 'thunder', m_eye: 'thunder',
   m_wraith: 'ice', m_reaper: 'fire', m_guard: 'ice', m_watcher: 'thunder'
 };
@@ -300,12 +300,14 @@ const MONSTER_DEFS_RAW: MonsterDef[] = [
     exp: 9, gold: 14, score: 65, minFloor: 9, maxFloor: 24, behavior: 'chase', color: 0x3a9a6a
   },
   {
-    key: 'm_skel', name: 'トーチスケルトン', hp: 32, atkMin: 8, atkMax: 15, def: 5,
-    exp: 10, gold: 10, score: 70, minFloor: 12, maxFloor: 28, behavior: 'ranged', ranged: true, color: 0x4fd0ff
+    key: 'm_skel', name: '蒼灯フクロウ', description: '青い灯火を吊るし、上空から氷弾を放つ機械フクロウ。',
+    hp: 32, atkMin: 8, atkMax: 15, def: 5, exp: 10, gold: 10, score: 70,
+    minFloor: 12, maxFloor: 28, behavior: 'ranged', ranged: true, wallPass: true, color: 0x4fd0ff
   },
   {
-    key: 'm_archer', name: 'ボーンアーチャー', hp: 26, atkMin: 7, atkMax: 14, def: 4,
-    exp: 9, gold: 10, score: 65, minFloor: 5, maxFloor: 26, behavior: 'ranged', ranged: true, color: 0xd8d2c0
+    key: 'm_archer', name: 'ギアホーネット', description: '小型の弩を抱え、雷を帯びた針で遠距離を射抜く機巧蜂。',
+    hp: 26, atkMin: 7, atkMax: 14, def: 4, exp: 9, gold: 10, score: 65,
+    minFloor: 5, maxFloor: 26, behavior: 'ranged', ranged: true, wallPass: true, color: 0xd0a13d
   },
   // ===== 深層獣群アップデート（新規23種） =====
   {
@@ -360,12 +362,14 @@ const MONSTER_DEFS_RAW: MonsterDef[] = [
     exp: 29, gold: 34, score: 180, minFloor: 24, maxFloor: 29, behavior: 'chase', isElite: true, color: 0xb6292d
   },
   {
-    key: 'm_bone_hound', name: '骨牙ハウンド', hp: 22, atkMin: 5, atkMax: 10, def: 2,
-    exp: 6, gold: 6, score: 45, minFloor: 5, maxFloor: 15, behavior: 'chase', color: 0xd8ccb4
+    key: 'm_bone_hound', name: '鉄殻アルマジロ', description: '分厚い鉄殻を丸め、雷をまとって一直線に突進する装甲獣。',
+    hp: 34, atkMin: 7, atkMax: 13, def: 9, exp: 9, gold: 9, score: 62,
+    minFloor: 5, maxFloor: 15, behavior: 'line', color: 0x4f6670
   },
   {
-    key: 'm_skeleton_mage', name: '骸骨魔導士', hp: 30, atkMin: 7, atkMax: 15, def: 4,
-    exp: 10, gold: 12, score: 72, minFloor: 9, maxFloor: 20, behavior: 'ranged', ranged: true, color: 0x8a58bd
+    key: 'm_skeleton_mage', name: 'ルーンマンドラゴラ', description: '浮遊するルーン石を操り、根を張ったまま氷の術を放つ魔草。',
+    hp: 30, atkMin: 7, atkMax: 15, def: 4, exp: 10, gold: 12, score: 72,
+    minFloor: 9, maxFloor: 20, behavior: 'ranged', ranged: true, color: 0x8a58bd
   },
   {
     key: 'm_death_knight', name: '死霊騎士', hp: 52, atkMin: 12, atkMax: 21, def: 13,
@@ -377,8 +381,9 @@ const MONSTER_DEFS_RAW: MonsterDef[] = [
     ranged: true, wallPass: true, isElite: true, color: 0x633e9e
   },
   {
-    key: 'm_bone_colossus', name: '骨塊コロッサス', hp: 86, atkMin: 15, atkMax: 25, def: 17,
-    exp: 27, gold: 30, score: 170, minFloor: 20, maxFloor: 29, behavior: 'slow', isElite: true, color: 0xc9b995
+    key: 'm_bone_colossus', name: '溶鉱炉タイタン', description: '炉心の炎で巨体を動かし、灼熱の鉄拳を振り下ろす機械巨人。',
+    hp: 86, atkMin: 15, atkMax: 25, def: 17, exp: 27, gold: 30, score: 170,
+    minFloor: 20, maxFloor: 29, behavior: 'slow', isElite: true, color: 0xc96b32
   },
   {
     key: 'm_grave_crawler', name: '墓這い', hp: 16, atkMin: 4, atkMax: 9, def: 1,
@@ -408,8 +413,9 @@ const MONSTER_DEFS_RAW: MonsterDef[] = [
   },
   // ===== 追加モンスター（種類を増やす）=====
   {
-    key: 'm_slime', name: 'ネジスライム', hp: 14, atkMin: 2, atkMax: 6, def: 0,
-    exp: 3, gold: 4, score: 25, minFloor: 1, maxFloor: 8, behavior: 'random', color: 0x6fd06f
+    key: 'm_slime', name: 'ミミックチェスト', description: '宝箱に擬態し、近づいた冒険者へ雷を帯びた長い舌で襲いかかる。',
+    hp: 20, atkMin: 4, atkMax: 9, def: 3, exp: 5, gold: 10, score: 38,
+    minFloor: 1, maxFloor: 8, behavior: 'chase', color: 0x7b4a38
   },
   {
     key: 'm_beetle', name: 'ゼンマイ甲虫', hp: 24, atkMin: 5, atkMax: 9, def: 7,

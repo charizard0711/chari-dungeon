@@ -6,6 +6,7 @@ import { Audio } from '../audio/manager';
 import { PLAYER_SHEETS } from '../playerAppearance';
 
 const EXPANSION_MONSTER_KEYS = [
+  'm_skel', 'm_archer', 'm_slime',
   'm_ember_drake', 'm_frost_wyrm', 'm_storm_wyvern', 'm_brass_dragon', 'm_void_drake', 'm_bone_dragon',
   'm_horn_demon', 'm_chain_demon', 'm_flame_gargoyle', 'm_abyss_hound', 'm_mask_fiend', 'm_archdemon',
   'm_bone_hound', 'm_skeleton_mage', 'm_death_knight', 'm_lich', 'm_bone_colossus', 'm_grave_crawler',
@@ -69,6 +70,12 @@ const SHIELD_ART = {
 } as const;
 
 const ORIGINAL_ITEM_ART = {
+  i_potion: 'assets/items/healing-potion.png',
+  i_smoke: 'assets/items/smoke-bottle.png',
+  i_warp: 'assets/items/warp-bell.png',
+  coin: 'assets/items/coin-pile.png',
+  chest: 'assets/items/treasure-chest.png',
+  chest_open: 'assets/items/treasure-chest-open.png',
   i_stone: 'assets/items/weapon-enhancement-scroll.png',
   i_shieldstone: 'assets/items/armor-enhancement-scroll.png',
   i_invis: 'assets/items/invisibility-potion.png',

@@ -481,28 +481,6 @@ const CUSTOM_GRIDS: Record<string, string[]> = {
     '..zxyyxxyyxz..', '.zxxxxxxxxxxz.', '.zxexppxppexz.', '.zxxxxxxxxxxz.',
     'dzxxxxxxxxxxzd', '.zzxxxxxxxxzz.', 'd.zzzzzzzzzz.d', '.d.d.d..d.d.d.',
   ],
-  // ネジスライム（緑の粘体・泡）※実画像フォールバック
-  m_slime: [
-    '..............', '......pp......', '.....p..p.....', '......pp......',
-    '..............', '...yyxxxxyy...', '..yxxxxxxxxy..', '.zxxeppxppexz.',
-    '.zxxxxxxxxxxz.', 'zxxxxxxxxxxxxz', 'zzxxxxxxxxxxzz', '.zzzzzzzzzzzz.',
-  ],
-  // ボーンアーチャー（骸骨の弓兵：右手に金の弓＋弦＋つがえた矢）
-  m_archer: [
-    '....zwwwz..g..',
-    '...zwwwwwzg.e.',
-    '...zwpwpwzg.e.',
-    '...zwwwwwzgoe.',
-    '....zwwwz.geo.',
-    '.....zwz..g.e.',
-    '...wwwwwwwg.e.',
-    '..d.wwwww.dge.',
-    '....w.w.w..g..',
-    '...wwwwwww....',
-    '....z...z.....',
-    '....w...w.....',
-    '...ww...ww....',
-  ],
   // 迷い火ウィスプ（青い炎）※実画像フォールバック
   m_wisp: [
     '......x.......', '.....xyx......', '....xyyyx.....', '....xyayx.....',

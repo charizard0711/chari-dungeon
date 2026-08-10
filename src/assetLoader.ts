@@ -66,11 +66,9 @@ const FRAME_DEFS: FrameDef[] = [
   { key: 'm_bat', sheet: 'monsters', r: [33, 590, 168, 712], mode: 'sprite', size: 32 },
   { key: 'm_imp', sheet: 'monsters', r: [383, 585, 502, 712], mode: 'sprite', size: 32 },
   { key: 'm_snake', sheet: 'monsters', r: [728, 590, 852, 712], mode: 'sprite', size: 32 },
-  { key: 'm_skel', sheet: 'monsters', r: [1088, 582, 1207, 714], mode: 'sprite', size: 32 },
   { key: 'm_guard', sheet: 'monsters', r: [148, 750, 292, 888], mode: 'sprite', size: 36 },
   { key: 'm_watcher', sheet: 'monsters', r: [635, 742, 935, 892], mode: 'sprite', size: 48 },
   // 下段「環境クリーチャー」から流用（実画像がある追加モンスター）
-  { key: 'm_slime', sheet: 'monsters', r: [342, 928, 519, 1064], mode: 'sprite', size: 32 }, // どくぬめり
   { key: 'm_wisp',  sheet: 'monsters', r: [66, 928, 142, 1064], mode: 'sprite', size: 36 },  // 青い炎
 
   // ---- 武器 ----
@@ -86,15 +84,11 @@ const FRAME_DEFS: FrameDef[] = [
   { key: 'w_gravity', sheet: 'items', r: [1307, 58, 1423, 198], mode: 'sprite', size: 48},
 
   // ---- 消耗品 ----
-  { key: 'i_potion', sheet: 'items', r: [85, 505, 196, 645], mode: 'sprite', size: 48},
   { key: 'i_shroom', sheet: 'items', r: [415, 505, 526, 645], mode: 'sprite', size: 48},
-  { key: 'i_smoke', sheet: 'items', r: [750, 505, 861, 645], mode: 'sprite', size: 48},
   { key: 'i_bomb', sheet: 'items', r: [907, 505, 1018, 645], mode: 'sprite', size: 48},
-  { key: 'i_warp', sheet: 'items', r: [1066, 505, 1177, 645], mode: 'sprite', size: 48},
   { key: 'i_revive', sheet: 'items', r: [1245, 505, 1356, 645], mode: 'sprite', size: 48},
 
   // ---- お宝・キーアイテム ----
-  { key: 'coin', sheet: 'items', r: [75, 715, 205, 848], mode: 'sprite', size: 48},
   { key: 'i_oldkey', sheet: 'items', r: [428, 715, 538, 848], mode: 'sprite', size: 48},
   { key: 'i_floorkey', sheet: 'items', r: [583, 715, 693, 848], mode: 'sprite', size: 48},
   // i_stone / i_shieldstone / i_invis / i_dash は専用のオリジナル画像を使用する。
@@ -109,8 +103,6 @@ const FRAME_DEFS: FrameDef[] = [
   { key: 'fx_levelup', sheet: 'items', r: [1161, 908, 1341, 1055], mode: 'sprite', size: 44 }, // レベルアップ
 
   // ---- 宝箱・階段・扉 ----
-  { key: 'chest', sheet: 'tiles', r: [30, 588, 135, 692], mode: 'sprite', size: 30 },
-  { key: 'chest_open', sheet: 'tiles', r: [163, 585, 275, 692], mode: 'sprite', size: 30 },
   { key: 'prop_torch', sheet: 'tiles', r: [292, 575, 390, 706], mode: 'sprite', size: 34 },
   { key: 'prop_lantern', sheet: 'tiles', r: [398, 575, 520, 706], mode: 'sprite', size: 34 },
   { key: 'prop_barrel', sheet: 'tiles', r: [980, 575, 1110, 706], mode: 'sprite', size: 34 },

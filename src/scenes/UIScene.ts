@@ -93,7 +93,8 @@ export class UIScene extends Phaser.Scene {
     this.overlay = this.add.container(0, 0).setDepth(100).setVisible(false);
     this.enemyInfoText = this.add.text(IS_MOBILE ? MAP_X + 8 : GAME_W - 360, IS_MOBILE ? MAP_Y + 8 : 300, '', {
       fontFamily: '"Yu Gothic UI"', fontSize: '14px', color: '#dfe7f0',
-      backgroundColor: '#0a1420ee', padding: { x: 8, y: 6 }, lineSpacing: 4
+      backgroundColor: '#0a1420ee', padding: { x: 8, y: 6 }, lineSpacing: 4,
+      wordWrap: { width: IS_MOBILE ? 250 : 330 }
     }).setDepth(90).setVisible(false);
 
     // イベント購読（GameSceneのイベントemitterに登録）
@@ -646,13 +647,15 @@ export class UIScene extends Phaser.Scene {
   }
 
   showEnemyInfo(info: any) {
-    this.enemyInfoText.setText([
+    const lines = [
       `【${info.name}】`,
+      ...(info.description ? [info.description] : []),
       `属性: ${info.element}`,
       `HP: ${info.hp}/${info.hpMax}`,
       `攻撃: ${info.atk}  防御: ${info.def}`,
       `行動: ${info.behavior}`
-    ].join('\n')).setVisible(true);
+    ];
+    this.enemyInfoText.setText(lines.join('\n')).setVisible(true);
     this.time.delayedCall(3000, () => this.enemyInfoText.setVisible(false));
   }
 

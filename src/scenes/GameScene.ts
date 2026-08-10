@@ -76,7 +76,7 @@ const MID_DRAGONS: { key: string; name: string; tint: number }[] = [
 const MILESTONE_BOSSES: Record<number, { key: string; name: string; tint: number; scale: number; hp: number; atkMin: number; atkMax: number; def: number }> = {
   5: { key: 'm_archdemon', name: '封印王アウレリウス', tint: 0xffc96b, scale: 1.72, hp: 96, atkMin: 6, atkMax: 11, def: 4 },
   10: { key: 'm_horn_demon', name: 'グランドバイソン', tint: 0xc98b52, scale: 1.82, hp: 150, atkMin: 9, atkMax: 16, def: 7 },
-  15: { key: 'm_bone_colossus', name: 'ボーンコロッサス', tint: 0xe1d3b9, scale: 1.9, hp: 220, atkMin: 11, atkMax: 19, def: 10 },
+  15: { key: 'm_bone_colossus', name: '炉心王タイタン', tint: 0xff9a45, scale: 1.9, hp: 220, atkMin: 11, atkMax: 19, def: 10 },
   20: { key: 'm_frost_wyrm', name: 'アズールドラゴン', tint: 0x4fa8ff, scale: 1.85, hp: 310, atkMin: 14, atkMax: 23, def: 12 },
   25: { key: 'm_brass_dragon', name: 'エンシェントドラゴン', tint: 0xff8c42, scale: 1.92, hp: 410, atkMin: 17, atkMax: 28, def: 15 },
   30: { key: 'm_hydra', name: 'トライヘッド・ドラゴン', tint: 0xb072ff, scale: 2.05, hp: 580, atkMin: 20, atkMax: 34, def: 18 }
@@ -134,7 +134,7 @@ interface AmbientMote {
 
 type BossGimmickKind =
   | 'mid_fire' | 'mid_frost' | 'mid_storm' | 'mid_void' | 'mid_bone' | 'mid_poison'
-  | 'bull_charge' | 'bone_colossus' | 'azure_flight' | 'ancient_fire' | 'tri_head';
+  | 'bull_charge' | 'furnace_titan' | 'azure_flight' | 'ancient_fire' | 'tri_head';
 
 type BossHazardKind = 'fire' | 'ice' | 'poison';
 type BossStrikeChannel = 'primary' | 'secondary' | 'tertiary';
@@ -180,6 +180,7 @@ interface BossObstacle {
   x: number;
   y: number;
   turns: number;
+  kind: 'bone' | 'iron';
   sprite: Phaser.GameObjects.Image;
 }
 
@@ -781,7 +782,7 @@ export class GameScene extends Phaser.Scene {
 
   milestoneGimmick(floor: number): BossGimmickKind {
     return ({
-      5: 'mid_fire', 10: 'bull_charge', 15: 'bone_colossus',
+      5: 'mid_fire', 10: 'bull_charge', 15: 'furnace_titan',
       20: 'azure_flight', 25: 'ancient_fire', 30: 'tri_head'
     } as Record<number, BossGimmickKind>)[floor] ?? 'mid_fire';
   }
@@ -952,11 +953,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   destroyBossObstacle(obstacle: BossObstacle) {
-    this.effectFx(obstacle.x, obstacle.y, 'fx_hit', 1.35, 300, 0xe8d9bd);
-    this.pickupBurst(obstacle.sprite.x, obstacle.sprite.y, 0xe8d9bd, 5);
+    const color = obstacle.kind === 'iron' ? 0xff9147 : 0xe8d9bd;
+    this.effectFx(obstacle.x, obstacle.y, 'fx_hit', 1.35, 300, color);
+    this.pickupBurst(obstacle.sprite.x, obstacle.sprite.y, color, 5);
     obstacle.sprite.destroy();
     this.bossObstacles = this.bossObstacles.filter((o) => o !== obstacle);
-    this.log('骨壁を砕いた！', 'special');
+    this.log(obstacle.kind === 'iron' ? '炉鉄壁を砕いた！' : '骨壁を砕いた！', 'special');
   }
 
   validBossTile(x: number, y: number): boolean {
@@ -1133,9 +1135,9 @@ export class GameScene extends Phaser.Scene {
         if (tiles.length < 2) return null;
         message = 'グランドバイソンが突進の構え！ 横へ避ければ壁へ激突する。';
         break;
-      case 'bone_colossus':
+      case 'furnace_titan':
         tiles = this.bossCrossTiles(p.x, p.y, 2);
-        message = 'ボーンコロッサスが大地を踏み砕く！ 骨壁の発生に注意。';
+        message = '炉心王タイタンが大地を踏み砕く！ 灼熱の炉鉄壁に注意。';
         break;
       case 'azure_flight': {
         destination = this.findBossDestination(e, true) ?? undefined;
@@ -1267,9 +1269,9 @@ export class GameScene extends Phaser.Scene {
         if (firstWave && intent.destination) this.teleportBoss(e, intent.destination);
         if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.72, `${e.def.name}の転移衝撃！`);
         break;
-      case 'bone_colossus':
-        if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.92, '大地粉砕！');
-        this.spawnBoneWalls(e, primary, state.phaseTwo ? 2 : 1);
+      case 'furnace_titan':
+        if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.92, '炉心震撃！');
+        this.spawnBossWalls(e, primary, state.phaseTwo ? 2 : 1, 'iron');
         break;
       case 'azure_flight':
         if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.86, '氷結ブレス！');
@@ -1300,7 +1302,7 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'mid_bone':
         if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.62, '骨片噴出！');
-        this.spawnBoneWalls(e, primary, 1);
+        this.spawnBossWalls(e, primary, 1, 'bone');
         break;
       case 'mid_poison':
         if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.64, '毒液散布！');
@@ -1319,7 +1321,8 @@ export class GameScene extends Phaser.Scene {
     if (kind === 'mid_frost' || kind === 'azure_flight') return 'ice';
     if (kind === 'mid_storm') return 'lightning';
     if (kind === 'mid_void') return 'void';
-    if (kind === 'mid_bone' || kind === 'bone_colossus') return 'bone';
+    if (kind === 'mid_bone') return 'bone';
+    if (kind === 'furnace_titan') return 'fire';
     if (kind === 'mid_poison') return 'poison';
     return 'impact';
   }
@@ -1448,7 +1451,7 @@ export class GameScene extends Phaser.Scene {
     this.player.shield = this.player.shields[0] ?? null;
   }
 
-  spawnBoneWalls(e: Enemy, candidates: Vec2[], count: number) {
+  spawnBossWalls(e: Enemy, candidates: Vec2[], count: number, kind: 'bone' | 'iron') {
     const choices = candidates.filter((tile) => {
       if (tile.x === this.player.x && tile.y === this.player.y) return false;
       if (tile.x === e.x && tile.y === e.y) return false;
@@ -1456,12 +1459,14 @@ export class GameScene extends Phaser.Scene {
     });
     Phaser.Utils.Array.Shuffle(choices);
     const suffix = eraSuffix(getTheme(this.floor).era);
+    const tint = kind === 'iron' ? 0x7a4b36 : 0xffe7c2;
+    const effectColor = kind === 'iron' ? 0xff9147 : 0xe8d9bd;
     for (const tile of choices.slice(0, count)) {
       const texture = this.textures.exists('prop_statue') ? 'prop_statue' : `wall${suffix}`;
       const sprite = this.add.image(tile.x * TILE + TILE / 2, tile.y * TILE + TILE / 2, texture)
-        .setDepth(8.6).setDisplaySize(TILE - 5, TILE - 3).setTint(0xffe7c2);
-      this.bossObstacles.push({ ...tile, turns: 5, sprite });
-      this.effectFx(tile.x, tile.y, 'fx_hit', 1.25, 300, 0xe8d9bd);
+        .setDepth(8.6).setDisplaySize(TILE - 5, TILE - 3).setTint(tint);
+      this.bossObstacles.push({ ...tile, turns: 5, kind, sprite });
+      this.effectFx(tile.x, tile.y, 'fx_hit', 1.25, 300, effectColor);
     }
   }
 
@@ -2511,7 +2516,7 @@ export class GameScene extends Phaser.Scene {
     e.animating = true;
     const targetX = mv.x * TILE + TILE / 2;
     const targetY = mv.y * TILE + TILE / 2;
-    const flying = /drake|dragon|wyrm|wyvern|moth|fiend|lich/.test(e.def.key);
+    const flying = !!e.def.wallPass || /drake|dragon|wyrm|wyvern|moth|fiend|lich/.test(e.def.key);
     const rushing = /hound|cerberus|crawler/.test(e.def.key);
     const lean = Math.sign(targetX - e.sprite.x) * (flying ? -2 : -4);
     e.sprite.setAngle(lean);
@@ -3682,8 +3687,8 @@ export class GameScene extends Phaser.Scene {
     for (const e of this.enemies) {
       if (!e.sprite || !e.sprite.visible) continue;
       if (!e.animating) {
-        const flying = /drake|dragon|wyrm|wyvern|moth|fiend|lich/.test(e.def.key);
-        const bony = /bone|skeleton|death|grave|lich/.test(e.def.key);
+        const flying = !!e.def.wallPass || /drake|dragon|wyrm|wyvern|moth|fiend|lich/.test(e.def.key);
+        const bony = ['m_bone_dragon', 'm_death_knight', 'm_grave_crawler', 'm_lich'].includes(e.def.key);
         const pulse = Math.sin(time * (flying ? 0.0052 : 0.004) + e.bobPhase);
         e.sprite.scaleX = e.baseScale * (1 - pulse * (bony ? 0.01 : 0.018));
         e.sprite.scaleY = e.baseScale * (1 + pulse * (flying ? 0.065 : 0.045));
@@ -3745,6 +3750,7 @@ export class GameScene extends Phaser.Scene {
       name: e.def.name, hp: e.hp, hpMax: e.hpMax,
       atk: `${e.def.atkMin}-${e.def.atkMax}`, def: e.def.def,
       behavior: this.behaviorLabel(e.def.behavior),
+      description: e.def.description,
       element: `${ELEMENT_INFO[element].name}属性（弱点: ${ELEMENT_INFO[ELEMENT_INFO[element].weakTo].name}属性）`
     });
   }

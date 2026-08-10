@@ -101,6 +101,7 @@ export interface Item {
 export interface MonsterDef {
   key: string;
   name: string;
+  description?: string;
   hp: number;
   atkMin: number;
   atkMax: number;
