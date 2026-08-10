@@ -1,5 +1,5 @@
 // ========================================================================
-import type { Element } from '../types';
+import type { Element, WeaponType } from '../types';
 // 音源パス定数
 // 本物のmp3/oggに差し替える場合は public/assets/audio/ に
 // 下記ファイル名で置くだけでOK（自動で読み込まれ、仮BGMより優先される）。
@@ -23,6 +23,10 @@ export const BGM_DEFS = {
   floor05:  { key: 'bgm_floor05',  path: 'assets/audio/bgm_floors_05_06.wav', volume: 0.5, loop: true },
   floor07:  { key: 'bgm_floor07',  path: 'assets/audio/bgm_floors_07_08.wav', volume: 0.5, loop: true },
   floor09:  { key: 'bgm_floor09',  path: 'assets/audio/bgm_floors_09_10.wav', volume: 0.5, loop: true },
+  // 5x5中ボス部屋：入口封鎖から撃破まで流れる高速メタル戦闘曲
+  midboss:  { key: 'bgm_midboss',  path: 'assets/audio/bgm_midboss.wav', volume: 0.44, loop: true },
+  // 5階ごとの大ボス部屋：暴君のレクイエム
+  boss:     { key: 'bgm_boss',     path: 'assets/audio/bgm_boss.wav', volume: 0.46, loop: true },
   // クリア：短い勝利ジングル
   clear:    { key: 'bgm_clear',    path: 'assets/audio/bgm_clear.mp3',    volume: 0.6,  loop: false },
   // ゲームオーバー：短い敗北ジングル
@@ -43,6 +47,12 @@ export const SE_DEFS = {
   click:   { key: 'se_click',   path: 'assets/audio/se_click.mp3',   volume: 0.5 },  // UIクリック
   step:    { key: 'se_step',    path: 'assets/audio/se_step.mp3',    volume: 0.35 }, // 足音
   attack:  { key: 'se_attack',  path: 'assets/audio/se_attack.mp3',  volume: 0.6 },  // 攻撃
+  weaponDagger:     { key: 'se_weapon_dagger',     path: 'assets/audio/se_weapon_dagger.wav',     volume: 0.48 },
+  weaponLongsword:  { key: 'se_weapon_longsword',  path: 'assets/audio/se_weapon_longsword.wav',  volume: 0.52 },
+  weaponLance:      { key: 'se_weapon_lance',      path: 'assets/audio/se_weapon_lance.wav',      volume: 0.54 },
+  weaponBow:        { key: 'se_weapon_bow',        path: 'assets/audio/se_weapon_bow.wav',        volume: 0.52 },
+  weaponGreatsword: { key: 'se_weapon_greatsword', path: 'assets/audio/se_weapon_greatsword.wav', volume: 0.56 },
+  weaponDual:       { key: 'se_weapon_dual',       path: 'assets/audio/se_weapon_dual.wav',       volume: 0.50 },
   elementFire:    { key: 'se_element_fire',    path: 'assets/audio/se_element_fire.mp3',    volume: 0.62 }, // 火属性攻撃
   elementWater:   { key: 'se_element_water',   path: 'assets/audio/se_element_water.mp3',   volume: 0.58 }, // 水属性攻撃
   elementThunder: { key: 'se_element_thunder', path: 'assets/audio/se_element_thunder.mp3', volume: 0.62 }, // 雷属性攻撃
@@ -69,4 +79,17 @@ export function elementAttackSe(element: Element): SeName {
   return ({
     fire: 'elementFire', water: 'elementWater', thunder: 'elementThunder', ice: 'elementIce'
   } as const)[element];
+}
+
+export function weaponAttackSe(type?: WeaponType): SeName {
+  if (!type) return 'attack';
+  return ({
+    dagger: 'weaponDagger',
+    longsword: 'weaponLongsword',
+    lance: 'weaponLance',
+    bow: 'weaponBow',
+    greatsword: 'weaponGreatsword',
+    dual_sword: 'weaponDual',
+    twin_daggers: 'weaponDual'
+  } as const)[type];
 }

@@ -193,6 +193,8 @@ const SONGS: Record<BgmName, () => Song> = {
   floor05: songTitle,
   floor07: songMachine,
   floor09: songFinal,
+  midboss: songMachine,
+  boss: songFinal,
   clear: songClear,
   gameover: songGameover
 };
@@ -263,6 +265,43 @@ const SE_SPECS: Record<SeName, { len: number; segs: SeSeg[] }> = {
     len: 0.16, segs: [
       { type: 'square', f0: 700, f1: 180, t: 0, d: 0.12, vol: 0.25 },
       { type: 'noise', f0: 2500, t: 0, d: 0.06, vol: 0.12 }
+    ]
+  },
+  weaponDagger: {
+    len: 0.27, segs: [
+      { type: 'noise', f0: 5200, f1: 1200, t: 0, d: 0.14, vol: 0.22 },
+      { type: 'sine', f0: 1500, f1: 900, t: 0.07, d: 0.12, vol: 0.14 }
+    ]
+  },
+  weaponLongsword: {
+    len: 0.39, segs: [
+      { type: 'noise', f0: 3300, f1: 500, t: 0, d: 0.24, vol: 0.25 },
+      { type: 'triangle', f0: 920, f1: 520, t: 0.1, d: 0.22, vol: 0.16 }
+    ]
+  },
+  weaponLance: {
+    len: 0.38, segs: [
+      { type: 'noise', f0: 1800, f1: 7200, t: 0, d: 0.22, vol: 0.23 },
+      { type: 'sine', f0: 1260, f1: 540, t: 0.15, d: 0.16, vol: 0.15 }
+    ]
+  },
+  weaponBow: {
+    len: 0.46, segs: [
+      { type: 'triangle', f0: 360, f1: 170, t: 0, d: 0.2, vol: 0.23 },
+      { type: 'noise', f0: 8500, f1: 2400, t: 0.04, d: 0.3, vol: 0.16 }
+    ]
+  },
+  weaponGreatsword: {
+    len: 0.58, segs: [
+      { type: 'noise', f0: 1450, f1: 130, t: 0, d: 0.4, vol: 0.29 },
+      { type: 'sine', f0: 160, f1: 45, t: 0.21, d: 0.28, vol: 0.25 }
+    ]
+  },
+  weaponDual: {
+    len: 0.44, segs: [
+      { type: 'noise', f0: 5700, f1: 1100, t: 0, d: 0.14, vol: 0.2 },
+      { type: 'noise', f0: 6500, f1: 1200, t: 0.11, d: 0.16, vol: 0.22 },
+      { type: 'sine', f0: 1750, f1: 850, t: 0.18, d: 0.14, vol: 0.12 }
     ]
   },
   elementFire: {

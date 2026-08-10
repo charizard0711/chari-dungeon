@@ -49,10 +49,6 @@ export function isPlayerArmor(value: unknown): value is PlayerArmor {
   return typeof value === 'string' && PLAYER_ARMORS.includes(value as PlayerArmor);
 }
 
-export function rollStarterArmor(): PlayerArmor {
-  return DEFAULT_PLAYER_ARMOR;
-}
-
 export function armorForGrade(grade: EquipmentGrade): PlayerArmorDef {
   return Object.values(PLAYER_ARMOR_DEFS).find((armor) => armor.grade === grade)
     ?? PLAYER_ARMOR_DEFS[DEFAULT_PLAYER_ARMOR];

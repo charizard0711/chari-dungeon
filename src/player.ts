@@ -2,6 +2,8 @@ import type { Weapon, Shield, Item, Dir, Magic, MagicCode, EquipmentGrade, Weapo
 import { WEAPON_DEFS, SHIELD_DEFS, magicLabel, makeItem, ELEMENT_INFO } from './data';
 import { ELEMENTAL_EQUIPMENT_RATE } from './balance';
 
+export const DEFAULT_PLAYER_WEAPON_KEY = 'w_iron_dagger';
+
 const WEAPON_PASSIVES: Record<WeaponType, WeaponPassive> = {
   dagger: { key: 'backstab', name: '背面急所', description: 'クリティカルダメージ+10%' },
   longsword: { key: 'sturdy', name: '剣身防御', description: '受けるダメージ-5%' },
@@ -43,6 +45,9 @@ export class Player {
     this.inventory.push(makeItem('potion'));
     this.inventory.push(makeItem('potion'));
     this.inventory.push(makeItem('potion'));
+    const defaultWeapon = makeWeapon(DEFAULT_PLAYER_WEAPON_KEY, []);
+    this.weapons.push(defaultWeapon);
+    this.weapon = defaultWeapon;
   }
 
   get atkMin(): number {
@@ -193,18 +198,6 @@ export function rollWeaponByGrade(grade: EquipmentGrade): Weapon {
   const picked = pool[Math.floor(Math.random() * pool.length)] ?? WEAPON_DEFS[0];
   const magicCount = grade === 'S' ? 2 : grade === 'A' ? 1 : grade === 'B' && Math.random() < 0.35 ? 1 : 0;
   return addRandomLootTraits(makeWeapon(picked.key, rollMagics(magicCount)));
-}
-
-export function rollStarterWeapon(): Weapon {
-  const pool = WEAPON_DEFS.filter((def) => def.grade === 'D' && def.minFloor <= 1 && !def.element && !def.dual);
-  const picked = pool[Math.floor(Math.random() * pool.length)] ?? WEAPON_DEFS.find((def) => def.key === 'w_iron_dagger')!;
-  return makeWeapon(picked.key, []);
-}
-
-export function rollStarterShield(): Shield {
-  const pool = SHIELD_DEFS.filter((def) => def.grade === 'D' && def.minFloor <= 1 && !def.element);
-  const picked = pool[Math.floor(Math.random() * pool.length)] ?? SHIELD_DEFS.find((def) => def.key === 's_iron_round')!;
-  return makeShield(picked.key);
 }
 
 export function weaponFullName(w: Weapon): string {

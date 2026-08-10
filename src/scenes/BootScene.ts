@@ -74,12 +74,21 @@ const ORIGINAL_ITEM_ART = {
   i_smoke: 'assets/items/smoke-bottle.png',
   i_warp: 'assets/items/warp-bell.png',
   coin: 'assets/items/coin-pile.png',
-  chest: 'assets/items/treasure-chest.png',
-  chest_open: 'assets/items/treasure-chest-open.png',
+  chest_common: 'assets/items/treasure-chest-common.png',
+  chest_common_open: 'assets/items/treasure-chest-common-open.png',
+  chest_rare: 'assets/items/treasure-chest-rare.png',
+  chest_rare_open: 'assets/items/treasure-chest-rare-open.png',
   i_stone: 'assets/items/weapon-enhancement-scroll.png',
   i_shieldstone: 'assets/items/armor-enhancement-scroll.png',
   i_invis: 'assets/items/invisibility-potion.png',
   i_dash: 'assets/items/gale-feather.png'
+} as const;
+
+const TERRAIN_PROP_ART = {
+  terrain_boss_gate: 'assets/terrain/boss-gate.png',
+  terrain_stairs: 'assets/terrain/stairs.png',
+  terrain_boss_brazier: 'assets/terrain/boss-brazier.png',
+  terrain_rune_lamp: 'assets/terrain/rune-lamp.png'
 } as const;
 
 export class BootScene extends Phaser.Scene {
@@ -109,6 +118,24 @@ export class BootScene extends Phaser.Scene {
     }
     for (const key of EXPANSION_MONSTER_KEYS) {
       this.load.image(key, `assets/monsters/${key}.png`);
+    }
+    for (let era = 1; era <= 4; era++) {
+      this.load.spritesheet(`terrain_floor_${era}`, `assets/terrain/floor-era${era}.png`, {
+        frameWidth: 64,
+        frameHeight: 64
+      });
+      this.load.spritesheet(`terrain_wall_${era}`, `assets/terrain/wall-era${era}.png`, {
+        frameWidth: 64,
+        frameHeight: 64
+      });
+      this.load.spritesheet(`terrain_wall_facade_${era}`, `assets/terrain/wall-facade-era${era}.png`, {
+        frameWidth: 64,
+        frameHeight: 64
+      });
+      this.load.image(`terrain_boss_floor_${era}`, `assets/terrain/boss-floor-era${era}.png`);
+    }
+    for (const [key, path] of Object.entries(TERRAIN_PROP_ART)) {
+      this.load.image(key, path);
     }
 
     this.load.on('loaderror', (file: Phaser.Loader.File) => {
