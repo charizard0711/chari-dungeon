@@ -617,9 +617,8 @@ function buildItemTextures(scene: Phaser.Scene) {
   for (const [k, fn] of Object.entries(items)) {
     iconTexture(scene, `i_${k}`, fn);
   }
-  // コイン・宝石・鍵などお宝
+  // コイン（スコア宝石は廃止済み）
   iconTexture(scene, 'coin', (g) => { g.fillStyle(0xf5c542); g.fillCircle(12, 12, 8); g.fillStyle(0xffe680); g.fillCircle(12, 12, 5); });
-  iconTexture(scene, 'gem', (g) => { g.fillStyle(0x4fb0ff); g.fillTriangle(12, 3, 21, 12, 12, 21); g.fillTriangle(12, 3, 3, 12, 12, 21); });
 }
 
 function buildWeaponTextures(scene: Phaser.Scene) {

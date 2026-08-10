@@ -11,13 +11,15 @@ import {
 import { Enemy } from '../enemy';
 import { computePlayerAttack, computeEnemyAttack } from '../combat';
 import { Audio } from '../audio/manager';
-import { bgmForFloor } from '../audio/config';
-import { enhancementChance, EQUIPMENT_LIMIT } from '../balance';
+import { bgmForFloor, elementAttackSe } from '../audio/config';
+import { enhancementChance, EQUIPMENT_LIMIT, SCROLL_DROP_RATE } from '../balance';
 import {
+  armorForGrade,
   DEFAULT_PLAYER_ARMOR,
   getSelectedGender,
   isPlayerArmor,
   isPlayerGender,
+  PLAYER_ARMOR_DEFS,
   playerFrameIndex,
   playerSheetKey,
   PlayerArmor,
@@ -80,6 +82,20 @@ const MILESTONE_BOSSES: Record<number, { key: string; name: string; tint: number
   30: { key: 'm_hydra', name: 'トライヘッド・ドラゴン', tint: 0xb072ff, scale: 2.05, hp: 580, atkMin: 20, atkMax: 34, def: 18 }
 };
 
+export interface GachaResult {
+  rank: 'SS' | 'S' | 'A' | 'B' | 'C';
+  color: number;
+  name: string;
+  texKey: string;
+  hasEffect: boolean;
+  elementColor?: number;
+  tintIcon: boolean;
+  category: '武器' | '盾' | '鎧';
+  grade: EquipmentGrade;
+  elementName?: string;
+  feature?: string;
+}
+
 interface Chest {
   x: number;
   y: number;
@@ -95,7 +111,7 @@ interface Chest {
 interface GroundItem {
   x: number;
   y: number;
-  kind: ItemKind | 'coin' | 'gem' | 'weapon' | 'shield';
+  kind: ItemKind | 'coin' | 'weapon' | 'shield';
   sprite: Phaser.GameObjects.Image;
   glow?: Phaser.GameObjects.Image;
   phase: number;
@@ -258,6 +274,7 @@ export class GameScene extends Phaser.Scene {
     this.playerArmor = location.hostname === 'localhost' && isPlayerArmor(qaArmor)
       ? qaArmor
       : null;
+    this.player.armorDefBonus = this.playerArmor ? PLAYER_ARMOR_DEFS[this.playerArmor].defBonus : 0;
     const qaFloor = location.hostname === 'localhost' ? Number(qaParams.get('qa-floor')) : 1;
     const startFloor = Number.isInteger(qaFloor) && qaFloor >= 1 && qaFloor <= 30 ? qaFloor : 1;
     this.qaBossMode = location.hostname === 'localhost' && qaParams.has('qa-boss');
@@ -558,9 +575,11 @@ export class GameScene extends Phaser.Scene {
     this.updateVisibility();
     const floorIntro = bossRoom
       ? `${floor}.5F 強ボス部屋へ転送された。ボスと配下を倒せ！`
-      : floor % 5 === 0
-        ? `${floor}F「${getTheme(floor).name}」に到達。4×4の出口部屋は${floor}.5Fへ通じ、中ボスは迷宮内のどこかにいる。`
-        : `${floor}F「${getTheme(floor).name}」に到達。中ボスは入口が1つの5×5部屋にいる。4×4の出口部屋からいつでも次へ進める。`;
+      : floor === 5
+        ? `${floor}F「${getTheme(floor).name}」に到達。この階に中ボスはおらず、最奥の扉は${floor}.5Fへ通じている。`
+        : floor % 5 === 0
+          ? `${floor}F「${getTheme(floor).name}」に到達。迷路内の5×5部屋で中ボスを倒すと、同じ部屋の扉から${floor}.5Fへ進める。`
+          : `${floor}F「${getTheme(floor).name}」に到達。迷路内の5×5部屋で中ボスを倒すと、同じ部屋に階段が現れる。`;
     this.log(floorIntro, 'sys');
     this.events.emit('floor', floor);
     // BGMは2階ごとに切り替わる。
@@ -665,7 +684,7 @@ export class GameScene extends Phaser.Scene {
       if (this.distToPlayer(pos.x, pos.y) < 4) continue;
       this.addEnemy(def, pos.x, pos.y, 1 + floor * 0.04);
     }
-    this.spawnMidBossDragon(floor, !this.dungeon.bossRoom);
+    if (floor !== 5) this.spawnMidBossDragon(floor, !this.dungeon.bossRoom);
   }
 
   floorHasGate(floor: number): boolean {
@@ -694,7 +713,7 @@ export class GameScene extends Phaser.Scene {
       bossTint: spec.tint
     };
     const message = fieldPlacement
-      ? `◆ ${floor}F 中ボス「${def.name}」が迷宮内のどこかに現れた！ 倒さなくても出口は使える。`
+      ? `◆ ${floor}F 中ボス「${def.name}」が迷宮内のどこかに現れた！`
       : this.inBossRoom
         ? `◆ ${floor}.5F 中ボス「${def.name}」が現れた！`
         : `◆ ${floor}F 中ボス「${def.name}」が5×5の専用部屋に現れた！`;
@@ -812,13 +831,26 @@ export class GameScene extends Phaser.Scene {
   bossArenaPosition(): Vec2 | null {
     const room = this.dungeon.bossRoom;
     if (!room) return null;
-    const candidates: Vec2[] = [
-      { x: room.cx, y: room.cy },
-      { x: room.cx - 2, y: room.cy }, { x: room.cx + 2, y: room.cy },
-      { x: room.cx, y: room.cy - 2 }, { x: room.cx, y: room.cy + 2 },
-      { x: room.x + 1, y: room.y + 1 },
-      { x: room.x + room.w - 2, y: room.y + room.h - 2 }
-    ];
+    const entry = this.dungeon.bossEntry;
+    const candidates: Vec2[] = [];
+    for (let y = room.y; y < room.y + room.h; y++) {
+      for (let x = room.x; x < room.x + room.w; x++) candidates.push({ x, y });
+    }
+    if (entry) {
+      // 埋め込み5×5部屋の中ボスは、唯一の入口から最も遠い床を初期位置にする。
+      candidates.sort((a, b) => {
+        const distanceA = Math.abs(a.x - entry.x) + Math.abs(a.y - entry.y);
+        const distanceB = Math.abs(b.x - entry.x) + Math.abs(b.y - entry.y);
+        return distanceB - distanceA;
+      });
+    } else {
+      // N.5Fの大型アリーナは従来どおり中央を優先する。
+      candidates.sort((a, b) => {
+        const distanceA = Math.abs(a.x - room.cx) + Math.abs(a.y - room.cy);
+        const distanceB = Math.abs(b.x - room.cx) + Math.abs(b.y - room.cy);
+        return distanceA - distanceB;
+      });
+    }
     for (const pos of candidates) {
       const tile = this.dungeon.tiles[pos.y]?.[pos.x];
       if (!tile || !isWalkable(tile) || tile === 'pit' || tile === 'stairs') continue;
@@ -1401,6 +1433,7 @@ export class GameScene extends Phaser.Scene {
   damagePlayerFromBoss(e: Enemy, factor: number, label: string) {
     const result = computeEnemyAttack(this.player, e.def);
     const damage = Math.max(1, Math.floor(result.damage * factor));
+    Audio.playSe(elementAttackSe(monsterElement(e.def)));
     this.damagePlayer(damage, label, e);
     if (result.shieldBroke) this.handleShieldBreak();
     this.hitFx(this.player.x, this.player.y);
@@ -1517,23 +1550,24 @@ export class GameScene extends Phaser.Scene {
   }
 
   spawnGroundItems(floor: number) {
-    const kinds: (ItemKind | 'coin' | 'gem')[] = [
-      'coin', 'coin', 'coin', 'potion', 'gem', 'stone', 'shieldstone', 'invis', 'dash'
-    ];
+    const commonKinds: (ItemKind | 'coin')[] = ['coin', 'coin', 'coin', 'potion', 'invis', 'dash'];
+    const scrollKinds: ItemKind[] = ['stone', 'shieldstone'];
     const n = 4 + Math.floor(Math.random() * 3); // 落ちてるアイテム(4〜6・狭いマップ向け)
     const arenaCells = this.bossRoomCells();
     for (let i = 0; i < n; i++) {
       const pos = randomFloor(this.dungeon, [...this.occupiedPositions(), ...arenaCells]);
       if (!pos) continue;
-      const kind = kinds[Math.floor(Math.random() * kinds.length)];
-      const texKey = kind === 'coin' ? 'coin' : kind === 'gem' ? 'gem' : `i_${kind}`;
+      const kind = Math.random() < SCROLL_DROP_RATE
+        ? scrollKinds[Math.floor(Math.random() * scrollKinds.length)]
+        : commonKinds[Math.floor(Math.random() * commonKinds.length)];
+      const texKey = kind === 'coin' ? 'coin' : `i_${kind}`;
       const spr = this.add.image(0, 0, texKey).setDepth(5).setOrigin(0.5, 0.6).setDisplaySize(22, 22);
       this.placeSprite(spr, pos.x, pos.y);
       const glow = this.add.image(spr.x, spr.y - 2, 'glow').setDepth(4.6)
         .setBlendMode(Phaser.BlendModes.ADD)
-        .setTint(kind === 'coin' ? 0xffc45a : kind === 'gem' ? 0x55dfff : 0x88dfd4)
+        .setTint(kind === 'coin' ? 0xffc45a : 0x88dfd4)
         .setDisplaySize(28, 28).setAlpha(0.18);
-      const value = kind === 'coin' ? 10 + Math.floor(Math.random() * floor * 6) : kind === 'gem' ? 40 + floor * 8 : undefined;
+      const value = kind === 'coin' ? 10 + Math.floor(Math.random() * floor * 6) : undefined;
       this.ground.push({ x: pos.x, y: pos.y, kind, sprite: spr, glow, phase: Math.random() * Math.PI * 2, value });
     }
   }
@@ -1612,7 +1646,15 @@ export class GameScene extends Phaser.Scene {
       const t = this.dungeon.tiles[ny]?.[nx];
       if (t === 'door' && !this.inBossRoom) {
         this.setPlayerVisual(dir, 'idle');
-        this.enterBossRoom();
+        const isExitDoor = nx === this.dungeon.stairs.x && ny === this.dungeon.stairs.y;
+        if (isExitDoor && this.floorHasGate(this.floor) && (!this.dungeon.bossRoom || this.floorBossDefeated)) {
+          this.enterBossRoom();
+        } else {
+          this.log(isExitDoor
+            ? '中ボスを倒すまで階段の封印は解けない。'
+            : '戦闘中は5×5部屋の入口が封鎖されている。', 'sys');
+          Audio.playSe('deny');
+        }
         return;
       }
       if (!t || !isWalkable(t) || t === 'pit') {
@@ -1772,11 +1814,6 @@ export class GameScene extends Phaser.Scene {
       this.addScore(Math.floor((gi.value ?? 5) / 2));
       this.log(`コインを拾った (+${gi.value}G)`, 'gold');
       Audio.playSe('coin');
-    } else if (gi.kind === 'gem') {
-      this.player.gold += gi.value ?? 20;
-      this.addScore(gi.value ?? 20);
-      this.log(`輝きの宝石を拾った！ (+${gi.value}G スコアも上昇)`, 'gold');
-      Audio.playSe('coin');
     } else {
       // 同じアイテムは重ねられるので所持上限は緩め
       if (this.player.inventory.length < 60) {
@@ -1829,7 +1866,8 @@ export class GameScene extends Phaser.Scene {
       yoyo: true,
       ease: 'Sine.easeInOut'
     });
-    Audio.playSe('attack');
+    const weaponElement = this.player.weapon?.element;
+    Audio.playSe(weaponElement ? elementAttackSe(weaponElement) : 'attack');
     // 敵の方向へ踏み込む（前进→戻る）と斬撃エフェクト
     const [ddx, ddy] = this.dirVec(dir);
     const homeX = this.playerSprite.x, homeY = this.playerSprite.y;
@@ -1942,15 +1980,18 @@ export class GameScene extends Phaser.Scene {
     if (def.key === 'm_snake' && Math.random() < 0.7) this.dropItem(e.x, e.y, 'oldkey');
     // ゴールドは高確率で多めに
     if (Math.random() < 0.7) this.dropItem(e.x, e.y, 'coin', def.gold * 3 + Math.floor(Math.random() * this.floor * 4));
-    // アイテムドロップ（確率大幅アップ）
+    // 通常消耗品とは別枠で抽選する。
     if (Math.random() < 0.4) {
-      const pool: ItemKind[] = ['potion', 'smoke', 'stone', 'shieldstone'];
+      const pool: ItemKind[] = ['potion', 'smoke', 'warp', 'invis'];
       this.dropItem(e.x, e.y, pool[Math.floor(Math.random() * pool.length)]);
     }
-    // エリート/ボスは強化スクロールを確定ドロップ＋超レアで復活の種
+    // 強化スクロールは通常敵・エリート・ボス共通で1/3。
+    if (Math.random() < SCROLL_DROP_RATE) {
+      const scrollPool: ItemKind[] = ['stone', 'shieldstone'];
+      this.dropItem(e.x, e.y, scrollPool[Math.floor(Math.random() * scrollPool.length)]);
+    }
+    // エリート/ボスは超レアで復活の種。
     if (def.isElite || def.isBoss) {
-      const stonePool: ItemKind[] = ['stone', 'shieldstone'];
-      this.dropItem(e.x, e.y, stonePool[Math.floor(Math.random() * stonePool.length)]);
       if (!this.reviveSeedSeen && Math.random() < 0.08) {
         this.reviveSeedSeen = true;
         this.dropItem(e.x, e.y, 'revive');
@@ -2047,7 +2088,9 @@ export class GameScene extends Phaser.Scene {
     this.dropBossRewards(defeatedAt);
     this.log(this.inBossRoom
       ? `${bossName}を撃破！ 報酬がその場にドロップし、出口の封印が解けた。`
-      : `${bossName}を撃破！ 報酬がその場にドロップした。出口はいつでも使える。`, 'special');
+      : this.floorHasGate(this.floor)
+        ? `${bossName}を撃破！ 報酬がその場にドロップし、5×5部屋内の強ボス扉が開いた。`
+        : `${bossName}を撃破！ 報酬がその場にドロップし、5×5部屋内に階段が現れた。`, 'special');
     this.updateVisibility();
     this.emitRefresh();
   }
@@ -2099,12 +2142,16 @@ export class GameScene extends Phaser.Scene {
     }
     this.dropItem(origin.x, origin.y, 'coin', 80 + this.floor * 18 + Math.floor(Math.random() * 80));
 
-    if (this.inBossRoom) {
+    if (this.inBossRoom || (this.dungeon.bossRoom && !this.floorHasGate(this.floor))) {
       this.bossRewardClaimed = true;
       const { x, y } = this.dungeon.stairs;
       this.dungeon.tiles[y][x] = 'stairs';
       this.tileSprites[y]?.[x]?.setTexture('stairs');
       this.effectFx(x, y, 'fx_magic', 2.0, 760, 0x54ff92);
+    } else if (this.dungeon.bossRoom && this.floorHasGate(this.floor)) {
+      this.bossRewardClaimed = true;
+      const { x, y } = this.dungeon.stairs;
+      this.effectFx(x, y, 'fx_magic', 2.0, 760, 0xffd36b);
     }
   }
 
@@ -2508,6 +2555,7 @@ export class GameScene extends Phaser.Scene {
         onComplete: () => {
           e.animating = false;
           e.sprite.setScale(e.baseScale).setAngle(0);
+          Audio.playSe(elementAttackSe(enemyElement));
           this.damagePlayer(res.damage, `${e.def.name}の${enemyElementInfo.name}属性攻撃！`, e);
           this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.4, 360, enemyElementInfo.color);
           this.hitFx(this.player.x, this.player.y);
@@ -2531,6 +2579,7 @@ export class GameScene extends Phaser.Scene {
     e.animating = true;
     const enemyElement = monsterElement(e.def);
     const enemyElementInfo = ELEMENT_INFO[enemyElement];
+    Audio.playSe(elementAttackSe(enemyElement));
     this.effectFx(e.x, e.y, 'fx_magic', 2.0, 600, enemyElementInfo.color);
     this.tweens.add({
       targets: e.sprite,
@@ -2741,10 +2790,9 @@ export class GameScene extends Phaser.Scene {
       this.player.weapon = weapon;
       this.player.shields.push(shield);
       this.player.shield = shield;
-      this.playerArmor = armor;
-      this.setPlayerVisual(this.player.dir, 'idle');
+      this.equipArmor(armor);
       this.updatePlayerAura();
-      this.log(`最初の装備を入手！ ${weapon.name}／${shield.name}／服1着`, 'special');
+      this.log(`最初の装備を入手！ ${weapon.name}／${shield.name}／${PLAYER_ARMOR_DEFS[armor].name}`, 'special');
       this.effectFx(c.x, c.y, 'fx_levelup', 2.0, 700);
     } else if (c.rare) {
       // ★赤い宝箱：レア確定＋大量ゴールド
@@ -2781,8 +2829,10 @@ export class GameScene extends Phaser.Scene {
           const s = rollShield(this.floor);
           if (this.receiveShield(s, '宝箱')) this.log(`宝箱から「${s.name}」を発見！`, 'item');
         } else {
-          const kinds: ItemKind[] = ['potion', 'warp', 'stone', 'shieldstone', 'invis'];
-          const k = kinds[Math.floor(Math.random() * kinds.length)];
+          const scrollKinds: ItemKind[] = ['stone', 'shieldstone'];
+          const consumableKinds: ItemKind[] = ['potion', 'warp', 'invis'];
+          const pool = Math.random() < SCROLL_DROP_RATE ? scrollKinds : consumableKinds;
+          const k = pool[Math.floor(Math.random() * pool.length)];
           this.player.inventory.push(makeItem(k));
           this.log(`宝箱から「${makeItem(k).name}」を入手。`, 'item');
         }
@@ -3008,7 +3058,7 @@ export class GameScene extends Phaser.Scene {
   // ============ ガチャ ============
   // 500Gで1回。排出は武器か盾のみ。ランクが装備グレードへ直結する。
   // 戻り値はUI演出用（rank/色/名前/アイコン）。ゴールド不足はnull。
-  gachaPull(): { rank: 'SS' | 'S' | 'A' | 'B' | 'C'; color: number; name: string; texKey: string; hasEffect: boolean; elementColor?: number; tintIcon: boolean } | null {
+  gachaPull(): GachaResult | null {
     if (this.gameEnded) return null;
     if (this.player.gold < 500) {
       this.log('ゴールドが足りない。（ガチャは500G）', 'sys');
@@ -3018,9 +3068,17 @@ export class GameScene extends Phaser.Scene {
     this.player.gold -= 500;
 
     // ランク抽選: SS 3% / S 12% / A 25% / B 35% / C 25%
+    const forcedRank = location.hostname === 'localhost'
+      ? new URLSearchParams(location.search).get('qa-gacha-rank')
+      : null;
+    const forcedCategory = location.hostname === 'localhost'
+      ? new URLSearchParams(location.search).get('qa-gacha-category')
+      : null;
     const r = Math.random();
     const rank: 'SS' | 'S' | 'A' | 'B' | 'C' =
-      r < 0.03 ? 'SS' : r < 0.15 ? 'S' : r < 0.40 ? 'A' : r < 0.75 ? 'B' : 'C';
+      forcedRank && ['SS', 'S', 'A', 'B', 'C'].includes(forcedRank)
+        ? forcedRank as 'SS' | 'S' | 'A' | 'B' | 'C'
+        : r < 0.03 ? 'SS' : r < 0.15 ? 'S' : r < 0.40 ? 'A' : r < 0.75 ? 'B' : 'C';
 
     const RANK_COLOR: Record<string, number> = {
       SS: 0xffd700, S: 0xff5a5a, A: 0xa06bff, B: 0x4fb0ff, C: 0xb8c2cc
@@ -3035,10 +3093,25 @@ export class GameScene extends Phaser.Scene {
     let hasEffect = false;
     let elementColor: number | undefined;
     let tintIcon = false;
+    let category: '武器' | '盾' | '鎧' = '盾';
+    let elementName: string | undefined;
+    let feature: string | undefined;
 
-    // 武器は1階につき最大1本。取得済みなら必ず盾になる。
-    const weaponPrize = !this.weaponWonThisFloor && Math.random() < 0.5;
-    if (weaponPrize) {
+    // SSの約1/3は最高位の鎧。その他は武器か盾で、属性付きは各抽選関数側で5%に制限する。
+    const armorPrize = rank === 'SS'
+      && (forcedCategory === 'armor' || (forcedCategory !== 'weapon' && forcedCategory !== 'shield' && Math.random() < 1 / 3));
+    const weaponPrize = !armorPrize && !this.weaponWonThisFloor
+      && (forcedCategory === 'weapon' || (forcedCategory !== 'shield' && Math.random() < 0.5));
+    if (armorPrize) {
+      const armor = armorForGrade(grade);
+      this.equipArmor(armor.key);
+      name = `[SS] ${armor.name}`;
+      texKey = playerSheetKey(this.playerGender, armor.key);
+      category = '鎧';
+      hasEffect = true;
+      elementName = '無属性';
+      feature = `防御力 +${armor.defBonus}`;
+    } else if (weaponPrize) {
       const w = rollWeaponByGrade(grade);
       if (rank === 'SS') w.plus = Math.max(w.plus, 3);
       else if (rank === 'S') w.plus = Math.max(w.plus, 1);
@@ -3046,8 +3119,11 @@ export class GameScene extends Phaser.Scene {
       this.weaponWonThisFloor = true;
       name = weaponFullName(w);
       texKey = w.key;
+      category = '武器';
       hasEffect = !!w.passive;
       elementColor = w.element ? ELEMENT_INFO[w.element].color : undefined;
+      elementName = w.element ? `${ELEMENT_INFO[w.element].name}属性` : '無属性';
+      feature = w.passive?.name ?? (w.magics.length ? `魔法刻印 ${w.magics.map((magic) => magic.label).join('')}` : undefined);
     } else {
       const s = rollShieldByGrade(grade);
       if (rank === 'SS') s.plus = 2;
@@ -3057,10 +3133,16 @@ export class GameScene extends Phaser.Scene {
       texKey = s.key;
       elementColor = s.element ? ELEMENT_INFO[s.element].color : undefined;
       hasEffect = !!s.passive;
+      category = '盾';
+      elementName = s.element ? `${ELEMENT_INFO[s.element].name}属性` : '無属性';
+      feature = s.passive?.name;
     }
 
     this.log(`ガチャ【${rank}】${name}を引き当てた！`, rank === 'SS' || rank === 'S' ? 'special' : 'item');
-    return { rank, color: RANK_COLOR[rank], name, texKey, hasEffect, elementColor, tintIcon };
+    return {
+      rank, color: RANK_COLOR[rank], name, texKey, hasEffect, elementColor, tintIcon,
+      category, grade, elementName, feature
+    };
   }
 
   shopRemaining(kind: 'potion' | 'stone' | 'shieldstone'): number {
@@ -3093,6 +3175,12 @@ export class GameScene extends Phaser.Scene {
     Audio.playSe('coin');
     this.emitRefresh();
     return true;
+  }
+
+  equipArmor(armor: PlayerArmor) {
+    this.playerArmor = armor;
+    this.player.armorDefBonus = PLAYER_ARMOR_DEFS[armor].defBonus;
+    if (this.playerSprite) this.setPlayerVisual(this.player.dir, 'idle');
   }
 
   // 装備切替（UIから）
@@ -3198,6 +3286,12 @@ export class GameScene extends Phaser.Scene {
   // 実際の降下処理（busyガードなし。移動から即呼ばれる）
   doDescend() {
     if (this.gameEnded) return;
+    if (!this.inBossRoom && this.dungeon.bossRoom && !this.floorBossDefeated) {
+      this.log('5×5部屋の中ボスを倒すまで次の階へは進めない。', 'sys');
+      Audio.playSe('deny');
+      this.busy = false;
+      return;
+    }
     if (this.inBossRoom && (!this.floorBossDefeated || !this.bossRewardClaimed)) {
       this.log('ボスを倒して出口の封印を解くまで次の階へは進めない。', 'sys');
       Audio.playSe('deny');
@@ -3646,10 +3740,12 @@ export class GameScene extends Phaser.Scene {
 
   showEnemyInfo(e: Enemy) {
     this.discovered.add(e.def.key);
+    const element = monsterElement(e.def);
     this.events.emit('enemyinfo', {
       name: e.def.name, hp: e.hp, hpMax: e.hpMax,
       atk: `${e.def.atkMin}-${e.def.atkMax}`, def: e.def.def,
-      behavior: this.behaviorLabel(e.def.behavior)
+      behavior: this.behaviorLabel(e.def.behavior),
+      element: `${ELEMENT_INFO[element].name}属性（弱点: ${ELEMENT_INFO[ELEMENT_INFO[element].weakTo].name}属性）`
     });
   }
   behaviorLabel(b: string): string {

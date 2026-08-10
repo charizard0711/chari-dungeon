@@ -1,5 +1,6 @@
 import type { Weapon, Shield, Item, Dir, Magic, MagicCode, EquipmentGrade, WeaponPassive, WeaponType } from './types';
 import { WEAPON_DEFS, SHIELD_DEFS, magicLabel, makeItem, ELEMENT_INFO } from './data';
+import { ELEMENTAL_EQUIPMENT_RATE } from './balance';
 
 const WEAPON_PASSIVES: Record<WeaponType, WeaponPassive> = {
   dagger: { key: 'backstab', name: '背面急所', description: 'クリティカルダメージ+10%' },
@@ -21,6 +22,7 @@ export class Player {
   baseAtkMin = 5;
   baseAtkMax = 12;
   baseDef = 3;
+  armorDefBonus = 0;
   gold = 0;
 
   x = 0;
@@ -69,7 +71,7 @@ export class Player {
   }
 
   get def(): number {
-    let v = this.baseDef + Math.floor(this.level * 0.4);
+    let v = this.baseDef + this.armorDefBonus + Math.floor(this.level * 0.4);
     if (this.shield && this.shield.dur > 0) v += this.shield.defBonus + (this.shield.plus ?? 0);
     return v;
   }
@@ -136,6 +138,23 @@ function addRandomLootTraits(weapon: Weapon): Weapon {
   return weapon;
 }
 
+function equipmentPoolAtElementRate<T extends { element?: unknown }>(pool: T[]): T[] {
+  const elemental = pool.filter((item) => item.element !== undefined);
+  const neutral = pool.filter((item) => item.element === undefined);
+  const selected = Math.random() < ELEMENTAL_EQUIPMENT_RATE ? elemental : neutral;
+  return selected.length ? selected : pool;
+}
+
+function weightedEquipmentPick<T extends { rarity: number }>(pool: T[]): T {
+  const total = pool.reduce((sum, item) => sum + item.rarity, 0);
+  let roll = Math.random() * total;
+  for (const item of pool) {
+    roll -= item.rarity;
+    if (roll <= 0) return item;
+  }
+  return pool[pool.length - 1];
+}
+
 // ランダムなマジックをn個生成（ガチャ・武器生成で共用）
 export function rollMagics(n: number): Magic[] {
   const magics: Magic[] = [];
@@ -153,12 +172,8 @@ export function rollMagics(n: number): Magic[] {
 
 // マジック付き武器をランダム生成
 export function rollWeapon(floor: number): Weapon {
-  const pool = WEAPON_DEFS.filter((d) => d.minFloor <= floor);
-  // rarity重み
-  const totalW = pool.reduce((s, d) => s + d.rarity, 0);
-  let r = Math.random() * totalW;
-  let picked = pool[0];
-  for (const d of pool) { r -= d.rarity; if (r <= 0) { picked = d; break; } }
+  const pool = equipmentPoolAtElementRate(WEAPON_DEFS.filter((d) => d.minFloor <= floor));
+  const picked = weightedEquipmentPick(pool);
 
   const magicChance = 0.35 + Math.min(0.4, floor * 0.015);
   const magics: Magic[] = Math.random() < magicChance
@@ -174,7 +189,7 @@ export function rollWeapon(floor: number): Weapon {
 }
 
 export function rollWeaponByGrade(grade: EquipmentGrade): Weapon {
-  const pool = WEAPON_DEFS.filter((d) => d.grade === grade);
+  const pool = equipmentPoolAtElementRate(WEAPON_DEFS.filter((d) => d.grade === grade));
   const picked = pool[Math.floor(Math.random() * pool.length)] ?? WEAPON_DEFS[0];
   const magicCount = grade === 'S' ? 2 : grade === 'A' ? 1 : grade === 'B' && Math.random() < 0.35 ? 1 : 0;
   return addRandomLootTraits(makeWeapon(picked.key, rollMagics(magicCount)));
@@ -201,19 +216,13 @@ export function weaponFullName(w: Weapon): string {
 }
 
 export function rollShield(floor: number): Shield {
-  const pool = SHIELD_DEFS.filter((d) => d.minFloor <= floor);
-  const totalWeight = pool.reduce((sum, def) => sum + def.rarity, 0);
-  let roll = Math.random() * totalWeight;
-  let picked = pool[0] ?? SHIELD_DEFS[0];
-  for (const def of pool) {
-    roll -= def.rarity;
-    if (roll <= 0) { picked = def; break; }
-  }
+  const pool = equipmentPoolAtElementRate(SHIELD_DEFS.filter((d) => d.minFloor <= floor));
+  const picked = weightedEquipmentPick(pool);
   return makeShield(picked.key);
 }
 
 export function rollShieldByGrade(grade: EquipmentGrade): Shield {
-  const pool = SHIELD_DEFS.filter((d) => d.grade === grade);
+  const pool = equipmentPoolAtElementRate(SHIELD_DEFS.filter((d) => d.grade === grade));
   const picked = pool[Math.floor(Math.random() * pool.length)] ?? SHIELD_DEFS[0];
   return makeShield(picked.key, grade);
 }

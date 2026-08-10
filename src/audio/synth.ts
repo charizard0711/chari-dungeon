@@ -265,6 +265,34 @@ const SE_SPECS: Record<SeName, { len: number; segs: SeSeg[] }> = {
       { type: 'noise', f0: 2500, t: 0, d: 0.06, vol: 0.12 }
     ]
   },
+  elementFire: {
+    len: 0.34, segs: [
+      { type: 'noise', f0: 1500, f1: 420, t: 0, d: 0.28, vol: 0.30 },
+      { type: 'sawtooth', f0: 210, f1: 620, t: 0.02, d: 0.22, vol: 0.18 },
+      { type: 'noise', f0: 3200, t: 0.17, d: 0.09, vol: 0.16 }
+    ]
+  },
+  elementWater: {
+    len: 0.42, segs: [
+      { type: 'sine', f0: 260, f1: 760, t: 0, d: 0.32, vol: 0.22 },
+      { type: 'sine', f0: 720, f1: 330, t: 0.08, d: 0.30, vol: 0.17 },
+      { type: 'noise', f0: 1050, t: 0.02, d: 0.24, vol: 0.10 }
+    ]
+  },
+  elementThunder: {
+    len: 0.32, segs: [
+      { type: 'noise', f0: 5200, t: 0, d: 0.07, vol: 0.34 },
+      { type: 'square', f0: 1500, f1: 120, t: 0.025, d: 0.22, vol: 0.24 },
+      { type: 'noise', f0: 900, t: 0.12, d: 0.16, vol: 0.22 }
+    ]
+  },
+  elementIce: {
+    len: 0.42, segs: [
+      { type: 'sine', f0: 1650, f1: 2550, t: 0, d: 0.12, vol: 0.20 },
+      { type: 'triangle', f0: 2100, f1: 880, t: 0.08, d: 0.28, vol: 0.20 },
+      { type: 'noise', f0: 3900, t: 0.18, d: 0.16, vol: 0.14 }
+    ]
+  },
   hit: {
     len: 0.18, segs: [
       { type: 'noise', f0: 300, t: 0, d: 0.12, vol: 0.35 },

@@ -238,7 +238,23 @@ export function makeItem(kind: ItemKind): Item {
 }
 
 // ===== モンスター定義 =====
-export const MONSTER_DEFS: MonsterDef[] = [
+const MONSTER_ELEMENTS: Record<string, Element> = {
+  m_mush: 'fire', m_mole: 'thunder', m_jelly: 'water', m_ghost: 'ice',
+  m_gear: 'thunder', m_vine: 'water', m_mud: 'water', m_moss: 'water',
+  m_bat: 'ice', m_imp: 'thunder', m_snake: 'water', m_skel: 'fire', m_archer: 'ice',
+  m_ember_drake: 'fire', m_frost_wyrm: 'ice', m_storm_wyvern: 'thunder',
+  m_brass_dragon: 'fire', m_void_drake: 'thunder', m_bone_dragon: 'ice',
+  m_horn_demon: 'fire', m_chain_demon: 'thunder', m_flame_gargoyle: 'fire',
+  m_abyss_hound: 'ice', m_mask_fiend: 'thunder', m_archdemon: 'fire',
+  m_bone_hound: 'ice', m_skeleton_mage: 'ice', m_death_knight: 'thunder',
+  m_lich: 'ice', m_bone_colossus: 'ice', m_grave_crawler: 'water',
+  m_cerberus: 'fire', m_hydra: 'water', m_crystal_crab: 'ice', m_blood_moth: 'fire',
+  m_clockwork_chimera: 'thunder', m_slime: 'water', m_beetle: 'thunder',
+  m_wisp: 'fire', m_spider: 'water', m_golem: 'thunder', m_eye: 'thunder',
+  m_wraith: 'ice', m_reaper: 'fire', m_guard: 'ice', m_watcher: 'thunder'
+};
+
+const MONSTER_DEFS_RAW: MonsterDef[] = [
   {
     key: 'm_mush', name: 'ランタンマッシュ', hp: 18, atkMin: 3, atkMax: 7, def: 1,
     exp: 4, gold: 3, score: 30, minFloor: 1, maxFloor: 10, behavior: 'chase', color: 0x8a6bff
@@ -433,6 +449,11 @@ export const MONSTER_DEFS: MonsterDef[] = [
     isBoss: true, isDragonType: true, color: 0x2a2a4a
   }
 ];
+
+export const MONSTER_DEFS: MonsterDef[] = MONSTER_DEFS_RAW.map((monster) => ({
+  ...monster,
+  element: MONSTER_ELEMENTS[monster.key]
+}));
 
 // ===== 階層テーマ（2フロアごとに名前・見た目が変わる）=====
 export interface FloorTheme {

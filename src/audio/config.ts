@@ -1,4 +1,5 @@
 // ========================================================================
+import type { Element } from '../types';
 // 音源パス定数
 // 本物のmp3/oggに差し替える場合は public/assets/audio/ に
 // 下記ファイル名で置くだけでOK（自動で読み込まれ、仮BGMより優先される）。
@@ -42,6 +43,10 @@ export const SE_DEFS = {
   click:   { key: 'se_click',   path: 'assets/audio/se_click.mp3',   volume: 0.5 },  // UIクリック
   step:    { key: 'se_step',    path: 'assets/audio/se_step.mp3',    volume: 0.35 }, // 足音
   attack:  { key: 'se_attack',  path: 'assets/audio/se_attack.mp3',  volume: 0.6 },  // 攻撃
+  elementFire:    { key: 'se_element_fire',    path: 'assets/audio/se_element_fire.mp3',    volume: 0.62 }, // 火属性攻撃
+  elementWater:   { key: 'se_element_water',   path: 'assets/audio/se_element_water.mp3',   volume: 0.58 }, // 水属性攻撃
+  elementThunder: { key: 'se_element_thunder', path: 'assets/audio/se_element_thunder.mp3', volume: 0.62 }, // 雷属性攻撃
+  elementIce:     { key: 'se_element_ice',     path: 'assets/audio/se_element_ice.mp3',     volume: 0.58 }, // 氷属性攻撃
   hit:     { key: 'se_hit',     path: 'assets/audio/se_hit.mp3',     volume: 0.6 },  // 命中
   hurt:    { key: 'se_hurt',    path: 'assets/audio/se_hurt.mp3',    volume: 0.6 },  // 被ダメージ
   kill:    { key: 'se_kill',    path: 'assets/audio/se_kill.mp3',    volume: 0.6 },  // 敵撃破
@@ -59,3 +64,9 @@ export const SE_DEFS = {
 } satisfies Record<string, AudioDef>;
 
 export type SeName = keyof typeof SE_DEFS;
+
+export function elementAttackSe(element: Element): SeName {
+  return ({
+    fire: 'elementFire', water: 'elementWater', thunder: 'elementThunder', ice: 'elementIce'
+  } as const)[element];
+}

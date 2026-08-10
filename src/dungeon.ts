@@ -148,7 +148,7 @@ export function generateDungeon(floor: number, _forcedBossRoomZone?: BossRoomZon
   const mazeRows = 8 + Math.min(3, Math.floor(floor / 8));
   const mazeWidth = mazeColumns * 2 + 1;
   const hasBossRoom = floor !== 5;
-  const w = mazeWidth + (hasBossRoom ? 8 : 0);
+  const w = mazeWidth;
   const h = mazeRows * 2 + 1;
   const tiles: TileType[][] = Array.from({ length: h }, () => Array<TileType>(w).fill('wall'));
 
@@ -160,46 +160,68 @@ export function generateDungeon(floor: number, _forcedBossRoomZone?: BossRoomZon
     tiles[3][1] = 'floor';
   }
   const exitAnchor = farthestReachableFloor(tiles, start);
-  const exitRoom = roomAt(
-    Math.max(1, Math.min(mazeWidth - 5, exitAnchor.x - 1)),
-    Math.max(1, Math.min(h - 5, exitAnchor.y - 1)),
-    4,
-    4
-  );
-  carveRoom(tiles, exitRoom);
-  carveThinCorridor(tiles, exitAnchor, { x: exitRoom.cx, y: exitRoom.cy });
-  const stairs = { x: exitRoom.cx, y: exitRoom.cy };
-  // 通常階はそのまま次へ進める階段。5階刻みだけは強ボス部屋への扉になる。
-  tiles[stairs.y][stairs.x] = floor % 5 === 0 ? 'door' : 'stairs';
-
-  // 5F以外の中ボスは、右側の5x5専用エリアに配置する。
-  // 外周は壁で閉じ、左中央の1マスだけを入口として迷路へ接続する。
+  let exitRoom: Room;
+  let stairs: Vec2;
   let bossRoom: Room | undefined;
   let bossEntrance: Vec2 | undefined;
   let bossEntry: Vec2 | undefined;
-  if (hasBossRoom) {
-    bossRoom = roomAt(mazeWidth + 1, Math.floor((h - 5) / 2), 5, 5);
-    carveRoom(tiles, bossRoom);
-    const entry = { x: bossRoom.x, y: bossRoom.cy };
-    const approach = { x: bossRoom.x - 1, y: bossRoom.cy };
-    const staging = { x: bossRoom.x - 2, y: bossRoom.cy };
-    const sourceRow = Math.max(0, Math.min(mazeRows - 1, Math.round((bossRoom.cy - 1) / 2)));
-    const source = { x: mazeWidth - 2, y: mazeCellPosition(mazeColumns - 1, sourceRow).y };
-    carveThinCorridor(tiles, source, staging);
 
+  if (hasBossRoom) {
+    // 迷路の外へ増築せず、最遠地点付近の7x7範囲を5x5の中ボス部屋へ作り替える。
+    // 位置は迷路生成ごとに変わり、必ずマップ全体の内側へ収まる。
+    let roomX = Math.max(3, Math.min(w - 7, exitAnchor.x - 2 + irand(-2, 2)));
+    let roomY = Math.max(3, Math.min(h - 7, exitAnchor.y - 2 + irand(-2, 2)));
+    if (roomX < 6 && roomY < 6) roomX = Math.max(3, w - 7);
+    bossRoom = roomAt(roomX, roomY, 5, 5);
+
+    // スタート側を向く一辺の中央だけを入口にする。
+    const enterFromWest = bossRoom.cx - start.x >= bossRoom.cy - start.y;
+    const entry = enterFromWest
+      ? { x: bossRoom.x, y: bossRoom.cy }
+      : { x: bossRoom.cx, y: bossRoom.y };
+    const approach = enterFromWest
+      ? { x: bossRoom.x - 1, y: bossRoom.cy }
+      : { x: bossRoom.cx, y: bossRoom.y - 1 };
+    const staging = enterFromWest
+      ? { x: bossRoom.x - 2, y: bossRoom.cy }
+      : { x: bossRoom.cx, y: bossRoom.y - 2 };
+
+    // 外周1マスを壁で閉じてから部屋を掘り直す。例外は入口の1マスだけ。
     for (let y = bossRoom.y - 1; y <= bossRoom.y + bossRoom.h; y++) {
       for (let x = bossRoom.x - 1; x <= bossRoom.x + bossRoom.w; x++) {
         const onRing = x === bossRoom.x - 1 || x === bossRoom.x + bossRoom.w
           || y === bossRoom.y - 1 || y === bossRoom.y + bossRoom.h;
-        if (onRing && !(x === approach.x && y === approach.y)) tiles[y][x] = 'wall';
+        if (onRing) tiles[y][x] = 'wall';
       }
     }
+    carveRoom(tiles, bossRoom);
+    carveThinCorridor(tiles, start, staging);
     tiles[staging.y][staging.x] = 'floor';
     tiles[approach.y][approach.x] = 'floor';
     tiles[entry.y][entry.x] = 'floor';
+
     bossEntrance = approach;
     bossEntry = entry;
+    exitRoom = bossRoom;
+    // 階段は必ず5x5内の入口から遠い隅へ。中ボス撃破までは封印扉として扱う。
+    stairs = { x: bossRoom.x + bossRoom.w - 2, y: bossRoom.y + bossRoom.h - 2 };
+    tiles[stairs.y][stairs.x] = 'door';
+  } else {
+    // 5Fだけは従来どおり、最遠地点の出口から独立した5.5F強ボス部屋へ進む。
+    exitRoom = roomAt(
+      Math.max(1, Math.min(mazeWidth - 5, exitAnchor.x - 1)),
+      Math.max(1, Math.min(h - 5, exitAnchor.y - 1)),
+      4,
+      4
+    );
+    carveRoom(tiles, exitRoom);
+    carveThinCorridor(tiles, exitAnchor, { x: exitRoom.cx, y: exitRoom.cy });
+    stairs = { x: exitRoom.cx, y: exitRoom.cy };
+    tiles[stairs.y][stairs.x] = 'door';
   }
+
+  // 5x5区画で元の一本道が分断された場合、到達不能側を壁へ戻して配置物の孤立を防ぐ。
+  removeUnreachableFloors(tiles, start);
 
   const hazards: Vec2[] = [];
   const hazardTypes: TileType[] = ['poison', 'cracked', 'rune', 'water'];
@@ -220,8 +242,8 @@ export function generateDungeon(floor: number, _forcedBossRoomZone?: BossRoomZon
   }
 
   return {
-    w, h, tiles, rooms: bossRoom ? [exitRoom, bossRoom] : [exitRoom], start, stairs, hazards,
-    exitRoom, bossRoom, bossRoomZone: bossRoom ? 'east' : undefined, bossEntrance, bossEntry
+    w, h, tiles, rooms: bossRoom ? [bossRoom] : [exitRoom], start, stairs, hazards,
+    exitRoom, bossRoom, bossRoomZone: bossRoom ? 'center' : undefined, bossEntrance, bossEntry
   };
 }
 

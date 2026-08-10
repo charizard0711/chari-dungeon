@@ -95,7 +95,6 @@ const FRAME_DEFS: FrameDef[] = [
 
   // ---- お宝・キーアイテム ----
   { key: 'coin', sheet: 'items', r: [75, 715, 205, 848], mode: 'sprite', size: 48},
-  { key: 'gem', sheet: 'items', r: [268, 715, 378, 848], mode: 'sprite', size: 48},
   { key: 'i_oldkey', sheet: 'items', r: [428, 715, 538, 848], mode: 'sprite', size: 48},
   { key: 'i_floorkey', sheet: 'items', r: [583, 715, 693, 848], mode: 'sprite', size: 48},
   // i_stone / i_shieldstone / i_invis / i_dash は専用のオリジナル画像を使用する。
