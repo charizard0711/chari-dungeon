@@ -455,7 +455,7 @@ export class UIScene extends Phaser.Scene {
     const boost = this.gs.holdBoostTier === 2 ? '  ⚡MAX BOOST' : this.gs.holdBoostTier === 1 ? '  ⚡BOOST' : '';
     const floorLabel = this.gs.inBossRoom ? `${this.gs.floor}.5F` : `${String(this.gs.floor).padStart(2, '0')}F`;
     const gate = this.gs.inBossRoom
-      ? this.gs.bossRewardClaimed ? 'EXIT OPEN' : this.gs.floorBossDefeated ? 'GREEN CHEST' : 'BOSS LOCK'
+      ? this.gs.bossRewardClaimed ? 'EXIT OPEN' : 'BOSS LOCK'
       : 'BOSS DOOR';
     this.topText.setText(IS_MOBILE
       ? `${floorLabel}  ${gate === 'BOSS LOCK' ? '🔒BOSS' : gate}  ${this.gs.score}pt${boost}`
@@ -906,7 +906,9 @@ export class UIScene extends Phaser.Scene {
     const summaryY = y + 80;
     const cardGap = 6;
     const cardW = (w - 32 - cardGap * 2) / 3;
-    const bodyTexture = `player_${this.gs.playerGender}_${this.gs.playerArmor}`;
+    const bodyTexture = this.gs.playerArmor
+      ? `player_${this.gs.playerGender}_${this.gs.playerArmor}`
+      : undefined;
     const equippedCards: {
       label: string;
       name: string;
@@ -936,11 +938,11 @@ export class UIScene extends Phaser.Scene {
       },
       {
         label: '◆ 体防具',
-        name: armorNames[this.gs.playerArmor] ?? '体防具',
-        sub: '現在の外見装備',
+        name: this.gs.playerArmor ? armorNames[this.gs.playerArmor] : '服なし',
+        sub: this.gs.playerArmor ? '現在の外見装備' : '赤い箱から入手',
         texture: bodyTexture,
         frame: 0,
-        color: 0x76a9d8
+        color: this.gs.playerArmor ? 0x76a9d8 : 0x36585d
       }
     ];
 

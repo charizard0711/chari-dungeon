@@ -34,6 +34,10 @@ export function isPlayerArmor(value: unknown): value is PlayerArmor {
   return typeof value === 'string' && PLAYER_ARMORS.includes(value as PlayerArmor);
 }
 
+export function rollStarterArmor(): PlayerArmor {
+  return PLAYER_ARMORS[Math.floor(Math.random() * PLAYER_ARMORS.length)];
+}
+
 export function getSelectedGender(): PlayerGender {
   try {
     const stored = localStorage.getItem(GENDER_STORAGE_KEY);

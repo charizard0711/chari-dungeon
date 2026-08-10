@@ -114,7 +114,6 @@ const FRAME_DEFS: FrameDef[] = [
   { key: 'chest_open', sheet: 'tiles', r: [163, 585, 275, 692], mode: 'sprite', size: 30 },
   { key: 'prop_torch', sheet: 'tiles', r: [292, 575, 390, 706], mode: 'sprite', size: 34 },
   { key: 'prop_lantern', sheet: 'tiles', r: [398, 575, 520, 706], mode: 'sprite', size: 34 },
-  { key: 'prop_crystal', sheet: 'tiles', r: [525, 570, 670, 706], mode: 'sprite', size: 36 },
   { key: 'prop_barrel', sheet: 'tiles', r: [980, 575, 1110, 706], mode: 'sprite', size: 34 },
   { key: 'prop_statue', sheet: 'tiles', r: [1115, 565, 1250, 706], mode: 'sprite', size: 36 },
   { key: 'stairs', sheet: 'tiles', r: [878, 95, 982, 205], mode: 'tile' },

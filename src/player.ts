@@ -37,10 +37,6 @@ export class Player {
   reviveReady = false; // 復活のタネ所持で有効化されるフラグ（アイテム所持で判定）
 
   constructor() {
-    this.weapon = makeWeapon('w_dagger_fire', []);
-    this.weapons.push(this.weapon);
-    this.shield = makeShield('s_iron_round');
-    this.shields.push(this.shield);
     // 初期アイテム
     this.inventory.push(makeItem('potion'));
     this.inventory.push(makeItem('potion'));
@@ -182,6 +178,18 @@ export function rollWeaponByGrade(grade: EquipmentGrade): Weapon {
   const picked = pool[Math.floor(Math.random() * pool.length)] ?? WEAPON_DEFS[0];
   const magicCount = grade === 'S' ? 2 : grade === 'A' ? 1 : grade === 'B' && Math.random() < 0.35 ? 1 : 0;
   return addRandomLootTraits(makeWeapon(picked.key, rollMagics(magicCount)));
+}
+
+export function rollStarterWeapon(): Weapon {
+  const pool = WEAPON_DEFS.filter((def) => def.grade === 'D' && def.minFloor <= 1 && !def.element && !def.dual);
+  const picked = pool[Math.floor(Math.random() * pool.length)] ?? WEAPON_DEFS.find((def) => def.key === 'w_iron_dagger')!;
+  return makeWeapon(picked.key, []);
+}
+
+export function rollStarterShield(): Shield {
+  const pool = SHIELD_DEFS.filter((def) => def.grade === 'D' && def.minFloor <= 1 && !def.element);
+  const picked = pool[Math.floor(Math.random() * pool.length)] ?? SHIELD_DEFS.find((def) => def.key === 's_iron_round')!;
+  return makeShield(picked.key);
 }
 
 export function weaponFullName(w: Weapon): string {
