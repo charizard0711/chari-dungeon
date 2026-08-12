@@ -254,6 +254,7 @@ export class GameScene extends Phaser.Scene {
   lightRadius = 3;
   shroomTurns = 0;
   torchTurns = 0;
+  lanternTurns = 0;
   dashSteps = 0; // 疾風の羽：残り歩数（1歩で2マス進める）
   themeTileTint = 0xffffff; // 現在フロアのタイル色合い（2階ごとに変わる）
   invisTurns = 0; // 透明ポーション：残りターン（敵から完全に見えない）
@@ -415,6 +416,10 @@ export class GameScene extends Phaser.Scene {
       this.torchTurns = 10;
       this.updateVisibility();
     }
+    if (location.hostname === 'localhost' && qaParams.has('qa-use-lantern')) {
+      this.lanternTurns = 5;
+      this.updateVisibility();
+    }
     if (location.hostname === 'localhost' && qaParams.has('qa-variety-room')) {
       const room = this.dungeon.rooms.find((candidate) => candidate.w === 3 && candidate.h === 3);
       const qaPos = room && [
@@ -507,6 +512,7 @@ export class GameScene extends Phaser.Scene {
       this.penaltyFlags = { p100: false, p150: false, p200: false, p250: false };
       this.shroomTurns = 0;
       this.torchTurns = 0;
+      this.lanternTurns = 0;
       this.invisTurns = 0;
       this.playerRootTurns = 0;
       this.itemSealTurns = 0;
@@ -2447,10 +2453,10 @@ export class GameScene extends Phaser.Scene {
   resolveMonsterDeathGimmick(e: Enemy) {
     const dist = Math.abs(this.player.x - e.x) + Math.abs(this.player.y - e.y);
     if (e.def.gimmick === 'lantern') {
-      this.shroomTurns = Math.max(this.shroomTurns, 5);
+      this.lanternTurns = Math.max(this.lanternTurns, 5);
       this.updateVisibility();
       this.effectFx(e.x, e.y, 'fx_magic', 1.4, 420, 0xffc95a);
-      this.log('ランタンの光で5ターンの間、視界が広がった。', 'special');
+      this.log('ランタンの光で5ターンの間、壁を越えて上下左右10マスまで明るくなった！', 'special');
     }
     if ((e.def.gimmick === 'shatter' || e.def.gimmick === 'death_burst') && dist <= 1) {
       const fiery = e.def.gimmick === 'death_burst';
@@ -2771,6 +2777,10 @@ export class GameScene extends Phaser.Scene {
     if (this.torchTurns > 0) {
       this.torchTurns--;
       if (this.torchTurns === 0) this.log('松明の火が消え、視界が元に戻った。', 'sys');
+    }
+    if (this.lanternTurns > 0) {
+      this.lanternTurns--;
+      if (this.lanternTurns === 0) this.log('ランタンの光が消え、視界が元に戻った。', 'sys');
     }
     // 透明化の残りターンを進める
     if (this.invisTurns > 0) {
@@ -3525,9 +3535,9 @@ export class GameScene extends Phaser.Scene {
 
   updateVisibility() {
     const d = this.dungeon;
-    const torchRadius = this.torchTurns > 0 ? this.lightRadius * 2 : this.lightRadius;
+    const wallPiercingLight = this.torchTurns > 0 || this.lanternTurns > 0;
     const shroomRadius = this.shroomTurns > 0 ? 7 : this.lightRadius;
-    const radius = Math.max(this.lightRadius, torchRadius, shroomRadius);
+    const radius = wallPiercingLight ? 10 : Math.max(this.lightRadius, shroomRadius);
     const bossRoomConcealed = !!d.bossRoom && !!d.bossEntry
       && !this.isInsideBossRoom(this.player.x, this.player.y);
     const isConcealedBossCell = (x: number, y: number) => bossRoomConcealed && !!d.bossRoom
@@ -3542,7 +3552,7 @@ export class GameScene extends Phaser.Scene {
     for (let y = 0; y < d.h; y++) {
       for (let x = 0; x < d.w; x++) {
         const cheb = Math.max(Math.abs(x - this.player.x), Math.abs(y - this.player.y));
-        let vis = cheb <= radius && this.hasVisionLine(this.player.x, this.player.y, x, y);
+        let vis = cheb <= radius && (wallPiercingLight || this.hasVisionLine(this.player.x, this.player.y, x, y));
         const insideConcealedRoom = isConcealedBossCell(x, y);
         const isEntryDoor = !!d.bossEntry && x === d.bossEntry.x && y === d.bossEntry.y;
         if (insideConcealedRoom && !isEntryDoor) vis = false;
@@ -3564,6 +3574,8 @@ export class GameScene extends Phaser.Scene {
             const wallY = y + dy;
             const wallTile = d.tiles[wallY]?.[wallX];
             if (wallTile !== 'wall' && wallTile !== 'door') continue;
+            if (wallPiercingLight
+              && Math.max(Math.abs(wallX - this.player.x), Math.abs(wallY - this.player.y)) > radius) continue;
             const isEntryDoor = !!d.bossEntry && wallX === d.bossEntry.x && wallY === d.bossEntry.y;
             if (isConcealedBossCell(wallX, wallY) && !isEntryDoor) continue;
             visible[wallY][wallX] = true;
@@ -3756,7 +3768,7 @@ export class GameScene extends Phaser.Scene {
       case 'torch': {
         this.torchTurns = 10;
         this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.45, 460, 0xffa52f);
-        this.log('松明に火を灯した！ 10ターンの間、視界が通常の2倍になる。', 'item');
+        this.log('松明に火を灯した！ 10ターンの間、壁を越えて上下左右10マスまで明るくなる。', 'item');
         Audio.playSe('pickup');
         passTurn = false;
         break;
