@@ -2,8 +2,8 @@ import Phaser from 'phaser';
 import { TILE } from '../textures';
 import { generateDungeon, generateBossArena, DungeonData, randomFloor, isWalkable } from '../dungeon';
 import type { BossRoomZone } from '../dungeon';
-import { getTheme, eraSuffix, MONSTER_DEFS, makeItem, gradeColor, ITEM_DEFS, ELEMENT_INFO, monsterElement } from '../data';
-import type { Dir, EquipmentGrade, ItemKind, MonsterDef, Shield, TileType, Vec2, Weapon } from '../types';
+import { getTheme, eraSuffix, MONSTER_DEFS, WEAPON_DEFS, makeItem, gradeColor, ITEM_DEFS, ELEMENT_INFO, monsterElement } from '../data';
+import type { Dir, Element, EquipmentGrade, ItemKind, MonsterDef, Shield, TileType, Vec2, Weapon } from '../types';
 import {
   Player, rollWeaponByGrade, rollShield, rollShieldByGrade,
   weaponFullName, shieldFullName, makeWeapon, makeShield
@@ -150,7 +150,7 @@ type BossGimmickKind =
   | 'mid_fire' | 'mid_frost' | 'mid_storm' | 'mid_void' | 'mid_bone' | 'mid_poison'
   | 'bull_charge' | 'furnace_titan' | 'azure_flight' | 'ancient_fire' | 'tri_head';
 
-type BossHazardKind = 'fire' | 'ice' | 'poison';
+type BossHazardKind = 'fire' | 'ice' | 'poison' | 'slow' | 'web' | 'lightning';
 type BossStrikeChannel = 'primary' | 'secondary' | 'tertiary';
 type BossImpactKind = 'fire' | 'ice' | 'lightning' | 'void' | 'bone' | 'poison' | 'impact';
 
@@ -218,6 +218,7 @@ export class GameScene extends Phaser.Scene {
   shopPurchases = { potion: 0, stone: 0, shieldstone: 0 };
   clickPathToken = 0;
   clickPathActive = false;
+  lastMapClickAt = 0;
   qaBossMode = false;
   qaBossRoomZone?: BossRoomZone;
 
@@ -237,6 +238,8 @@ export class GameScene extends Phaser.Scene {
   discovered: Set<string> = new Set();
   pendingEquipment: PendingEquipment | null = null;
   secretDualUnlocked = false;
+  playerRootTurns = 0;
+  itemSealTurns = 0;
 
   playerSprite!: Phaser.GameObjects.Image;
   playerShadow?: Phaser.GameObjects.Image; // 足元の影（接地感）
@@ -333,6 +336,7 @@ export class GameScene extends Phaser.Scene {
     this.shopPurchases = { potion: 0, stone: 0, shieldstone: 0 };
     this.clickPathToken = 0;
     this.clickPathActive = false;
+    this.lastMapClickAt = 0;
     this.discovered = location.hostname === 'localhost' && qaParams.has('qa-codex')
       ? new Set(MONSTER_DEFS.map((monster) => monster.key))
       : new Set();
@@ -473,6 +477,8 @@ export class GameScene extends Phaser.Scene {
       this.shroomTurns = 0;
       this.smokeTurns = 0;
       this.invisTurns = 0;
+      this.playerRootTurns = 0;
+      this.itemSealTurns = 0;
       this.bossRewardClaimed = false;
       this.weaponWonThisFloor = false;
       this.shopPurchases = { potion: 0, stone: 0, shieldstone: 0 };
@@ -793,7 +799,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   spawnEnemies(floor: number) {
-    const pool = MONSTER_DEFS.filter((m) => m.minFloor <= floor && floor <= m.maxFloor && !m.isBoss);
+    const pool = MONSTER_DEFS.filter((m) =>
+      m.minFloor <= floor && floor <= m.maxFloor && !m.isBoss && !m.isTreasureRabbit
+    );
     if (this.inBossRoom) {
       const mobCount = floor % 10 === 0 ? 5 : floor % 5 === 0 ? 4 : Math.min(4, 2 + Math.floor(floor / 12));
       for (let i = 0; i < mobCount; i++) {
@@ -817,7 +825,28 @@ export class GameScene extends Phaser.Scene {
       if (this.distToPlayer(pos.x, pos.y) < 4) continue;
       this.addEnemy(def, pos.x, pos.y, 1 + floor * 0.04);
     }
+    if (floor === 30) {
+      const watcher = MONSTER_DEFS.find((monster) => monster.key === 'm_watcher');
+      const watcherPos = randomFloor(this.dungeon, [this.dungeon.start, ...arenaCells, ...this.occupiedPositions()]);
+      if (watcher && watcherPos && this.distToPlayer(watcherPos.x, watcherPos.y) >= 5) {
+        this.addEnemy(watcher, watcherPos.x, watcherPos.y, 1.15);
+        this.log('最深部を巡回するコアウォッチャーの光が走った。', 'dmg');
+      }
+    }
+    this.maybeSpawnTreasureRabbit(floor);
     if (floor !== 5) this.spawnMidBossDragon(floor, !this.dungeon.bossRoom);
+  }
+
+  maybeSpawnTreasureRabbit(floor: number) {
+    const def = MONSTER_DEFS.find((monster) => monster.isTreasureRabbit);
+    if (!def || floor < def.minFloor || floor > def.maxFloor) return;
+    const qaForced = location.hostname === 'localhost'
+      && new URLSearchParams(location.search).has('qa-rare-rabbit');
+    if (!qaForced && Math.random() >= 0.025) return;
+    const pos = randomFloor(this.dungeon, [...this.occupiedPositions(), ...this.bossRoomCells()]);
+    if (!pos || this.distToPlayer(pos.x, pos.y) < 5) return;
+    this.addEnemy(def, pos.x, pos.y, 1 + floor * 0.025);
+    this.log('どこかでまばゆい金色の気配が走った…！', 'special');
   }
 
   floorHasGate(floor: number): boolean {
@@ -1042,11 +1071,30 @@ export class GameScene extends Phaser.Scene {
     const e = new Enemy(def, x, y, hpScale);
     e.shadow = this.add.image(0, 0, 'shadow').setDepth(9.5).setAlpha(0.6);
     e.sprite = this.add.image(0, 0, def.key).setDepth(10).setOrigin(0.5, 0.6);
-    const maxDim = def.isBoss || def.isFloorBoss ? 40 : def.isElite ? 34 : def.isDragonType ? 30 : 26;
+    const maxDim = def.isBoss || def.isFloorBoss ? 40
+      : def.isTreasureRabbit ? 32
+      : def.isElite ? 34
+      : def.isDragonType ? 30
+      : 26;
     const tex = this.textures.get(def.key).getSourceImage();
     const sc = maxDim / Math.max(tex.width, tex.height);
     e.sprite.setScale(sc);
     if (def.bossTint) e.sprite.setTint(def.bossTint);
+    if (def.isDarkNinja) {
+      e.sprite.setAlpha(0.08);
+      e.shadow.setAlpha(0.12);
+    }
+    if (def.gimmick === 'mimic') {
+      e.sprite.setTexture('chest_common').setAlpha(0.92);
+      e.shadow.setAlpha(0.35);
+    } else if (def.gimmick === 'ambush') {
+      e.sprite.setAlpha(0.1);
+      e.shadow.setAlpha(0.08);
+    } else if (def.gimmick === 'statue') {
+      e.sprite.setTint(0x777c83);
+    } else if (def.gimmick === 'phase' || def.gimmick === 'wraith_phase') {
+      e.sprite.setAlpha(def.gimmick === 'wraith_phase' ? 0.42 : 0.68);
+    }
     e.baseScale = sc;
     e.bobPhase = Math.random() * Math.PI * 2;
     this.placeSprite(e.sprite, x, y);
@@ -1054,6 +1102,7 @@ export class GameScene extends Phaser.Scene {
     e.shadow.setDepth(e.sprite.depth - 0.22);
     // 最終ボスは足元に特殊オーラ（中ボス/強ボスはspawnBossで付与）
     if (def.isBoss) this.attachAura(e, maxDim, 0x4fd0ff);
+    else if (def.isTreasureRabbit) this.attachAura(e, maxDim, 0xffdc55);
     e.sprite.setInteractive({ useHandCursor: true });
     e.sprite.on('pointerdown', () => this.showEnemyInfo(e));
     this.enemies.push(e);
@@ -1102,6 +1151,11 @@ export class GameScene extends Phaser.Scene {
     const tile = this.dungeon.tiles[y]?.[x];
     const insideGimmickArea = this.dungeon.bossRoom ? this.isInsideBossRoom(x, y) : true;
     return insideGimmickArea && !!tile && isWalkable(tile) && tile !== 'pit' && tile !== 'stairs';
+  }
+
+  validMonsterTile(x: number, y: number): boolean {
+    const tile = this.dungeon.tiles[y]?.[x];
+    return !!tile && isWalkable(tile) && tile !== 'pit' && tile !== 'stairs' && tile !== 'door';
   }
 
   uniqueBossTiles(tiles: Vec2[]): Vec2[] {
@@ -1608,10 +1662,15 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  addBossHazards(tiles: Vec2[], kind: BossHazardKind, turns: number) {
-    const color = kind === 'fire' ? 0xff5b35 : kind === 'ice' ? 0x55cfff : 0x9c55d9;
+  addBossHazards(tiles: Vec2[], kind: BossHazardKind, turns: number, restrictToBossRoom = true) {
+    const color = kind === 'fire' ? 0xff5b35
+      : kind === 'ice' ? 0x55cfff
+      : kind === 'poison' ? 0x9c55d9
+      : kind === 'web' ? 0xd7e8ef
+      : kind === 'lightning' ? 0xffdb45
+      : 0x62b86c;
     for (const tile of tiles) {
-      if (!this.validBossTile(tile.x, tile.y)) continue;
+      if (!(restrictToBossRoom ? this.validBossTile(tile.x, tile.y) : this.validMonsterTile(tile.x, tile.y))) continue;
       const existing = this.bossHazards.find((hazard) => hazard.x === tile.x && hazard.y === tile.y && hazard.kind === kind);
       if (existing) { existing.turns = Math.max(existing.turns, turns); continue; }
       const sprite = this.add.rectangle(
@@ -1629,6 +1688,9 @@ export class GameScene extends Phaser.Scene {
     }
     if (standing.some((hazard) => hazard.kind === 'poison')) {
       this.player.poisonTurns = Math.max(this.player.poisonTurns, 2);
+    }
+    if (standing.some((hazard) => hazard.kind === 'lightning')) {
+      this.damagePlayer(2 + Math.floor(this.floor / 8), '雷床が弾けた！');
     }
     for (const hazard of [...this.bossHazards]) {
       hazard.turns--;
@@ -1653,6 +1715,13 @@ export class GameScene extends Phaser.Scene {
     if (hazards.some((hazard) => hazard.kind === 'poison')) {
       this.player.poisonTurns = Math.max(this.player.poisonTurns, 3);
       this.log('毒沼を踏み、毒状態になった！', 'dmg');
+    }
+    if (hazards.some((hazard) => hazard.kind === 'slow' || hazard.kind === 'web')) {
+      this.playerRootTurns = Math.max(this.playerRootTurns, 1);
+      this.log(hazards.some((hazard) => hazard.kind === 'web') ? '糸に絡まり、次の移動が止まる！' : '足場に絡まり、次の移動が止まる！', 'dmg');
+    }
+    if (hazards.some((hazard) => hazard.kind === 'lightning')) {
+      this.damagePlayer(3 + Math.floor(this.floor / 8), '雷床を踏んだ！');
     }
   }
 
@@ -1800,6 +1869,15 @@ export class GameScene extends Phaser.Scene {
           Audio.playSe('deny');
         }
         this.emitRefresh();
+        return;
+      }
+
+      if (this.playerRootTurns > 0) {
+        this.busy = true;
+        this.log('足を取られて移動できない！', 'dmg');
+        this.effectFx(this.player.x, this.player.y, 'fx_hit', 0.9, 220, 0x9ad5b0);
+        await this.finishTurn();
+        this.busy = false;
         return;
       }
 
@@ -1971,6 +2049,76 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ============ 戦闘 ============
+  attackSide(e: Enemy): 'front' | 'back' | 'side' {
+    const [fx, fy] = this.dirVec(e.facing);
+    const rx = this.player.x - e.x;
+    const ry = this.player.y - e.y;
+    if (rx === fx && ry === fy) return 'front';
+    if (rx === -fx && ry === -fy) return 'back';
+    return 'side';
+  }
+
+  playerDamageAgainstGimmick(e: Enemy, baseDamage: number): number {
+    let factor = 1;
+    const side = this.attackSide(e);
+    switch (e.def.gimmick) {
+      case 'phase':
+        if (e.vulnerableTurns <= 0) factor *= 0.35;
+        break;
+      case 'wraith_phase':
+        if (e.vulnerableTurns <= 0) factor *= 0.12;
+        break;
+      case 'shell_guard':
+        if (side === 'front' && e.guardOpenTurns <= 0) factor *= e.def.key === 'm_bone_hound' ? 0.4 : 0.5;
+        break;
+      case 'knight_guard':
+      case 'golem_guard':
+      case 'guardian':
+        if (side === 'front' && e.guardOpenTurns <= 0) factor *= 0.5;
+        break;
+      case 'rear_weak':
+        if (side === 'front') factor *= 0.5;
+        else if (side === 'back') factor *= 1.5;
+        break;
+      case 'stance':
+        if (e.gimmickPhase === 1) factor *= 0.6;
+        break;
+      case 'statue':
+      case 'ambush':
+        if (!e.awakened) factor *= 0.3;
+        break;
+      case 'stealth':
+        factor *= e.stealthRevealed ? 1.5 : 0.65;
+        break;
+      case 'parry':
+        e.gimmickPhase++;
+        if (side === 'front' && e.gimmickPhase % 3 === 0) {
+          factor *= 0.2;
+          const counter = 2 + Math.floor(this.floor / 8);
+          this.damagePlayer(counter, `${e.def.name}の受け流し反撃！`, e);
+          this.effectFx(this.player.x, this.player.y, 'fx_slash', 1.0, 240, 0xff7548);
+        }
+        break;
+    }
+    if (e.revived) factor *= 1.5;
+    return Math.max(1, Math.floor(baseDamage * factor));
+  }
+
+  afterPlayerHitGimmick(e: Enemy, weaponElement?: Element) {
+    if (e.def.gimmick === 'regen') e.gimmickCounter = 0;
+    if (e.def.gimmick === 'hydra_regen' && weaponElement === 'fire') {
+      e.regenBlockedTurns = 4;
+      this.log(`${e.def.name}の再生を火属性で止めた！`, 'special');
+    }
+    if ((e.def.gimmick === 'mimic' || e.def.gimmick === 'statue' || e.def.gimmick === 'ambush') && !e.awakened) {
+      e.awakened = true;
+      if (e.def.gimmick === 'mimic') e.sprite.setTexture(e.def.key).setScale(e.baseScale);
+      e.sprite.setAlpha(1).clearTint();
+      e.shadow?.setAlpha(0.55);
+      this.log(`${e.def.name}が攻撃を受けて正体を現した！`, 'dmg');
+    }
+  }
+
   async playerAttack(e: Enemy, dir: Dir, ranged = false) {
     if (e.def.isFloorBoss && this.dungeon.bossRoom
       && (!this.isInsideBossRoom(this.player.x, this.player.y) || !this.isInsideBossRoom(e.x, e.y))) {
@@ -2047,7 +2195,9 @@ export class GameScene extends Phaser.Scene {
       attackingWeapon.specialCounter = (attackingWeapon.specialCounter ?? 0) + 1;
       knockbackReady = attackingWeapon.specialCounter % 3 === 0;
     }
-    e.hp -= res.damage;
+    const dealtDamage = this.playerDamageAgainstGimmick(e, res.damage);
+    e.hp -= dealtDamage;
+    this.afterPlayerHitGimmick(e, weaponElement);
     this.discovered.add(e.def.key);
     Audio.playSe('hit');
 
@@ -2059,7 +2209,7 @@ export class GameScene extends Phaser.Scene {
       });
     }
 
-    let msg = `${res.hits >= 2 ? '二連撃！ ' : ''}${e.def.name}に${res.damage}ダメージ`;
+    let msg = `${res.hits >= 2 ? '二連撃！ ' : ''}${e.def.name}に${dealtDamage}ダメージ`;
     if (res.crit) msg += '（会心！）';
     this.log(msg, res.crit ? 'special' : 'dmg');
     this.hitFx(e.x, e.y);
@@ -2096,7 +2246,14 @@ export class GameScene extends Phaser.Scene {
     this.playerSprite.setAngle(0).setScale(0.85);
     this.setPlayerVisual(dir, 'idle');
 
-    if (e.hp <= 0) {
+    if (e.hp <= 0 && e.def.gimmick === 'revive' && !e.revived) {
+      e.revived = true;
+      e.hp = Math.max(1, Math.floor(e.hpMax * 0.25));
+      e.sprite.setTint(0xc7eaff);
+      this.effectFx(e.x, e.y, 'fx_levelup', 1.6, 520, 0xc7eaff);
+      this.log(`${e.def.name}が骨を組み直して復活した！ 防御が崩れている。`, 'special');
+      this.drawEnemyHp(e);
+    } else if (e.hp <= 0) {
       this.killEnemy(e, res.killScoreBonus);
     } else {
       this.drawEnemyHp(e);
@@ -2112,23 +2269,32 @@ export class GameScene extends Phaser.Scene {
     this.log(`${def.name}を倒した！ EXP+${def.exp} G+${def.gold}`, 'gold');
     Audio.playSe('kill');
     if (leveled) { this.log(`レベルアップ！ Lv.${this.player.level} になった。`, 'special'); Audio.playSe('levelup'); this.levelupFx(); }
-    // 通常敵からは消耗品と素材を落とす。
-    if (def.key === 'm_snake' && Math.random() < 0.7) this.dropItem(e.x, e.y, 'oldkey');
-    // ゴールドは高確率で多めに
-    if (Math.random() < 0.7) this.dropItem(e.x, e.y, 'coin', def.gold * 3 + Math.floor(Math.random() * this.floor * 4));
-    // 通常消耗品とは別枠で抽選する。
-    if (Math.random() < 0.4) {
-      const pool: ItemKind[] = ['potion', 'smoke', 'warp', 'invis'];
-      this.dropItem(e.x, e.y, pool[Math.floor(Math.random() * pool.length)]);
-    }
-    // 強化スクロールは通常敵・エリート・ボス共通で1/3。
-    if (Math.random() < SCROLL_DROP_RATE) {
-      const scrollPool: ItemKind[] = ['stone', 'shieldstone'];
-      this.dropItem(e.x, e.y, scrollPool[Math.floor(Math.random() * scrollPool.length)]);
-    }
-    // エリート/ボスは超レアで復活の種。
-    if (def.isElite || def.isBoss) {
-      if (!this.reviveSeedSeen && Math.random() < 0.08) {
+    if (def.isTreasureRabbit) {
+      const ssElemental = WEAPON_DEFS.filter((weapon) => weapon.ss && weapon.element);
+      const rewardDef = ssElemental[Math.floor(Math.random() * ssElemental.length)];
+      if (rewardDef) {
+        const reward = makeWeapon(rewardDef.key, []);
+        reward.plus = Math.max(3, reward.plus);
+        this.dropEquipment(e.x, e.y, 'weapon', reward);
+        this.log(`福袋が弾けた！ 1000Gと属性付きSS武器 ${weaponFullName(reward)} を獲得！`, 'special');
+      }
+    } else {
+      // 通常敵からは消耗品と素材を落とす。
+      if (def.key === 'm_snake' && Math.random() < 0.7) this.dropItem(e.x, e.y, 'oldkey');
+      // ゴールドは高確率で多めに
+      if (Math.random() < 0.7) this.dropItem(e.x, e.y, 'coin', def.gold * 3 + Math.floor(Math.random() * this.floor * 4));
+      // 通常消耗品とは別枠で抽選する。
+      if (Math.random() < 0.4) {
+        const pool: ItemKind[] = ['potion', 'smoke', 'warp', 'invis'];
+        this.dropItem(e.x, e.y, pool[Math.floor(Math.random() * pool.length)]);
+      }
+      // 強化スクロールは通常敵・エリート・ボス共通で1/3。
+      if (Math.random() < SCROLL_DROP_RATE) {
+        const scrollPool: ItemKind[] = ['stone', 'shieldstone'];
+        this.dropItem(e.x, e.y, scrollPool[Math.floor(Math.random() * scrollPool.length)]);
+      }
+      // エリート/ボスは超レアで復活の種。
+      if ((def.isElite || def.isBoss) && !this.reviveSeedSeen && Math.random() < 0.08) {
         this.reviveSeedSeen = true;
         this.dropItem(e.x, e.y, 'revive');
         this.log('復活のタネがこぼれ落ちた…！ この冒険で現れるのは一度だけだ。', 'special');
@@ -2149,6 +2315,7 @@ export class GameScene extends Phaser.Scene {
     e.hpBar?.destroy();
     e.shadow?.destroy();
     this.enemies = this.enemies.filter((x) => x !== e);
+    this.resolveMonsterDeathGimmick(e);
 
     if (def.isFloorBoss) {
       this.unlockFloorGate(def.name, { x: e.x, y: e.y });
@@ -2230,6 +2397,49 @@ export class GameScene extends Phaser.Scene {
         : `${bossName}を撃破！ 報酬がその場にドロップし、5×5部屋内に階段が現れた。`, 'special');
     this.updateVisibility();
     this.emitRefresh();
+  }
+
+  resolveMonsterDeathGimmick(e: Enemy) {
+    const dist = Math.abs(this.player.x - e.x) + Math.abs(this.player.y - e.y);
+    if (e.def.gimmick === 'lantern') {
+      this.shroomTurns = Math.max(this.shroomTurns, 5);
+      this.updateVisibility();
+      this.effectFx(e.x, e.y, 'fx_magic', 1.4, 420, 0xffc95a);
+      this.log('ランタンの光で5ターンの間、視界が広がった。', 'special');
+    }
+    if ((e.def.gimmick === 'shatter' || e.def.gimmick === 'death_burst') && dist <= 1) {
+      const fiery = e.def.gimmick === 'death_burst';
+      this.damagePlayer((fiery ? 5 : 3) + Math.floor(this.floor / 10), fiery ? '迷い火の爆発！' : '砕けた氷片が飛び散った！', e);
+      this.effectFx(e.x, e.y, 'fx_magic', 1.5, 360, fiery ? 0xff8b42 : 0x8de9ff);
+    }
+    if (e.def.gimmick === 'split' && e.cloneDepth === 0) {
+      const spots = Phaser.Utils.Array.Shuffle([
+        { x: e.x + 1, y: e.y }, { x: e.x - 1, y: e.y },
+        { x: e.x, y: e.y + 1 }, { x: e.x, y: e.y - 1 }
+      ]);
+      let spawned = 0;
+      for (const spot of spots) {
+        if (spawned >= 2 || !this.validMonsterTile(spot.x, spot.y)) continue;
+        if (this.enemyAt(spot.x, spot.y) || this.player.x === spot.x && this.player.y === spot.y
+          || this.chestAt(spot.x, spot.y) || this.bossObstacleAt(spot.x, spot.y)) continue;
+        const fragmentDef: MonsterDef = {
+          ...e.def,
+          name: 'ミニゼリー',
+          hp: Math.max(4, Math.floor(e.def.hp * 0.35)),
+          atkMin: Math.max(1, Math.floor(e.def.atkMin * 0.65)),
+          atkMax: Math.max(2, Math.floor(e.def.atkMax * 0.65)),
+          exp: Math.max(1, Math.floor(e.def.exp * 0.2)),
+          gold: 0,
+          score: Math.max(1, Math.floor(e.def.score * 0.2))
+        };
+        const fragment = this.addEnemy(fragmentDef, spot.x, spot.y, 1);
+        fragment.cloneDepth = 1;
+        fragment.baseScale *= 0.72;
+        fragment.sprite.setScale(fragment.baseScale);
+        spawned++;
+      }
+      if (spawned > 0) this.log('ゼリークラウンが小型ゼリーへ分裂した！', 'dmg');
+    }
   }
 
   async knockbackEnemy(e: Enemy, dx: number, dy: number): Promise<boolean> {
@@ -2552,18 +2762,272 @@ export class GameScene extends Phaser.Scene {
   }
 
   spawnWanderer(elite: boolean) {
-    const pool = MONSTER_DEFS.filter((m) => m.minFloor <= this.floor && this.floor <= m.maxFloor && !m.isBoss && (elite ? m.isElite : true));
-    const usePool = pool.length ? pool : MONSTER_DEFS.filter((m) => !m.isBoss);
+    const pool = MONSTER_DEFS.filter((m) =>
+      m.minFloor <= this.floor && this.floor <= m.maxFloor && !m.isBoss && !m.isTreasureRabbit
+      && (elite ? m.isElite : true)
+    );
+    const usePool = pool.length ? pool : MONSTER_DEFS.filter((m) => !m.isBoss && !m.isTreasureRabbit);
     const def = usePool[Math.floor(Math.random() * usePool.length)];
     const pos = randomFloor(this.dungeon, this.occupiedPositions());
     if (!pos || this.distToPlayer(pos.x, pos.y) < 5) return;
     this.addEnemy(def, pos.x, pos.y, 1 + this.floor * 0.05);
   }
 
+  healEnemyFromGimmick(e: Enemy, amount: number, label?: string) {
+    if (amount <= 0 || e.hp >= e.hpMax) return;
+    const healed = Math.min(amount, e.hpMax - e.hp);
+    e.hp += healed;
+    this.drawEnemyHp(e);
+    this.effectFx(e.x, e.y, 'fx_heal', 0.85, 260, 0x75e89a);
+    if (label) this.log(`${e.def.name}${label}${healed}回復した。`, 'special');
+  }
+
+  summonGimmickMonsters(e: Enemy, key: string, count: number) {
+    const base = MONSTER_DEFS.find((monster) => monster.key === key);
+    if (!base) return;
+    const spots = Phaser.Utils.Array.Shuffle([
+      { x: e.x + 1, y: e.y }, { x: e.x - 1, y: e.y },
+      { x: e.x, y: e.y + 1 }, { x: e.x, y: e.y - 1 }
+    ]);
+    let spawned = 0;
+    for (const spot of spots) {
+      if (spawned >= count || !this.validMonsterTile(spot.x, spot.y)) continue;
+      if (this.enemyAt(spot.x, spot.y) || this.bossObstacleAt(spot.x, spot.y)
+        || this.player.x === spot.x && this.player.y === spot.y) continue;
+      const minionDef: MonsterDef = {
+        ...base,
+        name: `${base.name}（召喚）`,
+        hp: Math.max(8, Math.floor(base.hp * 0.65)),
+        exp: Math.max(1, Math.floor(base.exp * 0.4)),
+        gold: Math.max(0, Math.floor(base.gold * 0.25)),
+        score: Math.max(1, Math.floor(base.score * 0.4))
+      };
+      const minion = this.addEnemy(minionDef, spot.x, spot.y, 1);
+      minion.cloneDepth = 1;
+      this.effectFx(spot.x, spot.y, 'fx_magic', 1.1, 320, e.def.color);
+      spawned++;
+    }
+  }
+
+  nearbyGimmickDestination(e: Enemy): Vec2 | null {
+    const candidates = Phaser.Utils.Array.Shuffle([
+      { x: this.player.x + 1, y: this.player.y }, { x: this.player.x - 1, y: this.player.y },
+      { x: this.player.x, y: this.player.y + 1 }, { x: this.player.x, y: this.player.y - 1 }
+    ]);
+    return candidates.find((spot) => this.passable(e, spot.x, spot.y)) ?? null;
+  }
+
+  resolveMonsterCharge(e: Enemy, maxSteps: number, factor: number, label: string): Promise<void> | undefined {
+    const dir = e.chargeDir;
+    if (!dir) return undefined;
+    let end = { x: e.x, y: e.y };
+    let hit = false;
+    for (let step = 0; step < maxSteps; step++) {
+      const nx = end.x + dir.x;
+      const ny = end.y + dir.y;
+      if (nx === this.player.x && ny === this.player.y) {
+        this.damagePlayerFromBoss(e, factor, label);
+        hit = true;
+        break;
+      }
+      if (!this.passable(e, nx, ny)) break;
+      end = { x: nx, y: ny };
+    }
+    e.charging = false;
+    e.chargeDir = null;
+    e.sprite.clearTint();
+    if (end.x === e.x && end.y === e.y && !hit) {
+      e.stunnedTurns = Math.max(e.stunnedTurns, 1);
+      this.log(`${e.def.name}は壁際で体勢を崩した！`, 'special');
+      return undefined;
+    }
+    e.x = end.x;
+    e.y = end.y;
+    e.animating = true;
+    return this.tween(e.sprite, { x: end.x * TILE + TILE / 2, y: end.y * TILE + TILE / 2 }, 170, 'Cubic.easeIn').then(() => {
+      e.animating = false;
+      this.effectFx(e.x, e.y, 'fx_hit', 1.3, 300, e.def.color);
+    });
+  }
+
+  handleMonsterGimmickTurn(e: Enemy): { handled: boolean; animation?: Promise<void> } {
+    if (e.def.isFloorBoss) return { handled: false };
+    if (e.vulnerableTurns > 0) {
+      e.vulnerableTurns--;
+      if (e.vulnerableTurns === 0) {
+        if (e.def.gimmick === 'phase') e.sprite.setAlpha(0.68);
+        if (e.def.gimmick === 'wraith_phase') e.sprite.setAlpha(0.42);
+      }
+    }
+    if (e.guardOpenTurns > 0) e.guardOpenTurns--;
+    if (e.regenBlockedTurns > 0) e.regenBlockedTurns--;
+    if (e.stunnedTurns > 0) {
+      e.stunnedTurns--;
+      this.log(`${e.def.name}は体勢を崩して動けない。`, 'special');
+      return { handled: true };
+    }
+
+    const dx = this.player.x - e.x;
+    const dy = this.player.y - e.y;
+    const dist = Math.abs(dx) + Math.abs(dy);
+    e.gimmickCounter++;
+
+    if (e.def.gimmick === 'stance') e.gimmickPhase = (e.gimmickPhase + 1) % 2;
+    if (e.def.gimmick === 'regen' && e.gimmickCounter % 3 === 0) {
+      this.healEnemyFromGimmick(e, Math.max(1, Math.floor(e.hpMax * 0.06)), 'が苔の力で');
+    }
+    if (e.def.gimmick === 'hydra_regen' && e.regenBlockedTurns <= 0) {
+      this.healEnemyFromGimmick(e, Math.max(1, Math.floor(e.hpMax * 0.03)));
+    }
+    if (e.def.gimmick === 'heat_aura' && dist === 1) {
+      this.damagePlayer(2 + Math.floor(this.floor / 10), `${e.def.name}の熱気！`, e);
+    }
+
+    if ((e.def.gimmick === 'statue' || e.def.gimmick === 'mimic' || e.def.gimmick === 'ambush') && !e.awakened) {
+      if (dist > 2) return { handled: true };
+      e.awakened = true;
+      if (e.def.gimmick === 'mimic') e.sprite.setTexture(e.def.key).setScale(e.baseScale).setAlpha(1);
+      else e.sprite.setAlpha(1).clearTint();
+      e.shadow?.setAlpha(0.55);
+      this.effectFx(e.x, e.y, 'fx_magic', 1.1, 300, e.def.color);
+      this.log(`${e.def.name}が正体を現した！`, 'dmg');
+      return { handled: true };
+    }
+
+    if (e.def.gimmick === 'burrow') {
+      if (e.charging) {
+        e.charging = false;
+        const destination = this.nearbyGimmickDestination(e);
+        if (destination) this.teleportBoss(e, destination);
+        e.sprite.setAlpha(1);
+        e.shadow?.setAlpha(0.55);
+        this.log(`${e.def.name}が地中から飛び出した！`, 'dmg');
+        return { handled: true };
+      }
+      if (e.gimmickCounter % 3 === 0) {
+        e.charging = true;
+        e.sprite.setAlpha(0.05);
+        e.shadow?.setAlpha(0.03);
+        this.log(`${e.def.name}が地中へ潜った。`, 'sys');
+        return { handled: true };
+      }
+    }
+
+    if (e.def.gimmick === 'warp' && e.gimmickCounter % 4 === 0) {
+      const destination = this.nearbyGimmickDestination(e);
+      if (destination) {
+        this.teleportBoss(e, destination);
+        this.log(`${e.def.name}が空間を越えて接近した！`, 'dmg');
+        return { handled: true };
+      }
+    }
+
+    if (e.def.gimmick === 'summon' && !e.summoned && e.hp <= e.hpMax * 0.5) {
+      e.summoned = true;
+      this.summonGimmickMonsters(e, 'm_horn_demon', 1);
+      this.log(`${e.def.name}が双角デーモンを召喚した！`, 'dmg');
+      return { handled: true };
+    }
+    if (e.def.gimmick === 'necromancy' && !e.summoned && e.hp <= e.hpMax * 0.5) {
+      e.summoned = true;
+      this.summonGimmickMonsters(e, 'm_grave_crawler', 2);
+      this.log(`${e.def.name}が墓這いを呼び起こした！`, 'dmg');
+      return { handled: true };
+    }
+
+    if (e.def.gimmick === 'root' && dist <= 2 && e.gimmickCounter % 3 === 0) {
+      this.playerRootTurns = Math.max(this.playerRootTurns, 1);
+      this.effectFx(this.player.x, this.player.y, 'fx_poison', 1.0, 280, 0x6fc66e);
+      this.log(`${e.def.name}の根が足に絡みついた！`, 'dmg');
+      return { handled: true };
+    }
+
+    if (e.def.gimmick === 'pull' && dist >= 2 && dist <= 4 && (dx === 0 || dy === 0)
+      && this.lineOfSight(e.x, e.y, this.player.x, this.player.y)) {
+      const destination = { x: this.player.x - Math.sign(dx), y: this.player.y - Math.sign(dy) };
+      const tile = this.dungeon.tiles[destination.y]?.[destination.x];
+      if (tile && isWalkable(tile) && tile !== 'pit' && !this.enemyAt(destination.x, destination.y)
+        && !this.chestAt(destination.x, destination.y) && !this.bossObstacleAt(destination.x, destination.y)) {
+        this.player.x = destination.x;
+        this.player.y = destination.y;
+        this.log(`${e.def.name}の鎖に引き寄せられた！`, 'dmg');
+        const animation = this.tween(this.playerSprite, {
+          x: destination.x * TILE + TILE / 2, y: destination.y * TILE + TILE / 2
+        }, 150, 'Cubic.easeIn').then(() => this.onEnterTile(destination.x, destination.y));
+        return { handled: true, animation };
+      }
+    }
+
+    if (e.def.gimmick === 'rush' && dist >= 2 && dist <= 5 && (dx === 0 || dy === 0)) {
+      const step = { x: Math.sign(dx), y: Math.sign(dy) };
+      let destination = { x: e.x, y: e.y };
+      for (let i = 0; i < Math.min(2, dist - 1); i++) {
+        const next = { x: destination.x + step.x, y: destination.y + step.y };
+        if (!this.passable(e, next.x, next.y)) break;
+        destination = next;
+      }
+      if (destination.x !== e.x || destination.y !== e.y) {
+        e.x = destination.x;
+        e.y = destination.y;
+        this.log(`${e.def.name}が一直線に駆け寄った！`, 'dmg');
+        return { handled: true, animation: this.animateEnemyMove(e, destination) };
+      }
+    }
+
+    const chargeLike = e.def.gimmick === 'charge' || e.def.gimmick === 'bull_charge';
+    if (chargeLike && e.charging) {
+      return {
+        handled: true,
+        animation: this.resolveMonsterCharge(e, e.def.gimmick === 'bull_charge' ? 5 : 3, 1.2, `${e.def.name}の突進！`)
+      };
+    }
+    if (chargeLike && dist >= 2 && dist <= 6 && (dx === 0 || dy === 0)
+      && this.lineOfSight(e.x, e.y, this.player.x, this.player.y)) {
+      e.charging = true;
+      e.chargeDir = { x: Math.sign(dx), y: Math.sign(dy) };
+      e.sprite.setTint(0xffd05a);
+      this.effectFx(e.x, e.y, 'fx_levelup', 0.85, 280, 0xffd05a);
+      this.log(`${e.def.name}が突進の構え！ 横へ避けろ。`, 'dmg');
+      return { handled: true };
+    }
+
+    const laserLike = e.def.gimmick === 'laser_lock' || e.def.gimmick === 'core_laser';
+    if (laserLike && e.charging) {
+      const sameLine = e.def.gimmick === 'core_laser'
+        ? (this.player.x === e.x || this.player.y === e.y)
+        : (e.chargeDir?.x === 0 ? this.player.x === e.x : this.player.y === e.y);
+      if (sameLine && this.lineOfSight(e.x, e.y, this.player.x, this.player.y)) {
+        this.damagePlayerFromBoss(e, e.def.gimmick === 'core_laser' ? 1.35 : 1.05, `${e.def.name}の照準レーザー！`);
+        this.effectFx(this.player.x, this.player.y, 'fx_bolt', 1.5, 360, 0xff4fc8);
+      }
+      e.charging = false;
+      e.chargeDir = null;
+      e.sprite.clearTint();
+      return { handled: true };
+    }
+    if (laserLike && dist <= 6 && (dx === 0 || dy === 0)
+      && this.lineOfSight(e.x, e.y, this.player.x, this.player.y)) {
+      e.charging = true;
+      e.chargeDir = { x: Math.sign(dx), y: Math.sign(dy) };
+      e.sprite.setTint(0xff4fc8);
+      this.log(`${e.def.name}が射線を固定した！ 次のターンにレーザーが来る。`, 'dmg');
+      return { handled: true };
+    }
+
+    return { handled: false };
+  }
+
   async enemyTurn() {
     const anims: Promise<void>[] = [];
     for (const e of this.enemies) {
       if (!e.alive) continue;
+      // 3歩目に現れた闇忍者は、プレイヤーが1回行動したら再び闇へ溶ける。
+      if (e.def.isDarkNinja && e.stealthRevealed) {
+        e.stealthRevealed = false;
+        e.sprite.setAlpha(0.08);
+        e.shadow?.setAlpha(0.08);
+        e.hpBar?.setAlpha(0.08);
+      }
       if (e.def.isFloorBoss && this.dungeon.bossRoom && !this.isInsideBossRoom(this.player.x, this.player.y)) continue;
       // 状態異常
       if (e.freezeTurns > 0) {
@@ -2585,6 +3049,11 @@ export class GameScene extends Phaser.Scene {
         if (bossTurn.animation) anims.push(bossTurn.animation);
         continue;
       }
+      const gimmickTurn = this.handleMonsterGimmickTurn(e);
+      if (gimmickTurn.handled) {
+        if (gimmickTurn.animation) anims.push(gimmickTurn.animation);
+        continue;
+      }
       // slow：2ターンに1回
       if (e.def.behavior === 'slow') {
         e.slowToggle = !e.slowToggle;
@@ -2603,6 +3072,21 @@ export class GameScene extends Phaser.Scene {
     const dist = Math.abs(dxp) + Math.abs(dyp);
     // 透明化中は敵から完全に見えない（攻撃されず追跡もされない）
     const unseen = this.invisTurns > 0;
+
+    // 福袋うさぎは一切攻撃せず、毎ターンできるだけプレイヤーから離れる。
+    if (e.def.isTreasureRabbit) {
+      const escape = this.stepAway(e, this.player.x, this.player.y);
+      if (!escape) return null;
+      const moveDx = escape.x - e.x;
+      const moveDy = escape.y - e.y;
+      if (Math.abs(moveDx) > Math.abs(moveDy)) e.facing = moveDx > 0 ? 'right' : 'left';
+      else if (moveDy !== 0) e.facing = moveDy > 0 ? 'down' : 'up';
+      e.x = escape.x;
+      e.y = escape.y;
+      return this.animateEnemyMove(e, escape);
+    }
+    if (this.playerRootTurns > 0) this.playerRootTurns--;
+    if (this.itemSealTurns > 0) this.itemSealTurns--;
 
     // 隣接なら攻撃
     if (dist === 1 && !unseen) {
@@ -2636,12 +3120,15 @@ export class GameScene extends Phaser.Scene {
         break;
     }
     if (mv) {
+      const from = { x: e.x, y: e.y };
       const moveDx = mv.x - e.x;
       const moveDy = mv.y - e.y;
       if (Math.abs(moveDx) > Math.abs(moveDy)) e.facing = moveDx > 0 ? 'right' : 'left';
       else if (moveDy !== 0) e.facing = moveDy > 0 ? 'down' : 'up';
       e.x = mv.x;
       e.y = mv.y;
+      e.moveSteps++;
+      this.afterEnemyMoved(e, from);
       return this.animateEnemyMove(e, mv);
     }
     return null;
@@ -2649,6 +3136,12 @@ export class GameScene extends Phaser.Scene {
 
   animateEnemyMove(e: Enemy, mv: Vec2): Promise<void> {
     e.animating = true;
+    if (e.def.isDarkNinja) {
+      e.stealthRevealed = e.moveSteps % 3 === 0;
+      e.sprite.setAlpha(e.stealthRevealed ? 1 : 0.08);
+      e.shadow?.setAlpha(e.stealthRevealed ? 0.55 : 0.08);
+      if (e.stealthRevealed) this.effectFx(mv.x, mv.y, 'fx_magic', 0.8, 220, 0x9e55ff);
+    }
     const targetX = mv.x * TILE + TILE / 2;
     const targetY = mv.y * TILE + TILE / 2;
     const flying = !!e.def.wallPass || /drake|dragon|wyrm|wyvern|moth|fiend|lich/.test(e.def.key);
@@ -2672,9 +3165,107 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  afterEnemyMoved(e: Enemy, from: Vec2) {
+    if (e.moveSteps % 3 !== 0) return;
+    switch (e.def.gimmick) {
+      case 'vine_trail':
+        this.addBossHazards([from], 'slow', 4, false);
+        this.log(`${e.def.name}が床にツタを残した。`, 'sys');
+        break;
+      case 'web_trail':
+        this.addBossHazards([from], 'web', 5, false);
+        this.log(`${e.def.name}が粘着糸を張った。`, 'sys');
+        break;
+      case 'ice_trail':
+        this.addBossHazards([from], 'ice', 4, false);
+        break;
+      case 'storm_trail':
+        this.addBossHazards([from], 'lightning', 3, false);
+        break;
+    }
+  }
+
+  enemyAttackProfile(e: Enemy): { element: Element; factor: number; label: string } {
+    let element = monsterElement(e.def);
+    let factor = 1;
+    let label = '';
+    if (e.def.gimmick === 'element_cycle') {
+      const cycle: Element[] = ['fire', 'ice', 'thunder'];
+      element = cycle[e.gimmickPhase % cycle.length];
+      e.gimmickPhase++;
+      label = `${ELEMENT_INFO[element].name}変換・`;
+    }
+    if (['fire_breath', 'heat', 'multi_bite', 'starfall'].includes(e.def.gimmick ?? '')) {
+      e.gimmickPhase++;
+      if (e.gimmickPhase % 3 === 0) {
+        factor *= e.def.gimmick === 'multi_bite' ? 1.55 : 1.4;
+        label = e.def.gimmick === 'fire_breath' ? '火炎ブレス・'
+          : e.def.gimmick === 'heat' ? '過熱攻撃・'
+          : e.def.gimmick === 'multi_bite' ? '三首連撃・'
+          : '星弾・';
+      }
+    }
+    if (e.def.gimmick === 'enrage' && e.hp <= e.hpMax * 0.5) {
+      factor *= 1.35;
+      label = '怒り・';
+    }
+    if (e.def.gimmick === 'execute' && this.player.hp <= this.player.hpMax * 0.3) {
+      factor *= 1.65;
+      label = '処刑斬り・';
+    }
+    if (e.def.gimmick === 'stance' && e.gimmickPhase === 0) {
+      factor *= 1.25;
+      label = '攻撃姿勢・';
+    }
+    return { element, factor, label };
+  }
+
+  afterEnemyHitGimmick(e: Enemy, damage: number, ranged: boolean) {
+    if (e.def.gimmick === 'mud_bind') {
+      this.playerRootTurns = Math.max(this.playerRootTurns, 1);
+      this.log('泥が足に絡み、次の移動が止まる！', 'dmg');
+    }
+    if (e.def.gimmick === 'freeze_shot' && Math.random() < 0.35) {
+      this.playerRootTurns = Math.max(this.playerRootTurns, 1);
+      this.log('氷弾で足が凍りついた！', 'dmg');
+    }
+    if (e.def.gimmick === 'item_seal' && Math.random() < 0.5) {
+      this.itemSealTurns = Math.max(this.itemSealTurns, 2);
+      this.log('仮面の呪いでアイテムを2ターン封じられた！', 'dmg');
+    }
+    if (e.def.gimmick === 'vampire') {
+      this.healEnemyFromGimmick(e, Math.max(1, Math.floor(damage * 0.35)), 'が血を吸って');
+    }
+    if (e.def.gimmick === 'phase' || e.def.gimmick === 'wraith_phase') {
+      e.vulnerableTurns = 2;
+      e.sprite.setAlpha(1);
+      this.log(`${e.def.name}が攻撃直後に実体化した！`, 'special');
+    }
+    if (['shell_guard', 'knight_guard', 'golem_guard', 'guardian'].includes(e.def.gimmick ?? '')) {
+      e.guardOpenTurns = 2;
+      this.log(`${e.def.name}の守りが一時的に開いた！`, 'special');
+    }
+    if (e.def.gimmick === 'sidestep' && ranged) {
+      const options = Phaser.Utils.Array.Shuffle([
+        { x: e.x + 1, y: e.y }, { x: e.x - 1, y: e.y },
+        { x: e.x, y: e.y + 1 }, { x: e.x, y: e.y - 1 }
+      ]).filter((spot) => this.passable(e, spot.x, spot.y));
+      const destination = options[0];
+      if (destination) {
+        e.x = destination.x;
+        e.y = destination.y;
+        this.tween(e.sprite, {
+          x: destination.x * TILE + TILE / 2, y: destination.y * TILE + TILE / 2
+        }, 120, 'Sine.easeOut');
+      }
+    }
+  }
+
   enemyAttack(e: Enemy): Promise<void> {
-    const res = computeEnemyAttack(this.player, e.def);
-    const enemyElement = monsterElement(e.def);
+    const profile = this.enemyAttackProfile(e);
+    const res = computeEnemyAttack(this.player, e.def, profile.element);
+    const damage = Math.max(1, Math.floor(res.damage * profile.factor));
+    const enemyElement = profile.element;
     const enemyElementInfo = ELEMENT_INFO[enemyElement];
     e.animating = true;
     // 攻撃演出：少し前進
@@ -2696,7 +3287,8 @@ export class GameScene extends Phaser.Scene {
           e.animating = false;
           e.sprite.setScale(e.baseScale).setAngle(0);
           Audio.playSe(elementAttackSe(enemyElement));
-          this.damagePlayer(res.damage, `${e.def.name}の${enemyElementInfo.name}属性攻撃！`, e);
+          this.damagePlayer(damage, `${e.def.name}の${profile.label}${enemyElementInfo.name}属性攻撃！`, e);
+          this.afterEnemyHitGimmick(e, damage, false);
           this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.4, 360, enemyElementInfo.color);
           this.hitFx(this.player.x, this.player.y);
           this.cameras.main.shake(90, 0.004);
@@ -2717,7 +3309,8 @@ export class GameScene extends Phaser.Scene {
 
   enemyRanged(e: Enemy): Promise<void> {
     e.animating = true;
-    const enemyElement = monsterElement(e.def);
+    const profile = this.enemyAttackProfile(e);
+    const enemyElement = profile.element;
     const enemyElementInfo = ELEMENT_INFO[enemyElement];
     Audio.playSe(elementAttackSe(enemyElement));
     this.effectFx(e.x, e.y, 'fx_magic', 2.0, 600, enemyElementInfo.color);
@@ -2738,8 +3331,11 @@ export class GameScene extends Phaser.Scene {
           e.animating = false;
           e.sprite.setScale(e.baseScale);
           bolt.destroy();
-          const res = computeEnemyAttack(this.player, e.def);
-          this.damagePlayer(res.damage, `${e.def.name}の${enemyElementInfo.name}属性遠距離攻撃！`, e);
+          const res = computeEnemyAttack(this.player, e.def, profile.element);
+          const damage = Math.max(1, Math.floor(res.damage * profile.factor));
+          this.damagePlayer(damage, `${e.def.name}の${profile.label}${enemyElementInfo.name}属性遠距離攻撃！`, e);
+          this.afterEnemyHitGimmick(e, damage, true);
+          if (res.shieldBroke) this.handleShieldBreak();
           this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.45, 360, enemyElementInfo.color);
           resolve();
         }
@@ -2774,6 +3370,21 @@ export class GameScene extends Phaser.Scene {
     }
     for (const o of opts) if (this.passable(e, o.x, o.y)) return o;
     return null;
+  }
+
+  stepAway(e: Enemy, tx: number, ty: number): Vec2 | null {
+    const dirs = Phaser.Utils.Array.Shuffle([
+      { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }
+    ]);
+    const choices = dirs
+      .map((dir) => ({ x: e.x + dir.x, y: e.y + dir.y }))
+      .filter((pos) => this.passable(e, pos.x, pos.y))
+      .sort((a, b) => {
+        const da = Math.abs(a.x - tx) + Math.abs(a.y - ty);
+        const db = Math.abs(b.x - tx) + Math.abs(b.y - ty);
+        return db - da;
+      });
+    return choices[0] ?? null;
   }
 
   stepRandom(e: Enemy): Vec2 | null {
@@ -2895,7 +3506,19 @@ export class GameScene extends Phaser.Scene {
       for (const sprite of this.bossRoomDecorSprites) sprite.setVisible(active).setAlpha(active ? 1 : 0);
     }
     // 敵・宝箱・アイテム表示
-    for (const e of this.enemies) { const v = !!visible[e.y]?.[e.x]; e.sprite.setVisible(v); e.shadow?.setVisible(v); e.aura?.setVisible(v); e.freezeFx?.setVisible(v); if (e.hpBar) e.hpBar.setVisible(v); }
+    for (const e of this.enemies) {
+      const v = !!visible[e.y]?.[e.x];
+      e.sprite.setVisible(v);
+      e.shadow?.setVisible(v);
+      e.aura?.setVisible(v);
+      e.freezeFx?.setVisible(v);
+      if (e.hpBar) e.hpBar.setVisible(v);
+      if (e.def.isDarkNinja) {
+        e.sprite.setAlpha(v ? (e.stealthRevealed ? 1 : 0.08) : 0);
+        e.shadow?.setAlpha(v ? (e.stealthRevealed ? 0.55 : 0.08) : 0);
+        if (e.hpBar) e.hpBar.setAlpha(e.stealthRevealed ? 1 : 0.08);
+      }
+    }
     for (const c of this.chests) {
       const v = !!visible[c.y]?.[c.x];
       c.sprite.setVisible(v);
@@ -2992,6 +3615,11 @@ export class GameScene extends Phaser.Scene {
   // ============ アイテム使用（UIから呼ばれる）============
   useItem(index: number) {
     if (this.busy || this.gameEnded) return;
+    if (this.itemSealTurns > 0) {
+      this.log(`仮面の呪いでアイテムを使えない！ 残り${this.itemSealTurns}ターン`, 'dmg');
+      Audio.playSe('deny');
+      return;
+    }
     const item = this.player.inventory[index];
     if (!item) return;
     let consumed = true;
@@ -3195,6 +3823,36 @@ export class GameScene extends Phaser.Scene {
       : '隠し装備「デュアルソード（二刀流）」を発見した！ 売却後に受け取れます。', 'special');
     Audio.playSe('levelup');
     this.emitRefresh();
+    return true;
+  }
+
+  redeemCode(code: string): boolean {
+    if (code !== '0000000000') {
+      this.log('コードが違うようだ。', 'sys');
+      Audio.playSe('deny');
+      return false;
+    }
+    const owned = this.player.weapons.find((weapon) => weapon.dual && weapon.plus >= 10);
+    if (owned) {
+      this.log(`${weaponFullName(owned)}はすでに所持している。`, 'sys');
+      return true;
+    }
+    const strongest = WEAPON_DEFS
+      .filter((weapon) => weapon.dual)
+      .sort((a, b) => b.atkMax - a.atkMax || b.atkMin - a.atkMin)[0];
+    if (!strongest) return false;
+    const weapon = makeWeapon(strongest.key, []);
+    weapon.plus = 10;
+    const added = this.receiveWeapon(weapon, 'コード入力');
+    if (added) {
+      this.player.weapon = weapon;
+      this.player.shield = null;
+      this.updatePlayerAura();
+      this.log(`秘蔵装備 ${weaponFullName(weapon)} を装備した！`, 'special');
+    } else {
+      this.log(`秘蔵装備 ${weaponFullName(weapon)} が現れた！ 売却後に受け取れます。`, 'special');
+    }
+    Audio.playSe('levelup');
     return true;
   }
 
@@ -3626,10 +4284,20 @@ export class GameScene extends Phaser.Scene {
   // 矢印キーのホールド処理：押した瞬間に1歩、押しっぱなしで歩き続ける
   // （スマホ用十字ボタンの touchDir も同じ仕組みで処理）
   async handleMapClick(pointer: Phaser.Input.Pointer) {
-    if (pointer.button !== 0 || this.gameEnded || this.busy) return;
+    if (pointer.button !== 0 || this.gameEnded) return;
     if (pointer.x < MAP_X || pointer.x >= MAP_X + MAP_W || pointer.y < MAP_Y || pointer.y >= MAP_Y + MAP_H) return;
     const ui = this.scene.get('UIScene') as any;
     if (ui?.overlayMode && ui.overlayMode !== 'none') return;
+
+    const clickedAt = pointer.downTime || this.time.now;
+    if (this.clickPathActive && clickedAt - this.lastMapClickAt <= 360) {
+      this.lastMapClickAt = 0;
+      this.stopClickPath();
+      this.effectFx(this.player.x, this.player.y, 'fx_magic', 0.72, 180, 0xffd36b);
+      return;
+    }
+    this.lastMapClickAt = clickedAt;
+    if (this.busy) return;
 
     const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
     const target = { x: Math.floor(world.x / TILE), y: Math.floor(world.y / TILE) };
@@ -3647,9 +4315,25 @@ export class GameScene extends Phaser.Scene {
 
     while (token === this.clickPathToken && !this.gameEnded && !this.busy) {
       if (this.player.x === target.x && this.player.y === target.y) break;
-      const path = this.findClickPath(target.x, target.y);
+      let path = this.findClickPath(target.x, target.y);
+      if (!path.length) path = this.findClickPath(target.x, target.y, true);
       if (!path.length) break;
-      await this.playerAct(path[0]);
+      const dir = path[0];
+      const [dx, dy] = this.dirVec(dir);
+      const nextX = this.player.x + dx;
+      const nextY = this.player.y + dy;
+      let encounteredEnemy = !!this.enemyAt(nextX, nextY) || !!this.bossObstacleAt(nextX, nextY);
+      if (!encounteredEnemy && this.player.weapon?.weaponType === 'bow') {
+        for (let distance = 2; distance <= 3; distance++) {
+          if (this.enemyAt(this.player.x + dx * distance, this.player.y + dy * distance)) {
+            encounteredEnemy = true;
+            break;
+          }
+        }
+      }
+      await this.playerAct(dir);
+      // 自動移動中に敵へ遭遇したら、攻撃は1回だけにして必ず停止する。
+      if (encounteredEnemy) break;
       if (this.busy) break;
     }
 
@@ -3659,7 +4343,13 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  findClickPath(targetX: number, targetY: number): Dir[] {
+  stopClickPath() {
+    this.clickPathToken++;
+    this.clickPathActive = false;
+    this.setBoostTier(0);
+  }
+
+  findClickPath(targetX: number, targetY: number, stopAtEnemy = false): Dir[] {
     const dirs: { dir: Dir; dx: number; dy: number }[] = [
       { dir: 'up', dx: 0, dy: -1 }, { dir: 'down', dx: 0, dy: 1 },
       { dir: 'left', dx: -1, dy: 0 }, { dir: 'right', dx: 1, dy: 0 }
@@ -3676,8 +4366,12 @@ export class GameScene extends Phaser.Scene {
         const isTarget = nx === targetX && ny === targetY;
         const bossDoorTarget = isTarget && tile === 'door' && !this.inBossRoom;
         if (!tile || (!isWalkable(tile) && !bossDoorTarget) || tile === 'pit') continue;
-        if (!isTarget && (this.enemyAt(nx, ny) || this.chestAt(nx, ny) || this.bossObstacleAt(nx, ny))) continue;
         const path = [...cur.path, step.dir];
+        if (!isTarget && this.enemyAt(nx, ny)) {
+          if (stopAtEnemy) return path;
+          continue;
+        }
+        if (!isTarget && (this.chestAt(nx, ny) || this.bossObstacleAt(nx, ny))) continue;
         if (isTarget) return path;
         visited.add(key);
         queue.push({ x: nx, y: ny, path });

@@ -251,7 +251,63 @@ const MONSTER_ELEMENTS: Record<string, Element> = {
   m_cerberus: 'fire', m_hydra: 'water', m_crystal_crab: 'ice', m_blood_moth: 'fire',
   m_clockwork_chimera: 'thunder', m_slime: 'thunder', m_beetle: 'thunder',
   m_wisp: 'fire', m_spider: 'water', m_golem: 'thunder', m_eye: 'thunder',
-  m_wraith: 'ice', m_reaper: 'fire', m_guard: 'ice', m_watcher: 'thunder'
+  m_wraith: 'ice', m_reaper: 'fire', m_dark_ninja: 'thunder',
+  m_obsidian_shogun: 'fire', m_storm_minotaur: 'thunder', m_star_griffin: 'ice',
+  m_lucky_rabbit: 'fire', m_guard: 'ice', m_watcher: 'thunder'
+};
+
+const MONSTER_GIMMICKS: Record<string, { kind: NonNullable<MonsterDef['gimmick']>; text: string }> = {
+  m_mush: { kind: 'lantern', text: '撃破すると5ターンの間、視界が広がる。' },
+  m_mole: { kind: 'burrow', text: '3回目の行動で地中へ潜り、次の行動で近くへ奇襲する。' },
+  m_jelly: { kind: 'split', text: '最初の撃破時に小型ゼリー2体へ分裂する。' },
+  m_ghost: { kind: 'phase', text: '普段は被ダメージを軽減し、攻撃直後だけ実体化する。' },
+  m_gear: { kind: 'shell_guard', text: '正面からのダメージを半減し、攻撃後だけ甲羅が開く。' },
+  m_vine: { kind: 'vine_trail', text: '3歩ごとに踏むと足止めされるツタを残す。' },
+  m_mud: { kind: 'mud_bind', text: '攻撃を受けると足を取られ、次の移動が止まる。' },
+  m_moss: { kind: 'regen', text: 'ダメージを受けていない間、3ターンごとにHPを回復する。' },
+  m_bat: { kind: 'shatter', text: '撃破時に隣接していると氷片のダメージを受ける。' },
+  m_imp: { kind: 'stance', text: '攻撃重視と防御重視の姿勢を毎ターン切り替える。' },
+  m_snake: { kind: 'key_drop', text: '撃破時に70%で古びた鍵を落とす。' },
+  m_skel: { kind: 'freeze_shot', text: '氷弾が低確率で足止めを与える。' },
+  m_archer: { kind: 'sidestep', text: '射撃後に横へ移動して射線を変える。' },
+  m_ember_drake: { kind: 'fire_breath', text: '3回に1回、通常攻撃が強い火炎ブレスになる。' },
+  m_frost_wyrm: { kind: 'ice_trail', text: '3歩ごとに滑る氷床を残す。' },
+  m_storm_wyvern: { kind: 'storm_trail', text: '3歩ごとに雷床を残し、踏んだ相手へダメージを与える。' },
+  m_brass_dragon: { kind: 'heat', text: '行動するたび加熱し、3回目の攻撃が強化される。' },
+  m_void_drake: { kind: 'warp', text: '4ターンごとにプレイヤーの近くへ転移する。' },
+  m_bone_dragon: { kind: 'revive', text: '一度だけHP25%で復活するが、防御が大きく低下する。' },
+  m_horn_demon: { kind: 'enrage', text: 'HP半分以下で攻撃力が上昇する。' },
+  m_chain_demon: { kind: 'pull', text: '同じ縦横の近距離にいる相手を1マス引き寄せる。' },
+  m_flame_gargoyle: { kind: 'statue', text: '離れている間は石像化して被ダメージを軽減する。' },
+  m_abyss_hound: { kind: 'rush', text: '直線上の相手へ2マス突進する。' },
+  m_mask_fiend: { kind: 'item_seal', text: '攻撃時にアイテムを2ターン封印することがある。' },
+  m_archdemon: { kind: 'summon', text: 'HP半分で双角デーモンを1体召喚する。' },
+  m_bone_hound: { kind: 'shell_guard', text: '正面攻撃を軽減し、直進中はさらに硬くなる。' },
+  m_skeleton_mage: { kind: 'root', text: '近距離の相手へ根を伸ばし、移動を封じる。' },
+  m_death_knight: { kind: 'knight_guard', text: '正面攻撃を半減し、攻撃後だけ隙ができる。' },
+  m_lich: { kind: 'necromancy', text: 'HP半分で墓這いを最大2体召喚する。' },
+  m_bone_colossus: { kind: 'heat_aura', text: '隣接している相手へ毎ターン熱ダメージを与える。' },
+  m_grave_crawler: { kind: 'ambush', text: '普段は地中に隠れ、接近すると姿を現す。' },
+  m_cerberus: { kind: 'multi_bite', text: '3回に1回、三つ首による強力な連続攻撃を行う。' },
+  m_hydra: { kind: 'hydra_regen', text: '毎ターンHPを回復する。火属性で攻撃されると3ターン停止する。' },
+  m_crystal_crab: { kind: 'rear_weak', text: '正面は硬いが、背後から受けるダメージが増える。' },
+  m_blood_moth: { kind: 'vampire', text: '与えたダメージの一部を吸収して回復する。' },
+  m_clockwork_chimera: { kind: 'element_cycle', text: '攻撃属性を火・氷・雷の順に切り替える。' },
+  m_slime: { kind: 'mimic', text: '宝箱に擬態し、近づくまで動かず姿も暗い。' },
+  m_beetle: { kind: 'charge', text: '1ターン溜めてから直線を最大3マス突進する。' },
+  m_wisp: { kind: 'death_burst', text: '撃破時に隣接していると炎の爆発ダメージを受ける。' },
+  m_spider: { kind: 'web_trail', text: '3歩ごとに踏むと足止めされる糸を設置する。' },
+  m_golem: { kind: 'golem_guard', text: '正面攻撃を半減し、攻撃後は一時的に防御が崩れる。' },
+  m_eye: { kind: 'laser_lock', text: '照準を表示してから次のターンに直線レーザーを放つ。' },
+  m_wraith: { kind: 'wraith_phase', text: '普段は攻撃をほぼ無効化し、攻撃直後だけ実体化する。' },
+  m_reaper: { kind: 'execute', text: '相手のHPが30%以下になると攻撃力が上昇する。' },
+  m_dark_ninja: { kind: 'stealth', text: 'ほぼ透明で3歩ごとに姿を見せ、露出中は受けるダメージが増える。' },
+  m_obsidian_shogun: { kind: 'parry', text: '3回に1回、正面攻撃を受け流して反撃する。' },
+  m_storm_minotaur: { kind: 'bull_charge', text: '直線上の相手へ突進し、壁際で止まると隙ができる。' },
+  m_star_griffin: { kind: 'starfall', text: '3回に1回、凍てつく星弾を降らせる。' },
+  m_lucky_rabbit: { kind: 'treasure_flee', text: '攻撃せず逃走し、撃破で1000Gと属性付きSS武器を落とす。' },
+  m_guard: { kind: 'guardian', text: '正面攻撃を半減し、通路を塞いで追跡する。' },
+  m_watcher: { kind: 'core_laser', text: '照準後に四方向へ回転レーザーを放つ。' }
 };
 
 const MONSTER_DEFS_RAW: MonsterDef[] = [
@@ -446,6 +502,32 @@ const MONSTER_DEFS_RAW: MonsterDef[] = [
     exp: 20, gold: 22, score: 120, minFloor: 22, maxFloor: 29, behavior: 'chase', isDragonType: true, color: 0xc03060
   },
   {
+    key: 'm_dark_ninja', name: '闇忍者', description: '紫の闇へ溶け込み、3歩ごとに一瞬だけ姿を現す双刃の忍者。',
+    hp: 44, atkMin: 13, atkMax: 22, def: 8, exp: 18, gold: 20, score: 125,
+    minFloor: 16, maxFloor: 29, behavior: 'chase', isDarkNinja: true, color: 0x7428b8
+  },
+  {
+    key: 'm_obsidian_shogun', name: '黒曜武者', description: '溶岩の亀裂が走る黒曜鎧と大太刀をまとう深層の剣豪。',
+    hp: 82, atkMin: 17, atkMax: 29, def: 15, exp: 30, gold: 36, score: 190,
+    minFloor: 22, maxFloor: 29, behavior: 'chase', isElite: true, isDragonType: true, color: 0xb53024
+  },
+  {
+    key: 'm_storm_minotaur', name: '紫電ミノタウロス', description: '雷を巻いた巨角と戦槌で一直線に押し潰す怪力の魔獣。',
+    hp: 76, atkMin: 16, atkMax: 27, def: 13, exp: 27, gold: 32, score: 175,
+    minFloor: 18, maxFloor: 29, behavior: 'line', isElite: true, isDragonType: true, color: 0x416ee8
+  },
+  {
+    key: 'm_star_griffin', name: '星喰らいグリフォン', description: '星光を宿す翼で宙を舞い、凍てつく光弾を降らせる天獣。',
+    hp: 64, atkMin: 15, atkMax: 26, def: 10, exp: 25, gold: 30, score: 165,
+    minFloor: 20, maxFloor: 29, behavior: 'ranged', ranged: true, wallPass: true,
+    isElite: true, isDragonType: true, color: 0x326ee8
+  },
+  {
+    key: 'm_lucky_rabbit', name: '福袋うさぎ', description: '宝を満載した光る袋を背負い、戦わず逃げ回る幻の福兎。',
+    hp: 36, atkMin: 0, atkMax: 0, def: 3, exp: 100, gold: 1000, score: 1000,
+    minFloor: 3, maxFloor: 29, behavior: 'random', isTreasureRabbit: true, color: 0xffd84d
+  },
+  {
     key: 'm_guard', name: '深層の守衛', hp: 60, atkMin: 12, atkMax: 22, def: 14,
     exp: 20, gold: 25, score: 120, minFloor: 21, maxFloor: 30, behavior: 'chase', isElite: true, isDragonType: true, color: 0x3a3a5a
   },
@@ -458,7 +540,11 @@ const MONSTER_DEFS_RAW: MonsterDef[] = [
 
 export const MONSTER_DEFS: MonsterDef[] = MONSTER_DEFS_RAW.map((monster) => ({
   ...monster,
-  element: MONSTER_ELEMENTS[monster.key]
+  element: MONSTER_ELEMENTS[monster.key],
+  gimmick: MONSTER_GIMMICKS[monster.key]?.kind,
+  gimmickText: MONSTER_GIMMICKS[monster.key]?.text,
+  description: [monster.description, MONSTER_GIMMICKS[monster.key]?.text ? `【特性】${MONSTER_GIMMICKS[monster.key].text}` : '']
+    .filter(Boolean).join(' ')
 }));
 
 // ===== 階層テーマ（2フロアごとに名前・見た目が変わる）=====

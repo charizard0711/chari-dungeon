@@ -150,6 +150,9 @@ function tileDefs(): FrameDef[] {
 
 const ALL_DEFS = [...FRAME_DEFS, ...tileDefs()];
 
+// 個別PNGへ差し替えた初期モンスターは、旧スプライトシートで上書きしない。
+const INDIVIDUAL_ART_OVERRIDES = new Set(['m_mush', 'm_mole']);
+
 // タイル素材の外周には、素材シート上で単体表示するための暗い縁が入っている。
 // ゲーム内では隣接タイル同士を連続して見せたい地形だけ、縁を少しクロップする。
 function shouldCropTerrainEdge(key: string): boolean {
@@ -257,6 +260,7 @@ export function applyRealAssets(scene: Phaser.Scene): { applied: number; skipped
   const THR = 14;
 
   for (const def of ALL_DEFS) {
+    if (INDIVIDUAL_ART_OVERRIDES.has(def.key)) continue;
     // 床と壁は接続方向別のオートタイルを使うため、素材画像では上書きしない。
     if (/^(floor|wall)_/.test(def.key)) continue;
     if (!(def.sheet in sheets)) sheets[def.sheet] = prepareSheet(scene, def.sheet);

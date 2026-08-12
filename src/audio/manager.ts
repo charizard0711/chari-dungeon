@@ -19,6 +19,10 @@ class AudioManagerImpl {
   seOn = true;
 
   init(game: Phaser.Game) {
+    if (new URLSearchParams(location.search).get('mute') === '1') {
+      this.bgmOn = false;
+      this.seOn = false;
+    }
     if (this.game) return;
     this.game = game;
     // ブラウザの自動再生制限：最初のクリック/キー入力で解除されたら

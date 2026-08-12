@@ -6,6 +6,8 @@ import { Audio } from '../audio/manager';
 import { PLAYER_SHEETS } from '../playerAppearance';
 
 const EXPANSION_MONSTER_KEYS = [
+  'm_mush', 'm_mole', 'm_golem', 'm_spider', 'm_beetle', 'm_eye', 'm_wraith', 'm_reaper',
+  'm_dark_ninja', 'm_obsidian_shogun', 'm_storm_minotaur', 'm_star_griffin', 'm_lucky_rabbit',
   'm_skel', 'm_archer', 'm_slime',
   'm_ember_drake', 'm_frost_wyrm', 'm_storm_wyvern', 'm_brass_dragon', 'm_void_drake', 'm_bone_dragon',
   'm_horn_demon', 'm_chain_demon', 'm_flame_gargoyle', 'm_abyss_hound', 'm_mask_fiend', 'm_archdemon',

@@ -31,6 +31,8 @@ export class UIScene extends Phaser.Scene {
   overlayMode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' = 'none';
   pickSlot = 0; // 'pick'モードで開いている装備スロット（0武器/1盾/2頭/3体）
   gachaAnimating = false; // ガチャ演出中は再描画をブロック
+  codeDigits = '';
+  codeMessage = '';
   enemyInfoText!: Phaser.GameObjects.Text;
   // レイアウト依存の座標（PC / スマホ縦で切り替え）
   L!: {
@@ -764,7 +766,7 @@ export class UIScene extends Phaser.Scene {
 
     if (this.overlayMode === 'equip') this.buildEquipOverlay(x, y, w, h);
     else if (this.overlayMode === 'inv') this.buildUnifiedInventoryOverlay(x, y, w, h);
-    else if (this.overlayMode === 'settings') this.buildSettingsOverlay(x, y, w);
+    else if (this.overlayMode === 'settings') this.buildSettingsOverlay(x, y, w, h);
     else if (this.overlayMode === 'shop') this.buildShopOverlay(x, y, w);
     else if (this.overlayMode === 'gacha') this.buildGachaOverlay(x, y, w, h);
     else if (this.overlayMode === 'pick') this.buildPickOverlay(x, y, w);
@@ -1089,7 +1091,7 @@ export class UIScene extends Phaser.Scene {
   buildCodexOverlay(x: number, y: number, w: number) {
     const columns = w >= 640 ? 4 : 3;
     const gap = 6;
-    const rowH = 30;
+    const rowH = 40;
     const colW = (w - 32 - gap * (columns - 1)) / columns;
     const startY = y + 50;
     MONSTER_DEFS.forEach((m, i) => {
@@ -1120,6 +1122,11 @@ export class UIScene extends Phaser.Scene {
       const weakness = ELEMENT_INFO[element].weakTo;
       this.overlay.add(this.add.text(px + 29, py + 15, found ? `${ELEMENT_INFO[element].name}/弱${ELEMENT_INFO[weakness].name} HP${m.hp} 攻${m.atkMin}-${m.atkMax}` : `???  B${m.minFloor}-${m.maxFloor}`, {
         fontFamily: '"Yu Gothic UI"', fontSize: '8px', color: found ? '#8fc8d7' : '#465264'
+      }));
+      const trait = found ? (m.gimmickText ?? '固有効果なし') : '効果 ???';
+      this.overlay.add(this.add.text(px + 29, py + 25, trait, {
+        fontFamily: '"Yu Gothic UI"', fontSize: '7px', color: found ? '#e7c96d' : '#465264',
+        wordWrap: { width: Math.max(60, colW - 34) }, maxLines: 1
       }));
     });
   }
@@ -1209,7 +1216,7 @@ export class UIScene extends Phaser.Scene {
       .setStrokeStyle(1.5, 0xe7b85e, .5);
     const idleRing2 = this.add.circle(x + w / 2, y + h / 2 + 28, 100, 0x58d9d1, .015)
       .setStrokeStyle(1, 0x58d9d1, .25);
-    const idle = this.add.image(x + w / 2, y + h / 2 + 28, 'chest').setScale(1.9);
+    const idle = this.add.image(x + w / 2, y + h / 2 + 28, 'chest_rare').setDisplaySize(96, 96);
     this.tweens.add({ targets: idle, y: '-=10', duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     this.tweens.add({ targets: idleGlow, alpha: 0.15, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     this.tweens.add({ targets: idleRing, angle: 360, duration: 9000, repeat: -1 });
@@ -1346,7 +1353,7 @@ export class UIScene extends Phaser.Scene {
     });
 
     // ---- 宝箱が空から落ちてくる ----
-    const chest = track(this.add.image(cx, -80, 'chest').setDepth(303).setScale(2.4));
+    const chest = track(this.add.image(cx, -80, 'chest_rare').setDepth(303).setDisplaySize(104, 104));
     this.tweens.add({ targets: chest, y: cy + 20, duration: 650, ease: 'Bounce.easeOut', delay: 150 });
 
     // 着地：土煙＋振動
@@ -1404,7 +1411,7 @@ export class UIScene extends Phaser.Scene {
     // ---- 開封＆リザルト ----
     const reveal = () => {
       this.tweens.killTweensOf([chest, leak]);
-      chest.setAngle(0).setTexture('chest_open');
+      chest.setAngle(0).setTexture('chest_rare_open').setDisplaySize(104, 104);
       leak.setAlpha(0);
       ritualTag.setText(`${rankTitle[result.rank]}  //  ACQUIRED`).setColor(colHex);
       phaseText.setAlpha(0);
@@ -1610,7 +1617,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   // ---- 設定オーバーレイ：BGMと効果音（システム音）を別々に調整 ----
-  buildSettingsOverlay(x: number, y: number, w: number) {
+  buildSettingsOverlay(x: number, y: number, w: number, h: number) {
     const rows: {
       label: () => string;
       onMinus: () => void;
@@ -1688,5 +1695,83 @@ export class UIScene extends Phaser.Scene {
       fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '11px' : '13px', color: '#8a97ab', lineSpacing: 6,
       wordWrap: { width: w - (IS_MOBILE ? 40 : 60) }
     }));
+
+    const codeY = Math.min(y + h - 252, cy + (IS_MOBILE ? 82 : 88));
+    const centerX = x + w / 2;
+    this.overlay.add(this.add.text(x + (IS_MOBILE ? 20 : 30), codeY, 'コード入力欄', {
+      fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '15px' : '17px',
+      color: '#58d9d1', fontStyle: 'bold'
+    }));
+
+    const displayW = Math.min(w - (IS_MOBILE ? 40 : 60), 420);
+    const displayX = centerX - displayW / 2;
+    const displayY = codeY + 29;
+    const displayBg = this.add.graphics();
+    displayBg.fillStyle(0x071317, 1).fillRoundedRect(displayX, displayY, displayW, 38, 7);
+    displayBg.lineStyle(1.5, 0x2f6f6a, 1).strokeRoundedRect(displayX, displayY, displayW, 38, 7);
+    const displayText = this.add.text(centerX, displayY + 19, this.codeDigits || 'コードを入力', {
+      fontFamily: 'Consolas, monospace', fontSize: '18px', color: this.codeDigits ? '#ffffff' : '#63787b',
+      letterSpacing: 5
+    }).setOrigin(0.5);
+    this.overlay.add([displayBg, displayText]);
+
+    const buttonW = IS_MOBILE ? 58 : 54;
+    const buttonH = 34;
+    const gap = 6;
+    const gridW = buttonW * 5 + gap * 4;
+    const gridX = centerX - gridW / 2;
+    const gridY = displayY + 48;
+    const updateDisplay = () => {
+      displayText.setText(this.codeDigits || 'コードを入力');
+      displayText.setColor(this.codeDigits ? '#ffffff' : '#63787b');
+    };
+    const codeButton = (bx: number, by: number, bw: number, label: string, onClick: () => void, accent = false) => {
+      const g = this.add.graphics();
+      const draw = (hover: boolean) => {
+        g.clear();
+        g.fillStyle(hover ? 0x315957 : accent ? 0x49361d : 0x1c2536, 1).fillRoundedRect(bx, by, bw, buttonH, 6);
+        g.lineStyle(1.5, accent ? 0xe7b85e : 0x3f8f88, 1).strokeRoundedRect(bx, by, bw, buttonH, 6);
+      };
+      draw(false);
+      const text = this.add.text(bx + bw / 2, by + buttonH / 2, label, {
+        fontFamily: '"Yu Gothic UI"', fontSize: '16px', color: '#ffffff', fontStyle: 'bold'
+      }).setOrigin(0.5);
+      const zone = this.add.zone(bx, by, bw, buttonH).setOrigin(0).setInteractive({ useHandCursor: true });
+      zone.on('pointerover', () => draw(true));
+      zone.on('pointerout', () => draw(false));
+      zone.on('pointerdown', () => { Audio.playSe('click'); onClick(); });
+      this.overlay.add([g, text, zone]);
+    };
+
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 0].forEach((digit, index) => {
+      const row = Math.floor(index / 5);
+      const col = index % 5;
+      codeButton(gridX + col * (buttonW + gap), gridY + row * (buttonH + gap), buttonW, String(digit), () => {
+        if (this.codeDigits.length < 10) this.codeDigits += String(digit);
+        this.codeMessage = '';
+        messageText.setText('');
+        updateDisplay();
+      });
+    });
+
+    const actionY = gridY + (buttonH + gap) * 2 + 4;
+    codeButton(centerX - 136, actionY, 126, '消去', () => {
+      this.codeDigits = '';
+      this.codeMessage = '';
+      messageText.setText('');
+      updateDisplay();
+    });
+    codeButton(centerX + 10, actionY, 126, '入力', () => {
+      const accepted = this.gs.redeemCode(this.codeDigits);
+      this.codeMessage = accepted ? 'コードを適用しました' : 'コードが違います';
+      this.codeDigits = '';
+      updateDisplay();
+      messageText.setText(this.codeMessage).setColor(accepted ? '#f5c542' : '#ff7777');
+      this.refresh();
+    }, true);
+    const messageText = this.add.text(centerX, actionY + 43, this.codeMessage, {
+      fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: '#f5c542', fontStyle: 'bold'
+    }).setOrigin(0.5);
+    this.overlay.add(messageText);
   }
 }

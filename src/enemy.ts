@@ -22,6 +22,20 @@ export class Enemy {
   loopDir = 0;            // ループ移動方向index
   lineDir: { x: number; y: number } | null = null;
   facing: Dir = 'down';
+  moveSteps = 0;
+  stealthRevealed = false;
+  gimmickCounter = 0;
+  gimmickPhase = 0;
+  vulnerableTurns = 0;
+  guardOpenTurns = 0;
+  stunnedTurns = 0;
+  awakened = false;
+  revived = false;
+  regenBlockedTurns = 0;
+  summoned = false;
+  cloneDepth = 0;
+  charging = false;
+  chargeDir: { x: number; y: number } | null = null;
 
   constructor(def: MonsterDef, x: number, y: number, hpScale: number) {
     this.def = def;
