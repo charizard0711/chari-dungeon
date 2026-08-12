@@ -37,9 +37,7 @@ const MAP_ZOOM = 1.95;
 // アンチエイリアスとカメラ拡大で生じる細い隙間を隠すため、地形同士を少し重ねる。
 const TERRAIN_RENDER_SIZE = TILE + 2;
 const WALL_VISIBLE_TINT = 0xffffff;
-const WALL_EXPLORED_TINT = 0x10161a;
 const BOSS_ROOM_FLOOR_TINT = 0xd6a85c;
-const BOSS_ROOM_EXPLORED_TINT = 0x49391f;
 const WORLD_DEPTH_BASE = 10;
 const WORLD_DEPTH_Y_SCALE = 0.01;
 const WALL_FACADE_HEIGHT = 36;
@@ -225,6 +223,7 @@ export class GameScene extends Phaser.Scene {
   tileSprites: Phaser.GameObjects.Image[][] = [];
   wallFacades: WallFacade[] = [];
   explored: boolean[][] = [];
+  visibleTiles: boolean[][] = [];
   enemies: Enemy[] = [];
   chests: Chest[] = [];
   ground: GroundItem[] = [];
@@ -252,11 +251,11 @@ export class GameScene extends Phaser.Scene {
   playerArmor: PlayerArmor | null = null;
   playerAnimToken = 0;
   stairsHint!: Phaser.GameObjects.Text;
-  lightRadius = 4;
+  lightRadius = 3;
   shroomTurns = 0;
+  torchTurns = 0;
   dashSteps = 0; // 疾風の羽：残り歩数（1歩で2マス進める）
   themeTileTint = 0xffffff; // 現在フロアのタイル色合い（2階ごとに変わる）
-  smokeTurns = 0;
   invisTurns = 0; // 透明ポーション：残りターン（敵から完全に見えない）
 
   // 長居ペナルティフラグ
@@ -363,6 +362,7 @@ export class GameScene extends Phaser.Scene {
     this.bossHazards = [];
     this.bossObstacles = [];
     this.explored = [];
+    this.visibleTiles = [];
 
     this.cameras.main.setViewport(MAP_X, MAP_Y, MAP_W, MAP_H);
     this.cameras.main.setBackgroundColor('#05070a');
@@ -408,6 +408,37 @@ export class GameScene extends Phaser.Scene {
     }).setDepth(30).setVisible(false);
 
     this.buildFloor(startFloor, this.qaBossMode);
+    if (location.hostname === 'localhost' && qaParams.has('qa-torch')) {
+      this.player.inventory.push(makeItem('torch'));
+    }
+    if (location.hostname === 'localhost' && qaParams.has('qa-use-torch')) {
+      this.torchTurns = 10;
+      this.updateVisibility();
+    }
+    if (location.hostname === 'localhost' && qaParams.has('qa-variety-room')) {
+      const room = this.dungeon.rooms.find((candidate) => candidate.w === 3 && candidate.h === 3);
+      const qaPos = room && [
+        { x: room.cx, y: room.cy },
+        { x: room.cx - 1, y: room.cy }, { x: room.cx + 1, y: room.cy },
+        { x: room.cx, y: room.cy - 1 }, { x: room.cx, y: room.cy + 1 }
+      ].find((position) => !this.enemyAt(position.x, position.y) && !this.chestAt(position.x, position.y));
+      if (qaPos) {
+        this.player.x = qaPos.x;
+        this.player.y = qaPos.y;
+        this.placeSprite(this.playerSprite, qaPos.x, qaPos.y);
+        this.updateVisibility();
+      }
+    }
+    if (location.hostname === 'localhost' && qaParams.has('qa-field-door')
+      && this.dungeon.bossEntry && this.dungeon.bossEntrance) {
+      const entry = this.dungeon.bossEntry;
+      const approach = this.dungeon.bossEntrance;
+      const qaPos = { x: approach.x + approach.x - entry.x, y: approach.y + approach.y - entry.y };
+      this.player.x = qaPos.x;
+      this.player.y = qaPos.y;
+      this.placeSprite(this.playerSprite, qaPos.x, qaPos.y);
+      this.updateVisibility();
+    }
     if (location.hostname === 'localhost' && qaParams.has('qa-field-arena') && this.dungeon.bossRoom) {
       const boss = this.enemies.find((enemy) => enemy.def.isFloorBoss);
       const room = this.dungeon.bossRoom;
@@ -475,7 +506,7 @@ export class GameScene extends Phaser.Scene {
       this.floorDamaged = false;
       this.penaltyFlags = { p100: false, p150: false, p200: false, p250: false };
       this.shroomTurns = 0;
-      this.smokeTurns = 0;
+      this.torchTurns = 0;
       this.invisTurns = 0;
       this.playerRootTurns = 0;
       this.itemSealTurns = 0;
@@ -524,6 +555,7 @@ export class GameScene extends Phaser.Scene {
 
     // explored初期化
     this.explored = [];
+    this.visibleTiles = [];
     for (let y = 0; y < d.h; y++) {
       this.explored[y] = [];
       for (let x = 0; x < d.w; x++) this.explored[y][x] = false;
@@ -604,8 +636,8 @@ export class GameScene extends Phaser.Scene {
       : floor === 5
         ? `${floor}F「${getTheme(floor).name}」に到達。この階に中ボスはおらず、最奥の扉は${floor}.5Fへ通じている。`
         : floor % 5 === 0
-          ? `${floor}F「${getTheme(floor).name}」に到達。迷路内の5×5部屋で中ボスを倒すと、同じ部屋の扉から${floor}.5Fへ進める。`
-          : `${floor}F「${getTheme(floor).name}」に到達。迷路内の5×5部屋で中ボスを倒すと、同じ部屋に階段が現れる。`;
+          ? `${floor}F「${getTheme(floor).name}」に到達。迷路内の7×7部屋で中ボスを倒すと、同じ部屋の扉から${floor}.5Fへ進める。`
+          : `${floor}F「${getTheme(floor).name}」に到達。迷路内の7×7部屋で中ボスを倒すと、同じ部屋に階段が現れる。`;
     this.log(floorIntro, 'sys');
     this.events.emit('floor', floor);
     // BGMは2階ごとに切り替わる。
@@ -664,13 +696,18 @@ export class GameScene extends Phaser.Scene {
 
   tileVisual(t: TileType, era: number, x: number, y: number): TerrainVisual {
     const suffix = eraSuffix(era);
+    const bossEntry = this.dungeon?.bossEntry;
+    if (t === 'floor' && bossEntry && x === bossEntry.x && y === bossEntry.y
+      && !this.bossEntranceClosed && !this.floorBossDefeated) {
+      return { key: 'terrain_boss_gate', size: TILE, depth: 4.2 };
+    }
     switch (t) {
       case 'wall': return {
         key: `terrain_wall_${era}`,
         frame: ((x * 13 + y * 7) % 3) * 16 + this.terrainConnectionMask(x, y)
       };
       case 'stairs': return { key: 'terrain_stairs', size: TILE + 10, depth: 3.4 };
-      case 'door': return { key: 'terrain_boss_gate', size: TILE + 16, depth: 4.2 };
+      case 'door': return { key: 'terrain_boss_gate', size: TILE, depth: 4.2 };
       case 'water': return { key: `water${suffix}` };
       case 'poison': return { key: `poison${suffix}` };
       case 'pit': return { key: `pit${suffix}` };
@@ -700,7 +737,7 @@ export class GameScene extends Phaser.Scene {
   createBossRoomVisuals(era: number, accent: number) {
     const room = this.dungeon.bossRoom;
     if (!room) return;
-    if (room.w !== 5 || room.h !== 5) {
+    if (room.w !== 7 || room.h !== 7) {
       this.createBossFloorDecor(accent);
       return;
     }
@@ -878,7 +915,7 @@ export class GameScene extends Phaser.Scene {
       ? `◆ ${floor}F 中ボス「${def.name}」が迷宮内のどこかに現れた！`
       : this.inBossRoom
         ? `◆ ${floor}.5F 中ボス「${def.name}」が現れた！`
-        : `◆ ${floor}F 中ボス「${def.name}」が5×5の専用部屋に現れた！`;
+        : `◆ ${floor}F 7×7の専用部屋から強い気配がする。入口を探せ。`;
     this.placeFloorBoss(def, 1.32, spec.tint, message, this.midBossGimmick(base.key), fieldPlacement);
   }
 
@@ -978,13 +1015,21 @@ export class GameScene extends Phaser.Scene {
     const era = getTheme(this.floor).era;
     const sprite = this.tileSprites[entrance.y]?.[entrance.x];
     if (sprite) this.applyTileVisual(sprite, tile, era, entrance.x, entrance.y);
+    const entry = this.dungeon.bossEntry;
+    const entrySprite = entry ? this.tileSprites[entry.y]?.[entry.x] : undefined;
+    if (entry && entrySprite) this.applyTileVisual(entrySprite, this.dungeon.tiles[entry.y][entry.x], era, entry.x, entry.y);
     if (!this.inBossRoom) {
       Audio.playBgm(closed ? 'midboss' : bgmForFloor(this.floor));
     }
     if (!announce) return;
     this.effectFx(entrance.x, entrance.y, 'fx_magic', 1.45, 420, closed ? 0xff8a5b : 0x58d9d1);
     Audio.playSe('seal');
-    this.log(closed ? 'ボス部屋の入口が閉じた！' : 'ボス部屋の入口の扉が消えた。', 'special');
+    const revealedBoss = closed
+      ? this.enemies.find((enemy) => enemy.def.isFloorBoss && this.isInsideBossRoom(enemy.x, enemy.y))
+      : undefined;
+    this.log(closed && revealedBoss
+      ? `ボス部屋の入口が閉じ、中ボス「${revealedBoss.def.name}」が姿を現した！`
+      : closed ? 'ボス部屋の入口が閉じた！' : 'ボス部屋の入口の扉が消えた。', 'special');
   }
 
   closeBossEntranceOnEntry(x: number, y: number) {
@@ -1003,7 +1048,7 @@ export class GameScene extends Phaser.Scene {
       for (let x = room.x; x < room.x + room.w; x++) candidates.push({ x, y });
     }
     if (entry) {
-      // 埋め込み5×5部屋の中ボスは、唯一の入口から最も遠い床を初期位置にする。
+      // 埋め込み7×7部屋の中ボスは、唯一の入口から最も遠い床を初期位置にする。
       candidates.sort((a, b) => {
         const distanceA = Math.abs(a.x - entry.x) + Math.abs(a.y - entry.y);
         const distanceB = Math.abs(b.x - entry.x) + Math.abs(b.y - entry.y);
@@ -1414,7 +1459,7 @@ export class GameScene extends Phaser.Scene {
       state.cooldown--;
       return { handled: false };
     }
-    if (this.invisTurns > 0 || this.smokeTurns > 0) return { handled: false };
+    if (this.invisTurns > 0) return { handled: false };
     const room = this.dungeon.bossRoom;
     if (room && !(this.player.x >= room.x && this.player.x < room.x + room.w && this.player.y >= room.y && this.player.y < room.y + room.h)) {
       return { handled: false };
@@ -1750,7 +1795,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   spawnGroundItems(floor: number) {
-    const commonKinds: (ItemKind | 'coin')[] = ['coin', 'coin', 'coin', 'potion', 'invis', 'dash'];
+    const commonKinds: (ItemKind | 'coin')[] = ['coin', 'coin', 'coin', 'potion', 'torch', 'invis', 'dash'];
     const scrollKinds: ItemKind[] = ['stone', 'shieldstone'];
     const n = 4 + Math.floor(Math.random() * 3); // 落ちてるアイテム(4〜6・狭いマップ向け)
     const arenaCells = this.bossRoomCells();
@@ -1854,7 +1899,7 @@ export class GameScene extends Phaser.Scene {
         } else {
           this.log(isExitDoor
             ? '中ボスを倒すまで階段の封印は解けない。'
-            : '戦闘中は5×5部屋の入口が封鎖されている。', 'sys');
+            : '戦闘中は7×7部屋の入口が封鎖されている。', 'sys');
           Audio.playSe('deny');
         }
         return;
@@ -2122,7 +2167,7 @@ export class GameScene extends Phaser.Scene {
   async playerAttack(e: Enemy, dir: Dir, ranged = false) {
     if (e.def.isFloorBoss && this.dungeon.bossRoom
       && (!this.isInsideBossRoom(this.player.x, this.player.y) || !this.isInsideBossRoom(e.x, e.y))) {
-      this.log('中ボスへの攻撃と技は5×5の専用エリア内でだけ使える。', 'sys');
+      this.log('中ボスへの攻撃と技は7×7の専用エリア内でだけ使える。', 'sys');
       Audio.playSe('deny');
       return;
     }
@@ -2285,7 +2330,7 @@ export class GameScene extends Phaser.Scene {
       if (Math.random() < 0.7) this.dropItem(e.x, e.y, 'coin', def.gold * 3 + Math.floor(Math.random() * this.floor * 4));
       // 通常消耗品とは別枠で抽選する。
       if (Math.random() < 0.4) {
-        const pool: ItemKind[] = ['potion', 'smoke', 'warp', 'invis'];
+        const pool: ItemKind[] = ['potion', 'torch', 'warp', 'invis'];
         this.dropItem(e.x, e.y, pool[Math.floor(Math.random() * pool.length)]);
       }
       // 強化スクロールは通常敵・エリート・ボス共通で1/3。
@@ -2393,8 +2438,8 @@ export class GameScene extends Phaser.Scene {
     this.log(this.inBossRoom
       ? `${bossName}を撃破！ 報酬がその場にドロップし、出口の封印が解けた。`
       : this.floorHasGate(this.floor)
-        ? `${bossName}を撃破！ 報酬がその場にドロップし、5×5部屋内の強ボス扉が開いた。`
-        : `${bossName}を撃破！ 報酬がその場にドロップし、5×5部屋内に階段が現れた。`, 'special');
+        ? `${bossName}を撃破！ 報酬がその場にドロップし、7×7部屋内の強ボス扉が開いた。`
+        : `${bossName}を撃破！ 報酬がその場にドロップし、7×7部屋内に階段が現れた。`, 'special');
     this.updateVisibility();
     this.emitRefresh();
   }
@@ -2483,7 +2528,7 @@ export class GameScene extends Phaser.Scene {
       this.dropItem(origin.x, origin.y, 'potion');
       this.dropItem(origin.x, origin.y, Math.random() < 0.5 ? 'invis' : 'dash');
     } else {
-      const kinds: ItemKind[] = ['potion', 'warp', 'smoke', 'stone', 'shieldstone', 'invis', 'dash'];
+      const kinds: ItemKind[] = ['potion', 'warp', 'torch', 'stone', 'shieldstone', 'invis', 'dash'];
       this.dropItem(origin.x, origin.y, kinds[Math.floor(Math.random() * kinds.length)]);
       this.dropItem(origin.x, origin.y, kinds[Math.floor(Math.random() * kinds.length)]);
     }
@@ -2532,7 +2577,7 @@ export class GameScene extends Phaser.Scene {
     }
     const sprite = this.add.image(0, 0, equipment.key).setDepth(5).setOrigin(0.5, 0.6).setDisplaySize(24, 24);
     this.placeSprite(sprite, pos.x, pos.y);
-    sprite.setVisible(!!this.explored[pos.y]?.[pos.x]);
+    sprite.setVisible(this.isTileCurrentlyVisible(pos.x, pos.y));
     const glow = this.add.image(sprite.x, sprite.y - 2, 'glow').setDepth(4.6)
       .setBlendMode(Phaser.BlendModes.ADD).setTint(gradeColor(equipment.grade))
       .setDisplaySize(34, 34).setAlpha(0.32).setVisible(sprite.visible);
@@ -2554,7 +2599,7 @@ export class GameScene extends Phaser.Scene {
     const texKey = kind === 'coin' ? 'coin' : `i_${kind}`;
     const spr = this.add.image(0, 0, texKey).setDepth(5).setOrigin(0.5, 0.6).setDisplaySize(22, 22);
     this.placeSprite(spr, tx, ty);
-    spr.setVisible(!!this.explored[ty]?.[tx]);
+    spr.setVisible(this.isTileCurrentlyVisible(tx, ty));
     const glow = this.add.image(spr.x, spr.y - 2, 'glow').setDepth(4.6)
       .setBlendMode(Phaser.BlendModes.ADD)
       .setTint(kind === 'coin' ? 0xffc45a : 0x88dfd4)
@@ -2723,7 +2768,10 @@ export class GameScene extends Phaser.Scene {
       if (this.gameEnded) return;
     }
     if (this.shroomTurns > 0) this.shroomTurns--;
-    if (this.smokeTurns > 0) this.smokeTurns--;
+    if (this.torchTurns > 0) {
+      this.torchTurns--;
+      if (this.torchTurns === 0) this.log('松明の火が消え、視界が元に戻った。', 'sys');
+    }
     // 透明化の残りターンを進める
     if (this.invisTurns > 0) {
       this.invisTurns--;
@@ -3094,7 +3142,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     // 遠距離攻撃
-    if (!unseen && e.def.ranged && (dxp === 0 || dyp === 0) && dist <= 5 && this.smokeTurns === 0) {
+    if (!unseen && e.def.ranged && (dxp === 0 || dyp === 0) && dist <= 5) {
       if (this.lineOfSight(e.x, e.y, this.player.x, this.player.y)) {
         return this.enemyRanged(e);
       }
@@ -3102,7 +3150,7 @@ export class GameScene extends Phaser.Scene {
 
     // 行動パターンによる移動
     let mv: Vec2 | null = null;
-    const aggro = !unseen && dist <= 9 && this.smokeTurns === 0;
+    const aggro = !unseen && dist <= 9;
     switch (e.def.behavior) {
       case 'chase':
       case 'slow':
@@ -3434,99 +3482,167 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ============ 可視範囲 ============
+  blocksVisionAt(x: number, y: number) {
+    const tile = this.dungeon.tiles[y]?.[x];
+    return !tile || tile === 'wall' || tile === 'door';
+  }
+
+  hasVisionLine(x0: number, y0: number, x1: number, y1: number) {
+    if (x0 === x1 && y0 === y1) return true;
+    const dx = Math.abs(x1 - x0);
+    const dy = Math.abs(y1 - y0);
+    const stepX = Math.sign(x1 - x0);
+    const stepY = Math.sign(y1 - y0);
+    let x = x0;
+    let y = y0;
+    let movedX = 0;
+    let movedY = 0;
+
+    // Supercover式で視線が触れる全マスをたどる。壁そのものは見えるが、その先は通さない。
+    while (movedX < dx || movedY < dy) {
+      const decision = (1 + 2 * movedX) * dy - (1 + 2 * movedY) * dx;
+      if (decision === 0) {
+        // 壁角のすき間から斜め奥が漏れて見える「角抜け」も遮断する。
+        const nextIsTarget = x + stepX === x1 && y + stepY === y1;
+        const targetIsWall = nextIsTarget && this.blocksVisionAt(x1, y1);
+        if (!targetIsWall && (this.blocksVisionAt(x + stepX, y) || this.blocksVisionAt(x, y + stepY))) return false;
+        x += stepX;
+        y += stepY;
+        movedX++;
+        movedY++;
+      } else if (decision < 0) {
+        x += stepX;
+        movedX++;
+      } else {
+        y += stepY;
+        movedY++;
+      }
+      if (x === x1 && y === y1) return true;
+      if (this.blocksVisionAt(x, y)) return false;
+    }
+    return true;
+  }
+
   updateVisibility() {
     const d = this.dungeon;
-    const radius = this.lightRadius + (this.shroomTurns > 0 ? 4 : 0);
-    // 現在部屋を特定
-    let curRoom: DungeonData['rooms'][number] | null = null;
-    for (const r of d.rooms) {
-      if (this.player.x >= r.x && this.player.x < r.x + r.w && this.player.y >= r.y && this.player.y < r.y + r.h) {
-        if (!curRoom || r.w * r.h > curRoom.w * curRoom.h) curRoom = r;
-      }
-    }
+    const torchRadius = this.torchTurns > 0 ? this.lightRadius * 2 : this.lightRadius;
+    const shroomRadius = this.shroomTurns > 0 ? 7 : this.lightRadius;
+    const radius = Math.max(this.lightRadius, torchRadius, shroomRadius);
+    const bossRoomConcealed = !!d.bossRoom && !!d.bossEntry
+      && !this.isInsideBossRoom(this.player.x, this.player.y);
+    const isConcealedBossCell = (x: number, y: number) => bossRoomConcealed && !!d.bossRoom
+      && x >= d.bossRoom.x && x < d.bossRoom.x + d.bossRoom.w
+      && y >= d.bossRoom.y && y < d.bossRoom.y + d.bossRoom.h;
     const visible: boolean[][] = [];
-    for (let y = 0; y < d.h; y++) { visible[y] = []; for (let x = 0; x < d.w; x++) visible[y][x] = false; }
+    for (let y = 0; y < d.h; y++) {
+      visible[y] = [];
+      for (let x = 0; x < d.w; x++) visible[y][x] = false;
+    }
 
     for (let y = 0; y < d.h; y++) {
       for (let x = 0; x < d.w; x++) {
         const cheb = Math.max(Math.abs(x - this.player.x), Math.abs(y - this.player.y));
-        let vis = cheb <= radius;
-        if (curRoom && x >= curRoom.x - 1 && x < curRoom.x + curRoom.w + 1 && y >= curRoom.y - 1 && y < curRoom.y + curRoom.h + 1) vis = true;
-        if (vis) { visible[y][x] = true; this.explored[y][x] = true; }
+        let vis = cheb <= radius && this.hasVisionLine(this.player.x, this.player.y, x, y);
+        const insideConcealedRoom = isConcealedBossCell(x, y);
+        const isEntryDoor = !!d.bossEntry && x === d.bossEntry.x && y === d.bossEntry.y;
+        if (insideConcealedRoom && !isEntryDoor) vis = false;
+        if (vis) {
+          visible[y][x] = true;
+          this.explored[y][x] = true;
+        }
       }
     }
 
-    // タイル表示
-    // ・壁は暗めのtintにして道とはっきり見分けられるようにする
-    // ・初めて見えたタイルはフェードインで「ヌルっと」視界が広がる
+    // 視界内の床に接する最初の壁面は表示する。壁の先の床へは視界を伝播させない。
+    for (let y = 0; y < d.h; y++) {
+      for (let x = 0; x < d.w; x++) {
+        if (!visible[y][x] || this.blocksVisionAt(x, y)) continue;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            const wallX = x + dx;
+            const wallY = y + dy;
+            const wallTile = d.tiles[wallY]?.[wallX];
+            if (wallTile !== 'wall' && wallTile !== 'door') continue;
+            const isEntryDoor = !!d.bossEntry && wallX === d.bossEntry.x && wallY === d.bossEntry.y;
+            if (isConcealedBossCell(wallX, wallY) && !isEntryDoor) continue;
+            visible[wallY][wallX] = true;
+            this.explored[wallY][wallX] = true;
+          }
+        }
+      }
+    }
+    this.visibleTiles = visible;
+
+    // 現在の視界外は、探索済みであっても完全に隠す。
     for (let y = 0; y < d.h; y++) {
       for (let x = 0; x < d.w; x++) {
         const spr = this.tileSprites[y][x];
         const isWall = d.tiles[y][x] === 'wall';
         const room = d.bossRoom;
         const isBossRoomFloor = !!room && x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h;
+        const visionState = visible[y][x] ? 'visible' : 'hidden';
+        const previousState = spr.getData('visionState') as string | undefined;
+        if (previousState !== visionState) {
+          this.tweens.killTweensOf(spr);
+          spr.setData('visionState', visionState);
+        }
         if (visible[y][x]) {
-          const firstReveal = !spr.visible || spr.alpha < .5;
           spr.setVisible(true);
           spr.setTint(isWall ? WALL_VISIBLE_TINT : isBossRoomFloor ? BOSS_ROOM_FLOOR_TINT : this.themeTileTint);
-          if (firstReveal) {
+          if (previousState !== 'visible') {
             spr.setAlpha(.16);
             this.tweens.add({ targets: spr, alpha: 1, duration: 260, ease: 'Quad.easeOut' });
           } else spr.setAlpha(1);
-        } else if (this.explored[y][x]) {
-          const firstReveal = !spr.visible || spr.alpha < .2;
-          spr.setVisible(true);
-          spr.setTint(isWall ? WALL_EXPLORED_TINT : isBossRoomFloor ? BOSS_ROOM_EXPLORED_TINT : 0x172126);
-          if (firstReveal) {
-            spr.setAlpha(.05);
-            this.tweens.add({ targets: spr, alpha: .18, duration: 260, ease: 'Quad.easeOut' });
-          } else spr.setAlpha(.18);
         } else {
-          // 未探索部分は完全に隠し、プレイヤー周辺だけを見せる。
           spr.setVisible(false);
         }
       }
     }
     for (const facade of this.wallFacades) {
       const active = !!visible[facade.y]?.[facade.x];
-      const known = active || !!this.explored[facade.y]?.[facade.x];
-      facade.sprite.setVisible(known);
+      facade.sprite.setVisible(active);
       if (active) facade.sprite.setTint(WALL_VISIBLE_TINT).setAlpha(1);
-      else if (known) facade.sprite.setTint(WALL_EXPLORED_TINT).setAlpha(0.18);
     }
-    if (this.bossFloorDecor && d.bossRoom) {
-      this.bossFloorDecor.setVisible(!!visible[d.bossRoom.cy]?.[d.bossRoom.cx]);
-    }
-    if (this.bossRoomBackdrop && d.bossRoom) {
-      const active = !!visible[d.bossRoom.cy]?.[d.bossRoom.cx];
-      const known = active || !!this.explored[d.bossRoom.cy]?.[d.bossRoom.cx];
-      this.bossRoomBackdrop.setVisible(known).setAlpha(active ? 1 : 0.18);
-      if (active) this.bossRoomBackdrop.clearTint();
-      else this.bossRoomBackdrop.setTint(BOSS_ROOM_EXPLORED_TINT);
-      for (const sprite of this.bossRoomDecorSprites) sprite.setVisible(active).setAlpha(active ? 1 : 0);
+    if (d.bossRoom) {
+      let roomFullyVisible = true;
+      for (let y = d.bossRoom.y; y < d.bossRoom.y + d.bossRoom.h && roomFullyVisible; y++) {
+        for (let x = d.bossRoom.x; x < d.bossRoom.x + d.bossRoom.w; x++) {
+          if (!visible[y]?.[x]) { roomFullyVisible = false; break; }
+        }
+      }
+      this.bossFloorDecor?.setVisible(roomFullyVisible);
+      this.bossRoomBackdrop?.setVisible(roomFullyVisible).setAlpha(roomFullyVisible ? 1 : 0).clearTint();
+      for (const sprite of this.bossRoomDecorSprites) {
+        const tileX = Math.floor(sprite.x / TILE);
+        const tileY = Math.floor(sprite.y / TILE);
+        const active = !!visible[tileY]?.[tileX];
+        sprite.setVisible(active).setAlpha(active ? 1 : 0);
+      }
     }
     // 敵・宝箱・アイテム表示
     for (const e of this.enemies) {
-      const v = !!visible[e.y]?.[e.x];
+      const concealedMidBoss = bossRoomConcealed && e.def.isFloorBoss && this.isInsideBossRoom(e.x, e.y);
+      const v = !concealedMidBoss && !!visible[e.y]?.[e.x];
       e.sprite.setVisible(v);
       e.shadow?.setVisible(v);
       e.aura?.setVisible(v);
       e.freezeFx?.setVisible(v);
-      if (e.hpBar) e.hpBar.setVisible(v);
+      if (e.hpBar) e.hpBar.setVisible(v).setAlpha(1);
       if (e.def.isDarkNinja) {
-        e.sprite.setAlpha(v ? (e.stealthRevealed ? 1 : 0.08) : 0);
-        e.shadow?.setAlpha(v ? (e.stealthRevealed ? 0.55 : 0.08) : 0);
+        e.sprite.setAlpha(v ? (e.stealthRevealed ? 1 : .08) : 0);
+        e.shadow?.setAlpha(v ? (e.stealthRevealed ? .55 : .08) : 0);
         if (e.hpBar) e.hpBar.setAlpha(e.stealthRevealed ? 1 : 0.08);
-      }
+      } else e.sprite.setAlpha(v ? 1 : 0);
     }
     for (const c of this.chests) {
       const v = !!visible[c.y]?.[c.x];
-      c.sprite.setVisible(v);
+      c.sprite.setVisible(v).setAlpha(v ? 1 : 0);
       c.glow?.setVisible(v);
     }
     for (const g of this.ground) {
       const v = !!visible[g.y]?.[g.x];
-      g.sprite.setVisible(v);
+      g.sprite.setVisible(v).setAlpha(v ? 1 : 0);
       g.glow?.setVisible(v);
     }
     for (const m of this.ambientMotes) m.sprite.setVisible(!!visible[m.y]?.[m.x]);
@@ -3538,7 +3654,14 @@ export class GameScene extends Phaser.Scene {
       }
     }
     for (const hazard of this.bossHazards) hazard.sprite.setVisible(!!visible[hazard.y]?.[hazard.x]);
-    for (const obstacle of this.bossObstacles) obstacle.sprite.setVisible(!!visible[obstacle.y]?.[obstacle.x]);
+    for (const obstacle of this.bossObstacles) {
+      const v = !!visible[obstacle.y]?.[obstacle.x];
+      obstacle.sprite.setVisible(v).setAlpha(v ? 1 : 0);
+    }
+  }
+
+  isTileCurrentlyVisible(x: number, y: number) {
+    return !!this.visibleTiles[y]?.[x];
   }
 
   // ============ 宝箱 ============
@@ -3596,7 +3719,7 @@ export class GameScene extends Phaser.Scene {
           if (this.receiveShield(s, '宝箱')) this.log(`宝箱から「${s.name}」を発見！`, 'item');
         } else {
           const scrollKinds: ItemKind[] = ['stone', 'shieldstone'];
-          const consumableKinds: ItemKind[] = ['potion', 'warp', 'invis'];
+          const consumableKinds: ItemKind[] = ['potion', 'torch', 'warp', 'invis'];
           const pool = Math.random() < SCROLL_DROP_RATE ? scrollKinds : consumableKinds;
           const k = pool[Math.floor(Math.random() * pool.length)];
           this.player.inventory.push(makeItem(k));
@@ -3630,7 +3753,14 @@ export class GameScene extends Phaser.Scene {
       case 'stone': consumed = this.useStone(); passTurn = false; break;
       case 'shieldstone': consumed = this.useShieldStone(); passTurn = false; break;
       case 'shroom': this.shroomTurns = 12; this.log('光るキノコで周囲が明るくなった。', 'item'); Audio.playSe('pickup'); passTurn = false; break;
-      case 'smoke': this.smokeTurns = 6; this.log('煙幕を焚いた。敵から見つかりにくくなった。', 'item'); Audio.playSe('pickup'); break;
+      case 'torch': {
+        this.torchTurns = 10;
+        this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.45, 460, 0xffa52f);
+        this.log('松明に火を灯した！ 10ターンの間、視界が通常の2倍になる。', 'item');
+        Audio.playSe('pickup');
+        passTurn = false;
+        break;
+      }
       case 'bomb': this.useBomb(); break;
       case 'warp': this.useWarp(); passTurn = false; break;
       case 'seal': this.useSeal(); break;
@@ -4088,7 +4218,7 @@ export class GameScene extends Phaser.Scene {
   doDescend() {
     if (this.gameEnded) return;
     if (!this.inBossRoom && this.dungeon.bossRoom && !this.floorBossDefeated) {
-      this.log('5×5部屋の中ボスを倒すまで次の階へは進めない。', 'sys');
+      this.log('7×7部屋の中ボスを倒すまで次の階へは進めない。', 'sys');
       Audio.playSe('deny');
       this.busy = false;
       return;
@@ -4307,6 +4437,11 @@ export class GameScene extends Phaser.Scene {
       Audio.playSe('deny');
       return;
     }
+    if (!this.isTileCurrentlyVisible(target.x, target.y)) {
+      Audio.playSe('deny');
+      this.log('暗闇の先へは自動移動できない。', 'sys');
+      return;
+    }
 
     const token = ++this.clickPathToken;
     this.clickPathActive = true;
@@ -4315,6 +4450,7 @@ export class GameScene extends Phaser.Scene {
 
     while (token === this.clickPathToken && !this.gameEnded && !this.busy) {
       if (this.player.x === target.x && this.player.y === target.y) break;
+      if (!this.isTileCurrentlyVisible(target.x, target.y)) break;
       let path = this.findClickPath(target.x, target.y);
       if (!path.length) path = this.findClickPath(target.x, target.y, true);
       if (!path.length) break;
@@ -4365,6 +4501,7 @@ export class GameScene extends Phaser.Scene {
         const tile = this.dungeon.tiles[ny]?.[nx];
         const isTarget = nx === targetX && ny === targetY;
         const bossDoorTarget = isTarget && tile === 'door' && !this.inBossRoom;
+        if (!this.isTileCurrentlyVisible(nx, ny)) continue;
         if (!tile || (!isWalkable(tile) && !bossDoorTarget) || tile === 'pit') continue;
         const path = [...cur.path, step.dir];
         if (!isTarget && this.enemyAt(nx, ny)) {

@@ -552,7 +552,10 @@ function buildItemTextures(scene: Phaser.Scene) {
   const items: Record<ItemKind, (g: Phaser.GameObjects.Graphics) => void> = {
     potion: (g) => { px(g, 9, 2, 6, 4, 0x8a6a4a); px(g, 7, 6, 10, 16, 0xd03040); px(g, 9, 12, 6, 8, 0xff6070, 0.7); },
     shroom: (g) => { px(g, 10, 12, 4, 10, 0xe0d8c0); px(g, 5, 6, 14, 8, 0x4fb0ff); px(g, 8, 8, 2, 2, 0xffffff); px(g, 14, 9, 2, 2, 0xffffff); },
-    smoke: (g) => { px(g, 8, 4, 8, 6, 0x6a6a6a); px(g, 6, 10, 12, 12, 0x8a8a8a); px(g, 9, 14, 6, 6, 0xb0b0b0, 0.6); },
+    torch: (g) => {
+      px(g, 10, 11, 4, 11, 0x63351f); px(g, 8, 10, 8, 3, 0xb86b25);
+      px(g, 8, 4, 8, 7, 0xff5a18); px(g, 10, 2, 5, 8, 0xffb21f); px(g, 11, 3, 3, 5, 0xfff08a);
+    },
     bomb: (g) => { px(g, 6, 8, 12, 12, 0x202028); px(g, 12, 3, 2, 5, 0x8a6a4a); px(g, 12, 2, 3, 2, 0xf5a020); px(g, 9, 12, 3, 3, 0x4a4a55); },
     warp: (g) => { px(g, 8, 4, 8, 12, 0xf5c542); px(g, 6, 16, 12, 3, 0xd0a020); px(g, 11, 6, 2, 8, 0x4fd0e0); },
     revive: (g) => { px(g, 11, 8, 2, 12, 0x8a5a2a); px(g, 6, 4, 5, 5, 0x6fae2a); px(g, 13, 4, 5, 5, 0x6fae2a); px(g, 10, 2, 4, 4, 0x9fdf3a); },
