@@ -192,7 +192,7 @@ export function magicLabel(code: MagicCode, level: number): string {
 export const ITEM_DEFS: Record<ItemKind, Omit<Item, 'kind'>> = {
   potion:  { name: '回復ポーション', desc: 'HPを40回復する', textureKey: 'i_potion' },
   shroom:  { name: '光るキノコ', desc: '周囲をしばらく明るくする', textureKey: 'i_shroom' },
-  smoke:   { name: '煙幕ボトル', desc: '敵の視界を乱し逃げやすくなる', textureKey: 'i_smoke' },
+  torch:   { name: '松明', desc: '10ターンの間、通常の2倍まで視界が広がる', textureKey: 'i_torch' },
   bomb:    { name: 'ボムナッツ', desc: '周囲の敵に範囲ダメージ', textureKey: 'i_bomb' },
   warp:    { name: 'ワープベル', desc: '同じ階のランダム地点へ移動', textureKey: 'i_warp' },
   revive:  { name: '復活のタネ', desc: '倒れた時に一度だけ復活', textureKey: 'i_revive' },

@@ -46,6 +46,8 @@ export class UIScene extends Phaser.Scene {
   inventoryTab: 'all' | 'equip' | 'items' = 'all';
   inventoryScrollIndex = 0;
   inventoryScrollMax = 0;
+  codexScrollRow = 0;
+  codexScrollMax = 0;
   secretDirection: 'left' | 'right' | null = null;
   secretAlternatingPresses = 0;
 
@@ -113,6 +115,7 @@ export class UIScene extends Phaser.Scene {
     const onWheel = (_pointer: Phaser.Input.Pointer, _objects: Phaser.GameObjects.GameObject[], _dx: number, dy: number) => {
       if (this.overlayMode === 'equip' && dy !== 0) this.scrollEquipment(dy > 0 ? 1 : -1);
       if (this.overlayMode === 'inv' && dy !== 0) this.scrollInventory(dy > 0 ? 1 : -1);
+      if (this.overlayMode === 'codex' && dy !== 0) this.scrollCodex(dy > 0 ? 1 : -1);
     };
     const onSecretKey = (event: KeyboardEvent) => this.handleEquipmentSecret(event);
     this.input.on('wheel', onWheel);
@@ -680,6 +683,7 @@ export class UIScene extends Phaser.Scene {
     if (this.gachaAnimating) return; // 演出中は切替禁止
     if (this.gs.pendingEquipment && mode !== 'equip') mode = 'equip';
     if (mode === 'equip' && this.overlayMode !== 'equip') this.equipScrollIndex = 0;
+    if (mode === 'codex' && this.overlayMode !== 'codex') this.codexScrollRow = 0;
     if (mode !== 'equip') {
       this.secretDirection = null;
       this.secretAlternatingPresses = 0;
@@ -698,6 +702,11 @@ export class UIScene extends Phaser.Scene {
   }
 
   handleEquipmentSecret(event: KeyboardEvent) {
+    if (this.overlayMode === 'codex' && (event.code === 'ArrowUp' || event.code === 'ArrowDown')) {
+      event.preventDefault();
+      this.scrollCodex(event.code === 'ArrowDown' ? 1 : -1);
+      return;
+    }
     const equipmentListVisible = this.overlayMode === 'equip'
       || this.overlayMode === 'inv' && this.inventoryTab === 'equip';
     if (!equipmentListVisible || event.repeat || this.gs.secretDualUnlocked) return;
@@ -727,6 +736,14 @@ export class UIScene extends Phaser.Scene {
     const next = Phaser.Math.Clamp(this.inventoryScrollIndex + delta, 0, this.inventoryScrollMax);
     if (next === this.inventoryScrollIndex) return;
     this.inventoryScrollIndex = next;
+    this.rebuildOverlay();
+  }
+
+  scrollCodex(delta: number) {
+    if (this.overlayMode !== 'codex' || this.codexScrollMax <= 0) return;
+    const next = Phaser.Math.Clamp(this.codexScrollRow + delta, 0, this.codexScrollMax);
+    if (next === this.codexScrollRow) return;
+    this.codexScrollRow = next;
     this.rebuildOverlay();
   }
 
@@ -770,7 +787,7 @@ export class UIScene extends Phaser.Scene {
     else if (this.overlayMode === 'shop') this.buildShopOverlay(x, y, w);
     else if (this.overlayMode === 'gacha') this.buildGachaOverlay(x, y, w, h);
     else if (this.overlayMode === 'pick') this.buildPickOverlay(x, y, w);
-    else this.buildCodexOverlay(x, y, w);
+    else this.buildCodexOverlay(x, y, w, h);
   }
 
   // ---- 装備スロットから開く「装備変更」ポップアップ ----
@@ -1088,17 +1105,29 @@ export class UIScene extends Phaser.Scene {
     });
   }
 
-  buildCodexOverlay(x: number, y: number, w: number) {
+  buildCodexOverlay(x: number, y: number, w: number, h: number) {
     const columns = w >= 640 ? 4 : 3;
     const gap = 6;
     const rowH = 40;
     const colW = (w - 32 - gap * (columns - 1)) / columns;
-    const startY = y + 50;
-    MONSTER_DEFS.forEach((m, i) => {
+    const startY = y + 66;
+    const totalRows = Math.ceil(MONSTER_DEFS.length / columns);
+    const visibleRows = Math.max(3, Math.floor((h - 106) / rowH));
+    this.codexScrollMax = Math.max(0, totalRows - visibleRows);
+    this.codexScrollRow = Phaser.Math.Clamp(this.codexScrollRow, 0, this.codexScrollMax);
+    const firstIndex = this.codexScrollRow * columns;
+    const lastIndex = Math.min(MONSTER_DEFS.length, (this.codexScrollRow + visibleRows) * columns);
+
+    this.overlay.add(this.add.text(x + 16, y + 43, 'ホイール／上下ボタン／スワイプでスクロール', {
+      fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '10px' : '11px', color: '#86a9ad'
+    }));
+
+    MONSTER_DEFS.slice(firstIndex, lastIndex).forEach((m, visibleIndex) => {
+      const i = firstIndex + visibleIndex;
       const found = this.gs.discovered.has(m.key);
       const col = i % columns;
       const px = x + 16 + col * (colW + gap);
-      const py = startY + Math.floor(i / columns) * rowH;
+      const py = startY + (Math.floor(i / columns) - this.codexScrollRow) * rowH;
       const card = this.add.graphics();
       card.fillStyle(found ? 0x152235 : 0x111824, 0.92).fillRoundedRect(px, py, colW, rowH - 3, 4);
       card.lineStyle(1, found ? m.color : 0x2b3442, found ? 0.72 : 0.45)
@@ -1129,6 +1158,37 @@ export class UIScene extends Phaser.Scene {
         wordWrap: { width: Math.max(60, colW - 34) }, maxLines: 1
       }));
     });
+
+    if (this.codexScrollMax > 0) {
+      const navY = y + h - 36;
+      const up = this.rowButton(x + w / 2 - 94, navY, 54, '▲', false, () => {
+        Audio.playSe('click');
+        this.scrollCodex(-1);
+      }, this.codexScrollRow > 0);
+      const down = this.rowButton(x + w / 2 + 40, navY, 54, '▼', false, () => {
+        Audio.playSe('click');
+        this.scrollCodex(1);
+      }, this.codexScrollRow < this.codexScrollMax);
+      const status = this.add.text(x + w / 2, navY + 14, `${this.codexScrollRow + 1} / ${this.codexScrollMax + 1}`, {
+        fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#9fb4c4'
+      }).setOrigin(0.5);
+      this.overlay.add([up, down, status]);
+
+      const dragZone = this.add.zone(x + 12, startY, w - 24, visibleRows * rowH - 3)
+        .setOrigin(0)
+        .setInteractive({ useHandCursor: true });
+      let dragStartY: number | null = null;
+      const finishDrag = (pointer: Phaser.Input.Pointer) => {
+        if (dragStartY === null) return;
+        const deltaRows = Math.round((dragStartY - pointer.y) / rowH);
+        dragStartY = null;
+        if (deltaRows !== 0) this.scrollCodex(deltaRows);
+      };
+      dragZone.on('pointerdown', (pointer: Phaser.Input.Pointer) => { dragStartY = pointer.y; });
+      dragZone.on('pointerup', finishDrag);
+      dragZone.on('pointerupoutside', finishDrag);
+      this.overlay.add(dragZone);
+    }
   }
 
   // ============ フロアショップ ============

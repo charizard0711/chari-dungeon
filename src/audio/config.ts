@@ -23,7 +23,7 @@ export const BGM_DEFS = {
   floor05:  { key: 'bgm_floor05',  path: 'assets/audio/bgm_floors_05_06.wav', volume: 0.5, loop: true },
   floor07:  { key: 'bgm_floor07',  path: 'assets/audio/bgm_floors_07_08.wav', volume: 0.5, loop: true },
   floor09:  { key: 'bgm_floor09',  path: 'assets/audio/bgm_floors_09_10.wav', volume: 0.5, loop: true },
-  // 5x5中ボス部屋：入口封鎖から撃破まで流れる高速メタル戦闘曲
+  // 7x7中ボス部屋：入口封鎖から撃破まで流れる高速メタル戦闘曲
   midboss:  { key: 'bgm_midboss',  path: 'assets/audio/bgm_midboss.wav', volume: 0.44, loop: true },
   // 5階ごとの大ボス部屋：暴君のレクイエム
   boss:     { key: 'bgm_boss',     path: 'assets/audio/bgm_boss.wav', volume: 0.46, loop: true },

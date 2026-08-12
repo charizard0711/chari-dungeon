@@ -73,7 +73,7 @@ const SHIELD_ART = {
 
 const ORIGINAL_ITEM_ART = {
   i_potion: 'assets/items/healing-potion.png',
-  i_smoke: 'assets/items/smoke-bottle.png',
+  i_torch: 'assets/items/torch.png',
   i_warp: 'assets/items/warp-bell.png',
   coin: 'assets/items/coin-pile.png',
   chest_common: 'assets/items/treasure-chest-common.png',
@@ -87,7 +87,7 @@ const ORIGINAL_ITEM_ART = {
 } as const;
 
 const TERRAIN_PROP_ART = {
-  terrain_boss_gate: 'assets/terrain/boss-gate.png',
+  terrain_boss_gate: 'assets/terrain/boss-gate-v2.png',
   terrain_stairs: 'assets/terrain/stairs.png',
   terrain_boss_brazier: 'assets/terrain/boss-brazier.png',
   terrain_rune_lamp: 'assets/terrain/rune-lamp.png'
