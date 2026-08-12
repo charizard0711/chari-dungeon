@@ -1,6 +1,7 @@
-import type { Weapon, Shield, Item, Dir, Magic, MagicCode, EquipmentGrade, WeaponPassive, WeaponType } from './types';
+import type { Weapon, Shield, Armor, Item, Dir, Magic, MagicCode, EquipmentGrade, WeaponPassive, WeaponType } from './types';
 import { WEAPON_DEFS, SHIELD_DEFS, magicLabel, makeItem, ELEMENT_INFO } from './data';
 import { ELEMENTAL_EQUIPMENT_RATE } from './balance';
+import { DEFAULT_PLAYER_ARMOR, makePlayerArmor } from './playerAppearance';
 
 export const DEFAULT_PLAYER_WEAPON_KEY = 'w_iron_dagger';
 
@@ -24,7 +25,6 @@ export class Player {
   baseAtkMin = 5;
   baseAtkMax = 12;
   baseDef = 3;
-  armorDefBonus = 0;
   gold = 0;
 
   x = 0;
@@ -33,9 +33,11 @@ export class Player {
 
   weapon: Weapon | null = null;
   shield: Shield | null = null;
+  armor: Armor | null = null;
   inventory: Item[] = [];
   weapons: Weapon[] = [];   // 所持武器
   shields: Shield[] = [];   // 所持盾
+  armors: Armor[] = [];     // 所持服・鎧
 
   poisonTurns = 0;
   reviveReady = false; // 復活のタネ所持で有効化されるフラグ（アイテム所持で判定）
@@ -48,6 +50,9 @@ export class Player {
     const defaultWeapon = makeWeapon(DEFAULT_PLAYER_WEAPON_KEY, []);
     this.weapons.push(defaultWeapon);
     this.weapon = defaultWeapon;
+    const defaultArmor = makePlayerArmor(DEFAULT_PLAYER_ARMOR);
+    this.armors.push(defaultArmor);
+    this.armor = defaultArmor;
   }
 
   get atkMin(): number {
@@ -76,7 +81,8 @@ export class Player {
   }
 
   get def(): number {
-    let v = this.baseDef + this.armorDefBonus + Math.floor(this.level * 0.4);
+    let v = this.baseDef + Math.floor(this.level * 0.4);
+    if (this.armor && this.armor.dur > 0) v += this.armor.defBonus + (this.armor.plus ?? 0);
     if (this.shield && this.shield.dur > 0) v += this.shield.defBonus + (this.shield.plus ?? 0);
     return v;
   }

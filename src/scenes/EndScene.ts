@@ -33,7 +33,7 @@ export class EndScene extends Phaser.Scene {
     }
 
     const titleColor = stats.cleared ? '#f5c542' : '#ff6b6b';
-    const titleText = stats.cleared ? '🎉 ダンジョン制覇！ 🎉' : 'GAME OVER';
+    const titleText = stats.cleared ? '🎉 ダンジョン制覇！ 🎉' : '力尽きた…';
     const title = this.add.text(GAME_W / 2, mobile ? 102 : 130, titleText, {
       fontFamily: '"Yu Gothic UI"', fontSize: mobile ? '34px' : '58px', color: titleColor, fontStyle: 'bold'
     }).setOrigin(0.5).setWordWrapWidth(GAME_W - 32);
@@ -45,7 +45,7 @@ export class EndScene extends Phaser.Scene {
         fontFamily: '"Yu Gothic UI"', fontSize: mobile ? '16px' : '22px', color: '#3fe0d0'
       }).setOrigin(0.5).setWordWrapWidth(GAME_W - 36);
     } else {
-      this.add.text(GAME_W / 2, mobile ? 160 : 195, `${stats.floor}F でチャリは力尽きた…`, {
+      this.add.text(GAME_W / 2, mobile ? 160 : 195, `${stats.floor}階でチャリは力尽きた…`, {
         fontFamily: '"Yu Gothic UI"', fontSize: mobile ? '16px' : '22px', color: '#dfe7f0'
       }).setOrigin(0.5).setWordWrapWidth(GAME_W - 36);
     }
@@ -74,7 +74,7 @@ export class EndScene extends Phaser.Scene {
       ry += mobile ? 42 : 34;
     }
     // スコア大表示
-    this.add.text(px + pw / 2, py + ph - 54, 'SCORE', { fontFamily: '"Yu Gothic UI"', fontSize: '18px', color: '#f5c542' }).setOrigin(0.5);
+    this.add.text(px + pw / 2, py + ph - 54, '得点', { fontFamily: '"Yu Gothic UI"', fontSize: '18px', color: '#f5c542' }).setOrigin(0.5);
     const scoreText = this.add.text(px + pw / 2, py + ph - 16, '0', {
       fontFamily: '"Yu Gothic UI"', fontSize: '40px', color: '#f5c542', fontStyle: 'bold'
     }).setOrigin(0.5);

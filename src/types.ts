@@ -76,6 +76,17 @@ export interface Shield {
   guardCounter?: number;
 }
 
+// 服・鎧。装備すると防御力とキャラクターの見た目が同時に変わる。
+export interface Armor {
+  key: string;
+  name: string;
+  defBonus: number;
+  durMax: number;
+  dur: number;
+  grade: EquipmentGrade;
+  plus: number;
+}
+
 export type ItemKind =
   | 'potion'      // 回復ポーション
   | 'shroom'      // 光るキノコ

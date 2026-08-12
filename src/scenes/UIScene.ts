@@ -5,12 +5,12 @@ import { GAME_W, GAME_H } from '../main';
 import { IS_MOBILE, MAP_X, MAP_Y, MAP_W, MAP_H } from '../layout';
 import { durabilityRisk } from '../combat';
 import { weaponFullName } from '../player';
-import { getTheme, MAGIC_DESC, MONSTER_DEFS, ITEM_DEFS, plusColor, plusColorHex, gradeColor, isRareItem, ELEMENT_INFO, monsterElement } from '../data';
-import type { MagicCode, ItemKind, Item, Dir, Weapon, Shield, Element } from '../types';
+import { getTheme, MAGIC_DESC, MONSTER_DEFS, ITEM_DEFS, gradeColor, isRareItem, ELEMENT_INFO, monsterElement } from '../data';
+import type { Armor, MagicCode, ItemKind, Item, Dir, Weapon, Shield, Element } from '../types';
 import { shieldFullName } from '../player';
 import { Audio } from '../audio/manager';
 import { EQUIPMENT_LIMIT } from '../balance';
-import { PLAYER_ARMOR_DEFS } from '../playerAppearance';
+import { armorFullName, armorTextureKey, isPlayerArmor, PLAYER_ARMOR_DEFS, playerFrameIndex, playerSheetKey } from '../playerAppearance';
 
 const COLORS: Record<string, string> = {
   sys: '#d7e3e2', dmg: '#ff7b82', item: '#6fdda8', gold: '#ffd47d', special: '#c9b2ff'
@@ -23,13 +23,14 @@ export class UIScene extends Phaser.Scene {
   topText!: Phaser.GameObjects.Text;
   statusText!: Phaser.GameObjects.Text;
   hpBar!: Phaser.GameObjects.Graphics;
-  equipSlots: { tag: string; bg: Phaser.GameObjects.Graphics; icon: Phaser.GameObjects.Image; name: Phaser.GameObjects.Text; sub: Phaser.GameObjects.Text; rect: [number, number, number, number] }[] = [];
+  equipSlots: { kind: 'weapon' | 'armor' | 'shield'; tag: string; bg: Phaser.GameObjects.Graphics; icon: Phaser.GameObjects.Image; name: Phaser.GameObjects.Text; sub: Phaser.GameObjects.Text; rect: [number, number, number, number] }[] = [];
+  paperDoll?: Phaser.GameObjects.Image;
   codexText?: Phaser.GameObjects.Text; // モンスター図鑑サイドパネル（PCのみ）
   logTexts: Phaser.GameObjects.Text[] = []; // 固定8行（行ごとに色分け）
   itemContainer!: Phaser.GameObjects.Container;
   overlay!: Phaser.GameObjects.Container;
   overlayMode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' = 'none';
-  pickSlot = 0; // 'pick'モードで開いている装備スロット（0武器/1盾/2頭/3体）
+  pickSlot = 0; // 'pick'モードで開いている装備スロット（0武器/1服/2盾）
   gachaAnimating = false; // ガチャ演出中は再描画をブロック
   codeDigits = '';
   codeMessage = '';
@@ -71,10 +72,10 @@ export class UIScene extends Phaser.Scene {
       // スマホ縦持ち：縦型レイアウト
       this.L = {
         hpBar: { x: 20, y: 94, w: 350 },
-        items: { x: 14, y: 584, cols: 6 },
+        items: { x: 14, y: 604, cols: 6 },
         ov: { x: 8, y: 48, w: 374, h: 746 }
       };
-      this.equipIconSize = 32;
+      this.equipIconSize = 34;
       this.buildMobileLayout();
     } else {
       // PC：従来レイアウト
@@ -83,7 +84,7 @@ export class UIScene extends Phaser.Scene {
         items: { x: 730, y: 596, cols: 8 },
         ov: { x: 200, y: 80, w: 680, h: 460 }
       };
-      this.equipIconSize = 92;
+      this.equipIconSize = 58;
       this.buildFrames();
       this.buildTopBar();
       this.buildLeftMenu();
@@ -181,8 +182,8 @@ export class UIScene extends Phaser.Scene {
 
   buildTopBar() {
     this.panel(8, 4, GAME_W - 16, 36);
-    this.add.text(20, 9, 'CHARI  /  DEEP RUN', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#65dcd4', fontStyle: 'bold', letterSpacing: 2
+    this.add.text(20, 8, 'ちゃりだんじょん', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '16px', color: '#65dcd4', fontStyle: 'bold', letterSpacing: 1
     });
     this.topText = this.add.text(GAME_W - 26, 11, '', {
       fontFamily: '"Yu Gothic UI"', fontSize: '14px', color: '#f2cf85', fontStyle: 'bold'
@@ -191,38 +192,39 @@ export class UIScene extends Phaser.Scene {
 
   // ============ 左メニュー ============
   buildLeftMenu() {
-    this.panel(8, 48, 160, 512, 'NAVIGATION');
-    const labels: { t: string; f: () => void }[] = [
-      { t: '🧭 探索', f: () => this.setOverlay('none') },
-      { t: '🎒 所持品・装備', f: () => this.openInventory() },
-      { t: '🛒 ショップ', f: () => this.setOverlay('shop') },
-      { t: '🎰 ガチャ', f: () => this.setOverlay('gacha') },
-      { t: '👾 モンスター', f: () => this.setOverlay('codex') },
-      { t: '⚙ 設定', f: () => this.showSettings() }
+    this.panel(8, 48, 160, 512, 'メニュー');
+    const labels: { t: string; icon: string; f: () => void }[] = [
+      { t: '探索', icon: 'ui_nav_explore', f: () => this.setOverlay('none') },
+      { t: '持ち物・装備', icon: 'ui_nav_inventory', f: () => this.openInventory() },
+      { t: 'ショップ', icon: 'ui_nav_shop', f: () => this.setOverlay('shop') },
+      { t: 'ガチャ', icon: 'ui_nav_gacha', f: () => this.setOverlay('gacha') },
+      { t: 'モンスター図鑑', icon: 'ui_nav_codex', f: () => this.setOverlay('codex') },
+      { t: '設定', icon: 'ui_nav_settings', f: () => this.showSettings() }
     ];
     let y = 84;
     for (const it of labels) {
-      this.menuButton(16, y, 144, 40, it.t, it.f);
+      this.menuButton(16, y, 144, 40, it.icon, it.t, it.f);
       y += 48;
     }
     // ヒント
-    this.add.text(16, y + 6, '矢印/クリック: 移動\n長押し: BOOST', {
+    this.add.text(16, y + 6, '矢印・クリック：移動\n長押し：加速', {
       fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#789093', lineSpacing: 5
     });
   }
 
-  menuButton(x: number, y: number, w: number, h: number, label: string, onClick: () => void) {
+  menuButton(x: number, y: number, w: number, h: number, iconKey: string, label: string, onClick: () => void) {
     const g = this.add.graphics();
     const draw = (c: number, line = 0x315155) => { g.clear(); g.fillStyle(c, .96); g.fillRoundedRect(x, y, w, h, 8); g.lineStyle(1, line, .9); g.strokeRoundedRect(x, y, w, h, 8); };
     draw(0x0d2226);
-    const t = this.add.text(x + 12, y + h / 2, label, {
-      fontFamily: '"Yu Gothic UI"', fontSize: '15px', color: '#dfe7f0'
+    const icon = this.add.image(x + 24, y + h / 2, iconKey).setDisplaySize(34, 34);
+    const t = this.add.text(x + 46, y + h / 2, label, {
+      fontFamily: '"Yu Gothic UI"', fontSize: label.length > 7 ? '12px' : '14px', color: '#dfe7f0', fontStyle: 'bold'
     }).setOrigin(0, 0.5);
     const zone = this.add.zone(x, y, w, h).setOrigin(0).setInteractive({ useHandCursor: true });
     zone.on('pointerover', () => draw(0x1d4244, 0x58d9d1));
     zone.on('pointerout', () => draw(0x0d2226));
     zone.on('pointerdown', () => { Audio.playSe('click'); onClick(); });
-    void t;
+    void icon; void t;
   }
 
   // ============ 右ステータス ============
@@ -240,30 +242,37 @@ export class UIScene extends Phaser.Scene {
     this.hpBar = this.add.graphics();
     this.atkLabel = this.add.text(x + 14, 166, '', style);
 
-    // ---- そうび（武器・盾の2枠を横並びで大きく表示）----
-    this.panel(x, 232, w, 234, 'そうび');
-    const tags = ['⚔', '🛡'];
-    const gx = x + 14, gy = 262;
-    const sw = (w - 28 - 8) / 2, sh = 190, gapx = 8;
+    // ---- 装備（キャラクター見た目＋武器・服・盾）----
+    this.panel(x, 232, w, 234, '装備');
+    const dollFrame = this.add.graphics();
+    dollFrame.fillStyle(0x071417, 0.98).fillRoundedRect(x + 112, 260, 124, 180, 12);
+    dollFrame.lineStyle(1.5, 0x9b793e, 0.9).strokeRoundedRect(x + 112, 260, 124, 180, 12);
+    dollFrame.lineStyle(1, 0x58d9d1, 0.45).strokeRoundedRect(x + 118, 266, 112, 168, 9);
+    this.paperDoll = this.add.image(x + 174, 343, playerSheetKey(this.gs.playerGender, this.gs.playerArmor ?? 'leather'), playerFrameIndex('down', 'idle'))
+      .setDisplaySize(116, 116);
+    this.add.text(x + 174, 416, '装備中の見た目', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: '#a9c9c7'
+    }).setOrigin(0.5);
+
+    const slots = [
+      { kind: 'weapon' as const, tag: '武器', sx: x + 14, sy: 274 },
+      { kind: 'armor' as const, tag: '服', sx: x + w - 100, sy: 274 },
+      { kind: 'shield' as const, tag: '盾', sx: x + w - 100, sy: 370 }
+    ];
     this.equipSlots = [];
-    for (let i = 0; i < 2; i++) {
-      const sx = gx + i * (sw + gapx), sy = gy;
+    for (let i = 0; i < slots.length; i++) {
+      const { kind, tag, sx, sy } = slots[i];
+      const sw = 86, sh = 82;
       const bg = this.add.graphics();
-      const icon = this.add.image(sx + sw / 2, sy + 76, 'coin').setDisplaySize(60, 60);
-      this.add.text(sx + 8, sy + 6, tags[i], { fontFamily: '"Yu Gothic UI"', fontSize: '15px' });
-      const name = this.add.text(sx + sw / 2, sy + 118, '', {
-        fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#dfe7f0', align: 'center',
-        wordWrap: { width: sw - 10 }
-      }).setOrigin(0.5, 0);
-      const sub = this.add.text(sx + sw / 2, sy + sh - 48, '', {
-        fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: '#9fb4c4', align: 'center',
-        wordWrap: { width: sw - 10 }
-      }).setOrigin(0.5, 0);
-      this.equipSlots.push({ tag: tags[i], bg, icon, name, sub, rect: [sx, sy, sw, sh] });
-      // クリックで装備変更ポップアップを開く
+      const icon = this.add.image(sx + sw / 2, sy + 34, 'coin').setDisplaySize(58, 58);
+      const name = this.add.text(sx + sw / 2, sy + sh - 15, tag, {
+        fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#dfe7f0', fontStyle: 'bold'
+      }).setOrigin(0.5);
+      const sub = this.add.text(0, 0, '').setVisible(false);
+      this.equipSlots.push({ kind, tag, bg, icon, name, sub, rect: [sx, sy, sw, sh] });
       const slotIndex = i;
       const zone = this.add.zone(sx, sy, sw, sh).setOrigin(0).setInteractive({ useHandCursor: true });
-      zone.on('pointerover', () => this.showTooltip('装備を変更', 'クリックで持っている装備から選べる', sx + sw / 2, sy + 8));
+      zone.on('pointerover', () => this.showEquipmentTooltip(kind, sx + sw / 2, sy + 4));
       zone.on('pointerout', () => this.hideTooltip());
       zone.on('pointerdown', () => {
         Audio.playSe('click');
@@ -272,6 +281,9 @@ export class UIScene extends Phaser.Scene {
         this.setOverlay('pick');
       });
     }
+    this.add.text(x + 20, 378, 'カーソルで詳細\nクリックで装備変更', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: '#6f9496', lineSpacing: 5
+    });
 
     // ---- モンスター図鑑 ----
     this.panel(x, 474, w, 86, 'モンスター図鑑');
@@ -299,8 +311,8 @@ export class UIScene extends Phaser.Scene {
   buildMobileLayout() {
     // ---- 上部バー（タイトル＋フロア情報）----
     this.panel(8, 8, 374, 38);
-    this.add.text(16, 15, 'CHARI / DEEP RUN', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#3fe0d0', fontStyle: 'bold', letterSpacing: 1
+    this.add.text(16, 14, 'ちゃりだんじょん', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '14px', color: '#3fe0d0', fontStyle: 'bold', letterSpacing: 1
     });
     this.topText = this.add.text(374, 15, '', {
       fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#f5c542', fontStyle: 'bold'
@@ -318,51 +330,55 @@ export class UIScene extends Phaser.Scene {
     const fg = this.add.graphics();
     fg.lineStyle(2, 0x2f6f6a, 1).strokeRoundedRect(MAP_X - 2, MAP_Y - 2, MAP_W + 4, MAP_H + 4, 6);
 
-    // ---- そうび（マップ下に横2枠）----
-    this.panel(8, 498, 374, 60, 'そうび');
-    const tags = ['⚔', '🛡'];
+    // ---- 装備（スマホは武器・服・盾の3枠を横並び）----
+    this.panel(8, 498, 374, 82, '装備');
+    const slots = [
+      { kind: 'weapon' as const, tag: '武器' },
+      { kind: 'armor' as const, tag: '服' },
+      { kind: 'shield' as const, tag: '盾' }
+    ];
     this.equipSlots = [];
-    for (let i = 0; i < 2; i++) {
-      const sx = 14 + i * 184, sy = 518, sw = 178, sh = 34;
+    for (let i = 0; i < slots.length; i++) {
+      const { kind, tag } = slots[i];
+      const sx = 14 + i * 122, sy = 520, sw = 116, sh = 52;
       const bg = this.add.graphics();
-      const icon = this.add.image(sx + 22, sy + sh / 2, 'coin').setDisplaySize(28, 28);
-      this.add.text(sx + 3, sy + 2, tags[i], { fontFamily: '"Yu Gothic UI"', fontSize: '10px' });
-      const name = this.add.text(sx + 42, sy + 4, '', {
-        fontFamily: '"Yu Gothic UI"', fontSize: '9px', color: '#dfe7f0',
-        wordWrap: { width: sw - 46 }
+      const icon = this.add.image(sx + 24, sy + sh / 2, 'coin').setDisplaySize(34, 34);
+      const name = this.add.text(sx + 47, sy + 7, tag, {
+        fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: '#dfe7f0', fontStyle: 'bold',
+        wordWrap: { width: sw - 50 }
       });
-      const sub = this.add.text(sx + 42, sy + 19, '', {
-        fontFamily: '"Yu Gothic UI"', fontSize: '8px', color: '#9fb4c4',
-        wordWrap: { width: sw - 46 }
+      const sub = this.add.text(sx + 47, sy + 26, 'タップで詳細', {
+        fontFamily: '"Yu Gothic UI"', fontSize: '7px', color: '#76989b',
+        wordWrap: { width: sw - 50 }
       });
-      this.equipSlots.push({ tag: tags[i], bg, icon, name, sub, rect: [sx, sy, sw, sh] });
+      this.equipSlots.push({ kind, tag, bg, icon, name, sub, rect: [sx, sy, sw, sh] });
       const slotIndex = i;
       const zone = this.add.zone(sx, sy, sw, sh).setOrigin(0).setInteractive({ useHandCursor: true });
       zone.on('pointerdown', () => { Audio.playSe('click'); this.pickSlot = slotIndex; this.setOverlay('pick'); });
     }
 
     // ---- もちもの ----
-    this.panel(8, 566, 374, 74, 'クイックアイテム（タップで使用）');
+    this.panel(8, 586, 374, 66, 'クイックアイテム（タップで使用）');
     this.itemContainer = this.add.container(0, 0);
 
     // ---- 冒険ログ（最新1行）----
-    this.panel(8, 762, 374, 32);
-    this.add.text(16, 770, 'LOG', {
+    this.panel(8, 766, 374, 30);
+    this.add.text(16, 773, '冒険ログ', {
       fontFamily: '"Yu Gothic UI"', fontSize: '9px', color: '#65dcd4', fontStyle: 'bold', letterSpacing: 1
     });
     this.logTexts = [];
-    this.logTexts.push(this.add.text(52, 769, '', {
+    this.logTexts.push(this.add.text(76, 771, '', {
       fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#dfe7f0',
-      wordWrap: { width: 320 }
+      wordWrap: { width: 294 }
     }));
 
     // ---- 操作エリア：四方向キー ----
-    this.panel(8, 646, 374, 116);
-    this.add.text(16, 652, 'MOVE', {
+    this.panel(8, 658, 374, 106);
+    this.add.text(16, 664, '移動', {
       fontFamily: '"Yu Gothic UI"', fontSize: '9px', color: '#65dcd4', fontStyle: 'bold', letterSpacing: 1
     });
-    this.buildTouchControls(78, 704, 34, 24);
-    this.add.text(150, 686, '十字キーで移動\n長押しでBOOST', {
+    this.buildTouchControls(76, 716, 29, 22);
+    this.add.text(142, 692, '十字キーで移動\n長押しで加速', {
       fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: '#91a8b4', lineSpacing: 6
     });
 
@@ -372,11 +388,11 @@ export class UIScene extends Phaser.Scene {
 
   buildMobileNav() {
     const items: { icon: string; label: string; f: () => void }[] = [
-      { icon: '🎒', label: '所持品', f: () => this.openInventory() },
-      { icon: '🛒', label: '店', f: () => this.setOverlay('shop') },
-      { icon: '🎰', label: 'ガチャ', f: () => this.setOverlay('gacha') },
-      { icon: '👾', label: '図鑑', f: () => this.setOverlay('codex') },
-      { icon: '⚙', label: '設定', f: () => this.showSettings() }
+      { icon: 'ui_nav_inventory', label: '所持品', f: () => this.openInventory() },
+      { icon: 'ui_nav_shop', label: '店', f: () => this.setOverlay('shop') },
+      { icon: 'ui_nav_gacha', label: 'ガチャ', f: () => this.setOverlay('gacha') },
+      { icon: 'ui_nav_codex', label: '図鑑', f: () => this.setOverlay('codex') },
+      { icon: 'ui_nav_settings', label: '設定', f: () => this.showSettings() }
     ];
     this.panel(8, 800, 374, 36);
     items.forEach((it, i) => {
@@ -384,8 +400,8 @@ export class UIScene extends Phaser.Scene {
       const g = this.add.graphics();
       const draw = (c: number) => { g.clear(); g.fillStyle(c, 1).fillRoundedRect(x, y, w, h, 6); };
       draw(0x1c2536);
-      this.add.text(x + 13, y + h / 2, it.icon, { fontSize: '12px' }).setOrigin(0.5);
-      this.add.text(x + 25, y + h / 2, it.label, {
+      this.add.image(x + 14, y + h / 2, it.icon).setDisplaySize(24, 24);
+      this.add.text(x + 28, y + h / 2, it.label, {
         fontFamily: '"Yu Gothic UI"', fontSize: '8px', color: '#dfe7f0'
       }).setOrigin(0, 0.5);
       const zone = this.add.zone(x, y, w, h).setOrigin(0).setInteractive({ useHandCursor: true });
@@ -461,56 +477,83 @@ export class UIScene extends Phaser.Scene {
     return effects.length ? effects.join(' / ') : 'なし';
   }
 
+  showEquipmentTooltip(kind: 'weapon' | 'armor' | 'shield', anchorX: number, anchorY: number) {
+    const p = this.gs.player;
+    if (kind === 'weapon') {
+      const weapon = p.weapon;
+      if (!weapon) return this.showTooltip('素手', '武器を装備していない', anchorX, anchorY);
+      const risk = durabilityRisk(weapon.dur, weapon.durMax);
+      return this.showTooltip(
+        weaponFullName(weapon),
+        `攻撃力 ${p.atkMin}–${p.atkMax}\n耐久 ${weapon.dur} / ${weapon.durMax}（${risk.label}）\n効果 ${this.weaponEffectText(weapon)}`,
+        anchorX, anchorY
+      );
+    }
+    if (kind === 'armor') {
+      const armor = p.armor;
+      if (!armor) return this.showTooltip('服', '服を装備していない', anchorX, anchorY);
+      const risk = durabilityRisk(armor.dur, armor.durMax);
+      return this.showTooltip(
+        armorFullName(armor),
+        `防御力 +${armor.defBonus + armor.plus}\n耐久 ${armor.dur} / ${armor.durMax}（${risk.label}）\n見た目 ${PLAYER_ARMOR_DEFS[armor.key as keyof typeof PLAYER_ARMOR_DEFS]?.name ?? armor.name}`,
+        anchorX, anchorY
+      );
+    }
+    if (p.weapon?.dual) {
+      return this.showTooltip('盾を装備できない', '二刀流は両手を使うため、盾を持てない', anchorX, anchorY);
+    }
+    const shield = p.shield;
+    if (!shield) return this.showTooltip('盾', '盾を装備していない', anchorX, anchorY);
+    const risk = durabilityRisk(shield.dur, shield.durMax);
+    return this.showTooltip(
+      shieldFullName(shield),
+      `防御力 +${shield.defBonus + shield.plus}\n耐久 ${shield.dur} / ${shield.durMax}（${risk.label}）\n効果 ${this.shieldEffectText(shield)}`,
+      anchorX, anchorY
+    );
+  }
+
   // ============ リフレッシュ ============
   refresh() {
     const p = this.gs.player;
     const th = getTheme(this.gs.floor);
 
-    const boost = this.gs.holdBoostTier === 2 ? '  ⚡MAX BOOST' : this.gs.holdBoostTier === 1 ? '  ⚡BOOST' : '';
-    const floorLabel = this.gs.inBossRoom ? `${this.gs.floor}.5F` : `${String(this.gs.floor).padStart(2, '0')}F`;
+    const boost = this.gs.holdBoostTier === 2 ? '  最大加速' : this.gs.holdBoostTier === 1 ? '  加速' : '';
+    const floorLabel = this.gs.inBossRoom ? `${this.gs.floor}.5階` : `${this.gs.floor}階`;
     const gate = this.gs.inBossRoom
-      ? this.gs.bossRewardClaimed ? 'EXIT OPEN' : 'BOSS LOCK'
+      ? this.gs.bossRewardClaimed ? '出口解放' : 'ボス封印'
       : this.gs.floor === 5
-        ? 'BOSS DOOR'
+        ? 'ボス扉'
         : !this.gs.floorBossDefeated
-          ? 'BOSS LOCK'
-          : this.gs.floorHasGate(this.gs.floor) ? 'BOSS DOOR' : 'STAIRS OPEN';
+          ? 'ボス封印'
+          : this.gs.floorHasGate(this.gs.floor) ? 'ボス扉' : '階段解放';
     this.topText.setText(IS_MOBILE
-      ? `${floorLabel}  ${gate === 'BOSS LOCK' ? '🔒BOSS' : gate}  ${this.gs.score}pt${boost}`
-      : `${floorLabel} / 30F  ${th.name}   ${gate}   SCORE ${this.gs.score}   TURN ${this.gs.turn}${boost}`);
+      ? `${floorLabel}  ${gate}  得点${this.gs.score}${boost}`
+      : `${floorLabel} / 30階  ${th.name}   ${gate}   得点 ${this.gs.score}   ${this.gs.turn}ターン${boost}`);
 
     this.statusText.setText(IS_MOBILE
-      ? `${p.name} Lv.${p.level}  EXP ${p.exp}/${p.expNext}  TURN ${this.gs.turn}`
-      : `${p.name}  Lv.${p.level}   (EXP ${p.exp}/${p.expNext})`);
-    this.hpLabel.setText(`HP  ${p.hp} / ${p.hpMax}`);
+      ? `${p.name} レベル${p.level}  経験値 ${p.exp}/${p.expNext}  ${this.gs.turn}ターン`
+      : `${p.name}  レベル${p.level}   （経験値 ${p.exp}/${p.expNext}）`);
+    this.hpLabel.setText(`体力  ${p.hp} / ${p.hpMax}`);
     this.atkLabel.setText(IS_MOBILE
-      ? `攻 ${p.atkMin}-${p.atkMax}  防 ${p.def}  💰${p.gold}`
-      : `攻撃力 ${p.atkMin}-${p.atkMax}   防御力 ${p.def}   💰 ${p.gold} G`);
+      ? `攻 ${p.atkMin}-${p.atkMax}  防 ${p.def}  ${p.gold}G`
+      : `攻撃力 ${p.atkMin}-${p.atkMax}   防御力 ${p.def}   所持金 ${p.gold}G`);
     // HPバー（ラベルの下の固定位置。座標はレイアウト設定から）
     const { x: bx, y: by, w: bw } = this.L.hpBar;
     this.hpBar.clear();
     this.hpBar.fillStyle(0x2a1518).fillRect(bx, by, bw, 14);
     this.hpBar.fillStyle(0xff5a5a).fillRect(bx, by, bw * Math.max(0, p.hp / p.hpMax), 14);
 
-    const w = p.weapon, s = p.shield;
-    const slotInfo: { tex: string | null; name: string; sub: string; plus: number; grade?: 'D' | 'C' | 'B' | 'A' | 'S'; element?: Element }[] = [
-      w ? { tex: w.key, name: `[${w.ss ? 'SS' : w.grade}] ${w.name}`, sub: IS_MOBILE
-        ? `耐久 ${w.dur}/${w.durMax}  効果:${this.weaponEffectText(w, true)}`
-        : `耐久 ${w.dur}/${w.durMax}  強化${Math.round(this.gs.enhanceChance(w.plus) * 100)}%\n効果 ${this.weaponEffectText(w)}`,
-        plus: w.plus, grade: w.grade, element: w.element }
-        : { tex: null, name: '素手', sub: '', plus: 0 },
-      w?.dual ? { tex: w.key, name: `[${w.ss ? 'SS' : w.grade}] ${w.name}`, sub: IS_MOBILE
-        ? `二刀流  効果:${this.weaponEffectText(w, true)}`
-        : `二刀流・左手\n効果 ${this.weaponEffectText(w)}`,
-        plus: w.plus, grade: w.grade, element: w.element }
-        : s ? { tex: s.key, name: `[${s.grade}] ${s.element ? `【${ELEMENT_INFO[s.element].name}】` : ''}${s.name}`, sub: IS_MOBILE
-          ? `防+${s.defBonus + s.plus}  効果:${this.shieldEffectText(s, true)}`
-          : `防 +${s.defBonus + s.plus}  強化${Math.round(this.gs.enhanceChance(s.plus) * 100)}%\n効果 ${this.shieldEffectText(s)}`,
-          plus: s.plus, grade: s.grade, element: s.element }
-        : { tex: null, name: 'なし', sub: '', plus: 0 }
-    ];
-    this.equipSlots.forEach((slot, i) => {
-      const info = slotInfo[i];
+    const w = p.weapon, a = p.armor, s = p.shield;
+    const empty = { tex: null, sub: 'なし', plus: 0 };
+    const slotInfo: Record<'weapon' | 'armor' | 'shield', { tex: string | null; sub: string; plus: number; grade?: 'D' | 'C' | 'B' | 'A' | 'S'; element?: Element }> = {
+      weapon: w ? { tex: w.key, sub: `攻${w.atkMin}-${w.atkMax}`, plus: w.plus, grade: w.grade, element: w.element } : empty,
+      armor: a ? { tex: armorTextureKey(a.key), sub: `防+${a.defBonus + a.plus}`, plus: a.plus, grade: a.grade } : empty,
+      shield: w?.dual
+        ? { tex: w.key, sub: '二刀流', plus: w.plus, grade: w.grade, element: w.element }
+        : s ? { tex: s.key, sub: `防+${s.defBonus + s.plus}`, plus: s.plus, grade: s.grade, element: s.element } : empty
+    };
+    this.equipSlots.forEach((slot) => {
+      const info = slotInfo[slot.kind];
       const [sx, sy, sw, sh] = slot.rect;
       const has = info.tex !== null;
       const rim = this.elementColor(info.element) ?? (info.grade ? gradeColor(info.grade) : 0x2f6f6a);
@@ -523,10 +566,12 @@ export class UIScene extends Phaser.Scene {
       } else {
         slot.icon.setVisible(false);
       }
-      const nameCol = info.plus > 0 ? plusColorHex(info.plus) : info.grade ? '#' + gradeColor(info.grade).toString(16).padStart(6, '0') : '#e6eef7';
-      slot.name.setText(info.name + (info.plus > 0 ? ` +${info.plus}` : '')).setColor(has ? nameCol : '#6b7c8c');
-      slot.sub.setText(info.sub);
+      slot.name.setText(slot.tag).setColor(has ? '#e6eef7' : '#6b7c8c');
+      slot.sub.setText(IS_MOBILE ? info.sub : '');
     });
+    if (this.paperDoll && this.gs.playerArmor) {
+      this.paperDoll.setTexture(playerSheetKey(this.gs.playerGender, this.gs.playerArmor), playerFrameIndex('down', 'idle'));
+    }
 
     // 図鑑（サイドパネルはPCのみ。詳細は図鑑オーバーレイで）
     if (this.codexText) {
@@ -609,7 +654,8 @@ export class UIScene extends Phaser.Scene {
       if (!t) continue;
       const l = lines[i];
       if (l) {
-        t.setText(l.msg);
+        const message = IS_MOBILE && l.msg.length > 34 ? `${l.msg.slice(0, 34)}…` : l.msg;
+        t.setText(message);
         t.setColor(COLORS[l.type] ?? COLORS.sys);
         // 最新行だけ少し強調
         t.setAlpha(i === lines.length - 1 ? 1 : 0.75);
@@ -656,7 +702,7 @@ export class UIScene extends Phaser.Scene {
       `【${info.name}】`,
       ...(info.description ? [info.description] : []),
       `属性: ${info.element}`,
-      `HP: ${info.hp}/${info.hpMax}`,
+      `体力: ${info.hp}/${info.hpMax}`,
       `攻撃: ${info.atk}  防御: ${info.def}`,
       `行動: ${info.behavior}`
     ];
@@ -757,15 +803,15 @@ export class UIScene extends Phaser.Scene {
     g.lineStyle(1.5, 0x58d9d1).strokeRoundedRect(x, y, w, h, 14);
     this.overlay.add(g);
 
-    const pickTitles = ['⚔ 武器を変更', '🛡 盾を変更'];
+    const pickTitles = ['武器を変更', '服を変更', '盾を変更'];
     const title =
-      this.overlayMode === 'equip' ? (this.gs.pendingEquipment ? '⚠ 装備上限：売却が必要' : '⚔ 装備・売却') :
-      this.overlayMode === 'inv' ? '🎒 所持品・装備' :
-      this.overlayMode === 'settings' ? '⚙ 設定（サウンド）' :
-      this.overlayMode === 'shop' ? '🛒 フロアショップ' :
-      this.overlayMode === 'gacha' ? '🎰 ダンジョンガチャ' :
+      this.overlayMode === 'equip' ? (this.gs.pendingEquipment ? '装備上限：売却が必要' : '装備・売却') :
+      this.overlayMode === 'inv' ? '所持品・装備' :
+      this.overlayMode === 'settings' ? '設定' :
+      this.overlayMode === 'shop' ? 'フロアショップ' :
+      this.overlayMode === 'gacha' ? 'ダンジョンガチャ' :
       this.overlayMode === 'pick' ? pickTitles[this.pickSlot] :
-      '👾 モンスター図鑑';
+      'モンスター図鑑';
     this.overlay.add(this.add.text(x + 16, y + 12, title, {
       fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '15px' : '18px',
       color: '#3fe0d0', fontStyle: 'bold', wordWrap: { width: w - 72 }
@@ -811,6 +857,20 @@ export class UIScene extends Phaser.Scene {
         this.overlay.add([...icon, row]);
         cy += 38;
       });
+    } else if (this.pickSlot === 1) {
+      // 服・鎧
+      if (p.armors.length === 0) { empty('（服を持っていない）'); return; }
+      p.armors.forEach((armor, i) => {
+        const equipped = armor === p.armor;
+        const risk = durabilityRisk(armor.dur, armor.durMax);
+        const texKey = isPlayerArmor(armor.key) ? armorTextureKey(armor.key) : 'armor_leather';
+        const icon = this.framedIcon(x + 34, cy + 16, texKey, gradeColor(armor.grade), 36);
+        const row = this.rowButton(x + 58, cy, w - 74,
+          `${equipped ? '▶ ' : '　'}${armorFullName(armor)}  防御+${armor.defBonus + armor.plus}  耐久${armor.dur}/${armor.durMax}(${risk.label})`,
+          equipped, () => this.gs.equipArmor(i));
+        this.overlay.add([...icon, row]);
+        cy += 38;
+      });
     } else {
       // 盾
       if (p.weapon?.dual) {
@@ -850,21 +910,24 @@ export class UIScene extends Phaser.Scene {
     const pending = this.gs.pendingEquipment;
     let listY = y + 72;
 
-    this.overlay.add(this.add.text(x + 16, y + 45, `武器 ${p.weapons.length}/${EQUIPMENT_LIMIT}　盾 ${p.shields.length}/${EQUIPMENT_LIMIT}　（ホイール／▲▼でスクロール）`, {
+    this.overlay.add(this.add.text(x + 16, y + 45, `武器 ${p.weapons.length}/${EQUIPMENT_LIMIT}　服 ${p.armors.length}/${EQUIPMENT_LIMIT}　盾 ${p.shields.length}/${EQUIPMENT_LIMIT}`, {
       fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '11px' : '13px', color: '#b8d8d6'
     }));
 
     if (pending) {
-      const pendingName = pending.kind === 'weapon' ? weaponFullName(pending.item) : shieldFullName(pending.item);
-      this.overlay.add(this.add.text(x + 16, y + 67, `${pending.kind === 'weapon' ? '武器' : '盾'}を1つ売ると「${pendingName}」を受け取ります。閉じることはできません。`, {
+      const pendingName = pending.kind === 'weapon' ? weaponFullName(pending.item)
+        : pending.kind === 'shield' ? shieldFullName(pending.item) : armorFullName(pending.item);
+      const pendingKind = pending.kind === 'weapon' ? '武器' : pending.kind === 'shield' ? '盾' : '服';
+      this.overlay.add(this.add.text(x + 16, y + 67, `${pendingKind}を1つ売ると「${pendingName}」を受け取ります。閉じることはできません。`, {
         fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '10px' : '12px', color: '#ffb36b',
         wordWrap: { width: w - 32 }
       }));
       listY = y + 103;
     }
 
-    const entries: ({ kind: 'weapon'; item: Weapon; index: number } | { kind: 'shield'; item: Shield; index: number })[] = [
+    const entries: ({ kind: 'weapon'; item: Weapon; index: number } | { kind: 'armor'; item: Armor; index: number } | { kind: 'shield'; item: Shield; index: number })[] = [
       ...p.weapons.map((item, index) => ({ kind: 'weapon' as const, item, index })),
+      ...p.armors.map((item, index) => ({ kind: 'armor' as const, item, index })),
       ...p.shields.map((item, index) => ({ kind: 'shield' as const, item, index }))
     ];
     const visibleCount = Math.min(8, Math.max(4, Math.floor((h - (pending ? 150 : 118)) / 38)));
@@ -888,6 +951,19 @@ export class UIScene extends Phaser.Scene {
         const sell = this.rowButton(x + w - sellW - 10, cy, sellW,
           equipped ? '装備中' : `${IS_MOBILE ? '売' : '売却'} ${this.gs.weaponSellPrice(wp)}G`, false,
           () => this.gs.sellWeapon(entry.index), !equipped);
+        this.overlay.add([...icon, row, sell]);
+      } else if (entry.kind === 'armor') {
+        const armor = entry.item;
+        const equipped = armor === p.armor;
+        const risk = durabilityRisk(armor.dur, armor.durMax);
+        const texKey = isPlayerArmor(armor.key) ? armorTextureKey(armor.key) : 'armor_leather';
+        const icon = this.framedIcon(x + 34, cy + 14, texKey, gradeColor(armor.grade), 34);
+        const row = this.rowButton(x + 56, cy, w - 78 - sellW,
+          `服 ${equipped ? '▶ ' : ''}${armorFullName(armor)}  防御+${armor.defBonus + armor.plus}  耐久${armor.dur}/${armor.durMax}(${risk.label})`,
+          equipped, () => this.gs.equipArmor(entry.index));
+        const sell = this.rowButton(x + w - sellW - 10, cy, sellW,
+          equipped ? '装備中' : `${IS_MOBILE ? '売' : '売却'} ${this.gs.armorSellPrice(armor)}G`, false,
+          () => this.gs.sellArmor(entry.index), !equipped);
         this.overlay.add([...icon, row, sell]);
       } else {
         const sh = entry.item;
@@ -934,13 +1010,10 @@ export class UIScene extends Phaser.Scene {
       this.overlay.add(button);
     });
 
-    const armorDef = this.gs.playerArmor ? PLAYER_ARMOR_DEFS[this.gs.playerArmor] : null;
+    const armor = p.armor;
     const summaryY = y + 80;
     const cardGap = 6;
     const cardW = (w - 32 - cardGap * 2) / 3;
-    const bodyTexture = this.gs.playerArmor
-      ? `player_${this.gs.playerGender}_${this.gs.playerArmor}`
-      : undefined;
     const equippedCards: {
       label: string;
       name: string;
@@ -951,7 +1024,7 @@ export class UIScene extends Phaser.Scene {
       slot?: number;
     }[] = [
       {
-        label: '⚔ 武器',
+        label: '武器',
         name: p.weapon ? weaponFullName(p.weapon) : '素手',
         sub: p.weapon ? `攻${p.weapon.atkMin}-${p.weapon.atkMax}　耐久${p.weapon.dur}/${p.weapon.durMax}` : '装備なし',
         texture: p.weapon?.key,
@@ -959,22 +1032,22 @@ export class UIScene extends Phaser.Scene {
         slot: 0
       },
       {
-        label: '🛡 盾',
+        label: '服',
+        name: armor ? armorFullName(armor) : '装備なし',
+        sub: armor ? `防+${armor.defBonus + armor.plus}　耐久${armor.dur}/${armor.durMax}` : '装備なし',
+        texture: armor ? armorTextureKey(armor.key) : undefined,
+        color: armor ? gradeColor(armor.grade) : 0x36585d,
+        slot: 1
+      },
+      {
+        label: '盾',
         name: p.weapon?.dual ? '二刀流中' : p.shield ? shieldFullName(p.shield) : '装備なし',
         sub: p.weapon?.dual ? '盾は装備できない' : p.shield ? `防+${p.shield.defBonus + p.shield.plus}　耐久${p.shield.dur}/${p.shield.durMax}` : '装備なし',
         texture: p.weapon?.dual ? p.weapon.key : p.shield?.key,
         color: p.weapon?.dual
           ? this.elementColor(p.weapon.element) ?? gradeColor(p.weapon.grade)
           : p.shield ? this.elementColor(p.shield.element) ?? gradeColor(p.shield.grade) : 0x36585d,
-        slot: 1
-      },
-      {
-        label: '◆ 体防具',
-        name: armorDef?.name ?? '服なし',
-        sub: armorDef ? `GRADE ${armorDef.grade}　防御+${armorDef.defBonus}` : '赤い箱から入手',
-        texture: bodyTexture,
-        frame: 0,
-        color: armorDef ? gradeColor(armorDef.grade) : 0x36585d
+        slot: 2
       }
     ];
 
@@ -1013,10 +1086,12 @@ export class UIScene extends Phaser.Scene {
 
     type UnifiedEntry =
       | { type: 'weapon'; item: Weapon; index: number }
+      | { type: 'armor'; item: Armor; index: number }
       | { type: 'shield'; item: Shield; index: number }
       | { type: 'item'; group: { kind: ItemKind; item: Item; count: number; firstIndex: number } };
     const equipmentEntries: UnifiedEntry[] = [
       ...p.weapons.map((item, index) => ({ type: 'weapon' as const, item, index })),
+      ...p.armors.map((item, index) => ({ type: 'armor' as const, item, index })),
       ...p.shields.map((item, index) => ({ type: 'shield' as const, item, index }))
     ];
     const itemEntries: UnifiedEntry[] = this.stackInventory(p.inventory)
@@ -1026,7 +1101,7 @@ export class UIScene extends Phaser.Scene {
       : [...equipmentEntries, ...itemEntries];
 
     const listTitle = this.inventoryTab === 'equip'
-      ? `所持装備　武器 ${p.weapons.length}/${EQUIPMENT_LIMIT}　盾 ${p.shields.length}/${EQUIPMENT_LIMIT}`
+      ? `所持装備　武器 ${p.weapons.length}/${EQUIPMENT_LIMIT}　服 ${p.armors.length}/${EQUIPMENT_LIMIT}　盾 ${p.shields.length}/${EQUIPMENT_LIMIT}`
       : this.inventoryTab === 'items'
         ? `道具　${p.inventory.length}/60`
         : `所持品一覧　装備 ${equipmentEntries.length}　道具 ${p.inventory.length}`;
@@ -1057,6 +1132,19 @@ export class UIScene extends Phaser.Scene {
         const action = this.rowButton(x + w - actionW - 10, cy, actionW,
           equipped ? '装備中' : `売却 ${this.gs.weaponSellPrice(wp)}G`, false,
           () => this.gs.sellWeapon(entry.index), !equipped);
+        this.overlay.add([...icon, row, action]);
+      } else if (entry.type === 'armor') {
+        const armor = entry.item;
+        const equipped = armor === p.armor;
+        const risk = durabilityRisk(armor.dur, armor.durMax);
+        const texKey = isPlayerArmor(armor.key) ? armorTextureKey(armor.key) : 'armor_leather';
+        const icon = this.framedIcon(x + 33, cy + 14, texKey, gradeColor(armor.grade), 32);
+        const row = this.rowButton(x + 54, cy, w - 76 - actionW,
+          `服 ${equipped ? '▶ ' : ''}${armorFullName(armor)}　防+${armor.defBonus + armor.plus}　耐久${armor.dur}/${armor.durMax}(${risk.label})`,
+          equipped, () => this.gs.equipArmor(entry.index));
+        const action = this.rowButton(x + w - actionW - 10, cy, actionW,
+          equipped ? '装備中' : `売却 ${this.gs.armorSellPrice(armor)}G`, false,
+          () => this.gs.sellArmor(entry.index), !equipped);
         this.overlay.add([...icon, row, action]);
       } else if (entry.type === 'shield') {
         const sh = entry.item;
@@ -1149,7 +1237,7 @@ export class UIScene extends Phaser.Scene {
       }));
       const element = monsterElement(m);
       const weakness = ELEMENT_INFO[element].weakTo;
-      this.overlay.add(this.add.text(px + 29, py + 15, found ? `${ELEMENT_INFO[element].name}/弱${ELEMENT_INFO[weakness].name} HP${m.hp} 攻${m.atkMin}-${m.atkMax}` : `???  B${m.minFloor}-${m.maxFloor}`, {
+      this.overlay.add(this.add.text(px + 29, py + 15, found ? `${ELEMENT_INFO[element].name}/弱${ELEMENT_INFO[weakness].name} 体力${m.hp} 攻${m.atkMin}-${m.atkMax}` : `???  ${m.minFloor}-${m.maxFloor}階`, {
         fontFamily: '"Yu Gothic UI"', fontSize: '8px', color: found ? '#8fc8d7' : '#465264'
       }));
       const trait = found ? (m.gimmickText ?? '固有効果なし') : '効果 ???';
@@ -1203,7 +1291,7 @@ export class UIScene extends Phaser.Scene {
     }));
 
     const rows: { kind: 'potion' | 'stone' | 'shieldstone'; price: number; label: string }[] = [
-      { kind: 'potion', price: 25, label: '回復ポーション　HPを40回復' },
+      { kind: 'potion', price: 25, label: '回復ポーション　体力を40回復' },
       { kind: 'stone', price: 100, label: '武器強化スクロール　装備中の武器を強化' },
       { kind: 'shieldstone', price: 100, label: '防具強化スクロール　装備中の盾を強化' }
     ];
@@ -1248,23 +1336,23 @@ export class UIScene extends Phaser.Scene {
       fontFamily: '"Yu Gothic UI"', fontSize: '16px', color: '#f5c542', fontStyle: 'bold'
     }).setOrigin(1, 0));
 
-    this.overlay.add(this.add.text(x + w / 2, y + 54, 'ARCANE  RELIQUARY', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: '#58d9d1', fontStyle: 'bold', letterSpacing: 4
+    this.overlay.add(this.add.text(x + w / 2, y + 54, '古代遺物召喚', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#58d9d1', fontStyle: 'bold', letterSpacing: 3
     }).setOrigin(0.5));
 
     // 説明
-    this.overlay.add(this.add.text(x + w / 2, y + 79, '500Gで武器・盾を召喚。SSでは最高位の鎧も排出', {
+    this.overlay.add(this.add.text(x + w / 2, y + 79, '500Gで武器・服・盾を召喚。等級に応じた装備が排出', {
       fontFamily: '"Yu Gothic UI"', fontSize: '15px', color: '#eef3ee', fontStyle: 'bold'
     }).setOrigin(0.5));
 
     // 排出ランク表
     this.overlay.add(this.add.text(x + w / 2, y + 132, [
       'SS  3%     S  12%     A  25%     B  35%     C  25%',
-      '装備グレード:  SS→S　S→A　A→B　B→C　C→D',
-      '属性付き武器・盾は約5%  /  SSの約1/3は鎧',
+      '装備等級:  SS→S　S→A　A→B　B→C　C→D',
+      '排出カテゴリ: 武器50%　盾40%　服10%  /  属性装備は約5%',
       this.gs.weaponWonThisFloor
-        ? 'この階の武器は取得済み  /  以降は盾のみ排出'
-        : '武器50%・盾50%  /  武器は1階につき最大1本'
+        ? 'この階の武器は取得済み  /  以降は盾80%・服20%'
+        : '武器は1階につき最大1本'
     ].join('\n'), {
       fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#859a9c', align: 'center', lineSpacing: 7
     }).setOrigin(0.5));
@@ -1324,7 +1412,7 @@ export class UIScene extends Phaser.Scene {
     const high = result.rank === 'SS' || result.rank === 'S';
     const mid = result.rank === 'A';
     const rankTitle: Record<GachaResult['rank'], string> = {
-      SS: 'MYTHIC RELIC', S: 'LEGENDARY RELIC', A: 'ARCANE RELIC', B: 'RARE RELIC', C: 'RELIC'
+      SS: '神話遺物', S: '伝説遺物', A: '秘術遺物', B: '希少遺物', C: '遺物'
     };
     const starCount: Record<GachaResult['rank'], number> = { SS: 5, S: 4, A: 3, B: 2, C: 1 };
     const objs: Phaser.GameObjects.GameObject[] = [];
@@ -1340,10 +1428,10 @@ export class UIScene extends Phaser.Scene {
     };
     const colHex = '#' + result.color.toString(16).padStart(6, '0');
 
-    const ritualTag = track(this.add.text(cx, my + 28, 'FORBIDDEN  VAULT  //  RELIC  SUMMON', {
+    const ritualTag = track(this.add.text(cx, my + 28, '禁忌の宝物庫　／　遺物召喚', {
       fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: '#69efe4', fontStyle: 'bold', letterSpacing: 3
     }).setOrigin(.5).setDepth(307));
-    const phaseText = track(this.add.text(cx, my + 49, 'SEAL SYNCHRONIZING  00%', {
+    const phaseText = track(this.add.text(cx, my + 49, '封印同調　00%', {
       fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#8ca2a5', fontStyle: 'bold', letterSpacing: 2
     }).setOrigin(.5).setDepth(307));
 
@@ -1418,7 +1506,7 @@ export class UIScene extends Phaser.Scene {
 
     // 着地：土煙＋振動
     this.time.delayedCall(830, () => {
-      phaseText.setText('RESONANCE DETECTED  32%');
+      phaseText.setText('共鳴を検知　32%');
       Audio.playSe('hit');
       this.cameras.main.shake(180, 0.008);
       for (let i = 0; i < 6; i++) {
@@ -1433,7 +1521,7 @@ export class UIScene extends Phaser.Scene {
 
     // ---- 震えフェーズ：ガタガタ揺れ、光が漏れ出す ----
     this.time.delayedCall(1050, () => {
-      phaseText.setText('READING RELIC CLASS  64%');
+      phaseText.setText('遺物等級を鑑定　64%');
       Audio.playSe('warp');
       this.tweens.add({ targets: chest, angle: { from: -3.5, to: 3.5 }, duration: 85, yoyo: true, repeat: 13 });
       this.tweens.add({ targets: leak, alpha: 0.85, scale: 2.3, duration: 1100, ease: 'Quad.easeIn' });
@@ -1441,7 +1529,7 @@ export class UIScene extends Phaser.Scene {
       this.time.delayedCall(550, () => {
         leak.setTint(result.color);
         sealOuter.setFillStyle(result.color, .035).setStrokeStyle(3, result.color, .72);
-        phaseText.setText('RELIC CLASS LOCKED  100%').setColor(colHex);
+        phaseText.setText('遺物等級が確定　100%').setColor(colHex);
       });
       // 隙間から光の粒が吹き出す
       timers.push(this.time.addEvent({
@@ -1473,7 +1561,7 @@ export class UIScene extends Phaser.Scene {
       this.tweens.killTweensOf([chest, leak]);
       chest.setAngle(0).setTexture('chest_rare_open').setDisplaySize(104, 104);
       leak.setAlpha(0);
-      ritualTag.setText(`${rankTitle[result.rank]}  //  ACQUIRED`).setColor(colHex);
+      ritualTag.setText(`${rankTitle[result.rank]}　／　獲得`).setColor(colHex);
       phaseText.setAlpha(0);
       Audio.playSe(result.rank === 'SS' ? 'levelup' : result.rank === 'S' ? 'kill' : 'chest');
 
@@ -1557,7 +1645,7 @@ export class UIScene extends Phaser.Scene {
       if (nameText.width > cardW - 48) nameText.setFontSize(IS_MOBILE ? 12 : 15);
       this.tweens.add({ targets: nameText, alpha: 1, y: nameY, duration: 350, delay: 500 });
 
-      const metaParts = [`${result.category} / GRADE ${result.grade}`, result.elementName ?? '無属性'];
+      const metaParts = [`${result.category} / 等級 ${result.grade}`, result.elementName ?? '無属性'];
       if (result.feature) metaParts.push(`固有効果: ${result.feature}`);
       const meta = track(this.add.text(cx, itemY + 102, metaParts.join('   ◆   '), {
         fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '9px' : '11px', color: '#b8d8d6',
@@ -1570,11 +1658,11 @@ export class UIScene extends Phaser.Scene {
       hintBg.fillStyle(result.color, .14).fillRoundedRect(cx - 105, hintY - 14, 210, 28, 14);
       hintBg.lineStyle(1, result.color, .52).strokeRoundedRect(cx - 105, hintY - 14, 210, 28, 14);
       this.tweens.add({ targets: hintBg, alpha: 1, duration: 350, delay: 850 });
-      const hint = track(this.add.text(cx, hintY, 'TAP  TO  CONTINUE', {
+      const hint = track(this.add.text(cx, hintY, 'タップして続ける', {
         fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: '#f6e2ac', fontStyle: 'bold', letterSpacing: 2
       }).setOrigin(0.5).setAlpha(0).setDepth(307));
       this.tweens.add({ targets: hint, alpha: 1, duration: 350, delay: 800 });
-      const acquired = track(this.add.text(cx, my + mh - 38, 'NEW RELIC ACQUIRED', {
+      const acquired = track(this.add.text(cx, my + mh - 38, '新たな遺物を獲得', {
         fontFamily: '"Yu Gothic UI"', fontSize: '9px', color: '#70898b', fontStyle: 'bold', letterSpacing: 3
       }).setOrigin(.5).setAlpha(0).setDepth(307));
       this.tweens.add({ targets: acquired, alpha: 1, duration: 350, delay: 650 });
@@ -1686,18 +1774,18 @@ export class UIScene extends Phaser.Scene {
       toggleLabel: () => string;
     }[] = [
       {
-        label: () => `🎵 BGM音量: ${Math.round(Audio.bgmVolume * 100)}%`,
+        label: () => `音楽音量: ${Math.round(Audio.bgmVolume * 100)}%`,
         onMinus: () => Audio.setBgmVolume(Audio.bgmVolume - 0.1),
         onPlus: () => Audio.setBgmVolume(Audio.bgmVolume + 0.1),
         onToggle: () => Audio.toggleBgm(),
-        toggleLabel: () => (Audio.bgmOn ? '🔊 ON' : '🔇 OFF')
+        toggleLabel: () => (Audio.bgmOn ? '音楽 入' : '音楽 切')
       },
       {
         label: () => `🔔 効果音音量: ${Math.round(Audio.seVolume * 100)}%`,
         onMinus: () => Audio.setSeVolume(Audio.seVolume - 0.1),
         onPlus: () => Audio.setSeVolume(Audio.seVolume + 0.1),
         onToggle: () => Audio.toggleSe(),
-        toggleLabel: () => (Audio.seOn ? '🔊 ON' : '🔇 OFF')
+        toggleLabel: () => (Audio.seOn ? '効果音 入' : '効果音 切')
       }
     ];
 
@@ -1746,7 +1834,7 @@ export class UIScene extends Phaser.Scene {
     }
 
     this.overlay.add(this.add.text(x + (IS_MOBILE ? 20 : 30), cy + 14, [
-      '※ BGMと効果音は別々に調整できます。',
+      '※ 音楽と効果音は別々に調整できます。',
       IS_MOBILE
         ? '※ 音源がない場合は内蔵チップチューンを再生します。'
         : '※ 音源ファイル(public/assets/audio/*.mp3)を置くと自動でそちらが使われます。',

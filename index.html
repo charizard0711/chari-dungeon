@@ -10,6 +10,18 @@
     <div id="app">
       <div id="game-container"></div>
     </div>
+    <div id="game-loading" role="status" aria-live="polite" aria-hidden="true">
+      <div class="loading-panel">
+        <div class="loading-art" aria-hidden="true">
+          <span class="loading-flame loading-flame-left"></span>
+          <img src="assets/terrain/boss-gate-v2.png" alt="" />
+          <span class="loading-flame loading-flame-right"></span>
+        </div>
+        <div class="loading-title">NOW LOADING</div>
+        <div class="loading-copy">ダンジョンを生成しています</div>
+        <div class="loading-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
