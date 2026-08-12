@@ -9,6 +9,7 @@ import {
   PlayerGender,
   setSelectedGender
 } from '../playerAppearance';
+import { showGameLoading } from '../loadingOverlay';
 
 const FONT = '"Yu Gothic UI", "Meiryo", sans-serif';
 
@@ -40,6 +41,7 @@ export class TitleScene extends Phaser.Scene {
       if (starting) return;
       starting = true;
       setSelectedGender(this.selectedGender);
+      showGameLoading();
       this.cameras.main.fadeOut(180, 2, 7, 8);
       this.time.delayedCall(190, () => this.scene.start('GameScene'));
     };

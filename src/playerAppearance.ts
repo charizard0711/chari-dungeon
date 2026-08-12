@@ -1,4 +1,4 @@
-import type { Dir, EquipmentGrade } from './types';
+import type { Armor, Dir, EquipmentGrade } from './types';
 
 export const PLAYER_GENDERS = ['male', 'female'] as const;
 export type PlayerGender = typeof PLAYER_GENDERS[number];
@@ -19,14 +19,16 @@ export interface PlayerArmorDef {
   name: string;
   grade: EquipmentGrade;
   defBonus: number;
+  durMax: number;
+  minFloor: number;
 }
 
 export const PLAYER_ARMOR_DEFS: Record<PlayerArmor, PlayerArmorDef> = {
-  leather: { key: 'leather', name: '革の鎧', grade: 'D', defBonus: 0 },
-  chain: { key: 'chain', name: '鎖帷子', grade: 'C', defBonus: 2 },
-  plate: { key: 'plate', name: '騎士の板金鎧', grade: 'B', defBonus: 4 },
-  arcane: { key: 'arcane', name: '秘術装甲', grade: 'A', defBonus: 6 },
-  dragon: { key: 'dragon', name: '竜鱗神鎧', grade: 'S', defBonus: 9 }
+  leather: { key: 'leather', name: '旅人の革装', grade: 'D', defBonus: 1, durMax: 90, minFloor: 1 },
+  chain: { key: 'chain', name: '鎖帷子', grade: 'C', defBonus: 3, durMax: 120, minFloor: 5 },
+  plate: { key: 'plate', name: '騎士の板金鎧', grade: 'B', defBonus: 5, durMax: 155, minFloor: 10 },
+  arcane: { key: 'arcane', name: '秘術装甲', grade: 'A', defBonus: 8, durMax: 190, minFloor: 17 },
+  dragon: { key: 'dragon', name: '竜鱗神鎧', grade: 'S', defBonus: 12, durMax: 240, minFloor: 24 }
 };
 
 const GENDER_STORAGE_KEY = 'chari-dungeon:player-gender';
@@ -52,6 +54,28 @@ export function isPlayerArmor(value: unknown): value is PlayerArmor {
 export function armorForGrade(grade: EquipmentGrade): PlayerArmorDef {
   return Object.values(PLAYER_ARMOR_DEFS).find((armor) => armor.grade === grade)
     ?? PLAYER_ARMOR_DEFS[DEFAULT_PLAYER_ARMOR];
+}
+
+export function armorTextureKey(armor: PlayerArmor | string): string {
+  return `armor_${armor}`;
+}
+
+export function makePlayerArmor(key: PlayerArmor): Armor {
+  const def = PLAYER_ARMOR_DEFS[key];
+  return {
+    key: def.key,
+    name: def.name,
+    grade: def.grade,
+    defBonus: def.defBonus,
+    durMax: def.durMax,
+    dur: def.durMax,
+    plus: 0
+  };
+}
+
+export function armorFullName(armor: Armor): string {
+  const plus = armor.plus > 0 ? `+${armor.plus} ` : '';
+  return `[${armor.grade}] ${plus}${armor.name}`;
 }
 
 export function getSelectedGender(): PlayerGender {

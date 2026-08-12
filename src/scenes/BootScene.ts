@@ -71,6 +71,20 @@ const SHIELD_ART = {
   s_frost_aegis: 'assets/shields/elemental/frost_aegis.png'
 } as const;
 
+const UI_ART = {
+  ui_nav_explore: 'assets/ui/generated/nav-explore.png',
+  ui_nav_inventory: 'assets/ui/generated/nav-inventory.png',
+  ui_nav_shop: 'assets/ui/generated/nav-shop.png',
+  ui_nav_gacha: 'assets/ui/generated/nav-gacha.png',
+  ui_nav_codex: 'assets/ui/generated/nav-codex.png',
+  ui_nav_settings: 'assets/ui/generated/nav-settings.png',
+  armor_leather: 'assets/ui/generated/armor-leather.png',
+  armor_chain: 'assets/ui/generated/armor-chain.png',
+  armor_plate: 'assets/ui/generated/armor-plate.png',
+  armor_arcane: 'assets/ui/generated/armor-arcane.png',
+  armor_dragon: 'assets/ui/generated/armor-dragon.png'
+} as const;
+
 const ORIGINAL_ITEM_ART = {
   i_potion: 'assets/items/healing-potion.png',
   i_torch: 'assets/items/torch.png',
@@ -116,6 +130,9 @@ export class BootScene extends Phaser.Scene {
       this.load.image(key, path);
     }
     for (const [key, path] of Object.entries(SHIELD_ART)) {
+      this.load.image(key, path);
+    }
+    for (const [key, path] of Object.entries(UI_ART)) {
       this.load.image(key, path);
     }
     for (const key of EXPANSION_MONSTER_KEYS) {
