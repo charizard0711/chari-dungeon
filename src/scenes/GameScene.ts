@@ -423,6 +423,9 @@ export class GameScene extends Phaser.Scene {
     if (location.hostname === 'localhost' && qaParams.has('qa-torch')) {
       this.player.inventory.push(makeItem('torch'));
     }
+    if (location.hostname === 'localhost' && qaParams.has('qa-revive')) {
+      this.player.inventory.push(makeItem('revive'));
+    }
     if (location.hostname === 'localhost' && qaParams.has('qa-use-torch')) {
       this.torchTurns = 10;
       this.updateVisibility();

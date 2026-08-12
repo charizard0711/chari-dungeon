@@ -427,7 +427,8 @@ export function generateBossArena(floor: number): DungeonData {
   for (const pillar of pillars) tiles[pillar.y][pillar.x] = 'wall';
 
   const start = { x: bossRoom.cx, y: bossRoom.y + bossRoom.h - 1 };
-  const stairs = { x: bossRoom.cx, y: bossRoom.y };
+  // 強ボス撃破後の出口は見失わないよう、部屋の完全な中央に置く。
+  const stairs = { x: bossRoom.cx, y: bossRoom.cy };
   tiles[start.y][start.x] = 'floor';
   tiles[stairs.y][stairs.x] = 'door';
   return {
