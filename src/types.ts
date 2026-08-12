@@ -118,10 +118,26 @@ export interface MonsterDef {
   isBoss?: boolean;
   isFloorBoss?: boolean;
   isDragonType?: boolean; // DK特効対象
+  isDarkNinja?: boolean;  // 通常は透明で、3歩ごとに姿を見せる
+  isTreasureRabbit?: boolean; // 攻撃せず逃げ続けるレア報酬モンスター
+  gimmick?: MonsterGimmick;
+  gimmickText?: string;
   bossTint?: number;
   color: number;          // 代替ドット絵の基調色
   element?: Element;
 }
+
+export type MonsterGimmick =
+  | 'lantern' | 'burrow' | 'split' | 'phase' | 'shell_guard' | 'vine_trail'
+  | 'mud_bind' | 'regen' | 'shatter' | 'stance' | 'key_drop' | 'freeze_shot'
+  | 'sidestep' | 'fire_breath' | 'ice_trail' | 'storm_trail' | 'heat'
+  | 'warp' | 'revive' | 'enrage' | 'pull' | 'statue' | 'rush' | 'item_seal'
+  | 'summon' | 'root' | 'knight_guard' | 'necromancy' | 'heat_aura'
+  | 'ambush' | 'multi_bite' | 'hydra_regen' | 'rear_weak' | 'vampire'
+  | 'element_cycle' | 'mimic' | 'charge' | 'death_burst' | 'web_trail'
+  | 'golem_guard' | 'laser_lock' | 'wraith_phase' | 'execute' | 'stealth'
+  | 'parry' | 'bull_charge' | 'starfall' | 'treasure_flee' | 'guardian'
+  | 'core_laser';
 
 export type MonsterBehavior =
   | 'chase'      // 追尾
