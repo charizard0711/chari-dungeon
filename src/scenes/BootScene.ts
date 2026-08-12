@@ -89,6 +89,7 @@ const ORIGINAL_ITEM_ART = {
   i_potion: 'assets/items/healing-potion.png',
   i_torch: 'assets/items/torch.png',
   i_warp: 'assets/items/warp-bell.png',
+  i_revive: 'assets/items/revival-seed.png',
   coin: 'assets/items/coin-pile.png',
   chest_common: 'assets/items/treasure-chest-common.png',
   chest_common_open: 'assets/items/treasure-chest-common-open.png',
