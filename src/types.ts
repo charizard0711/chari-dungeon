@@ -79,7 +79,7 @@ export interface Shield {
 export type ItemKind =
   | 'potion'      // 回復ポーション
   | 'shroom'      // 光るキノコ
-  | 'torch'       // 松明（10ターン視界2倍）
+  | 'torch'       // 松明（10ターン、壁を越えて上下左右10マスを照らす）
   | 'bomb'        // ボムナッツ
   | 'warp'        // ワープベル
   | 'revive'      // 復活のタネ

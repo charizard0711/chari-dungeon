@@ -355,11 +355,8 @@ export function generateDungeon(floor: number, _forcedBossRoomZone?: BossRoomZon
     bossEntrance = approach;
     bossEntry = entry;
     exitRoom = bossRoom;
-    // 階段は必ず7x7内の入口から遠い隅へ。中ボス撃破までは封印扉として扱う。
-    stairs = {
-      x: bossRoom.x + bossRoom.w - 2,
-      y: enterFromTop ? bossRoom.y + bossRoom.h - 2 : bossRoom.y + 1
-    };
+    // 出口は見失わないよう7x7部屋の中央へ置き、中ボス撃破までは封印床として確保する。
+    stairs = { x: bossRoom.cx, y: bossRoom.cy };
     tiles[stairs.y][stairs.x] = 'door';
   } else {
     // 5Fだけは従来どおり、最遠地点の出口から独立した5.5F強ボス部屋へ進む。
