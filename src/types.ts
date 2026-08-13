@@ -167,4 +167,9 @@ export type TileType =
   | 'pit'
   | 'rune'
   | 'cracked'
-  | 'door';
+  | 'door'
+  | 'roomDoor'
+  | 'ice'
+  | 'lava'
+  | 'lightning'
+  | 'voidRift';
