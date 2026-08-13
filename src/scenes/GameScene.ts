@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { hideGameLoading } from '../loadingOverlay';
 import { TILE } from '../textures';
 import { generateDungeon, generateBossArena, DungeonData, randomFloor, isWalkable } from '../dungeon';
-import type { BossRoomZone } from '../dungeon';
+import type { BossRoomZone, OptionalRoom, OptionalRoomKind, Room } from '../dungeon';
 import { getTheme, eraSuffix, MONSTER_DEFS, WEAPON_DEFS, makeItem, gradeColor, ITEM_DEFS, ELEMENT_INFO, monsterElement } from '../data';
 import type { Armor, Dir, Element, EquipmentGrade, ItemKind, MonsterDef, Shield, TileType, Vec2, Weapon } from '../types';
 import {
@@ -144,6 +144,21 @@ interface WallFacade {
   sprite: Phaser.GameObjects.Image;
 }
 
+type HealingDungeonObjectKind = 'fountain' | 'healingLake';
+type RoomPropKind = 'barrel' | 'jar' | 'crates' | 'weaponRack' | 'mapTable' | 'cookingPot' | 'minecart' | 'bonePile';
+type DungeonObjectKind = HealingDungeonObjectKind | RoomPropKind;
+
+interface DungeonObject {
+  kind: DungeonObjectKind;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  sprite: Phaser.GameObjects.Image;
+  used: boolean;
+  breakable: boolean;
+}
+
 interface TerrainVisual {
   key: string;
   frame?: number;
@@ -218,6 +233,7 @@ export class GameScene extends Phaser.Scene {
   inBossRoom = false;
   bossRewardClaimed = false;
   bossEntranceClosed = false;
+  openedOptionalRooms = new Set<OptionalRoom>();
   weaponWonThisFloor = false;
   reviveSeedSeen = false;
   shopPurchases = { potion: 0, stone: 0, shieldstone: 0 };
@@ -241,6 +257,7 @@ export class GameScene extends Phaser.Scene {
   bossFloorDecor?: Phaser.GameObjects.Graphics;
   bossRoomBackdrop?: Phaser.GameObjects.Image;
   bossRoomDecorSprites: Phaser.GameObjects.Image[] = [];
+  dungeonObjects: DungeonObject[] = [];
   discovered: Set<string> = new Set();
   pendingEquipment: PendingEquipment | null = null;
   secretDualUnlocked = false;
@@ -342,6 +359,7 @@ export class GameScene extends Phaser.Scene {
     this.inBossRoom = false;
     this.bossRewardClaimed = false;
     this.bossEntranceClosed = false;
+    this.openedOptionalRooms = new Set();
     this.weaponWonThisFloor = false;
     this.reviveSeedSeen = false;
     this.shopPurchases = { potion: 0, stone: 0, shieldstone: 0 };
@@ -373,6 +391,7 @@ export class GameScene extends Phaser.Scene {
     this.bossStates = new Map();
     this.bossHazards = [];
     this.bossObstacles = [];
+    this.dungeonObjects = [];
     this.explored = [];
     this.visibleTiles = [];
 
@@ -434,6 +453,26 @@ export class GameScene extends Phaser.Scene {
       this.lanternTurns = 5;
       this.updateVisibility();
     }
+    if (location.hostname === 'localhost' && qaParams.has('qa-optional-door') && this.dungeon.optionalRooms[0]) {
+      const optional = this.dungeon.optionalRooms[0];
+      const door = optional.door;
+      const candidates = [
+        { x: door.x + 1, y: door.y }, { x: door.x - 1, y: door.y },
+        { x: door.x, y: door.y + 1 }, { x: door.x, y: door.y - 1 }
+      ];
+      const qaPos = candidates.find((position) => {
+        const tile = this.dungeon.tiles[position.y]?.[position.x];
+        const inside = position.x >= optional.room.x && position.x < optional.room.x + optional.room.w
+          && position.y >= optional.room.y && position.y < optional.room.y + optional.room.h;
+        return !!tile && isWalkable(tile) && !inside;
+      });
+      if (qaPos) {
+        this.player.x = qaPos.x;
+        this.player.y = qaPos.y;
+        this.placeSprite(this.playerSprite, qaPos.x, qaPos.y);
+        this.updateVisibility();
+      }
+    }
     if (location.hostname === 'localhost' && qaParams.has('qa-mimic')) {
       const mimicDef = MONSTER_DEFS.find((monster) => monster.gimmick === 'mimic');
       const qaPos = [
@@ -462,6 +501,54 @@ export class GameScene extends Phaser.Scene {
         this.placeSprite(this.playerSprite, qaPos.x, qaPos.y);
         this.updateVisibility();
       }
+    }
+    if (location.hostname === 'localhost' && qaParams.has('qa-dungeon-object') && this.dungeonObjects[0]) {
+      const object = this.dungeonObjects[0];
+      const halfW = Math.floor(object.w / 2), halfH = Math.floor(object.h / 2);
+      const qaPos = [
+        { x: object.x, y: object.y + halfH + 1 }, { x: object.x, y: object.y - halfH - 1 },
+        { x: object.x + halfW + 1, y: object.y }, { x: object.x - halfW - 1, y: object.y }
+      ].find((position) => isWalkable(this.dungeon.tiles[position.y]?.[position.x] ?? 'wall'));
+      if (qaPos) {
+        this.player.x = qaPos.x;
+        this.player.y = qaPos.y;
+        this.placeSprite(this.playerSprite, qaPos.x, qaPos.y);
+        this.updateVisibility();
+      }
+    }
+    if (location.hostname === 'localhost' && qaParams.has('qa-room-props')) {
+      const prop = this.dungeonObjects.find((object) => object.kind === 'barrel' || object.kind === 'jar');
+      if (prop) {
+        const containingRoom = this.optionalRoomContaining(prop.x, prop.y);
+        if (containingRoom && !containingRoom.opened) this.openOptionalRoom(containingRoom);
+        const qaPos = [
+          { x: prop.x, y: prop.y + 1 }, { x: prop.x, y: prop.y - 1 },
+          { x: prop.x + 1, y: prop.y }, { x: prop.x - 1, y: prop.y }
+        ].find((position) => {
+          const tile = this.dungeon.tiles[position.y]?.[position.x];
+          return !!tile && isWalkable(tile) && !this.dungeonObjectAt(position.x, position.y)
+            && !this.enemyAt(position.x, position.y) && !this.chestAt(position.x, position.y);
+        });
+        if (qaPos) {
+          this.player.x = qaPos.x;
+          this.player.y = qaPos.y;
+          this.placeSprite(this.playerSprite, qaPos.x, qaPos.y);
+          this.updateVisibility();
+        }
+      }
+    }
+    if (location.hostname === 'localhost' && qaParams.has('qa-chest-size')) {
+      const positions = [
+        { x: this.player.x - 1, y: this.player.y - 2, rare: false },
+        { x: this.player.x + 1, y: this.player.y - 2, rare: true }
+      ];
+      for (const position of positions) {
+        const tile = this.dungeon.tiles[position.y]?.[position.x];
+        if (tile && isWalkable(tile) && !this.dungeonObjectAt(position.x, position.y)) {
+          this.spawnChestAt(position.x, position.y, position.rare);
+        }
+      }
+      this.updateVisibility();
     }
     if (location.hostname === 'localhost' && qaParams.has('qa-field-door')
       && this.dungeon.bossEntry && this.dungeon.bossEntrance) {
@@ -569,6 +656,8 @@ export class GameScene extends Phaser.Scene {
     this.bossRoomBackdrop = undefined;
     for (const sprite of this.bossRoomDecorSprites) sprite.destroy();
     this.bossRoomDecorSprites = [];
+    for (const object of this.dungeonObjects) object.sprite.destroy();
+    this.dungeonObjects = [];
     for (const row of this.tileSprites) for (const s of row) s.destroy();
     this.tileSprites = [];
     for (const facade of this.wallFacades) facade.sprite.destroy();
@@ -646,11 +735,29 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setZoom(MAP_ZOOM);
 
     // 敵配置
+    if (!bossRoom) {
+      this.spawnDungeonObjects(floor);
+      this.spawnRoomProps(floor);
+    }
     this.spawnEnemies(floor);
     if (!bossRoom) {
       // 通常迷宮だけに探索用の宝箱とアイテムを置く。
       this.spawnChests(floor);
       this.spawnGroundItems(floor);
+    }
+
+    const qaParamsForFloor = new URLSearchParams(location.search);
+    if (location.hostname === 'localhost' && qaParamsForFloor.has('qa-dungeon-object') && this.dungeonObjects[0]) {
+      const object = this.dungeonObjects[0];
+      const containingRoom = this.dungeon.optionalRooms.find((optional) => object.x >= optional.room.x
+        && object.x < optional.room.x + optional.room.w && object.y >= optional.room.y
+        && object.y < optional.room.y + optional.room.h);
+      if (containingRoom && !containingRoom.opened) this.openOptionalRoom(containingRoom);
+    }
+    if (location.hostname === 'localhost' && qaParamsForFloor.has('qa-room-props')) {
+      const prop = this.dungeonObjects.find((object) => object.kind === 'barrel' || object.kind === 'jar');
+      const containingRoom = prop ? this.optionalRoomContaining(prop.x, prop.y) : undefined;
+      if (containingRoom && !containingRoom.opened) this.openOptionalRoom(containingRoom);
     }
 
     if (this.qaBossMode && d.bossRoom) {
@@ -747,11 +854,21 @@ export class GameScene extends Phaser.Scene {
     }
     switch (t) {
       case 'wall': return {
-        key: `terrain_wall_${era}`,
-        frame: ((x * 13 + y * 7) % 3) * 16 + this.terrainConnectionMask(x, y)
+        key: this.inBossRoom ? `terrain_wall_${era}` : `terrain_biome_wall_${this.dungeon.biome}`,
+        frame: this.inBossRoom ? ((x * 13 + y * 7) % 3) * 16 + this.terrainConnectionMask(x, y) : undefined
       };
       case 'stairs': return { key: 'terrain_stairs', size: TILE + 10, depth: 3.4 };
-      case 'door': return { key: 'terrain_boss_gate', size: TILE, depth: 4.2 };
+      case 'door': {
+        const isCentralStairSeal = x === this.dungeon.stairs.x && y === this.dungeon.stairs.y;
+        return isCentralStairSeal
+          ? { key: 'terrain_boss_chain_gate', size: TILE * 1.45, depth: 4.2 }
+          : { key: 'terrain_boss_gate', size: TILE, depth: 4.2 };
+      }
+      case 'roomDoor': return { key: 'terrain_boss_gate', size: TILE, depth: 4.2 };
+      case 'ice':
+      case 'lava':
+      case 'lightning':
+      case 'voidRift': return { key: `terrain_biome_hazard_${this.dungeon.biome}` };
       case 'water': return { key: `water${suffix}` };
       case 'poison': return { key: `poison${suffix}` };
       case 'pit': return { key: `pit${suffix}` };
@@ -759,7 +876,9 @@ export class GameScene extends Phaser.Scene {
       case 'cracked': return { key: `cracked${suffix}` };
       case 'floor':
       default:
-        return { key: `terrain_floor_${era}`, frame: (x * 7 + y * 11) % 3 };
+        return this.inBossRoom
+          ? { key: `terrain_floor_${era}`, frame: (x * 7 + y * 11) % 3 }
+          : { key: `terrain_biome_floor_${this.dungeon.biome}` };
     }
   }
 
@@ -789,6 +908,7 @@ export class GameScene extends Phaser.Scene {
     const cx = room.x * TILE + room.w * TILE / 2;
     const cy = room.y * TILE + room.h * TILE / 2;
     this.bossRoomBackdrop = this.add.image(cx, cy, `terrain_boss_floor_${era}`)
+      .setTexture('terrain_midboss_floor_7x7')
       .setDepth(0.35)
       .setDisplaySize(room.w * TILE + 2, room.h * TILE + 2)
       .setVisible(false);
@@ -887,7 +1007,7 @@ export class GameScene extends Phaser.Scene {
       const mobCount = floor % 10 === 0 ? 5 : floor % 5 === 0 ? 4 : Math.min(4, 2 + Math.floor(floor / 12));
       for (let i = 0; i < mobCount; i++) {
         const def = pool.length ? pool[Math.floor(Math.random() * pool.length)] : MONSTER_DEFS[0];
-        const pos = randomFloor(this.dungeon, this.occupiedPositions());
+        const pos = this.randomBossCombatFloor(this.occupiedPositions());
         if (!pos || this.distToPlayer(pos.x, pos.y) < 4) continue;
         this.addEnemy(def, pos.x, pos.y, 1 + floor * 0.035);
       }
@@ -1002,7 +1122,9 @@ export class GameScene extends Phaser.Scene {
     let pos = fieldPlacement ? this.randomFieldBossPosition() : this.bossArenaPosition();
     if (!fieldPlacement && !pos) pos = this.nearStairsPosition();
     if (!pos || this.distToPlayer(pos.x, pos.y) < 5 || this.enemyAt(pos.x, pos.y)) {
-      pos = randomFloor(this.dungeon, this.occupiedPositions());
+      pos = this.inBossRoom
+        ? this.randomBossCombatFloor(this.occupiedPositions())
+        : randomFloor(this.dungeon, this.occupiedPositions());
     }
     if (!pos) return;
     const enemy = this.addEnemy(def, pos.x, pos.y, 1);
@@ -1043,6 +1165,86 @@ export class GameScene extends Phaser.Scene {
   isInsideBossRoom(x: number, y: number): boolean {
     const room = this.dungeon?.bossRoom;
     return !!room && x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h;
+  }
+
+  isInsideBossCombatFrame(x: number, y: number): boolean {
+    const room = this.dungeon?.bossRoom;
+    if (!room) return true;
+    // 7x7 mid-boss rooms use their whole floor. Dedicated N.5F arenas keep the
+    // outer tile ring as visible decoration, with only the bottom-center entry open.
+    if (!this.inBossRoom) return this.isInsideBossRoom(x, y);
+    const insideFrame = x >= room.x + 1 && x < room.x + room.w - 1
+      && y >= room.y + 1 && y < room.y + room.h - 1;
+    const entrance = x === this.dungeon.start.x && y === this.dungeon.start.y;
+    return insideFrame || entrance;
+  }
+
+  randomBossCombatFloor(avoid: Vec2[]): Vec2 | null {
+    const room = this.dungeon?.bossRoom;
+    if (!room) return randomFloor(this.dungeon, avoid);
+    const blocked = new Set(avoid.map((position) => `${position.x},${position.y}`));
+    const candidates: Vec2[] = [];
+    for (let y = room.y; y < room.y + room.h; y++) {
+      for (let x = room.x; x < room.x + room.w; x++) {
+        if (blocked.has(`${x},${y}`) || !this.validMonsterTile(x, y)) continue;
+        candidates.push({ x, y });
+      }
+    }
+    return Phaser.Utils.Array.Shuffle(candidates)[0] ?? null;
+  }
+
+  optionalRoomAtDoor(x: number, y: number): OptionalRoom | undefined {
+    return this.dungeon.optionalRooms.find((optional) => optional.door.x === x && optional.door.y === y);
+  }
+
+  optionalRoomContaining(x: number, y: number): OptionalRoom | undefined {
+    return this.dungeon.optionalRooms.find((optional) => x >= optional.room.x && x < optional.room.x + optional.room.w
+      && y >= optional.room.y && y < optional.room.y + optional.room.h);
+  }
+
+  openOptionalRoom(optional: OptionalRoom) {
+    if (optional.opened) return;
+    optional.opened = true;
+    this.openedOptionalRooms.add(optional);
+    const { door, entry, room } = optional;
+    this.dungeon.tiles[door.y][door.x] = 'floor';
+    this.applyTileVisual(this.tileSprites[door.y][door.x], 'floor', getTheme(this.floor).era, door.x, door.y);
+    this.effectFx(door.x, door.y, 'fx_magic', 1.35, 360, getTheme(this.floor).accent);
+    Audio.playSe('seal');
+
+    if (optional.kind === 'hazard') {
+      const hazard: TileType = this.dungeon.biome === 'frost' ? 'ice'
+        : this.dungeon.biome === 'magma' ? 'lava'
+          : this.dungeon.biome === 'storm' ? 'lightning'
+            : this.dungeon.biome === 'void' ? 'voidRift'
+              : this.dungeon.biome === 'aqueduct' ? 'water' : 'pit';
+      for (const pos of [{ x: room.cx, y: room.cy }, { x: room.cx - 2, y: room.cy }, { x: room.cx + 2, y: room.cy }]) {
+        this.dungeon.tiles[pos.y][pos.x] = hazard;
+        this.applyTileVisual(this.tileSprites[pos.y][pos.x], hazard, getTheme(this.floor).era, pos.x, pos.y);
+      }
+    }
+    if (optional.kind === 'ambush' || optional.kind === 'hazard') {
+      const pool = MONSTER_DEFS.filter((monster) => monster.minFloor <= this.floor && this.floor <= monster.maxFloor
+        && !monster.isBoss && !monster.isTreasureRabbit);
+      const positions = Phaser.Utils.Array.Shuffle([
+        { x: room.cx - 2, y: room.cy - 1 }, { x: room.cx + 2, y: room.cy - 1 },
+        { x: room.cx - 2, y: room.cy + 2 }, { x: room.cx + 2, y: room.cy + 2 }
+      ]).filter((position) => !this.dungeonObjectAt(position.x, position.y));
+      for (const position of positions.slice(0, optional.kind === 'ambush' ? 3 : 1)) {
+        const def = pool[Math.floor(Math.random() * pool.length)] ?? MONSTER_DEFS[0];
+        this.addEnemy(def, position.x, position.y, 1 + this.floor * 0.035);
+      }
+    }
+    if (optional.kind === 'treasure') {
+      for (const position of [{ x: room.cx - 2, y: room.cy }, { x: room.cx, y: room.cy - 1 }, { x: room.cx + 2, y: room.cy }]) {
+        this.spawnChestAt(position.x, position.y, Math.random() < 0.22);
+      }
+    }
+    this.log(optional.kind === 'ambush' ? '扉の奥から敵の気配があふれ出した！'
+      : optional.kind === 'treasure' ? '隠された宝物庫を発見した！'
+        : optional.kind === 'shrine' ? '静かな祭壇の部屋を発見した。'
+          : '属性の力が満ちた部屋を発見した！', optional.kind === 'ambush' ? 'dmg' : 'special');
+    this.updateVisibility();
   }
 
   bossEntrancePosition(): Vec2 | null {
@@ -1107,8 +1309,7 @@ export class GameScene extends Phaser.Scene {
       });
     }
     for (const pos of candidates) {
-      const tile = this.dungeon.tiles[pos.y]?.[pos.x];
-      if (!tile || !isWalkable(tile) || tile === 'pit' || tile === 'stairs') continue;
+      if (!this.validBossTile(pos.x, pos.y)) continue;
       if (this.enemyAt(pos.x, pos.y) || this.player.x === pos.x && this.player.y === pos.y) continue;
       return pos;
     }
@@ -1177,7 +1378,7 @@ export class GameScene extends Phaser.Scene {
     if (def.gimmick === 'mimic') {
       // 本物の通常宝箱と同じ絵・同じ約30pxサイズで擬態する。
       // baseScaleは変身後のミミック用なので、待機中はdisplaySizeを固定する。
-      e.sprite.setTexture('chest_common').setDisplaySize(30, 30).setAlpha(1).clearTint();
+      e.sprite.setTexture('chest_common').setDisplaySize(26, 26).setAlpha(1).clearTint();
       e.shadow.setAlpha(0.35);
     } else if (def.gimmick === 'ambush') {
       e.sprite.setAlpha(0.1);
@@ -1259,13 +1460,14 @@ export class GameScene extends Phaser.Scene {
 
   validBossTile(x: number, y: number): boolean {
     const tile = this.dungeon.tiles[y]?.[x];
-    const insideGimmickArea = this.dungeon.bossRoom ? this.isInsideBossRoom(x, y) : true;
+    const insideGimmickArea = this.dungeon.bossRoom ? this.isInsideBossCombatFrame(x, y) : true;
     return insideGimmickArea && !!tile && isWalkable(tile) && tile !== 'pit' && tile !== 'stairs';
   }
 
   validMonsterTile(x: number, y: number): boolean {
     const tile = this.dungeon.tiles[y]?.[x];
-    return !!tile && isWalkable(tile) && tile !== 'pit' && tile !== 'stairs' && tile !== 'door';
+    const insideCombatFrame = !this.inBossRoom || this.isInsideBossCombatFrame(x, y);
+    return insideCombatFrame && !!tile && isWalkable(tile) && tile !== 'pit' && tile !== 'stairs' && tile !== 'door';
   }
 
   uniqueBossTiles(tiles: Vec2[]): Vec2[] {
@@ -1844,26 +2046,260 @@ export class GameScene extends Phaser.Scene {
       const pos = randomFloor(this.dungeon, [...this.occupiedPositions(), ...arenaCells]);
       if (!pos) continue;
       // レア箱は序盤約10%、最深部でも最大25%。色と専用絵で一目で判別できる。
-      const rare = Math.random() < 0.10 + Math.min(0.15, floor * 0.005);
-      const baseScale = rare ? 0.50 : 0.47;
-      const spr = this.add.image(0, 0, rare ? 'chest_rare' : 'chest_common')
-        .setDepth(6).setOrigin(0.5, 0.6).setScale(baseScale);
-      this.placeSprite(spr, pos.x, pos.y);
-      const glow = rare
-        ? this.add.image(spr.x, spr.y - 4, 'glow').setDepth(spr.depth - 0.12).setBlendMode(Phaser.BlendModes.ADD)
-          .setTint(0xffca52).setDisplaySize(42, 42).setAlpha(0.34)
-        : undefined;
-      this.chests.push({
-        x: pos.x, y: pos.y, opened: false, rare, sprite: spr, glow,
-        phase: Math.random() * Math.PI * 2, baseScale
-      });
+      this.spawnChestAt(pos.x, pos.y, Math.random() < 0.10 + Math.min(0.15, floor * 0.005));
     }
+  }
+
+  spawnChestAt(x: number, y: number, rare: boolean) {
+    if (this.chestAt(x, y) || this.enemyAt(x, y) || this.dungeonObjectAt(x, y)) return;
+    const displaySize = rare ? 27 : 26;
+    const spr = this.add.image(0, 0, rare ? 'chest_rare' : 'chest_common')
+      .setDepth(6).setOrigin(0.5, 0.62).setDisplaySize(displaySize, displaySize);
+    const baseScale = spr.scaleX;
+    this.placeSprite(spr, x, y);
+    const glow = rare
+      ? this.add.image(spr.x, spr.y - 4, 'glow').setDepth(spr.depth - 0.12).setBlendMode(Phaser.BlendModes.ADD)
+        .setTint(0xffca52).setDisplaySize(42, 42).setAlpha(0.34)
+      : undefined;
+    this.chests.push({
+      x, y, opened: false, rare, sprite: spr, glow,
+      phase: Math.random() * Math.PI * 2, baseScale
+    });
+  }
+
+  spawnDungeonObjects(floor: number) {
+    const rooms = Phaser.Utils.Array.Shuffle(this.dungeon.optionalRooms
+      .filter((optional) => optional.kind === 'shrine')
+      .map((optional) => optional.room));
+    const fallbackRooms = Phaser.Utils.Array.Shuffle(this.dungeon.rooms.filter((room) => room.w >= 7 && room.h >= 7
+      && room !== this.dungeon.bossRoom && room !== this.dungeon.exitRoom
+      && !(this.dungeon.start.x >= room.x && this.dungeon.start.x < room.x + room.w
+        && this.dungeon.start.y >= room.y && this.dungeon.start.y < room.y + room.h)));
+    const candidates = [...rooms, ...fallbackRooms];
+    const wanted: HealingDungeonObjectKind[] = floor % 5 === 0 ? ['healingLake', 'fountain'] : ['fountain'];
+    if (floor >= 6 && floor % 3 === 0) wanted.push('healingLake');
+    for (const kind of wanted) {
+      const room = candidates.find((candidate) => !this.dungeonObjects.some((object) => object.x === candidate.cx && object.y === candidate.cy));
+      if (!room) break;
+      const size = kind === 'healingLake' ? 5 : 3;
+      this.addDungeonObject(kind, room.cx, room.cy, size, size, false);
+    }
+  }
+
+  roomPropTexture(kind: RoomPropKind) {
+    return `terrain_prop_${kind.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)}`;
+  }
+
+  roomPropRenderTiles(kind: RoomPropKind) {
+    if (kind === 'weaponRack' || kind === 'mapTable') return 0.84;
+    if (kind === 'crates' || kind === 'minecart') return 0.82;
+    if (kind === 'cookingPot') return 0.78;
+    if (kind === 'bonePile') return 0.72;
+    if (kind === 'barrel') return 0.76;
+    return 0.72;
+  }
+
+  roomPropChoices(kind?: OptionalRoomKind): RoomPropKind[] {
+    if (kind === 'treasure') return ['barrel', 'jar', 'crates', 'barrel', 'crates'];
+    if (kind === 'ambush') return ['bonePile', 'weaponRack', 'barrel', 'jar'];
+    if (kind === 'shrine') return ['cookingPot', 'mapTable', 'jar', 'bonePile'];
+    if (kind === 'hazard') return ['minecart', 'bonePile', 'crates', 'jar'];
+    const byBiome: Partial<Record<typeof this.dungeon.biome, RoomPropKind[]>> = {
+      aqueduct: ['jar', 'barrel', 'crates', 'cookingPot'],
+      frost: ['crates', 'weaponRack', 'bonePile', 'barrel'],
+      magma: ['cookingPot', 'minecart', 'crates', 'barrel'],
+      storm: ['weaponRack', 'mapTable', 'crates', 'jar'],
+      void: ['bonePile', 'jar', 'weaponRack', 'mapTable']
+    };
+    return byBiome[this.dungeon.biome] ?? ['barrel', 'jar', 'crates', 'weaponRack', 'mapTable', 'cookingPot'];
+  }
+
+  roomPropCandidates(room: Room): Vec2[] {
+    const x0 = room.x + 1, x1 = room.x + room.w - 2;
+    const y0 = room.y + 1, y1 = room.y + room.h - 2;
+    const candidates = [
+      { x: x0, y: y0 }, { x: x1, y: y0 }, { x: x0, y: y1 }, { x: x1, y: y1 },
+      { x: room.cx - 2, y: y0 }, { x: room.cx + 2, y: y0 },
+      { x: x0, y: room.cy - 1 }, { x: x0, y: room.cy + 1 },
+      { x: x1, y: room.cy - 1 }, { x: x1, y: room.cy + 1 }
+    ];
+    const unique = new Map<string, Vec2>();
+    for (const position of candidates) {
+      if (position.x < room.x || position.x >= room.x + room.w
+        || position.y < room.y || position.y >= room.y + room.h) continue;
+      unique.set(`${position.x},${position.y}`, position);
+    }
+    return Phaser.Utils.Array.Shuffle([...unique.values()]);
+  }
+
+  canPlaceRoomProp(position: Vec2) {
+    const tile = this.dungeon.tiles[position.y]?.[position.x];
+    if (!tile || !isWalkable(tile) || tile === 'pit' || this.dungeonObjectAt(position.x, position.y)) return false;
+    if (Math.max(Math.abs(position.x - this.dungeon.start.x), Math.abs(position.y - this.dungeon.start.y)) <= 2) return false;
+    if (Math.max(Math.abs(position.x - this.dungeon.stairs.x), Math.abs(position.y - this.dungeon.stairs.y)) <= 2) return false;
+    if (this.dungeon.bossEntry && Math.max(Math.abs(position.x - this.dungeon.bossEntry.x), Math.abs(position.y - this.dungeon.bossEntry.y)) <= 2) return false;
+    if (this.dungeon.bossEntrance && Math.max(Math.abs(position.x - this.dungeon.bossEntrance.x), Math.abs(position.y - this.dungeon.bossEntrance.y)) <= 2) return false;
+    if (this.dungeon.optionalRooms.some((optional) => Math.max(Math.abs(position.x - optional.entry.x), Math.abs(position.y - optional.entry.y)) <= 1)) return false;
+    return !this.dungeon.hazards.some((hazard) => hazard.x === position.x && hazard.y === position.y);
+  }
+
+  isReservedOptionalRoomCell(room: Room, kind: OptionalRoomKind | undefined, position: Vec2) {
+    if (!kind || kind === 'shrine') return false;
+    const reserved = kind === 'treasure'
+      ? [{ x: room.cx - 2, y: room.cy }, { x: room.cx, y: room.cy - 1 }, { x: room.cx + 2, y: room.cy }]
+      : kind === 'ambush'
+        ? [
+            { x: room.cx - 2, y: room.cy - 1 }, { x: room.cx + 2, y: room.cy - 1 },
+            { x: room.cx - 2, y: room.cy + 2 }, { x: room.cx + 2, y: room.cy + 2 }
+          ]
+        : [{ x: room.cx, y: room.cy }, { x: room.cx - 2, y: room.cy }, { x: room.cx + 2, y: room.cy }];
+    return reserved.some((cell) => cell.x === position.x && cell.y === position.y);
+  }
+
+  spawnRoomProps(floor: number) {
+    const optionalByRoom = new Map(this.dungeon.optionalRooms.map((optional) => [optional.room, optional.kind]));
+    const rooms = this.dungeon.rooms.filter((room) => room !== this.dungeon.bossRoom && room !== this.dungeon.exitRoom);
+    let breakableCount = 0;
+    for (const room of Phaser.Utils.Array.Shuffle([...rooms])) {
+      if (room.w < 5 || room.h < 5) continue;
+      const optionalKind = optionalByRoom.get(room);
+      const targetCount = optionalKind ? 4 : (room.w >= 9 || room.h >= 8 ? 4 : 2);
+      const choices = this.roomPropChoices(optionalKind);
+      let placed = 0;
+      for (const position of this.roomPropCandidates(room)) {
+        if (placed >= targetCount || !this.canPlaceRoomProp(position)
+          || this.isReservedOptionalRoomCell(room, optionalKind, position)) continue;
+        let kind = choices[Math.floor(Math.random() * choices.length)];
+        if (breakableCount < 5 && placed === 0) kind = breakableCount % 2 === 0 ? 'barrel' : 'jar';
+        this.addDungeonObject(kind, position.x, position.y, 1, 1, kind === 'barrel' || kind === 'jar');
+        if (kind === 'barrel' || kind === 'jar') breakableCount++;
+        placed++;
+      }
+    }
+
+    // 毎階、探索アイテムの供給源になる壊せる容器を最低6個は置く。
+    const fallbackRooms = Phaser.Utils.Array.Shuffle(rooms.filter((room) => room.w >= 7 && room.h >= 5));
+    for (const room of fallbackRooms) {
+      if (breakableCount >= 6) break;
+      const optionalKind = optionalByRoom.get(room);
+      const position = this.roomPropCandidates(room).find((candidate) => this.canPlaceRoomProp(candidate)
+        && !this.isReservedOptionalRoomCell(room, optionalKind, candidate));
+      if (!position) continue;
+      const kind: RoomPropKind = breakableCount % 2 === 0 ? 'barrel' : 'jar';
+      this.addDungeonObject(kind, position.x, position.y, 1, 1, true);
+      breakableCount++;
+    }
+
+    // 大部屋を見渡した時に用途の違いが出るよう、装飾6種も各階に最低1つずつ保証する。
+    const requiredDecor: RoomPropKind[] = ['crates', 'weaponRack', 'mapTable', 'cookingPot', 'minecart', 'bonePile'];
+    requiredDecor.forEach((kind, index) => {
+      if (this.dungeonObjects.some((object) => object.kind === kind)) return;
+      const offset = fallbackRooms.length ? (floor + index) % fallbackRooms.length : 0;
+      const orderedRooms = [...fallbackRooms.slice(offset), ...fallbackRooms.slice(0, offset)];
+      for (const room of orderedRooms) {
+        const optionalKind = optionalByRoom.get(room);
+        const position = this.roomPropCandidates(room).find((candidate) => this.canPlaceRoomProp(candidate)
+          && !this.isReservedOptionalRoomCell(room, optionalKind, candidate));
+        if (!position) continue;
+        this.addDungeonObject(kind, position.x, position.y, 1, 1, false);
+        break;
+      }
+    });
+  }
+
+  addDungeonObject(kind: DungeonObjectKind, centerX: number, centerY: number, w: number, h: number, breakable = false) {
+    const isHealing = kind === 'fountain' || kind === 'healingLake';
+    const texture = kind === 'fountain' ? 'terrain_healing_fountain'
+      : kind === 'healingLake' ? 'terrain_healing_lake'
+        : this.roomPropTexture(kind);
+    const renderTiles = kind === 'fountain' ? 3.25 : kind === 'healingLake' ? 5.25 : this.roomPropRenderTiles(kind);
+    const worldX = centerX * TILE + TILE / 2;
+    const worldY = centerY * TILE + TILE / 2;
+    const sprite = this.add.image(worldX, worldY, texture)
+      .setDisplaySize(renderTiles * TILE, renderTiles * TILE)
+      .setOrigin(0.5, isHealing ? 0.5 : 0.72)
+      .setDepth(this.worldDepth(worldY + h * TILE / 2, 10))
+      .setVisible(false);
+    this.dungeonObjects.push({ kind, x: centerX, y: centerY, w, h, sprite, used: false, breakable });
+  }
+
+  dungeonObjectAt(x: number, y: number): DungeonObject | null {
+    for (const object of this.dungeonObjects) {
+      const left = object.x - Math.floor((object.w - 1) / 2);
+      const top = object.y - Math.floor((object.h - 1) / 2);
+      if (x >= left && x < left + object.w && y >= top && y < top + object.h) return object;
+    }
+    return null;
+  }
+
+  useHealingObject(object: DungeonObject) {
+    if (object.used) {
+      this.log(object.kind === 'healingLake' ? '癒やしの湖は静かに澄んでいる。' : '噴水の魔力は失われている。', 'sys');
+      Audio.playSe('deny');
+      return;
+    }
+    const healed = Math.max(0, this.player.hpMax - this.player.hp);
+    this.player.hp = this.player.hpMax;
+    this.player.poisonTurns = 0;
+    object.used = true;
+    object.sprite.setTint(0x7b8c8a).setAlpha(0.72);
+    this.effectFx(object.x, object.y, 'fx_magic', object.kind === 'healingLake' ? 2.4 : 1.8, 720, 0x62f7e8);
+    this.healFx();
+    Audio.playSe('heal');
+    this.log(object.kind === 'healingLake'
+      ? `癒やしの湖の光に包まれ、体力が全回復した。${healed > 0 ? `（+${healed}）` : ''}`
+      : `古代の噴水で体力が全回復した。${healed > 0 ? `（+${healed}）` : ''}`, 'item');
+    this.emitRefresh();
+  }
+
+  breakRoomProp(object: DungeonObject) {
+    if (!object.breakable || object.used) return;
+    object.used = true;
+    object.breakable = false;
+    this.dungeonObjects = this.dungeonObjects.filter((candidate) => candidate !== object);
+    Audio.playSe('break');
+    this.effectFx(object.x, object.y, 'fx_hit', object.kind === 'jar' ? 1.0 : 1.2, 260,
+      object.kind === 'jar' ? 0xd5a86a : 0x9a6337);
+    this.tweens.add({
+      targets: object.sprite,
+      alpha: 0, angle: object.kind === 'jar' ? 16 : -9,
+      scaleX: object.sprite.scaleX * 1.18, scaleY: object.sprite.scaleY * 0.58,
+      duration: 150, ease: 'Quad.easeIn', onComplete: () => object.sprite.destroy()
+    });
+
+    const roll = Math.random();
+    if (roll < 0.32) {
+      const gold = 12 + Math.floor(Math.random() * (20 + this.floor * 3));
+      this.dropItem(object.x, object.y, 'coin', gold);
+      this.log(`${object.kind === 'jar' ? '壺' : '樽'}の中から${gold}Gがこぼれた！`, 'gold');
+    } else {
+      const pool: ItemKind[] = object.kind === 'jar'
+        ? ['potion', 'potion', 'torch', 'invis', 'dash', 'shieldstone']
+        : ['potion', 'torch', 'torch', 'dash', 'stone', 'shieldstone'];
+      const kind = pool[Math.floor(Math.random() * pool.length)];
+      this.dropItem(object.x, object.y, kind);
+      this.log(`${object.kind === 'jar' ? '壺' : '樽'}を壊すと、${ITEM_DEFS[kind].name}が出てきた！`, 'item');
+    }
+    this.updateVisibility();
+  }
+
+  inspectRoomProp(object: DungeonObject) {
+    const message: Partial<Record<DungeonObjectKind, string>> = {
+      crates: '固く縛られた物資箱だ。鍵も蓋の隙間も見当たらない。',
+      weaponRack: '使い古された武器が並ぶ。今使えるものはなさそうだ。',
+      mapTable: '古い探索図だ。歩いた場所が書き足されている。',
+      cookingPot: 'まだ少し温かい。誰かがここで休んでいたようだ。',
+      minecart: '黒い鉱石を満載したトロッコだ。びくともしない。',
+      bonePile: '古い骨が積まれている。近づかないほうがよさそうだ。'
+    };
+    this.log(message[object.kind] ?? '古びたダンジョンの置物だ。', 'sys');
   }
 
   spawnGroundItems(floor: number) {
     const commonKinds: (ItemKind | 'coin')[] = ['coin', 'coin', 'coin', 'potion', 'torch', 'invis', 'dash'];
     const scrollKinds: ItemKind[] = ['stone', 'shieldstone'];
-    const n = 4 + Math.floor(Math.random() * 3); // 落ちてるアイテム(4〜6・狭いマップ向け)
+    // 消耗品は主に樽・壺から手に入る。床への直置きはたまに1個だけ。
+    const n = Math.random() < 0.28 ? 1 : 0;
     const arenaCells = this.bossRoomCells();
     for (let i = 0; i < n; i++) {
       const pos = randomFloor(this.dungeon, [...this.occupiedPositions(), ...arenaCells]);
@@ -1890,6 +2326,13 @@ export class GameScene extends Phaser.Scene {
     for (const c of this.chests) arr.push({ x: c.x, y: c.y });
     for (const g of this.ground) arr.push({ x: g.x, y: g.y });
     for (const obstacle of this.bossObstacles) arr.push({ x: obstacle.x, y: obstacle.y });
+    for (const object of this.dungeonObjects) {
+      const left = object.x - Math.floor((object.w - 1) / 2);
+      const top = object.y - Math.floor((object.h - 1) / 2);
+      for (let y = top; y < top + object.h; y++) {
+        for (let x = left; x < left + object.w; x++) arr.push({ x, y });
+      }
+    }
     return arr;
   }
 
@@ -1906,6 +2349,30 @@ export class GameScene extends Phaser.Scene {
       const [dx, dy] = this.dirVec(dir);
       const nx = this.player.x + dx;
       const ny = this.player.y + dy;
+
+      if (this.inBossRoom && !this.isInsideBossCombatFrame(nx, ny)) {
+        this.setPlayerVisual(dir, 'idle');
+        Audio.playSe('deny');
+        return;
+      }
+
+      const dungeonObject = this.dungeonObjectAt(nx, ny);
+      if (dungeonObject) {
+        if (dungeonObject.breakable) {
+          this.busy = true;
+          this.setPlayerVisual(dir, 'atk');
+          Audio.playSe(weaponAttackSe(this.player.weapon?.weaponType));
+          this.breakRoomProp(dungeonObject);
+          await this.finishTurn();
+          this.setPlayerVisual(dir, 'idle');
+          this.busy = false;
+        } else {
+          this.setPlayerVisual(dir, 'idle');
+          if (dungeonObject.kind === 'fountain' || dungeonObject.kind === 'healingLake') this.useHealingObject(dungeonObject);
+          else this.inspectRoomProp(dungeonObject);
+        }
+        return;
+      }
 
       const obstacle = this.bossObstacleAt(nx, ny);
       if (obstacle) {
@@ -1957,6 +2424,14 @@ export class GameScene extends Phaser.Scene {
       }
       // 壁など通行不可 → 向きだけ変える（ターン経過なし）
       const t = this.dungeon.tiles[ny]?.[nx];
+      if (t === 'roomDoor') {
+        const optional = this.optionalRoomAtDoor(nx, ny);
+        if (optional) {
+          this.setPlayerVisual(dir, 'idle');
+          this.openOptionalRoom(optional);
+          return;
+        }
+      }
       if (t === 'door' && !this.inBossRoom) {
         this.setPlayerVisual(dir, 'idle');
         const isExitDoor = nx === this.dungeon.stairs.x && ny === this.dungeon.stairs.y;
@@ -2046,7 +2521,9 @@ export class GameScene extends Phaser.Scene {
         this.dashSteps--;
         const nx2 = nx + dx, ny2 = ny + dy;
         const t2 = this.dungeon.tiles[ny2]?.[nx2];
-        if (t2 && isWalkable(t2) && t2 !== 'pit' && !this.enemyAt(nx2, ny2) && !this.chestAt(nx2, ny2)) {
+        if (t2 && isWalkable(t2) && t2 !== 'pit'
+          && (!this.inBossRoom || this.isInsideBossCombatFrame(nx2, ny2))
+          && !this.enemyAt(nx2, ny2) && !this.chestAt(nx2, ny2)) {
           this.effectFx(this.player.x, this.player.y, 'fx_slash', 1.2, 260, 0x9fe8ff);
           this.player.x = nx2;
           this.player.y = ny2;
@@ -2089,6 +2566,14 @@ export class GameScene extends Phaser.Scene {
       if (Math.random() < 0.2) {
         this.damagePlayer(6, 'ひび割れ床が崩れた！');
       }
+    } else if (t === 'lava') {
+      this.damagePlayer(5 + Math.floor(this.floor / 8), '灼熱の亀裂を踏んだ！');
+    } else if (t === 'lightning') {
+      this.damagePlayer(4 + Math.floor(this.floor / 10), '通電床から雷が走った！');
+    } else if (t === 'voidRift') {
+      this.damagePlayer(4 + Math.floor(this.floor / 9), '虚無の亀裂に生命力を奪われた！');
+    } else if (t === 'ice') {
+      // Movement continues one extra tile in the same direction below.
     }
     this.applyBossHazardOnEntry(x, y);
     // アイテム拾得
@@ -2097,13 +2582,16 @@ export class GameScene extends Phaser.Scene {
   }
 
   async slidePlayerOnBossIce(dir: Dir, moveDuration: number): Promise<boolean> {
-    const icy = this.bossHazards.some((hazard) => hazard.kind === 'ice' && hazard.x === this.player.x && hazard.y === this.player.y);
+    const icy = this.dungeon.tiles[this.player.y]?.[this.player.x] === 'ice'
+      || this.bossHazards.some((hazard) => hazard.kind === 'ice' && hazard.x === this.player.x && hazard.y === this.player.y);
     if (!icy) return false;
     const [dx, dy] = this.dirVec(dir);
     const nx = this.player.x + dx;
     const ny = this.player.y + dy;
     const tile = this.dungeon.tiles[ny]?.[nx];
-    if (!tile || !isWalkable(tile) || tile === 'pit' || this.enemyAt(nx, ny) || this.chestAt(nx, ny) || this.bossObstacleAt(nx, ny)) {
+    if (!tile || !isWalkable(tile) || tile === 'pit'
+      || (this.inBossRoom && !this.isInsideBossCombatFrame(nx, ny))
+      || this.enemyAt(nx, ny) || this.chestAt(nx, ny) || this.bossObstacleAt(nx, ny)) {
       this.log('氷の上で滑ったが、障害物にぶつかった！', 'sys');
       return false;
     }
@@ -2509,6 +2997,19 @@ export class GameScene extends Phaser.Scene {
     Audio.playSe('seal');
     this.setBossEntranceClosed(false);
     this.dropBossRewards(defeatedAt);
+    const stairs = this.dungeon.stairs;
+    if (this.inBossRoom || !this.floorHasGate(this.floor)) {
+      const sprite = this.tileSprites[stairs.y]?.[stairs.x];
+      if (sprite) {
+        this.tweens.add({ targets: sprite, displayWidth: 8, displayHeight: 8, alpha: 0, duration: 240, ease: 'Back.easeIn', onComplete: () => {
+          this.applyTileVisual(sprite, 'stairs', getTheme(this.floor).era, stairs.x, stairs.y);
+          const targetSize = TILE + 10;
+          sprite.setDisplaySize(8, 8).setAlpha(0);
+          this.tweens.add({ targets: sprite, displayWidth: targetSize, displayHeight: targetSize, alpha: 1, duration: 360, ease: 'Back.easeOut' });
+        } });
+      }
+      this.effectFx(stairs.x, stairs.y, 'fx_magic', 2.3, 820, 0xff4b38);
+    }
     this.log(this.inBossRoom
       ? `${bossName}を撃破！ 報酬がその場にドロップし、出口の封印が解けた。`
       : this.floorHasGate(this.floor)
@@ -2644,7 +3145,7 @@ export class GameScene extends Phaser.Scene {
           const tx = x + dx, ty = y + dy;
           const tile = this.dungeon.tiles[ty]?.[tx];
           if (!tile || !isWalkable(tile) || tile === 'pit') continue;
-          if (this.groundAt(tx, ty) || this.chestAt(tx, ty) || this.enemyAt(tx, ty)) continue;
+          if (this.groundAt(tx, ty) || this.chestAt(tx, ty) || this.enemyAt(tx, ty) || this.dungeonObjectAt(tx, ty)) continue;
           if (this.bossObstacleAt(tx, ty) || (this.player.x === tx && this.player.y === ty)) continue;
           return { x: tx, y: ty };
         }
@@ -2917,7 +3418,9 @@ export class GameScene extends Phaser.Scene {
     );
     const usePool = pool.length ? pool : MONSTER_DEFS.filter((m) => !m.isBoss && !m.isTreasureRabbit);
     const def = usePool[Math.floor(Math.random() * usePool.length)];
-    const pos = randomFloor(this.dungeon, this.occupiedPositions());
+    const pos = this.inBossRoom
+      ? this.randomBossCombatFloor(this.occupiedPositions())
+      : randomFloor(this.dungeon, this.occupiedPositions());
     if (!pos || this.distToPlayer(pos.x, pos.y) < 5) return;
     this.addEnemy(def, pos.x, pos.y, 1 + this.floor * 0.05);
   }
@@ -3097,6 +3600,7 @@ export class GameScene extends Phaser.Scene {
       const destination = { x: this.player.x - Math.sign(dx), y: this.player.y - Math.sign(dy) };
       const tile = this.dungeon.tiles[destination.y]?.[destination.x];
       if (tile && isWalkable(tile) && tile !== 'pit' && !this.enemyAt(destination.x, destination.y)
+        && (!this.inBossRoom || this.isInsideBossCombatFrame(destination.x, destination.y))
         && !this.chestAt(destination.x, destination.y) && !this.bossObstacleAt(destination.x, destination.y)) {
         this.player.x = destination.x;
         this.player.y = destination.y;
@@ -3171,6 +3675,8 @@ export class GameScene extends Phaser.Scene {
     const anims: Promise<void>[] = [];
     for (const e of this.enemies) {
       if (!e.alive) continue;
+      const sealedRoom = this.optionalRoomContaining(e.x, e.y);
+      if (sealedRoom && !sealedRoom.opened) continue;
       // 3歩目に現れた闇忍者は、プレイヤーが1回行動したら再び闇へ溶ける。
       if (e.def.isDarkNinja && e.stealthRevealed) {
         e.stealthRevealed = false;
@@ -3497,6 +4003,7 @@ export class GameScene extends Phaser.Scene {
   passable(e: Enemy, x: number, y: number): boolean {
     const t = this.dungeon.tiles[y]?.[x];
     if (!t) return false;
+    if (this.inBossRoom && !this.isInsideBossCombatFrame(x, y)) return false;
     if (e.def.isFloorBoss && this.dungeon.bossRoom && !this.isInsideBossRoom(x, y)) return false;
     if (t === 'wall' && !e.def.wallPass) return false;
     if (t === 'pit') return false;
@@ -3504,6 +4011,7 @@ export class GameScene extends Phaser.Scene {
     if (this.player.x === x && this.player.y === y) return false;
     if (this.chestAt(x, y)) return false;
     if (this.bossObstacleAt(x, y)) return false;
+    if (this.dungeonObjectAt(x, y)) return false;
     return true;
   }
 
@@ -3586,7 +4094,7 @@ export class GameScene extends Phaser.Scene {
   // ============ 可視範囲 ============
   blocksVisionAt(x: number, y: number) {
     const tile = this.dungeon.tiles[y]?.[x];
-    return !tile || tile === 'wall' || tile === 'door';
+    return !tile || tile === 'wall' || tile === 'door' || tile === 'roomDoor';
   }
 
   hasVisionLine(x0: number, y0: number, x1: number, y1: number) {
@@ -3630,11 +4138,14 @@ export class GameScene extends Phaser.Scene {
     const wallPiercingLight = this.torchTurns > 0 || this.lanternTurns > 0;
     const shroomRadius = this.shroomTurns > 0 ? 7 : this.lightRadius;
     const radius = wallPiercingLight ? 10 : Math.max(this.lightRadius, shroomRadius);
-    const bossRoomConcealed = !!d.bossRoom && !!d.bossEntry
-      && !this.isInsideBossRoom(this.player.x, this.player.y);
+    const playerInsideBossRoom = this.isInsideBossRoom(this.player.x, this.player.y);
+    const bossRoomConcealed = !!d.bossRoom && !!d.bossEntry && !playerInsideBossRoom;
     const isConcealedBossCell = (x: number, y: number) => bossRoomConcealed && !!d.bossRoom
       && x >= d.bossRoom.x && x < d.bossRoom.x + d.bossRoom.w
       && y >= d.bossRoom.y && y < d.bossRoom.y + d.bossRoom.h;
+    const isSealedOptionalCell = (x: number, y: number) => d.optionalRooms.some((optional) => !optional.opened
+      && x >= optional.room.x && x < optional.room.x + optional.room.w
+      && y >= optional.room.y && y < optional.room.y + optional.room.h);
     const visible: boolean[][] = [];
     for (let y = 0; y < d.h; y++) {
       visible[y] = [];
@@ -3648,6 +4159,7 @@ export class GameScene extends Phaser.Scene {
         const insideConcealedRoom = isConcealedBossCell(x, y);
         const isEntryDoor = !!d.bossEntry && x === d.bossEntry.x && y === d.bossEntry.y;
         if (insideConcealedRoom && !isEntryDoor) vis = false;
+        if (isSealedOptionalCell(x, y)) vis = false;
         if (vis) {
           visible[y][x] = true;
           this.explored[y][x] = true;
@@ -3656,6 +4168,16 @@ export class GameScene extends Phaser.Scene {
     }
 
     // 視界内の床に接する最初の壁面は表示する。壁の先の床へは視界を伝播させない。
+    // 中ボス部屋へ入った後は、松明なしでも専用の7x7床全体を見せる。
+    if (playerInsideBossRoom && d.bossRoom && d.bossRoom.w === 7 && d.bossRoom.h === 7) {
+      for (let y = d.bossRoom.y; y < d.bossRoom.y + d.bossRoom.h; y++) {
+        for (let x = d.bossRoom.x; x < d.bossRoom.x + d.bossRoom.w; x++) {
+          visible[y][x] = true;
+          this.explored[y][x] = true;
+        }
+      }
+    }
+
     for (let y = 0; y < d.h; y++) {
       for (let x = 0; x < d.w; x++) {
         if (!visible[y][x] || this.blocksVisionAt(x, y)) continue;
@@ -3665,11 +4187,12 @@ export class GameScene extends Phaser.Scene {
             const wallX = x + dx;
             const wallY = y + dy;
             const wallTile = d.tiles[wallY]?.[wallX];
-            if (wallTile !== 'wall' && wallTile !== 'door') continue;
+            if (wallTile !== 'wall' && wallTile !== 'door' && wallTile !== 'roomDoor') continue;
             if (wallPiercingLight
               && Math.max(Math.abs(wallX - this.player.x), Math.abs(wallY - this.player.y)) > radius) continue;
             const isEntryDoor = !!d.bossEntry && wallX === d.bossEntry.x && wallY === d.bossEntry.y;
             if (isConcealedBossCell(wallX, wallY) && !isEntryDoor) continue;
+            if (isSealedOptionalCell(wallX, wallY)) continue;
             visible[wallY][wallX] = true;
             this.explored[wallY][wallX] = true;
           }
@@ -3748,6 +4271,21 @@ export class GameScene extends Phaser.Scene {
       const v = !!visible[g.y]?.[g.x];
       g.sprite.setVisible(v).setAlpha(v ? 1 : 0);
       g.glow?.setVisible(v);
+    }
+    for (const object of this.dungeonObjects) {
+      const room = this.dungeon.optionalRooms.find((optional) => object.x >= optional.room.x
+        && object.x < optional.room.x + optional.room.w && object.y >= optional.room.y
+        && object.y < optional.room.y + optional.room.h);
+      const left = object.x - Math.floor((object.w - 1) / 2);
+      const top = object.y - Math.floor((object.h - 1) / 2);
+      let anyVisible = false;
+      for (let y = top; y < top + object.h && !anyVisible; y++) {
+        for (let x = left; x < left + object.w; x++) {
+          if (visible[y]?.[x]) { anyVisible = true; break; }
+        }
+      }
+      const v = (!room || room.opened) && anyVisible;
+      object.sprite.setVisible(v).setAlpha(v ? (object.used && (object.kind === 'fountain' || object.kind === 'healingLake') ? 0.72 : 1) : 0);
     }
     for (const m of this.ambientMotes) m.sprite.setVisible(!!visible[m.y]?.[m.x]);
     for (const state of this.bossStates.values()) {
@@ -4595,7 +5133,8 @@ export class GameScene extends Phaser.Scene {
     const target = { x: Math.floor(world.x / TILE), y: Math.floor(world.y / TILE) };
     const tile = this.dungeon.tiles[target.y]?.[target.x];
     const bossDoorTarget = tile === 'door' && !this.inBossRoom;
-    if (!tile || (!isWalkable(tile) && !bossDoorTarget) || tile === 'pit') {
+    if (!tile || (!isWalkable(tile) && !bossDoorTarget) || tile === 'pit'
+      || (this.inBossRoom && !this.isInsideBossCombatFrame(target.x, target.y))) {
       Audio.playSe('deny');
       return;
     }
@@ -4682,12 +5221,15 @@ export class GameScene extends Phaser.Scene {
         const bossDoorTarget = isTarget && tile === 'door' && !this.inBossRoom;
         if (!this.isTileCurrentlyVisible(nx, ny)) continue;
         if (!tile || (!isWalkable(tile) && !bossDoorTarget) || tile === 'pit') continue;
+        if (this.inBossRoom && !this.isInsideBossCombatFrame(nx, ny)) continue;
         const path = [...cur.path, step.dir];
         if (!isTarget && this.enemyAt(nx, ny)) {
           if (stopAtEnemy) return path;
           continue;
         }
-        if (!isTarget && (this.chestAt(nx, ny) || this.bossObstacleAt(nx, ny))) continue;
+        const object = this.dungeonObjectAt(nx, ny);
+        if (!isTarget && (this.chestAt(nx, ny) || this.bossObstacleAt(nx, ny) || object)) continue;
+        if (object && (!isTarget || !object.breakable)) continue;
         if (isTarget) return path;
         visited.add(key);
         queue.push({ x: nx, y: ny, path });
@@ -4780,6 +5322,8 @@ export class GameScene extends Phaser.Scene {
     const nx = this.player.x + dx, ny = this.player.y + dy;
     if (this.enemyAt(nx, ny)) return true;
     if (this.bossObstacleAt(nx, ny)) return true;
+    const object = this.dungeonObjectAt(nx, ny);
+    if (object) return object.breakable || object.kind === 'fountain' || object.kind === 'healingLake';
     const c = this.chestAt(nx, ny);
     if (c && !c.opened) return true;
     const t = this.dungeon.tiles[ny]?.[nx];
@@ -4841,7 +5385,7 @@ export class GameScene extends Phaser.Scene {
       if (!e.animating) {
         if (e.def.gimmick === 'mimic' && !e.awakened) {
           // 敵用baseScaleで宝箱が縮まないよう、擬態中は本物と同じ固定サイズにする。
-          e.sprite.setDisplaySize(30, 30).setAngle(0);
+          e.sprite.setDisplaySize(26, 26).setAngle(0);
         } else {
           const flying = !!e.def.wallPass || /drake|dragon|wyrm|wyvern|moth|fiend|lich/.test(e.def.key);
           const bony = ['m_bone_dragon', 'm_death_knight', 'm_grave_crawler', 'm_lich'].includes(e.def.key);
@@ -4893,6 +5437,11 @@ export class GameScene extends Phaser.Scene {
         g.glow.setAlpha(0.16 + pulse * 0.06).setScale(0.9 + pulse * 0.08);
         g.glow.setDepth(g.sprite.depth - 0.12);
       }
+    }
+
+    for (const object of this.dungeonObjects) {
+      if (!object.sprite.visible) continue;
+      object.sprite.setDepth(this.worldDepth(object.sprite.y + object.h * TILE / 2, 10));
     }
 
     for (const m of this.ambientMotes) {

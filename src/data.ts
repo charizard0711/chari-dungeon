@@ -581,9 +581,12 @@ const THEME_BANDS: { name: string; era: 1 | 2 | 3 | 4; accent: number; tileTint:
 const FINAL_THEME = { name: '最深部・コアゲート', era: 4 as const, accent: 0xf5c542, tileTint: 0xffd166 };
 
 export function getTheme(floor: number): FloorTheme {
-  if (floor >= 30) return FINAL_THEME;
-  const band = Math.floor((floor - 1) / 2); // 0..14
-  return THEME_BANDS[Math.min(band, THEME_BANDS.length - 1)];
+  if (floor <= 5) return { name: '古代石造区', era: 1, accent: 0x3fe0d0, tileTint: 0xffffff };
+  if (floor <= 10) return { name: '苔むす水路区', era: 1, accent: 0x63d7a0, tileTint: 0xffffff };
+  if (floor <= 15) return { name: '氷晶牢獄区', era: 2, accent: 0x8eeaff, tileTint: 0xffffff };
+  if (floor <= 20) return { name: '灼熱鍛冶区', era: 2, accent: 0xff7738, tileTint: 0xffffff };
+  if (floor <= 25) return { name: '雷鳴機関区', era: 3, accent: 0x63bfff, tileTint: 0xffffff };
+  return { name: '虚無王城区', era: 4, accent: 0xa76bff, tileTint: 0xffffff };
 }
 
 // タイル素材の系統サフィックス（_1/_11/_21/_30）

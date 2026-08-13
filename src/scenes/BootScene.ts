@@ -91,10 +91,10 @@ const ORIGINAL_ITEM_ART = {
   i_warp: 'assets/items/warp-bell.png',
   i_revive: 'assets/items/revival-seed.png',
   coin: 'assets/items/coin-pile.png',
-  chest_common: 'assets/items/treasure-chest-common.png',
-  chest_common_open: 'assets/items/treasure-chest-common-open.png',
-  chest_rare: 'assets/items/treasure-chest-rare.png',
-  chest_rare_open: 'assets/items/treasure-chest-rare-open.png',
+  chest_common: 'assets/items/chests-centered/treasure-chest-common.png',
+  chest_common_open: 'assets/items/chests-centered/treasure-chest-common-open.png',
+  chest_rare: 'assets/items/chests-centered/treasure-chest-rare.png',
+  chest_rare_open: 'assets/items/chests-centered/treasure-chest-rare-open.png',
   i_stone: 'assets/items/weapon-enhancement-scroll.png',
   i_shieldstone: 'assets/items/armor-enhancement-scroll.png',
   i_invis: 'assets/items/invisibility-potion.png',
@@ -103,9 +103,21 @@ const ORIGINAL_ITEM_ART = {
 
 const TERRAIN_PROP_ART = {
   terrain_boss_gate: 'assets/terrain/boss-gate-v2.png',
+  terrain_boss_chain_gate: 'assets/terrain/objects/boss-chain-gate.png',
   terrain_stairs: 'assets/terrain/stairs.png',
   terrain_boss_brazier: 'assets/terrain/boss-brazier.png',
-  terrain_rune_lamp: 'assets/terrain/rune-lamp.png'
+  terrain_rune_lamp: 'assets/terrain/rune-lamp.png',
+  terrain_healing_fountain: 'assets/terrain/objects/healing-fountain.png',
+  terrain_healing_lake: 'assets/terrain/objects/healing-lake.png',
+  terrain_midboss_floor_7x7: 'assets/terrain/objects/midboss-floor-7x7.png',
+  terrain_prop_barrel: 'assets/terrain/objects/room-props/barrel.png',
+  terrain_prop_jar: 'assets/terrain/objects/room-props/jar.png',
+  terrain_prop_crates: 'assets/terrain/objects/room-props/crates.png',
+  terrain_prop_weapon_rack: 'assets/terrain/objects/room-props/weapon-rack.png',
+  terrain_prop_map_table: 'assets/terrain/objects/room-props/map-table.png',
+  terrain_prop_cooking_pot: 'assets/terrain/objects/room-props/cooking-pot.png',
+  terrain_prop_minecart: 'assets/terrain/objects/room-props/minecart.png',
+  terrain_prop_bone_pile: 'assets/terrain/objects/room-props/bone-pile.png'
 } as const;
 
 export class BootScene extends Phaser.Scene {
@@ -153,6 +165,11 @@ export class BootScene extends Phaser.Scene {
         frameHeight: 64
       });
       this.load.image(`terrain_boss_floor_${era}`, `assets/terrain/boss-floor-era${era}.png`);
+    }
+    for (const biome of ['ruins', 'aqueduct', 'frost', 'magma', 'storm', 'void']) {
+      this.load.image(`terrain_biome_floor_${biome}`, `assets/terrain/biomes/${biome}-floor.png`);
+      this.load.image(`terrain_biome_wall_${biome}`, `assets/terrain/biomes/${biome}-wall.png`);
+      this.load.image(`terrain_biome_hazard_${biome}`, `assets/terrain/biomes/${biome}-hazard.png`);
     }
     for (const [key, path] of Object.entries(TERRAIN_PROP_ART)) {
       this.load.image(key, path);
