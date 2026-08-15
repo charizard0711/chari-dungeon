@@ -1004,12 +1004,15 @@ export class GameScene extends Phaser.Scene {
       m.minFloor <= floor && floor <= m.maxFloor && !m.isBoss && !m.isTreasureRabbit
     );
     if (this.inBossRoom) {
-      const mobCount = floor % 10 === 0 ? 5 : floor % 5 === 0 ? 4 : Math.min(4, 2 + Math.floor(floor / 12));
-      for (let i = 0; i < mobCount; i++) {
+      const baseMobCount = floor % 10 === 0 ? 5 : floor % 5 === 0 ? 4 : Math.min(4, 2 + Math.floor(floor / 12));
+      const mobCount = Math.ceil(baseMobCount * 1.5);
+      let spawned = 0;
+      for (let attempts = 0; attempts < mobCount * 12 && spawned < mobCount; attempts++) {
         const def = pool.length ? pool[Math.floor(Math.random() * pool.length)] : MONSTER_DEFS[0];
         const pos = this.randomBossCombatFloor(this.occupiedPositions());
         if (!pos || this.distToPlayer(pos.x, pos.y) < 4) continue;
         this.addEnemy(def, pos.x, pos.y, 1 + floor * 0.035);
+        spawned++;
       }
       // 分離部屋に置くのは5階刻みの強ボスだけ。通常の中ボスはフィールド側にいる。
       if (floor % 5 === 0) this.spawnMilestoneBoss(floor);
@@ -1018,13 +1021,16 @@ export class GameScene extends Phaser.Scene {
     }
     const arenaCells = this.bossRoomCells();
     // 出現数（狭い迷路マップに合わせて調整）
-    const count = floor === 30 ? 5 : Math.min(10, 4 + Math.floor(floor / 3));
-    for (let i = 0; i < count; i++) {
+    const baseCount = floor === 30 ? 5 : Math.min(10, 4 + Math.floor(floor / 3));
+    const count = Math.ceil(baseCount * 1.5);
+    let spawned = 0;
+    for (let attempts = 0; attempts < count * 12 && spawned < count; attempts++) {
       const def = pool.length ? pool[Math.floor(Math.random() * pool.length)] : MONSTER_DEFS[0];
-      const pos = randomFloor(this.dungeon, [this.dungeon.start, ...arenaCells]);
+      const pos = randomFloor(this.dungeon, [...this.occupiedPositions(), ...arenaCells]);
       if (!pos) continue;
       if (this.distToPlayer(pos.x, pos.y) < 4) continue;
       this.addEnemy(def, pos.x, pos.y, 1 + floor * 0.04);
+      spawned++;
     }
     if (floor === 30) {
       const watcher = MONSTER_DEFS.find((monster) => monster.key === 'm_watcher');
@@ -1170,13 +1176,11 @@ export class GameScene extends Phaser.Scene {
   isInsideBossCombatFrame(x: number, y: number): boolean {
     const room = this.dungeon?.bossRoom;
     if (!room) return true;
-    // 7x7 mid-boss rooms use their whole floor. Dedicated N.5F arenas keep the
-    // outer tile ring as visible decoration, with only the bottom-center entry open.
-    if (!this.inBossRoom) return this.isInsideBossRoom(x, y);
-    const insideFrame = x >= room.x + 1 && x < room.x + room.w - 1
-      && y >= room.y + 1 && y < room.y + room.h - 1;
-    const entrance = x === this.dungeon.start.x && y === this.dungeon.start.y;
-    return insideFrame || entrance;
+    // The carved room edge sits under the oversized wall art, so it must never be occupied.
+    // Dedicated N.5F arenas may use the visible floor edge; field mid-bosses stay one tile farther in.
+    const inset = this.inBossRoom ? 1 : 2;
+    return x >= room.x + inset && x < room.x + room.w - inset
+      && y >= room.y + inset && y < room.y + room.h - inset;
   }
 
   randomBossCombatFloor(avoid: Vec2[]): Vec2 | null {
@@ -1230,7 +1234,7 @@ export class GameScene extends Phaser.Scene {
         { x: room.cx - 2, y: room.cy - 1 }, { x: room.cx + 2, y: room.cy - 1 },
         { x: room.cx - 2, y: room.cy + 2 }, { x: room.cx + 2, y: room.cy + 2 }
       ]).filter((position) => !this.dungeonObjectAt(position.x, position.y));
-      for (const position of positions.slice(0, optional.kind === 'ambush' ? 3 : 1)) {
+      for (const position of positions.slice(0, optional.kind === 'ambush' ? 4 : 2)) {
         const def = pool[Math.floor(Math.random() * pool.length)] ?? MONSTER_DEFS[0];
         this.addEnemy(def, position.x, position.y, 1 + this.floor * 0.035);
       }
@@ -1461,7 +1465,8 @@ export class GameScene extends Phaser.Scene {
   validBossTile(x: number, y: number): boolean {
     const tile = this.dungeon.tiles[y]?.[x];
     const insideGimmickArea = this.dungeon.bossRoom ? this.isInsideBossCombatFrame(x, y) : true;
-    return insideGimmickArea && !!tile && isWalkable(tile) && tile !== 'pit' && tile !== 'stairs';
+    return insideGimmickArea && !!tile && isWalkable(tile)
+      && tile !== 'pit' && tile !== 'stairs' && tile !== 'door' && tile !== 'roomDoor';
   }
 
   validMonsterTile(x: number, y: number): boolean {
@@ -2071,15 +2076,16 @@ export class GameScene extends Phaser.Scene {
     const rooms = Phaser.Utils.Array.Shuffle(this.dungeon.optionalRooms
       .filter((optional) => optional.kind === 'shrine')
       .map((optional) => optional.room));
-    const fallbackRooms = Phaser.Utils.Array.Shuffle(this.dungeon.rooms.filter((room) => room.w >= 7 && room.h >= 7
+    const lakeRoom = this.dungeon.lakeRoom;
+    const fallbackRooms = Phaser.Utils.Array.Shuffle(this.dungeon.rooms.filter((room) => room.w >= 5 && room.h >= 5
       && room !== this.dungeon.bossRoom && room !== this.dungeon.exitRoom
       && !(this.dungeon.start.x >= room.x && this.dungeon.start.x < room.x + room.w
         && this.dungeon.start.y >= room.y && this.dungeon.start.y < room.y + room.h)));
-    const candidates = [...rooms, ...fallbackRooms];
-    const wanted: HealingDungeonObjectKind[] = floor % 5 === 0 ? ['healingLake', 'fountain'] : ['fountain'];
-    if (floor >= 6 && floor % 3 === 0) wanted.push('healingLake');
+    const candidates = [...rooms, ...fallbackRooms].filter((room) => room !== lakeRoom);
+    const wanted: HealingDungeonObjectKind[] = lakeRoom ? ['healingLake', 'fountain'] : ['fountain'];
     for (const kind of wanted) {
-      const room = candidates.find((candidate) => !this.dungeonObjects.some((object) => object.x === candidate.cx && object.y === candidate.cy));
+      const room = (kind === 'healingLake' ? lakeRoom : undefined)
+        ?? candidates.find((candidate) => !this.dungeonObjects.some((object) => object.x === candidate.cx && object.y === candidate.cy));
       if (!room) break;
       const size = kind === 'healingLake' ? 5 : 3;
       this.addDungeonObject(kind, room.cx, room.cy, size, size, false);
@@ -2158,12 +2164,13 @@ export class GameScene extends Phaser.Scene {
 
   spawnRoomProps(floor: number) {
     const optionalByRoom = new Map(this.dungeon.optionalRooms.map((optional) => [optional.room, optional.kind]));
-    const rooms = this.dungeon.rooms.filter((room) => room !== this.dungeon.bossRoom && room !== this.dungeon.exitRoom);
+    const rooms = this.dungeon.rooms.filter((room) => room !== this.dungeon.bossRoom
+      && room !== this.dungeon.exitRoom && room !== this.dungeon.lakeRoom);
     let breakableCount = 0;
     for (const room of Phaser.Utils.Array.Shuffle([...rooms])) {
       if (room.w < 5 || room.h < 5) continue;
       const optionalKind = optionalByRoom.get(room);
-      const targetCount = optionalKind ? 4 : (room.w >= 9 || room.h >= 8 ? 4 : 2);
+      const targetCount = optionalKind ? 2 : (room.w >= 7 && room.h >= 7 ? 3 : 1);
       const choices = this.roomPropChoices(optionalKind);
       let placed = 0;
       for (const position of this.roomPropCandidates(room)) {
@@ -2178,7 +2185,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     // 毎階、探索アイテムの供給源になる壊せる容器を最低6個は置く。
-    const fallbackRooms = Phaser.Utils.Array.Shuffle(rooms.filter((room) => room.w >= 7 && room.h >= 5));
+    const fallbackRooms = Phaser.Utils.Array.Shuffle(rooms.filter((room) => room.w >= 5 && room.h >= 5));
     for (const room of fallbackRooms) {
       if (breakableCount >= 6) break;
       const optionalKind = optionalByRoom.get(room);
@@ -4004,7 +4011,7 @@ export class GameScene extends Phaser.Scene {
     const t = this.dungeon.tiles[y]?.[x];
     if (!t) return false;
     if (this.inBossRoom && !this.isInsideBossCombatFrame(x, y)) return false;
-    if (e.def.isFloorBoss && this.dungeon.bossRoom && !this.isInsideBossRoom(x, y)) return false;
+    if (e.def.isFloorBoss && this.dungeon.bossRoom && !this.isInsideBossCombatFrame(x, y)) return false;
     if (t === 'wall' && !e.def.wallPass) return false;
     if (t === 'pit') return false;
     if (this.enemyAt(x, y, e)) return false;
