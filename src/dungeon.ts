@@ -29,6 +29,7 @@ export interface DungeonData {
   stairs: Vec2;
   hazards: Vec2[];
   exitRoom?: Room;
+  lakeRoom?: Room;
   bossRoom?: Room;
   bossRoomZone?: BossRoomZone;
   bossEntrance?: Vec2;
@@ -177,6 +178,15 @@ function roomsOverlap(a: Room, b: Room, padding = 1) {
     && a.y < b.y + b.h + padding && a.y + a.h + padding > b.y;
 }
 
+function roomTouchesCarvedFloor(tiles: TileType[][], room: Room, padding = 1) {
+  for (let y = room.y - padding; y < room.y + room.h + padding; y++) {
+    for (let x = room.x - padding; x < room.x + room.w + padding; x++) {
+      if (!tiles[y]?.[x] || tiles[y][x] !== 'wall') return true;
+    }
+  }
+  return false;
+}
+
 function nearestMainRoom(room: Room, mainRooms: Room[]): Room {
   return [...mainRooms].sort((a, b) => Math.abs(a.cx - room.cx) + Math.abs(a.cy - room.cy)
     - (Math.abs(b.cx - room.cx) + Math.abs(b.cy - room.cy)))[0];
@@ -237,53 +247,95 @@ function closeOptionalRoom(tiles: TileType[][], optional: OptionalRoom) {
   tiles[door.y][door.x] = 'roomDoor';
 }
 
-function buildSpaciousDungeon(floor: number): DungeonData {
+function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone): DungeonData {
   const biome = biomeForFloor(floor);
-  const w = 49 + Math.min(6, Math.floor(floor / 10) * 2);
-  const h = 39 + Math.min(4, Math.floor(floor / 15) * 2);
+  const w = 57 + Math.min(6, Math.floor(floor / 10) * 2);
+  const h = 47 + Math.min(4, Math.floor(floor / 15) * 2);
   const tiles: TileType[][] = Array.from({ length: h }, () => Array<TileType>(w).fill('wall'));
-  const startRoom = roomAt(Math.floor(w / 2) - 3, h - 8, 7, 5);
-  const hubRoom = roomAt(Math.floor(w / 2) - 4, Math.floor(h / 2) - 3, 9, 7);
-  const leftHall = roomAt(3, Math.floor(h / 2) - 4, 9, 8);
-  const rightHall = roomAt(w - 12, Math.floor(h / 2) - 4, 9, 8);
-  const exitRoom = roomAt(Math.floor(w / 2) - 3, 2, 7, 7);
+  const hasFieldBossRoom = floor % 5 !== 0;
+  const needsHealingLake = floor % 5 === 0 || (floor >= 6 && floor % 3 === 0);
+  const lakeSide = needsHealingLake && Math.random() < 0.5 ? 'left' : needsHealingLake ? 'right' : undefined;
+  const hubCenterX = Math.floor(w / 2) + irand(-2, 2);
+  const startCenterX = Math.floor(w / 2) + irand(-6, 6);
+  const randomBossRoomZone = shuffle<BossRoomZone>(['west', 'north', 'east'])[0];
+  const exitZone: BossRoomZone = forcedBossRoomZone === 'west' || forcedBossRoomZone === 'east'
+    ? forcedBossRoomZone
+    : forcedBossRoomZone === 'north' || forcedBossRoomZone === 'center'
+      ? 'north'
+      : randomBossRoomZone;
+  const exitCenterX = exitZone === 'west'
+    ? irand(7, 12)
+    : exitZone === 'east'
+      ? irand(w - 13, w - 8)
+      : Math.floor(w / 2) + irand(-4, 4);
+  const hallCenterY = Math.floor(h / 2);
+  const leftHeight = lakeSide === 'left' ? 7 : 5;
+  const rightHeight = lakeSide === 'right' ? 7 : 5;
+  const exitSize = hasFieldBossRoom ? 7 : 5;
+  const startRoom = roomAt(startCenterX - 2, h - 6, 5, 3);
+  const hubRoom = roomAt(hubCenterX - 3, Math.floor(h / 2) - 2, 7, 5);
+  const leftHall = roomAt(3, hallCenterY + irand(-3, 3) - Math.floor(leftHeight / 2), 7, leftHeight);
+  const rightHall = roomAt(w - 10, hallCenterY + irand(-3, 3) - Math.floor(rightHeight / 2), 7, rightHeight);
+  const exitRoom = roomAt(exitCenterX - Math.floor(exitSize / 2), 2, exitSize, exitSize);
+  const lakeRoom = lakeSide === 'left' ? leftHall : lakeSide === 'right' ? rightHall : undefined;
   const mainRooms = [startRoom, hubRoom, leftHall, rightHall, exitRoom];
   for (const room of mainRooms) carveRoom(tiles, room);
 
   // 広間同士を直線で結ばず、四方向の迷路帯を必ず抜ける構成にする。
   // 小さな再合流はあるが行き止まりも残るため、地図を覚える探索感が生まれる。
-  const westMazeOrigin = { x: leftHall.x + leftHall.w + 1, y: hubRoom.y - 2 };
-  const eastMazeOrigin = { x: hubRoom.x + hubRoom.w + 1, y: hubRoom.y - 2 };
-  const northMazeOrigin = { x: hubRoom.cx - 4, y: exitRoom.y + exitRoom.h + 1 };
-  const southMazeOrigin = { x: hubRoom.cx - 4, y: hubRoom.y + hubRoom.h + 1 };
-  carveMazeRegion(tiles, westMazeOrigin, 4, 4, 1);
-  carveMazeRegion(tiles, eastMazeOrigin, 4, 4, 1);
-  carveMazeRegion(tiles, northMazeOrigin, 5, 3, 1);
-  carveMazeRegion(tiles, southMazeOrigin, 5, 4, 1);
+  // The four maze bands now contain roughly twice as many cells as before.
+  // Their room positions, entry points, exits, DFS routes, and extra loops all vary per run.
+  const westMaze = { columns: 6, rows: 5 };
+  const eastMaze = { columns: 6, rows: 5 };
+  const northMaze = { columns: 7, rows: 5 };
+  const southMaze = { columns: 7, rows: 6 };
+  const westMazeOrigin = {
+    x: leftHall.x + leftHall.w + 1,
+    y: Math.floor((leftHall.cy + hubRoom.cy) / 2) - (westMaze.rows - 1)
+  };
+  const eastMazeOrigin = {
+    x: hubRoom.x + hubRoom.w + 1,
+    y: Math.floor((rightHall.cy + hubRoom.cy) / 2) - (eastMaze.rows - 1)
+  };
+  const northMazeOrigin = {
+    x: Math.floor((exitRoom.cx + hubRoom.cx) / 2) - (northMaze.columns - 1),
+    y: exitRoom.y + exitRoom.h + 1
+  };
+  const southMazeOrigin = {
+    x: Math.floor((startRoom.cx + hubRoom.cx) / 2) - (southMaze.columns - 1),
+    y: hubRoom.y + hubRoom.h + 1
+  };
+  carveMazeRegion(tiles, westMazeOrigin, westMaze.columns, westMaze.rows, irand(1, 3));
+  carveMazeRegion(tiles, eastMazeOrigin, eastMaze.columns, eastMaze.rows, irand(1, 3));
+  carveMazeRegion(tiles, northMazeOrigin, northMaze.columns, northMaze.rows, irand(1, 3));
+  carveMazeRegion(tiles, southMazeOrigin, southMaze.columns, southMaze.rows, irand(1, 3));
 
-  const westEntry = { x: westMazeOrigin.x, y: westMazeOrigin.y + 4 };
-  const westExit = { x: westMazeOrigin.x + 6, y: westMazeOrigin.y + 4 };
-  const eastEntry = { x: eastMazeOrigin.x, y: eastMazeOrigin.y + 4 };
-  const eastExit = { x: eastMazeOrigin.x + 6, y: eastMazeOrigin.y + 4 };
-  const northEntry = { x: northMazeOrigin.x + 4, y: northMazeOrigin.y };
-  const northExit = { x: northMazeOrigin.x + 4, y: northMazeOrigin.y + 4 };
-  const southEntry = { x: southMazeOrigin.x + 4, y: southMazeOrigin.y };
-  const southExit = { x: southMazeOrigin.x + 4, y: southMazeOrigin.y + 6 };
+  const westEntry = { x: westMazeOrigin.x, y: westMazeOrigin.y + irand(0, westMaze.rows - 1) * 2 };
+  const westExit = { x: westMazeOrigin.x + (westMaze.columns - 1) * 2, y: westMazeOrigin.y + irand(0, westMaze.rows - 1) * 2 };
+  const eastEntry = { x: eastMazeOrigin.x, y: eastMazeOrigin.y + irand(0, eastMaze.rows - 1) * 2 };
+  const eastExit = { x: eastMazeOrigin.x + (eastMaze.columns - 1) * 2, y: eastMazeOrigin.y + irand(0, eastMaze.rows - 1) * 2 };
+  const northEntry = { x: northMazeOrigin.x + irand(0, northMaze.columns - 1) * 2, y: northMazeOrigin.y };
+  const northExit = { x: northMazeOrigin.x + irand(0, northMaze.columns - 1) * 2, y: northMazeOrigin.y + (northMaze.rows - 1) * 2 };
+  const southEntry = { x: southMazeOrigin.x + irand(0, southMaze.columns - 1) * 2, y: southMazeOrigin.y };
+  const southExit = { x: southMazeOrigin.x + irand(0, southMaze.columns - 1) * 2, y: southMazeOrigin.y + (southMaze.rows - 1) * 2 };
   carveThinCorridor(tiles, { x: leftHall.x + leftHall.w - 1, y: leftHall.cy }, westEntry);
   carveThinCorridor(tiles, westExit, { x: hubRoom.x, y: hubRoom.cy });
   carveThinCorridor(tiles, { x: hubRoom.x + hubRoom.w - 1, y: hubRoom.cy }, eastEntry);
   carveThinCorridor(tiles, eastExit, { x: rightHall.x, y: rightHall.cy });
-  carveThinCorridor(tiles, { x: exitRoom.cx, y: exitRoom.y + exitRoom.h - 1 }, northEntry);
+  const exitMazeStaging = { x: exitRoom.cx, y: exitRoom.y + exitRoom.h + 1 };
+  carveThinCorridor(tiles, exitMazeStaging, northEntry);
   carveThinCorridor(tiles, northExit, { x: hubRoom.cx, y: hubRoom.y });
   carveThinCorridor(tiles, { x: hubRoom.cx, y: hubRoom.y + hubRoom.h - 1 }, southEntry);
   carveThinCorridor(tiles, southExit, { x: startRoom.cx, y: startRoom.y });
 
   // 迷路の一部だけ3x3の小広場にして、細道だけが続く窮屈さを和らげる。
-  const mazePocket = floor % 2 === 0
-    ? roomAt(westMazeOrigin.x + 2, westMazeOrigin.y + 2, 3, 3)
-    : roomAt(eastMazeOrigin.x + 2, eastMazeOrigin.y + 2, 3, 3);
-  carveRoom(tiles, mazePocket);
-  const hasFieldBossRoom = floor % 5 !== 0;
+  const mazePocketCandidates = shuffle([
+    roomAt(westMazeOrigin.x + 2, westMazeOrigin.y + 2, 3, 3),
+    roomAt(eastMazeOrigin.x + 4, eastMazeOrigin.y + 2, 3, 3),
+    roomAt(northMazeOrigin.x + 4, northMazeOrigin.y + 2, 3, 3),
+    roomAt(southMazeOrigin.x + 6, southMazeOrigin.y + 4, 3, 3)
+  ]);
+  for (const mazePocket of mazePocketCandidates.slice(0, irand(1, 2))) carveRoom(tiles, mazePocket);
   const exitApproach = { x: exitRoom.cx, y: exitRoom.y + exitRoom.h };
 
   const start = { x: startRoom.cx, y: startRoom.cy };
@@ -315,17 +367,16 @@ function buildSpaciousDungeon(floor: number): DungeonData {
   const roomBudget = Math.min(3, 1 + Math.floor((floor - 1) / 4));
   const requestedRooms = Math.max(0, roomBudget - (hasFieldBossRoom ? 1 : 0));
   const candidates = shuffle([
-    roomAt(2, 2, 7, 7),
-    roomAt(w - 9, 2, 7, 7),
-    roomAt(2, h - 10, 7, 7),
-    roomAt(w - 9, h - 10, 7, 7)
-  ]).filter((room) => mainRooms.every((main) => !roomsOverlap(room, main, 2)))
-    .sort((a, b) => {
-      const aMain = nearestMainRoom(a, [leftHall, rightHall, hubRoom]);
-      const bMain = nearestMainRoom(b, [leftHall, rightHall, hubRoom]);
-      return Math.abs(b.cx - bMain.cx) + Math.abs(b.cy - bMain.cy)
-        - (Math.abs(a.cx - aMain.cx) + Math.abs(a.cy - aMain.cy));
-    });
+    roomAt(2, 2, 5, 5),
+    roomAt(w - 7, 2, 5, 5),
+    roomAt(2, h - 8, 5, 5),
+    roomAt(w - 7, h - 8, 5, 5),
+    roomAt(2, Math.floor(h * 0.25), 5, 5),
+    roomAt(w - 7, Math.floor(h * 0.25), 5, 5),
+    roomAt(2, Math.floor(h * 0.68), 5, 5),
+    roomAt(w - 7, Math.floor(h * 0.68), 5, 5)
+  ]).filter((room) => mainRooms.every((main) => !roomsOverlap(room, main, 2))
+    && !roomTouchesCarvedFloor(tiles, room, 1));
   const optionalRooms: OptionalRoom[] = [];
   for (const room of candidates) {
     if (optionalRooms.length >= requestedRooms) break;
@@ -366,8 +417,8 @@ function buildSpaciousDungeon(floor: number): DungeonData {
 
   return {
     w, h, tiles, rooms: [...mainRooms, ...optionalRooms.map((optional) => optional.room)],
-    start, stairs, hazards, exitRoom, bossRoom, bossEntrance, bossEntry,
-    bossRoomZone: bossRoom ? 'center' : undefined, biome, optionalRooms
+    start, stairs, hazards, exitRoom, lakeRoom, bossRoom, bossEntrance, bossEntry,
+    bossRoomZone: bossRoom ? exitZone : undefined, biome, optionalRooms
   };
 }
 
@@ -563,7 +614,7 @@ function removeUnreachableFloors(tiles: TileType[][], start: Vec2) {
 }
 
 export function generateDungeon(floor: number, _forcedBossRoomZone?: BossRoomZone): DungeonData {
-  return buildSpaciousDungeon(floor);
+  return buildSpaciousDungeon(floor, _forcedBossRoomZone);
   /* Legacy maze generator kept below temporarily as a reference while the spacious generator settles.
   // 縦横を約√2倍にし、従来比でおよそ2倍の探索面積を確保する。
   const mazeColumns = 16 + Math.min(5, Math.floor(floor / 6));
