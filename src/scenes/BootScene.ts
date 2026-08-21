@@ -110,12 +110,14 @@ const ORIGINAL_ITEM_ART = {
 
 const TERRAIN_PROP_ART = {
   terrain_boss_gate: 'assets/terrain/boss-gate-v2.png',
+  terrain_boss_gate_side: 'assets/terrain/boss-gate-side.png',
   terrain_boss_chain_gate: 'assets/terrain/objects/boss-chain-gate.png',
   terrain_stairs: 'assets/terrain/stairs.png',
   terrain_boss_brazier: 'assets/terrain/boss-brazier.png',
   terrain_rune_lamp: 'assets/terrain/rune-lamp.png',
   terrain_healing_fountain: 'assets/terrain/objects/healing-fountain-pixel.png',
   terrain_healing_lake: 'assets/terrain/objects/healing-lake.png',
+  terrain_teleport_pad: 'assets/terrain/objects/teleport-pad.png',
   terrain_midboss_floor_7x7: 'assets/terrain/objects/midboss-floor-7x7.png',
   terrain_prop_barrel: 'assets/terrain/objects/room-props/barrel.png',
   terrain_prop_jar: 'assets/terrain/objects/room-props/jar.png',

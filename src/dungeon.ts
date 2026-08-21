@@ -34,11 +34,17 @@ export interface DungeonData {
   bossRoomZone?: BossRoomZone;
   bossEntrance?: Vec2;
   bossEntry?: Vec2;
+  teleportPads: TeleportPad[];
   biome: DungeonBiome;
   optionalRooms: OptionalRoom[];
 }
 
 export type BossRoomZone = 'north' | 'south' | 'east' | 'west' | 'center';
+export type TeleportPadZone = Exclude<BossRoomZone, 'center'>;
+
+export interface TeleportPad extends Vec2 {
+  zone: TeleportPadZone;
+}
 
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 
@@ -195,6 +201,23 @@ function nearestMainRoom(room: Room, mainRooms: Room[]): Room {
 function pointInRoom(point: Vec2, room: Room, padding = 0) {
   return point.x >= room.x - padding && point.x < room.x + room.w + padding
     && point.y >= room.y - padding && point.y < room.y + room.h + padding;
+}
+
+function allTargetsWalkablyReachable(tiles: TileType[][], start: Vec2, targets: Vec2[]): boolean {
+  const seen = new Set<string>([`${start.x},${start.y}`]);
+  const queue: Vec2[] = [{ ...start }];
+  while (queue.length) {
+    const current = queue.shift()!;
+    for (const [dx, dy] of DIRS) {
+      const x = current.x + dx, y = current.y + dy;
+      const tile = tiles[y]?.[x];
+      const key = `${x},${y}`;
+      if (!tile || tile === 'wall' || tile === 'door' || tile === 'roomDoor' || tile === 'pit' || seen.has(key)) continue;
+      seen.add(key);
+      queue.push({ x, y });
+    }
+  }
+  return targets.every((target) => seen.has(`${target.x},${target.y}`));
 }
 
 export function biomeForFloor(floor: number): DungeonBiome {
@@ -386,6 +409,15 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
     tiles[stairs.y][stairs.x] = 'door';
   }
 
+  // 四方向の終端手前へ固定転送床を置く。ボス方向も門の外側なので、転送で部屋へ侵入できない。
+  const teleportPads: TeleportPad[] = [
+    { ...northRoomStaging, zone: 'north' },
+    { ...southRoomStaging, zone: 'south' },
+    { ...westRoomStaging, zone: 'west' },
+    { ...eastRoomStaging, zone: 'east' }
+  ];
+  for (const pad of teleportPads) tiles[pad.y][pad.x] = 'floor';
+
   const roomBudget = Math.min(3, 1 + Math.floor((floor - 1) / 4));
   const requestedRooms = Math.max(0, roomBudget - (hasFieldBossRoom ? 1 : 0));
   const candidates = shuffle([
@@ -427,11 +459,16 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
     const x = irand(2, w - 3), y = irand(2, h - 3);
     if (tiles[y][x] !== 'floor'
       || pointInRoom({ x, y }, hubRoom, 1) || pointInRoom({ x, y }, exitRoom, 1)
+      || teleportPads.some((pad) => pad.x === x && pad.y === y)
       || protectedRooms.some((room) => pointInRoom({ x, y }, room, 1))) continue;
     const biomeHazards = hazardByBiome[biome];
     if (!biomeHazards.length) break;
     const type = biomeHazards[irand(0, biomeHazards.length - 1)];
     tiles[y][x] = type;
+    if (type === 'pit' && !allTargetsWalkablyReachable(tiles, start, teleportPads)) {
+      tiles[y][x] = 'floor';
+      continue;
+    }
     if (type !== 'water' && type !== 'rune') hazards.push({ x, y });
     placed++;
   }
@@ -439,7 +476,7 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
   return {
     w, h, tiles, rooms: [...mainRooms, ...optionalRooms.map((optional) => optional.room)],
     start, stairs, hazards, exitRoom, lakeRoom, bossRoom, bossEntrance, bossEntry,
-    bossRoomZone: bossRoom ? exitZone : undefined, biome, optionalRooms
+    bossRoomZone: bossRoom ? exitZone : undefined, teleportPads, biome, optionalRooms
   };
 }
 
@@ -787,7 +824,7 @@ export function generateBossArena(floor: number): DungeonData {
   tiles[stairs.y][stairs.x] = 'door';
   return {
     w, h, tiles, rooms: [bossRoom], start, stairs, hazards: [], bossRoom,
-    bossRoomZone: 'center', biome: biomeForFloor(floor), optionalRooms: []
+    bossRoomZone: 'center', teleportPads: [], biome: biomeForFloor(floor), optionalRooms: []
   };
 }
 

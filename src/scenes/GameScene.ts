@@ -1,5 +1,4 @@
 import Phaser from 'phaser';
-import { hideGameLoading } from '../loadingOverlay';
 import { TILE } from '../textures';
 import { generateDungeon, generateBossArena, DungeonData, randomFloor, isWalkable } from '../dungeon';
 import type { BossRoomZone, OptionalRoom, OptionalRoomKind, Room } from '../dungeon';
@@ -174,11 +173,21 @@ interface DungeonObject {
   breakable: boolean;
 }
 
+interface TeleportPadVisual {
+  x: number;
+  y: number;
+  zone: DungeonData['teleportPads'][number]['zone'];
+  sprite: Phaser.GameObjects.Image;
+  phase: number;
+  baseScale: number;
+}
+
 interface TerrainVisual {
   key: string;
   frame?: number;
   size?: number;
   depth?: number;
+  flipX?: boolean;
 }
 
 type BossGimmickKind =
@@ -275,6 +284,7 @@ export class GameScene extends Phaser.Scene {
   bossRoomBackdrop?: Phaser.GameObjects.Image;
   bossRoomDecorSprites: Phaser.GameObjects.Image[] = [];
   dungeonObjects: DungeonObject[] = [];
+  teleportPadVisuals: TeleportPadVisual[] = [];
   discovered: Set<string> = new Set();
   pendingEquipment: PendingEquipment | null = null;
   secretDualUnlocked = false;
@@ -418,6 +428,7 @@ export class GameScene extends Phaser.Scene {
     this.bossHazards = [];
     this.bossObstacles = [];
     this.dungeonObjects = [];
+    this.teleportPadVisuals = [];
     this.explored = [];
     this.visibleTiles = [];
 
@@ -641,7 +652,6 @@ export class GameScene extends Phaser.Scene {
 
     // 少し遅らせてUIに初期表示させる
     this.time.delayedCall(50, () => this.emitRefresh());
-    requestAnimationFrame(() => hideGameLoading());
   }
 
   // ============ フロア生成 ============
@@ -690,6 +700,8 @@ export class GameScene extends Phaser.Scene {
       object.sprite.destroy();
     }
     this.dungeonObjects = [];
+    for (const pad of this.teleportPadVisuals) pad.sprite.destroy();
+    this.teleportPadVisuals = [];
     for (const row of this.tileSprites) for (const s of row) s.destroy();
     this.tileSprites = [];
     for (const facade of this.wallFacades) facade.sprite.destroy();
@@ -730,6 +742,7 @@ export class GameScene extends Phaser.Scene {
         const t = d.tiles[y][x];
         const visual = this.tileVisual(t, theme.era, x, y);
         const spr = this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, visual.key, visual.frame)
+          .setFlipX(visual.flipX ?? false)
           .setDepth(visual.depth ?? 0)
           .setDisplaySize(visual.size ?? TERRAIN_RENDER_SIZE, visual.size ?? TERRAIN_RENDER_SIZE);
         this.tileSprites[y][x] = spr;
@@ -738,6 +751,7 @@ export class GameScene extends Phaser.Scene {
     this.createWallFacades(theme.era);
     this.createBossRoomVisuals(theme.era, theme.accent);
     this.spawnAmbientMotes(floor);
+    this.spawnTeleportPads();
 
     // 小さなフロアもビューポート中央に配置し、左右に大きな空白を作らない
     const worldW = d.w * TILE, worldH = d.h * TILE;
@@ -792,6 +806,30 @@ export class GameScene extends Phaser.Scene {
       const prop = this.dungeonObjects.find((object) => object.kind === 'barrel' || object.kind === 'jar');
       const containingRoom = prop ? this.optionalRoomContaining(prop.x, prop.y) : undefined;
       if (containingRoom && !containingRoom.opened) this.openOptionalRoom(containingRoom);
+    }
+    if (location.hostname === 'localhost' && qaParamsForFloor.has('qa-teleport') && d.teleportPads[0]) {
+      const pad = d.teleportPads[0];
+      const inwardStep: Record<typeof pad.zone, Vec2> = {
+        north: { x: pad.x, y: pad.y + 1 },
+        south: { x: pad.x, y: pad.y - 1 },
+        west: { x: pad.x + 1, y: pad.y },
+        east: { x: pad.x - 1, y: pad.y }
+      };
+      const qaPos = [
+        inwardStep[pad.zone],
+        { x: pad.x + 1, y: pad.y }, { x: pad.x - 1, y: pad.y },
+        { x: pad.x, y: pad.y + 1 }, { x: pad.x, y: pad.y - 1 }
+      ].find((position) => {
+        const tile = d.tiles[position.y]?.[position.x];
+        return !!tile && isWalkable(tile) && !d.teleportPads.some((candidate) => candidate.x === position.x && candidate.y === position.y)
+          && !this.enemyAt(position.x, position.y) && !this.chestAt(position.x, position.y)
+          && !this.dungeonObjectAt(position.x, position.y);
+      });
+      if (qaPos) {
+        this.player.x = qaPos.x;
+        this.player.y = qaPos.y;
+        this.placeSprite(this.playerSprite, qaPos.x, qaPos.y);
+      }
     }
 
     if (this.qaBossMode && d.bossRoom) {
@@ -884,7 +922,7 @@ export class GameScene extends Phaser.Scene {
     const bossEntry = this.dungeon?.bossEntry;
     if (t === 'floor' && bossEntry && x === bossEntry.x && y === bossEntry.y
       && !this.bossEntranceClosed && !this.floorBossDefeated) {
-      return { key: 'terrain_boss_gate', size: TILE, depth: 4.2 };
+      return this.bossGateVisual();
     }
     switch (t) {
       case 'wall': return {
@@ -894,9 +932,12 @@ export class GameScene extends Phaser.Scene {
       case 'stairs': return { key: 'terrain_stairs', size: TILE + 10, depth: 3.4 };
       case 'door': {
         const isCentralStairSeal = x === this.dungeon.stairs.x && y === this.dungeon.stairs.y;
+        const bossEntrance = this.dungeon.bossEntrance;
+        const isBossEntrance = !!bossEntrance && x === bossEntrance.x && y === bossEntrance.y;
         return isCentralStairSeal
           ? { key: 'terrain_boss_chain_gate', size: TILE * 1.45, depth: 4.2 }
-          : { key: 'terrain_boss_gate', size: TILE, depth: 4.2 };
+          : isBossEntrance ? this.bossGateVisual()
+            : { key: 'terrain_boss_gate', size: TILE, depth: 4.2 };
       }
       case 'roomDoor': return { key: 'terrain_boss_gate', size: TILE, depth: 4.2 };
       case 'ice':
@@ -916,9 +957,21 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  bossGateVisual(): TerrainVisual {
+    const zone = this.dungeon?.bossRoomZone;
+    if (zone === 'east' || zone === 'west') {
+      return {
+        key: 'terrain_boss_gate_side', size: TILE, depth: 4.2,
+        flipX: zone === 'west'
+      };
+    }
+    return { key: 'terrain_boss_gate', size: TILE, depth: 4.2 };
+  }
+
   applyTileVisual(sprite: Phaser.GameObjects.Image, t: TileType, era: number, x: number, y: number) {
     const visual = this.tileVisual(t, era, x, y);
     sprite.setTexture(visual.key, visual.frame)
+      .setFlipX(visual.flipX ?? false)
       .setDepth(visual.depth ?? 0)
       .setDisplaySize(visual.size ?? TERRAIN_RENDER_SIZE, visual.size ?? TERRAIN_RENDER_SIZE);
   }
@@ -984,6 +1037,27 @@ export class GameScene extends Phaser.Scene {
         0.7 + Math.random() * 1.1, color, 0.32
       ).setDepth(4.4).setBlendMode(Phaser.BlendModes.ADD);
       this.ambientMotes.push({ x: pos.x, y: pos.y, baseY, phase: Math.random() * Math.PI * 2, sprite });
+    }
+  }
+
+  spawnTeleportPads() {
+    if (!this.dungeon.teleportPads.length) return;
+    this.textures.get('terrain_teleport_pad').setFilter(Phaser.Textures.FilterMode.NEAREST);
+    for (const pad of this.dungeon.teleportPads) {
+      const sprite = this.add.image(
+        pad.x * TILE + TILE / 2,
+        pad.y * TILE + TILE / 2,
+        'terrain_teleport_pad'
+      )
+        .setDisplaySize(TILE, TILE)
+        .setDepth(2.7)
+        .setVisible(false);
+      this.teleportPadVisuals.push({
+        ...pad,
+        sprite,
+        phase: Math.random() * Math.PI * 2,
+        baseScale: sprite.scaleX
+      });
     }
   }
 
@@ -2366,6 +2440,7 @@ export class GameScene extends Phaser.Scene {
 
   occupiedPositions(): Vec2[] {
     const arr: Vec2[] = [{ x: this.dungeon.start.x, y: this.dungeon.start.y }, this.dungeon.stairs];
+    for (const pad of this.dungeon.teleportPads) arr.push({ x: pad.x, y: pad.y });
     for (const e of this.enemies) arr.push({ x: e.x, y: e.y });
     for (const c of this.chests) arr.push({ x: c.x, y: c.y });
     for (const g of this.ground) arr.push({ x: g.x, y: g.y });
@@ -2556,14 +2631,15 @@ export class GameScene extends Phaser.Scene {
       }, moveDuration, this.holdBoostTier > 0 ? 'Quad.easeOut' : 'Sine.easeInOut');
       this.setPlayerVisual(dir, 'idle');
       this.onEnterTile(nx, ny);
-      const slidOnIce = await this.slidePlayerOnBossIce(dir, moveDuration);
+      const teleported = this.player.x !== nx || this.player.y !== ny;
+      const slidOnIce = teleported ? false : await this.slidePlayerOnBossIce(dir, moveDuration);
       // 階段を踏んだら確認なしで即降りる（doDescendがbusyを管理）
       if (this.dungeon.tiles[this.player.y]?.[this.player.x] === 'stairs') {
         this.doDescend();
         return;
       }
       // 疾風の羽の効果中：同じ方向へもう1マス駆け抜ける（1歩で2マス）
-      if (this.dashSteps > 0 && !this.gameEnded && !slidOnIce) {
+      if (this.dashSteps > 0 && !this.gameEnded && !slidOnIce && !teleported) {
         this.dashSteps--;
         const nx2 = nx + dx, ny2 = ny + dy;
         const t2 = this.dungeon.tiles[ny2]?.[nx2];
@@ -2590,6 +2666,7 @@ export class GameScene extends Phaser.Scene {
 
   onEnterTile(x: number, y: number) {
     this.closeBossEntranceOnEntry(x, y);
+    if (this.activateTeleportPad(x, y)) return;
     const t = this.dungeon.tiles[y][x];
     if (t === 'poison') {
       this.player.poisonTurns = Math.max(this.player.poisonTurns, 3);
@@ -2625,6 +2702,36 @@ export class GameScene extends Phaser.Scene {
     // アイテム拾得
     const gi = this.groundAt(x, y);
     if (gi) this.pickUp(gi);
+  }
+
+  teleportPadAt(x: number, y: number) {
+    return this.dungeon.teleportPads.find((pad) => pad.x === x && pad.y === y);
+  }
+
+  teleportZoneLabel(zone: DungeonData['teleportPads'][number]['zone']): string {
+    const labels: Record<DungeonData['teleportPads'][number]['zone'], string> = {
+      north: '北', south: '南', west: '西', east: '東'
+    };
+    return labels[zone];
+  }
+
+  activateTeleportPad(x: number, y: number): boolean {
+    const source = this.teleportPadAt(x, y);
+    if (!source) return false;
+    const destinations = this.dungeon.teleportPads.filter((pad) => pad !== source);
+    const destination = destinations[Math.floor(Math.random() * destinations.length)];
+    if (!destination) return false;
+
+    this.stopClickPath();
+    this.effectFx(source.x, source.y, 'fx_magic', 1.15, 360, 0x58e7ff);
+    this.player.x = destination.x;
+    this.player.y = destination.y;
+    this.placeSprite(this.playerSprite, destination.x, destination.y);
+    this.effectFx(destination.x, destination.y, 'fx_magic', 1.55, 520, 0xa36cff);
+    Audio.playSe('warp');
+    this.log(`転送床が輝き、${this.teleportZoneLabel(destination.zone)}の終端へ飛んだ！`, 'special');
+    this.updateVisibility();
+    return true;
   }
 
   async slidePlayerOnBossIce(dir: Dir, moveDuration: number): Promise<boolean> {
@@ -4082,6 +4189,7 @@ export class GameScene extends Phaser.Scene {
     if (this.chestAt(x, y)) return false;
     if (this.bossObstacleAt(x, y)) return false;
     if (this.dungeonObjectAt(x, y)) return false;
+    if (this.dungeon.teleportPads.some((pad) => pad.x === x && pad.y === y)) return false;
     return true;
   }
 
@@ -4432,6 +4540,10 @@ export class GameScene extends Phaser.Scene {
       const v = !!visible[g.y]?.[g.x];
       g.sprite.setVisible(v).setAlpha(v ? 1 : 0);
       g.glow?.setVisible(v);
+    }
+    for (const pad of this.teleportPadVisuals) {
+      const v = !!visible[pad.y]?.[pad.x];
+      pad.sprite.setVisible(v).setAlpha(v ? 1 : 0);
     }
     for (const object of this.dungeonObjects) {
       const room = this.dungeon.optionalRooms.find((optional) => object.x >= optional.room.x
@@ -5700,6 +5812,13 @@ export class GameScene extends Phaser.Scene {
         g.glow.setAlpha(0.16 + pulse * 0.06).setScale(0.9 + pulse * 0.08);
         g.glow.setDepth(g.sprite.depth - 0.12);
       }
+    }
+
+    for (const pad of this.teleportPadVisuals) {
+      if (!pad.sprite.visible) continue;
+      const pulse = Math.sin(time * 0.004 + pad.phase);
+      pad.sprite.setScale(pad.baseScale * (1 + pulse * 0.035));
+      pad.sprite.setAlpha(0.9 + pulse * 0.1);
     }
 
     for (const object of this.dungeonObjects) {

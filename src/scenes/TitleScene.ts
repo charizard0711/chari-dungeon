@@ -9,7 +9,6 @@ import {
   PlayerGender,
   setSelectedGender
 } from '../playerAppearance';
-import { showGameLoading } from '../loadingOverlay';
 
 const FONT = '"Yu Gothic UI", "Meiryo", sans-serif';
 
@@ -41,7 +40,6 @@ export class TitleScene extends Phaser.Scene {
       if (starting) return;
       starting = true;
       setSelectedGender(this.selectedGender);
-      showGameLoading();
       this.cameras.main.fadeOut(180, 2, 7, 8);
       this.time.delayedCall(190, () => this.scene.start('GameScene'));
     };
@@ -306,10 +304,8 @@ export class TitleScene extends Phaser.Scene {
       letterSpacing: 1
     }).setOrigin(0.5);
     container.add([bg, text]);
-    container.setSize(w + 28, h + 20).setInteractive(
-      new Phaser.Geom.Rectangle(-w / 2 - 14, -h / 2 - 10, w + 28, h + 20),
-      Phaser.Geom.Rectangle.Contains
-    );
+    // Containerの既定ヒット領域を使い、表示サイズとタップ領域を一致させる。
+    container.setSize(w + 28, h + 20).setInteractive({ useHandCursor: true });
     container.on('pointerover', () => { draw(true); this.tweens.add({ targets: container, scale: 1.035, duration: 120 }); });
     container.on('pointerout', () => { draw(false); this.tweens.add({ targets: container, scale: 1, duration: 120 }); });
     container.on('pointerdown', () => {
