@@ -40,11 +40,7 @@ export interface DungeonData {
 }
 
 export type BossRoomZone = 'north' | 'south' | 'east' | 'west' | 'center';
-export type TeleportPadZone = Exclude<BossRoomZone, 'center'>;
-
-export interface TeleportPad extends Vec2 {
-  zone: TeleportPadZone;
-}
+export type TeleportPad = Vec2;
 
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 
@@ -409,13 +405,15 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
     tiles[stairs.y][stairs.x] = 'door';
   }
 
-  // 四方向の終端手前へ固定転送床を置く。ボス方向も門の外側なので、転送で部屋へ侵入できない。
-  const teleportPads: TeleportPad[] = [
-    { ...northRoomStaging, zone: 'north' },
-    { ...southRoomStaging, zone: 'south' },
-    { ...westRoomStaging, zone: 'west' },
-    { ...eastRoomStaging, zone: 'east' }
-  ];
+  // 通路を塞がないよう、転送床はボス部屋を除いた通常部屋の隅へ置く。
+  // 5の倍数階は中ボス部屋がないため、5部屋から毎回ランダムに4部屋を選ぶ。
+  const teleportRooms = shuffle(mainRooms.filter((room) => room !== bossRoom)).slice(0, 4);
+  const teleportPads: TeleportPad[] = teleportRooms.map((room) => shuffle([
+    { x: room.x, y: room.y },
+    { x: room.x + room.w - 1, y: room.y },
+    { x: room.x, y: room.y + room.h - 1 },
+    { x: room.x + room.w - 1, y: room.y + room.h - 1 }
+  ])[0]);
   for (const pad of teleportPads) tiles[pad.y][pad.x] = 'floor';
 
   const roomBudget = Math.min(3, 1 + Math.floor((floor - 1) / 4));
