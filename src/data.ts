@@ -39,6 +39,24 @@ export const WEAPON_DEFS: WeaponDef[] = [
   { key: 'w_dual_sword_thunder', name: '双雷刃ライキリ', atkMin: 9, atkMax: 17, durMax: 138, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'dual_sword', element: 'thunder', dual: true, ss: true },
   { key: 'w_dual_sword_ice', name: '双氷刃フロストバイト', atkMin: 8, atkMax: 16, durMax: 150, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'dual_sword', element: 'ice', dual: true, ss: true },
 
+  // ハンドガンは2マス先を狙える中距離武器。全系統に固有効果「早撃ち」を持たせる。
+  {
+    key: 'w_handgun_fire', name: '焔銃イグナイト', atkMin: 9, atkMax: 19, durMax: 108, minFloor: 4, rarity: 7, grade: 'C', weaponType: 'handgun', element: 'fire',
+    passive: { key: 'quickdraw', name: '早撃ち', description: '2マス先へ射撃・会心率+8%' }
+  },
+  {
+    key: 'w_handgun_water', name: '蒼銃アクアリウム', atkMin: 8, atkMax: 19, durMax: 114, minFloor: 4, rarity: 7, grade: 'C', weaponType: 'handgun', element: 'water',
+    passive: { key: 'quickdraw', name: '早撃ち', description: '2マス先へ射撃・会心率+8%' }
+  },
+  {
+    key: 'w_handgun_thunder', name: '雷銃ヴォルト', atkMin: 11, atkMax: 22, durMax: 102, minFloor: 8, rarity: 5, grade: 'B', weaponType: 'handgun', element: 'thunder',
+    passive: { key: 'quickdraw', name: '早撃ち', description: '2マス先へ射撃・会心率+8%' }
+  },
+  {
+    key: 'w_handgun_ice', name: '氷銃フロストロック', atkMin: 10, atkMax: 21, durMax: 111, minFloor: 8, rarity: 5, grade: 'B', weaponType: 'handgun', element: 'ice',
+    passive: { key: 'quickdraw', name: '早撃ち', description: '2マス先へ射撃・会心率+8%' }
+  },
+
   // 無属性武器。属性相性に左右されず、各ランクで安定して扱える。
   { key: 'w_iron_dagger', name: '黒鉄の短剣', atkMin: 5, atkMax: 12, durMax: 150, minFloor: 1, rarity: 14, grade: 'D', weaponType: 'dagger' },
   { key: 'w_shadow_stiletto', name: '影縫いのスティレット', atkMin: 7, atkMax: 15, durMax: 132, minFloor: 3, rarity: 10, grade: 'C', weaponType: 'dagger' },
@@ -63,6 +81,11 @@ export const WEAPON_DEFS: WeaponDef[] = [
   { key: 'w_blackwood_bow', name: '黒檀弓ナイトレイ', atkMin: 10, atkMax: 21, durMax: 144, minFloor: 8, rarity: 6, grade: 'B', weaponType: 'bow' },
   { key: 'w_royal_bow', name: '王弓レガリア', atkMin: 11, atkMax: 24, durMax: 150, minFloor: 13, rarity: 4, grade: 'A', weaponType: 'bow' },
   { key: 'w_siege_arbalest', name: '攻城弩バリスタ', atkMin: 14, atkMax: 29, durMax: 168, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'bow' },
+
+  {
+    key: 'w_blackpowder_handgun', name: '黒鉄のハンドガン', atkMin: 7, atkMax: 16, durMax: 126, minFloor: 1, rarity: 12, grade: 'D', weaponType: 'handgun',
+    passive: { key: 'quickdraw', name: '早撃ち', description: '2マス先へ射撃・会心率+8%' }
+  },
 
   { key: 'w_rusted_greatsword', name: '錆びた大剣', atkMin: 7, atkMax: 16, durMax: 195, minFloor: 1, rarity: 12, grade: 'D', weaponType: 'greatsword' },
   { key: 'w_executioner_blade', name: '断罪の処刑剣', atkMin: 10, atkMax: 21, durMax: 210, minFloor: 3, rarity: 8, grade: 'C', weaponType: 'greatsword' },
@@ -201,12 +224,14 @@ export const ITEM_DEFS: Record<ItemKind, Omit<Item, 'kind'>> = {
   seal:    { name: '封印の魔導書', desc: '周囲の敵を数ターン止める', textureKey: 'i_seal' },
   stone:   { name: '武器強化スクロール', desc: '装備中の武器を強化。成功率90%から強化ごとに10%低下（最低30%）', textureKey: 'i_stone' },
   shieldstone: { name: '防具強化スクロール', desc: '装備中の盾を強化。成功率90%から強化ごとに10%低下（最低30%）', textureKey: 'i_shieldstone' },
+  slime_scroll: { name: 'スライム変身スクロール', desc: '30ターンの間スライムへ変身。装備の能力・属性・追加効果はすべて引き継ぐ', textureKey: 'i_slime_scroll' },
+  boss5_scroll: { name: '封印王変身スクロール', desc: '30ターンの間5Fボス「封印王アウレリウス」へ変身。装備効果も引き継ぐ', textureKey: 'i_boss5_scroll' },
   invis:   { name: '透明ポーション', desc: '20ターンの間、敵から完全に見えなくなる', textureKey: 'i_invis' },
   dash:    { name: '疾風の羽', desc: '20歩の間、1歩で2マス進めるようになる', textureKey: 'i_dash' }
 };
 
 // レアアイテム（所持欄で赤枠になる）
-const RARE_ITEMS = new Set<ItemKind>(['revive']);
+const RARE_ITEMS = new Set<ItemKind>(['revive', 'slime_scroll', 'boss5_scroll']);
 export function isRareItem(kind: ItemKind): boolean {
   return RARE_ITEMS.has(kind);
 }

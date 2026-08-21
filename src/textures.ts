@@ -572,6 +572,14 @@ function buildItemTextures(scene: Phaser.Scene) {
       px(g, 5, 4, 14, 16, 0x173c87); px(g, 4, 3, 16, 4, 0x276ad2); px(g, 4, 18, 16, 3, 0x2054b1);
       g.lineStyle(2, 0xbfefff, 1); g.beginPath(); g.moveTo(8, 9); g.lineTo(12, 7); g.lineTo(16, 9); g.lineTo(15, 15); g.lineTo(12, 18); g.lineTo(9, 15); g.closePath(); g.strokePath();
     },
+    slime_scroll: (g) => {
+      px(g, 5, 4, 14, 16, 0x246b58); px(g, 4, 3, 16, 4, 0x42a987); px(g, 4, 18, 16, 3, 0x318a70);
+      g.fillStyle(0x9af0cf); g.fillEllipse(12, 13, 9, 7); px(g, 9, 11, 2, 2, 0x102b27); px(g, 14, 11, 2, 2, 0x102b27);
+    },
+    boss5_scroll: (g) => {
+      px(g, 5, 4, 14, 16, 0x5b2330); px(g, 4, 3, 16, 4, 0xa85a35); px(g, 4, 18, 16, 3, 0x863b2d);
+      px(g, 8, 9, 3, 7, 0xffd27a); px(g, 13, 9, 3, 7, 0xffd27a); px(g, 10, 12, 4, 5, 0xe05a42);
+    },
     // 透明ポーション：ガラス瓶の輪郭だけが見え、中身が透けている
     invis: (g) => {
       px(g, 9, 2, 6, 4, 0x8a6a4a);                                 // コルク栓
@@ -624,6 +632,14 @@ function buildWeaponTextures(scene: Phaser.Scene) {
         px(g, 3, 18, 5, 4, 0x5a3a20); px(g, 16, 18, 5, 4, 0x5a3a20);
         // 交差の光
         g.fillStyle(0xffffff, 0.9); g.fillCircle(12, 11, 2);
+      });
+      continue;
+    }
+    if (def.weaponType === 'handgun') {
+      iconTexture(scene, def.key, (g) => {
+        px(g, 5, 6, 15, 7, c); px(g, 16, 5, 5, 5, shade(c, 1.25));
+        px(g, 7, 12, 8, 3, shade(c, 0.62)); px(g, 9, 14, 5, 8, 0x5a3a20);
+        px(g, 10, 7, 8, 2, shade(c, 1.45)); px(g, 14, 13, 2, 4, 0x8a6a3a);
       });
       continue;
     }
