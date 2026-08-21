@@ -38,7 +38,7 @@ export function computePlayerAttack(p: Player, def: MonsterDef, backstab = false
   let crit = false;
   const cMagic = p.hasMagic('C');
   const innateCrit = w?.weaponType === 'lance' ? 0.08 : 0;
-  const passiveCrit = w?.passive?.key === 'eagle_eye' ? 0.04 : 0;
+  const passiveCrit = w?.passive?.key === 'eagle_eye' ? 0.04 : w?.passive?.key === 'quickdraw' ? 0.08 : 0;
   const daggerBackstab = w?.weaponType === 'dagger' && backstab;
   const critChance = 0.05 + innateCrit + passiveCrit + (cMagic ? 0.15 : 0);
   if (daggerBackstab || Math.random() < critChance) {

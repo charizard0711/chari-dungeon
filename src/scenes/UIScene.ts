@@ -518,6 +518,9 @@ export class UIScene extends Phaser.Scene {
     const th = getTheme(this.gs.floor);
 
     const boost = this.gs.holdBoostTier === 2 ? '  最大加速' : this.gs.holdBoostTier === 1 ? '  加速' : '';
+    const transformation = this.gs.transformation
+      ? `  変身:${this.gs.transformation.name} 残り${this.gs.transformation.turns}`
+      : '';
     const floorLabel = this.gs.inBossRoom ? `${this.gs.floor}.5階` : `${this.gs.floor}階`;
     const gate = this.gs.inBossRoom
       ? this.gs.bossRewardClaimed ? '出口解放' : 'ボス封印'
@@ -531,8 +534,8 @@ export class UIScene extends Phaser.Scene {
       : `${floorLabel} / 30階  ${th.name}   ${gate}   得点 ${this.gs.score}   ${this.gs.turn}ターン${boost}`);
 
     this.statusText.setText(IS_MOBILE
-      ? `${p.name} レベル${p.level}  経験値 ${p.exp}/${p.expNext}  ${this.gs.turn}ターン`
-      : `${p.name}  レベル${p.level}   （経験値 ${p.exp}/${p.expNext}）`);
+      ? `${p.name} レベル${p.level}  経験値 ${p.exp}/${p.expNext}  ${this.gs.turn}ターン${transformation}`
+      : `${p.name}  レベル${p.level}   （経験値 ${p.exp}/${p.expNext}）${transformation}`);
     this.hpLabel.setText(`体力  ${p.hp} / ${p.hpMax}`);
     this.atkLabel.setText(IS_MOBILE
       ? `攻 ${p.atkMin}-${p.atkMax}  防 ${p.def}  ${p.gold}G`
@@ -1285,20 +1288,20 @@ export class UIScene extends Phaser.Scene {
     this.overlay.add(this.add.text(x + w - 58, y + 16, `所持 ${p.gold} G`, {
       fontFamily: '"Yu Gothic UI"', fontSize: '16px', color: '#f5c542', fontStyle: 'bold'
     }).setOrigin(1, 0));
-    this.overlay.add(this.add.text(x + 24, y + 58, '各階で在庫が補充されます。強化スクロールは各2枚まで、1枚100G。', {
+    this.overlay.add(this.add.text(x + 24, y + 58, '強化スクロールの販売は終了しました。変身スクロールはショップ限定・各階1枚、効果は30ターンです。', {
       fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '11px' : '13px', color: '#9db8b9',
       wordWrap: { width: w - 48 }
     }));
 
-    const rows: { kind: 'potion' | 'stone' | 'shieldstone'; price: number; label: string }[] = [
+    const rows: { kind: 'potion' | 'slime_scroll' | 'boss5_scroll'; price: number; label: string }[] = [
       { kind: 'potion', price: 25, label: '回復ポーション　体力を40回復' },
-      { kind: 'stone', price: 100, label: '武器強化スクロール　装備中の武器を強化' },
-      { kind: 'shieldstone', price: 100, label: '防具強化スクロール　装備中の盾を強化' }
+      { kind: 'slime_scroll', price: 500, label: 'スライム変身スクロール　装備効果を継承して30ターン変身' },
+      { kind: 'boss5_scroll', price: 500, label: '封印王変身スクロール　5Fボスへ30ターン変身' }
     ];
     let cy = y + (IS_MOBILE ? 112 : 102);
     for (const row of rows) {
       const remaining = this.gs.shopRemaining(row.kind);
-      const color = row.kind === 'potion' ? 0x61c78d : row.kind === 'stone' ? 0xffc857 : 0x56a8ff;
+      const color = row.kind === 'potion' ? 0x61c78d : row.kind === 'slime_scroll' ? 0x70e2c2 : 0xffc96b;
       const card = this.add.graphics();
       const cardH = IS_MOBILE ? 104 : 88;
       card.fillStyle(0x111f26, .98).fillRoundedRect(x + 20, cy, w - 40, cardH, 10);

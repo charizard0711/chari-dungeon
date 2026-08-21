@@ -291,6 +291,13 @@ const SE_SPECS: Record<SeName, { len: number; segs: SeSeg[] }> = {
       { type: 'noise', f0: 8500, f1: 2400, t: 0.04, d: 0.3, vol: 0.16 }
     ]
   },
+  weaponHandgun: {
+    len: 0.36, segs: [
+      { type: 'noise', f0: 12000, f1: 900, t: 0, d: 0.08, vol: 0.36 },
+      { type: 'sine', f0: 310, f1: 52, t: 0, d: 0.15, vol: 0.28 },
+      { type: 'noise', f0: 1200, f1: 90, t: 0.04, d: 0.22, vol: 0.13 }
+    ]
+  },
   weaponGreatsword: {
     len: 0.58, segs: [
       { type: 'noise', f0: 1450, f1: 130, t: 0, d: 0.4, vol: 0.29 },

@@ -125,6 +125,18 @@ interface GroundItem {
   armor?: Armor;
 }
 
+type EnhancementScrollKind = 'stone' | 'shieldstone';
+type ShopItemKind = 'potion' | 'slime_scroll' | 'boss5_scroll';
+type TransformationKind = 'slime' | 'boss5';
+
+interface PlayerTransformation {
+  kind: TransformationKind;
+  turns: number;
+  name: string;
+  textureKey: 'm_jelly' | 'm_archdemon';
+  displaySize: number;
+}
+
 type PendingEquipment =
   | { kind: 'weapon'; item: Weapon; source: string }
   | { kind: 'shield'; item: Shield; source: string }
@@ -236,7 +248,9 @@ export class GameScene extends Phaser.Scene {
   openedOptionalRooms = new Set<OptionalRoom>();
   weaponWonThisFloor = false;
   reviveSeedSeen = false;
-  shopPurchases = { potion: 0, stone: 0, shieldstone: 0 };
+  shopPurchases: Record<ShopItemKind, number> = { potion: 0, slime_scroll: 0, boss5_scroll: 0 };
+  enhancementScrollDrops: Record<EnhancementScrollKind, boolean> = { stone: false, shieldstone: false };
+  reservedBossScroll: EnhancementScrollKind | null = null;
   clickPathToken = 0;
   clickPathActive = false;
   lastMapClickAt = 0;
@@ -282,6 +296,9 @@ export class GameScene extends Phaser.Scene {
   dashSteps = 0; // 疾風の羽：残り歩数（1歩で2マス進める）
   themeTileTint = 0xffffff; // 現在フロアのタイル色合い（2階ごとに変わる）
   invisTurns = 0; // 透明ポーション：残りターン（敵から完全に見えない）
+  transformation: PlayerTransformation | null = null;
+  transformationSprite?: Phaser.GameObjects.Image;
+  transformationBaseScale = 1;
 
   // 長居ペナルティフラグ
   penaltyFlags = { p100: false, p150: false, p200: false, p250: false };
@@ -336,6 +353,7 @@ export class GameScene extends Phaser.Scene {
         'w_soldier_blade', 'w_knight_sword', 'w_rune_saber', 'w_paladin_edge', 'w_black_oath',
         'w_iron_pike', 'w_royal_spear', 'w_bone_lance', 'w_drill_lance', 'w_dragon_lance',
         'w_hunter_bow', 'w_composite_bow', 'w_blackwood_bow', 'w_royal_bow', 'w_siege_arbalest',
+        'w_blackpowder_handgun', 'w_handgun_fire', 'w_handgun_water', 'w_handgun_thunder', 'w_handgun_ice',
         'w_rusted_greatsword', 'w_executioner_blade', 'w_titan_cleaver', 'w_holy_greatsword', 'w_grand_breaker'
       ];
       const shieldKeys = [
@@ -362,7 +380,9 @@ export class GameScene extends Phaser.Scene {
     this.openedOptionalRooms = new Set();
     this.weaponWonThisFloor = false;
     this.reviveSeedSeen = false;
-    this.shopPurchases = { potion: 0, stone: 0, shieldstone: 0 };
+    this.shopPurchases = { potion: 0, slime_scroll: 0, boss5_scroll: 0 };
+    this.enhancementScrollDrops = { stone: false, shieldstone: false };
+    this.reservedBossScroll = null;
     this.clickPathToken = 0;
     this.clickPathActive = false;
     this.lastMapClickAt = 0;
@@ -375,6 +395,8 @@ export class GameScene extends Phaser.Scene {
     this.stepFrame = 0;
     this.playerAttacking = false;
     this.playerAnimToken = 0;
+    this.transformation = null;
+    this.transformationBaseScale = 1;
 
     // シーン再起動時、Phaserはインスタンスを再利用するため
     // 前回の（破棄済み）オブジェクト参照をリセットする
@@ -383,6 +405,7 @@ export class GameScene extends Phaser.Scene {
     this.playerShadow = undefined;
     this.playerAura = undefined;
     this.weaponSprite = undefined;
+    this.transformationSprite = undefined;
     this.tileSprites = [];
     this.enemies = [];
     this.chests = [];
@@ -622,6 +645,9 @@ export class GameScene extends Phaser.Scene {
   buildFloor(floor: number, bossRoom = false) {
     this.floor = floor;
     this.inBossRoom = bossRoom;
+    this.enhancementScrollDrops = { stone: false, shieldstone: false };
+    const mapHasBoss = bossRoom || floor !== 5;
+    this.reservedBossScroll = mapHasBoss ? (Math.random() < 0.5 ? 'stone' : 'shieldstone') : null;
     if (!bossRoom) {
       this.floorTurn = 0;
       this.floorStartHp = this.player.hp;
@@ -635,7 +661,7 @@ export class GameScene extends Phaser.Scene {
       this.itemSealTurns = 0;
       this.bossRewardClaimed = false;
       this.weaponWonThisFloor = false;
-      this.shopPurchases = { potion: 0, stone: 0, shieldstone: 0 };
+      this.shopPurchases = { potion: 0, slime_scroll: 0, boss5_scroll: 0 };
     } else {
       // フィールド中ボスの任意報酬と、強ボス部屋の必須報酬は別扱い。
       this.bossRewardClaimed = false;
@@ -731,6 +757,7 @@ export class GameScene extends Phaser.Scene {
     this.placeSprite(this.playerSprite, d.start.x, d.start.y);
     this.playerShadow?.setPosition(this.playerSprite.x, this.playerSprite.y + 13);
     this.updatePlayerAura();
+    this.refreshTransformationVisual();
     this.cameras.main.startFollow(this.playerSprite, true, 0.15, 0.15);
     this.cameras.main.setZoom(MAP_ZOOM);
 
@@ -2281,9 +2308,10 @@ export class GameScene extends Phaser.Scene {
       this.log(`${object.kind === 'jar' ? '壺' : '樽'}の中から${gold}Gがこぼれた！`, 'gold');
     } else {
       const pool: ItemKind[] = object.kind === 'jar'
-        ? ['potion', 'potion', 'torch', 'invis', 'dash', 'shieldstone']
-        : ['potion', 'torch', 'torch', 'dash', 'stone', 'shieldstone'];
-      const kind = pool[Math.floor(Math.random() * pool.length)];
+        ? ['potion', 'potion', 'torch', 'invis', 'dash']
+        : ['potion', 'torch', 'torch', 'dash'];
+      const regularScroll = Math.random() < SCROLL_DROP_RATE ? this.claimRegularEnhancementScroll() : null;
+      const kind = regularScroll ?? pool[Math.floor(Math.random() * pool.length)];
       this.dropItem(object.x, object.y, kind);
       this.log(`${object.kind === 'jar' ? '壺' : '樽'}を壊すと、${ITEM_DEFS[kind].name}が出てきた！`, 'item');
     }
@@ -2304,16 +2332,14 @@ export class GameScene extends Phaser.Scene {
 
   spawnGroundItems(floor: number) {
     const commonKinds: (ItemKind | 'coin')[] = ['coin', 'coin', 'coin', 'potion', 'torch', 'invis', 'dash'];
-    const scrollKinds: ItemKind[] = ['stone', 'shieldstone'];
     // 消耗品は主に樽・壺から手に入る。床への直置きはたまに1個だけ。
     const n = Math.random() < 0.28 ? 1 : 0;
     const arenaCells = this.bossRoomCells();
     for (let i = 0; i < n; i++) {
       const pos = randomFloor(this.dungeon, [...this.occupiedPositions(), ...arenaCells]);
       if (!pos) continue;
-      const kind = Math.random() < SCROLL_DROP_RATE
-        ? scrollKinds[Math.floor(Math.random() * scrollKinds.length)]
-        : commonKinds[Math.floor(Math.random() * commonKinds.length)];
+      const regularScroll = Math.random() < SCROLL_DROP_RATE ? this.claimRegularEnhancementScroll() : null;
+      const kind: ItemKind | 'coin' = regularScroll ?? commonKinds[Math.floor(Math.random() * commonKinds.length)];
       const texKey = kind === 'coin' ? 'coin' : `i_${kind}`;
       const spr = this.add.image(0, 0, texKey).setDepth(5).setOrigin(0.5, 0.6).setDisplaySize(22, 22);
       this.placeSprite(spr, pos.x, pos.y);
@@ -2325,6 +2351,34 @@ export class GameScene extends Phaser.Scene {
       const value = kind === 'coin' ? 10 + Math.floor(Math.random() * floor * 6) : undefined;
       this.ground.push({ x: pos.x, y: pos.y, kind, sprite: spr, glow, phase: Math.random() * Math.PI * 2, value });
     }
+  }
+
+  private claimRegularEnhancementScroll(): EnhancementScrollKind | null {
+    const candidates: EnhancementScrollKind[] = (['stone', 'shieldstone'] as EnhancementScrollKind[])
+      .filter((kind) => !this.enhancementScrollDrops[kind] && kind !== this.reservedBossScroll);
+    if (!candidates.length) return null;
+    const kind = candidates[Math.floor(Math.random() * candidates.length)];
+    this.enhancementScrollDrops[kind] = true;
+    return kind;
+  }
+
+  private grantRegularEnhancementScroll(): EnhancementScrollKind | null {
+    const kind = this.claimRegularEnhancementScroll();
+    if (kind) this.player.inventory.push(makeItem(kind));
+    return kind;
+  }
+
+  private dropGuaranteedBossScroll(x: number, y: number): EnhancementScrollKind {
+    const preferred = this.reservedBossScroll;
+    const fallback: EnhancementScrollKind = preferred === 'stone' ? 'shieldstone' : 'stone';
+    const kind = preferred && !this.enhancementScrollDrops[preferred]
+      ? preferred
+      : !this.enhancementScrollDrops[fallback]
+        ? fallback
+        : preferred ?? fallback;
+    this.enhancementScrollDrops[kind] = true;
+    this.dropItem(x, y, kind);
+    return kind;
   }
 
   occupiedPositions(): Vec2[] {
@@ -2402,9 +2456,11 @@ export class GameScene extends Phaser.Scene {
         this.busy = false;
         return;
       }
-      // 弓は向いている方向の3マス先まで、最初の敵へ矢を放つ。
-      if (this.player.weapon?.weaponType === 'bow') {
-        for (let distance = 2; distance <= 3; distance++) {
+      // 弓は3マス、ハンドガンは2マス先まで、向いている方向の最初の敵へ射撃する。
+      const rangedDistance = this.player.weapon?.weaponType === 'bow' ? 3
+        : this.player.weapon?.weaponType === 'handgun' ? 2 : 0;
+      if (rangedDistance > 0) {
+        for (let distance = 2; distance <= rangedDistance; distance++) {
           const tx = this.player.x + dx * distance;
           const ty = this.player.y + dy * distance;
           const tile = this.dungeon.tiles[ty]?.[tx];
@@ -2902,10 +2958,10 @@ export class GameScene extends Phaser.Scene {
         const pool: ItemKind[] = ['potion', 'torch', 'warp', 'invis'];
         this.dropItem(e.x, e.y, pool[Math.floor(Math.random() * pool.length)]);
       }
-      // 強化スクロールは通常敵・エリート・ボス共通で1/3。
-      if (Math.random() < SCROLL_DROP_RATE) {
-        const scrollPool: ItemKind[] = ['stone', 'shieldstone'];
-        this.dropItem(e.x, e.y, scrollPool[Math.floor(Math.random() * scrollPool.length)]);
+      // ボス用の1枚は予約し、通常敵・エリートからはもう一方だけを各マップ最大1枚に制限する。
+      if (!def.isFloorBoss && Math.random() < SCROLL_DROP_RATE) {
+        const scroll = this.claimRegularEnhancementScroll();
+        if (scroll) this.dropItem(e.x, e.y, scroll);
       }
       // エリート/ボスは超レアで復活の種。
       if ((def.isElite || def.isBoss) && !this.reviveSeedSeen && Math.random() < 0.08) {
@@ -2932,6 +2988,8 @@ export class GameScene extends Phaser.Scene {
     this.resolveMonsterDeathGimmick(e);
 
     if (def.isFloorBoss) {
+      const guaranteedScroll = this.dropGuaranteedBossScroll(e.x, e.y);
+      this.log(`ボス討伐報酬！ ${ITEM_DEFS[guaranteedScroll].name}が必ず出現した。`, 'special');
       this.unlockFloorGate(def.name, { x: e.x, y: e.y });
     }
   }
@@ -3118,13 +3176,13 @@ export class GameScene extends Phaser.Scene {
     } else if (rewardRoll < 0.28) {
       this.dropEquipment(origin.x, origin.y, 'shield', rollShield(this.floor));
     } else if (rewardRoll < 0.55) {
-      this.dropItem(origin.x, origin.y, 'stone');
-      this.dropItem(origin.x, origin.y, 'shieldstone');
+      this.dropItem(origin.x, origin.y, 'potion');
+      this.dropItem(origin.x, origin.y, Math.random() < 0.5 ? 'invis' : 'dash');
     } else if (rewardRoll < 0.78) {
       this.dropItem(origin.x, origin.y, 'potion');
       this.dropItem(origin.x, origin.y, Math.random() < 0.5 ? 'invis' : 'dash');
     } else {
-      const kinds: ItemKind[] = ['potion', 'warp', 'torch', 'stone', 'shieldstone', 'invis', 'dash'];
+      const kinds: ItemKind[] = ['potion', 'warp', 'torch', 'invis', 'dash'];
       this.dropItem(origin.x, origin.y, kinds[Math.floor(Math.random() * kinds.length)]);
       this.dropItem(origin.x, origin.y, kinds[Math.floor(Math.random() * kinds.length)]);
     }
@@ -3386,9 +3444,12 @@ export class GameScene extends Phaser.Scene {
       this.invisTurns--;
       if (this.invisTurns === 0) {
         this.log('透明化が解けた。敵に見えるようになった！', 'sys');
-        this.playerSprite.setAlpha(1);
-        this.weaponSprite?.setAlpha(1);
+        this.refreshTransformationVisual();
       }
+    }
+    if (this.transformation) {
+      this.transformation.turns--;
+      if (this.transformation.turns <= 0) this.clearTransformation(true);
     }
 
     this.applyLongStay();
@@ -4342,8 +4403,12 @@ export class GameScene extends Phaser.Scene {
         this.player.inventory.push(makeItem('revive'));
         this.log('超レア！ この冒険で一度だけの復活のタネが入っていた！', 'special');
       } else if (rr < 0.32) {
-        this.player.inventory.push(makeItem('stone'), makeItem('stone'));
-        this.log('レア！ 武器強化スクロール×2が入っていた！', 'special');
+        const scroll = this.grantRegularEnhancementScroll();
+        if (scroll) this.log(`レア！ ${ITEM_DEFS[scroll].name}が入っていた！`, 'special');
+        else {
+          this.player.inventory.push(makeItem('potion'));
+          this.log('このマップの強化スクロールは出現済み。代わりに回復ポーションが入っていた。', 'item');
+        }
       } else if (rr < 0.50) {
         const s = rollShield(Math.max(8, this.floor));
         if (this.receiveShield(s, '金の宝箱')) this.log(`さらに「${s.name}」も入っていた！`, 'item');
@@ -4353,9 +4418,12 @@ export class GameScene extends Phaser.Scene {
         const armor = makePlayerArmor(def.key);
         if (this.receiveArmor(armor, '金の宝箱')) this.log(`さらに「${armor.name}」も入っていた！`, 'item');
       } else {
-        this.player.inventory.push(makeItem('stone'));
-        this.player.inventory.push(makeItem('shieldstone'));
-        this.log('武器強化スクロール＋防具強化スクロールも入っていた！', 'item');
+        const scroll = this.grantRegularEnhancementScroll();
+        if (scroll) this.log(`${ITEM_DEFS[scroll].name}も入っていた！`, 'item');
+        else {
+          this.player.inventory.push(makeItem('torch'));
+          this.log('このマップの強化スクロールは出現済み。代わりに松明が入っていた。', 'item');
+        }
       }
       // 大量ゴールド
       const gold = 80 + Math.floor(Math.random() * this.floor * 20);
@@ -4377,11 +4445,10 @@ export class GameScene extends Phaser.Scene {
           const armor = makePlayerArmor(def.key);
           if (this.receiveArmor(armor, '宝箱')) this.log(`宝箱から「${armor.name}」を発見！`, 'item');
         } else {
-          const scrollKinds: ItemKind[] = ['stone', 'shieldstone'];
           const consumableKinds: ItemKind[] = ['potion', 'torch', 'warp', 'invis'];
-          const pool = Math.random() < SCROLL_DROP_RATE ? scrollKinds : consumableKinds;
-          const k = pool[Math.floor(Math.random() * pool.length)];
-          this.player.inventory.push(makeItem(k));
+          const regularScroll = Math.random() < SCROLL_DROP_RATE ? this.grantRegularEnhancementScroll() : null;
+          const k = regularScroll ?? consumableKinds[Math.floor(Math.random() * consumableKinds.length)];
+          if (!regularScroll) this.player.inventory.push(makeItem(k));
           this.log(`宝箱から「${makeItem(k).name}」を入手。`, 'item');
         }
       } else {
@@ -4411,6 +4478,8 @@ export class GameScene extends Phaser.Scene {
       case 'potion': this.player.heal(40); this.log('回復ポーションでHPを40回復した。', 'item'); Audio.playSe('heal'); this.healFx(); break;
       case 'stone': consumed = this.useStone(); passTurn = false; break;
       case 'shieldstone': consumed = this.useShieldStone(); passTurn = false; break;
+      case 'slime_scroll': this.startTransformation('slime'); passTurn = false; break;
+      case 'boss5_scroll': this.startTransformation('boss5'); passTurn = false; break;
       case 'shroom': this.shroomTurns = 12; this.log('光るキノコで周囲が明るくなった。', 'item'); Audio.playSe('pickup'); passTurn = false; break;
       case 'torch': {
         this.torchTurns = 10;
@@ -4430,6 +4499,7 @@ export class GameScene extends Phaser.Scene {
         this.invisTurns = 20;
         this.playerSprite.setAlpha(0.4);
         this.weaponSprite?.setAlpha(0.4);
+        this.transformationSprite?.setAlpha(0.4);
         this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.6, 500, 0x9fe8ff);
         Audio.playSe('warp');
         this.log('透明ポーションで姿を消した！ 20ターンの間、敵に見つからない。', 'item');
@@ -4454,6 +4524,59 @@ export class GameScene extends Phaser.Scene {
       this.busy = true;
       this.finishTurn().then(() => { this.busy = false; });
     }
+  }
+
+  startTransformation(kind: TransformationKind) {
+    const transformation: PlayerTransformation = kind === 'slime'
+      ? { kind, turns: 30, name: 'スライム', textureKey: 'm_jelly', displaySize: 35 }
+      : { kind, turns: 30, name: '封印王アウレリウス', textureKey: 'm_archdemon', displaySize: 43 };
+    this.transformation = transformation;
+    this.refreshTransformationVisual();
+    this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.9, 650, kind === 'slime' ? 0x70e2c2 : 0xffc96b);
+    Audio.playSe('warp');
+    this.log(`${transformation.name}へ変身した！ 30ターンの間、装備の能力・属性・追加効果をすべて引き継ぐ。`, 'special');
+  }
+
+  clearTransformation(announce = false) {
+    const previous = this.transformation;
+    this.transformation = null;
+    this.transformationSprite?.destroy();
+    this.transformationSprite = undefined;
+    this.transformationBaseScale = 1;
+    if (this.playerSprite) this.playerSprite.setAlpha(this.invisTurns > 0 ? 0.4 : 1);
+    this.updatePlayerAura();
+    this.weaponSprite?.setAlpha(this.invisTurns > 0 ? 0.4 : 1);
+    if (announce && previous) this.log(`${previous.name}の変身が解け、元の姿に戻った。`, 'sys');
+  }
+
+  refreshTransformationVisual() {
+    if (!this.playerSprite) return;
+    if (!this.transformation) {
+      this.playerSprite.setAlpha(this.invisTurns > 0 ? 0.4 : 1);
+      this.transformationSprite?.setVisible(false);
+      this.updatePlayerAura();
+      this.weaponSprite?.setAlpha(this.invisTurns > 0 ? 0.4 : 1);
+      return;
+    }
+
+    const { textureKey, displaySize, kind } = this.transformation;
+    if (!this.transformationSprite || !this.transformationSprite.scene) {
+      this.transformationSprite = this.add.image(this.playerSprite.x, this.playerSprite.y, textureKey)
+        .setOrigin(0.5, 0.62)
+        .setDepth(this.playerSprite.depth + 0.05);
+    }
+    this.transformationSprite.setTexture(textureKey).setVisible(true);
+    const source = this.textures.get(textureKey).getSourceImage() as { width?: number; height?: number };
+    const maxEdge = Math.max(1, source?.width ?? displaySize, source?.height ?? displaySize);
+    this.transformationBaseScale = displaySize / maxEdge;
+    this.transformationSprite
+      .setScale(this.transformationBaseScale)
+      .setFlipX(this.player.dir === 'left')
+      .setAlpha(this.invisTurns > 0 ? 0.4 : 1)
+      .clearTint();
+    if (kind === 'boss5') this.transformationSprite.setTint(0xffd28a);
+    this.playerSprite.setAlpha(0);
+    this.weaponSprite?.setVisible(false);
   }
 
   useBomb() {
@@ -4755,13 +4878,13 @@ export class GameScene extends Phaser.Scene {
     };
   }
 
-  shopRemaining(kind: 'potion' | 'stone' | 'shieldstone'): number {
-    const limit = kind === 'potion' ? 5 : 2;
+  shopRemaining(kind: ShopItemKind): number {
+    const limit = kind === 'potion' ? 5 : 1;
     return Math.max(0, limit - this.shopPurchases[kind]);
   }
 
-  buyItem(kind: 'potion' | 'stone' | 'shieldstone'): boolean {
-    const price = kind === 'potion' ? 25 : 100;
+  buyItem(kind: ShopItemKind): boolean {
+    const price = kind === 'potion' ? 25 : 500;
     if (this.gameEnded) return false;
     if (this.shopRemaining(kind) <= 0) {
       this.log(`この階の${ITEM_DEFS[kind].name}は売り切れだ。`, 'sys');
@@ -4980,6 +5103,7 @@ export class GameScene extends Phaser.Scene {
       Audio.playBgm('clear'); // 勝利ジングル
     } else {
       this.log('チャリは力尽きた…', 'dmg');
+      this.clearTransformation(false);
       this.playerAttacking = false;
       this.playPlayerDeath();
       this.weaponSprite?.setVisible(false);
@@ -5108,7 +5232,9 @@ export class GameScene extends Phaser.Scene {
     // 手持ち武器：装備中の武器の絵に変える（強化色でtint）
     if (this.weaponSprite) {
       const w = this.player.weapon;
-      if (w && this.textures.exists(w.key)) {
+      if (this.transformation) {
+        this.weaponSprite.setVisible(false);
+      } else if (w && this.textures.exists(w.key)) {
         const size = w.grade === 'S' ? 22 : w.grade === 'A' ? 20 : 18;
         this.weaponSprite.setVisible(true).setTexture(w.key).setDisplaySize(size, size);
         this.weaponSprite.clearTint();
@@ -5173,8 +5299,10 @@ export class GameScene extends Phaser.Scene {
         const bossCombat = this.enemies.some((enemy) => enemy.def.isFloorBoss && enemy.alive)
           && (this.inBossRoom || this.isInsideBossRoom(this.player.x, this.player.y));
         let encounteredEnemy = !!this.enemyAt(nextX, nextY) || !!this.bossObstacleAt(nextX, nextY);
-        if (!encounteredEnemy && this.player.weapon?.weaponType === 'bow') {
-          for (let distance = 2; distance <= 3; distance++) {
+        const rangedDistance = this.player.weapon?.weaponType === 'bow' ? 3
+          : this.player.weapon?.weaponType === 'handgun' ? 2 : 0;
+        if (!encounteredEnemy && rangedDistance > 0) {
+          for (let distance = 2; distance <= rangedDistance; distance++) {
             if (this.enemyAt(this.player.x + dx * distance, this.player.y + dy * distance)) {
               encounteredEnemy = true;
               break;
@@ -5352,6 +5480,18 @@ export class GameScene extends Phaser.Scene {
       ps.scaleY = 0.85 * (1 + breathe * 0.032);
     }
     ps.setDepth(this.worldDepth(ps.y, 13));
+    if (this.transformationSprite?.visible && this.transformation) {
+      const pulse = Math.sin(time * 0.004);
+      this.transformationSprite
+        .setPosition(ps.x, ps.y)
+        .setScale(
+          this.transformationBaseScale * (1 - pulse * 0.018),
+          this.transformationBaseScale * (1 + pulse * 0.045)
+        )
+        .setFlipX(this.player.dir === 'left')
+        .setAlpha(this.invisTurns > 0 ? 0.4 : 1)
+        .setDepth(ps.depth + 0.05);
+    }
     // 足元の影
     if (this.playerShadow) {
       this.playerShadow.x = ps.x;
@@ -5492,6 +5632,7 @@ export class GameScene extends Phaser.Scene {
   // ============ 描画ヘルパー ============
   setPlayerVisual(dir: Dir, frame: PlayerVisualFrame) {
     this.player.dir = dir;
+    this.transformationSprite?.setFlipX(dir === 'left');
     const sheetKey = playerSheetKey(this.playerGender, this.playerArmor ?? DEFAULT_PLAYER_ARMOR);
     if (this.textures.exists(sheetKey)) {
       this.playerSprite.setTexture(sheetKey, playerFrameIndex(dir, frame));

@@ -51,6 +51,7 @@ export const SE_DEFS = {
   weaponLongsword:  { key: 'se_weapon_longsword',  path: 'assets/audio/se_weapon_longsword.wav',  volume: 0.52 },
   weaponLance:      { key: 'se_weapon_lance',      path: 'assets/audio/se_weapon_lance.wav',      volume: 0.54 },
   weaponBow:        { key: 'se_weapon_bow',        path: 'assets/audio/se_weapon_bow.wav',        volume: 0.52 },
+  weaponHandgun:    { key: 'se_weapon_handgun',    path: 'assets/audio/se_weapon_handgun.wav',    volume: 0.54 },
   weaponGreatsword: { key: 'se_weapon_greatsword', path: 'assets/audio/se_weapon_greatsword.wav', volume: 0.56 },
   weaponDual:       { key: 'se_weapon_dual',       path: 'assets/audio/se_weapon_dual.wav',       volume: 0.50 },
   elementFire:    { key: 'se_element_fire',    path: 'assets/audio/se_element_fire.mp3',    volume: 0.62 }, // 火属性攻撃
@@ -88,6 +89,7 @@ export function weaponAttackSe(type?: WeaponType): SeName {
     longsword: 'weaponLongsword',
     lance: 'weaponLance',
     bow: 'weaponBow',
+    handgun: 'weaponHandgun',
     greatsword: 'weaponGreatsword',
     dual_sword: 'weaponDual',
     twin_daggers: 'weaponDual'

@@ -134,6 +134,19 @@ def bow() -> np.ndarray:
     return mix.finish(0.46)
 
 
+def handgun() -> np.ndarray:
+    mix = SoundMix(0.36)
+    blast = shaped_noise(0.075, 180, 12_500, 45)
+    blast *= np.exp(-np.linspace(0, 8.0, len(blast)))
+    smoke = shaped_noise(0.22, 70, 1_300, 46)
+    smoke *= np.exp(-np.linspace(0, 5.8, len(smoke)))
+    mix.add(blast, 0.0, 0.92, -0.04)
+    mix.add(bass_impact(0.15, 310, 52), 0.0, 0.58, 0.02)
+    mix.add(metal_ring(0.17, 1_260, 0.72), 0.018, 0.23, 0.18)
+    mix.add(smoke, 0.042, 0.24, -0.14)
+    return mix.finish(0.52)
+
+
 def greatsword() -> np.ndarray:
     mix = SoundMix(0.58)
     mix.add(whoosh(0.40, 95, 2300, 55, 1.15), 0.0, 0.84, -0.08)
@@ -171,6 +184,7 @@ def main() -> None:
         "se_weapon_longsword.wav": longsword(),
         "se_weapon_lance.wav": lance(),
         "se_weapon_bow.wav": bow(),
+        "se_weapon_handgun.wav": handgun(),
         "se_weapon_greatsword.wav": greatsword(),
         "se_weapon_dual.wav": dual(),
     }

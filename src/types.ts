@@ -30,10 +30,10 @@ export interface Magic {
 export type EquipmentGrade = 'D' | 'C' | 'B' | 'A' | 'S';
 
 export type Element = 'fire' | 'thunder' | 'water' | 'ice';
-export type WeaponType = 'dagger' | 'longsword' | 'lance' | 'bow' | 'greatsword' | 'dual_sword' | 'twin_daggers';
+export type WeaponType = 'dagger' | 'longsword' | 'lance' | 'bow' | 'handgun' | 'greatsword' | 'dual_sword' | 'twin_daggers';
 
 export interface WeaponPassive {
-  key: 'backstab' | 'sturdy' | 'pierce' | 'eagle_eye' | 'heavy_strike' | 'twin_edge' | 'blood_edge' | 'knockback';
+  key: 'backstab' | 'sturdy' | 'pierce' | 'eagle_eye' | 'quickdraw' | 'heavy_strike' | 'twin_edge' | 'blood_edge' | 'knockback';
   name: string;
   description: string;
 }
@@ -99,6 +99,8 @@ export type ItemKind =
   | 'seal'        // 封印の魔導書
   | 'stone'       // 武器強化スクロール＝横の強化（保存互換のためIDは維持）
   | 'shieldstone' // 防具強化スクロール＝縦の強化（保存互換のためIDは維持）
+  | 'slime_scroll' // スライムへ30ターン変身（ショップ限定）
+  | 'boss5_scroll' // 5Fボスへ30ターン変身（ショップ限定）
   | 'invis'       // 透明ポーション（20ターン敵から見えなくなる）
   | 'dash';       // 疾風の羽（20歩の間、1歩で2マス進める）
 

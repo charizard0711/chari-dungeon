@@ -28,6 +28,10 @@ const WEAPON_ART = {
   w_bow_water: 'assets/weapons/affinities/bow_water.png',
   w_bow_thunder: 'assets/weapons/affinities/bow_thunder.png',
   w_bow_ice: 'assets/weapons/affinities/bow_ice.png',
+  w_handgun_fire: 'assets/weapons/affinities/handgun_fire.png',
+  w_handgun_water: 'assets/weapons/affinities/handgun_water.png',
+  w_handgun_thunder: 'assets/weapons/affinities/handgun_thunder.png',
+  w_handgun_ice: 'assets/weapons/affinities/handgun_ice.png',
   w_dual_sword_fire: 'assets/weapons/affinities/dual_sword_fire.png',
   w_dual_sword_water: 'assets/weapons/affinities/dual_sword_water.png',
   w_dual_sword_thunder: 'assets/weapons/affinities/dual_sword_thunder.png',
@@ -52,6 +56,7 @@ const WEAPON_ART = {
   w_blackwood_bow: 'assets/weapons/neutral/blackwood_bow.png',
   w_royal_bow: 'assets/weapons/neutral/royal_bow.png',
   w_siege_arbalest: 'assets/weapons/neutral/siege_arbalest.png',
+  w_blackpowder_handgun: 'assets/weapons/neutral/blackpowder_handgun.png',
   w_rusted_greatsword: 'assets/weapons/neutral/rusted_greatsword.png',
   w_executioner_blade: 'assets/weapons/neutral/executioner_blade.png',
   w_titan_cleaver: 'assets/weapons/neutral/titan_cleaver.png',
@@ -97,6 +102,8 @@ const ORIGINAL_ITEM_ART = {
   chest_rare_open: 'assets/items/chests-centered/treasure-chest-rare-open.png',
   i_stone: 'assets/items/weapon-enhancement-scroll.png',
   i_shieldstone: 'assets/items/armor-enhancement-scroll.png',
+  i_slime_scroll: 'assets/items/slime-transformation-scroll.png',
+  i_boss5_scroll: 'assets/items/aurelius-transformation-scroll.png',
   i_invis: 'assets/items/invisibility-potion.png',
   i_dash: 'assets/items/gale-feather.png'
 } as const;
