@@ -176,7 +176,6 @@ interface DungeonObject {
 interface TeleportPadVisual {
   x: number;
   y: number;
-  zone: DungeonData['teleportPads'][number]['zone'];
   sprite: Phaser.GameObjects.Image;
   phase: number;
   baseScale: number;
@@ -809,14 +808,7 @@ export class GameScene extends Phaser.Scene {
     }
     if (location.hostname === 'localhost' && qaParamsForFloor.has('qa-teleport') && d.teleportPads[0]) {
       const pad = d.teleportPads[0];
-      const inwardStep: Record<typeof pad.zone, Vec2> = {
-        north: { x: pad.x, y: pad.y + 1 },
-        south: { x: pad.x, y: pad.y - 1 },
-        west: { x: pad.x + 1, y: pad.y },
-        east: { x: pad.x - 1, y: pad.y }
-      };
       const qaPos = [
-        inwardStep[pad.zone],
         { x: pad.x + 1, y: pad.y }, { x: pad.x - 1, y: pad.y },
         { x: pad.x, y: pad.y + 1 }, { x: pad.x, y: pad.y - 1 }
       ].find((position) => {
@@ -2202,6 +2194,7 @@ export class GameScene extends Phaser.Scene {
   canPlaceRoomProp(position: Vec2) {
     const tile = this.dungeon.tiles[position.y]?.[position.x];
     if (!tile || !isWalkable(tile) || tile === 'pit' || this.dungeonObjectAt(position.x, position.y)) return false;
+    if (this.dungeon.teleportPads.some((pad) => pad.x === position.x && pad.y === position.y)) return false;
     if (Math.max(Math.abs(position.x - this.dungeon.start.x), Math.abs(position.y - this.dungeon.start.y)) <= 2) return false;
     if (Math.max(Math.abs(position.x - this.dungeon.stairs.x), Math.abs(position.y - this.dungeon.stairs.y)) <= 2) return false;
     if (this.dungeon.bossEntry && Math.max(Math.abs(position.x - this.dungeon.bossEntry.x), Math.abs(position.y - this.dungeon.bossEntry.y)) <= 2) return false;
@@ -2708,13 +2701,6 @@ export class GameScene extends Phaser.Scene {
     return this.dungeon.teleportPads.find((pad) => pad.x === x && pad.y === y);
   }
 
-  teleportZoneLabel(zone: DungeonData['teleportPads'][number]['zone']): string {
-    const labels: Record<DungeonData['teleportPads'][number]['zone'], string> = {
-      north: '北', south: '南', west: '西', east: '東'
-    };
-    return labels[zone];
-  }
-
   activateTeleportPad(x: number, y: number): boolean {
     const source = this.teleportPadAt(x, y);
     if (!source) return false;
@@ -2729,7 +2715,7 @@ export class GameScene extends Phaser.Scene {
     this.placeSprite(this.playerSprite, destination.x, destination.y);
     this.effectFx(destination.x, destination.y, 'fx_magic', 1.55, 520, 0xa36cff);
     Audio.playSe('warp');
-    this.log(`転送床が輝き、${this.teleportZoneLabel(destination.zone)}の終端へ飛んだ！`, 'special');
+    this.log('転送床が輝き、別の部屋へ飛んだ！', 'special');
     this.updateVisibility();
     return true;
   }
