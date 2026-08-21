@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { Dir, MonsterDef } from './types';
+import type { Dir, MonsterDef, Vec2 } from './types';
 
 export class Enemy {
   def: MonsterDef;
@@ -36,6 +36,8 @@ export class Enemy {
   cloneDepth = 0;
   charging = false;
   chargeDir: { x: number; y: number } | null = null;
+  plannedMove?: Vec2 | null;
+  moveMarker?: Phaser.GameObjects.Container;
 
   constructor(def: MonsterDef, x: number, y: number, hpScale: number) {
     this.def = def;

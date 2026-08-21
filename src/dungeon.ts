@@ -254,31 +254,28 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
   const tiles: TileType[][] = Array.from({ length: h }, () => Array<TileType>(w).fill('wall'));
   const hasFieldBossRoom = floor % 5 !== 0;
   const needsHealingLake = floor % 5 === 0 || (floor >= 6 && floor % 3 === 0);
-  const lakeSide = needsHealingLake && Math.random() < 0.5 ? 'left' : needsHealingLake ? 'right' : undefined;
-  const hubCenterX = Math.floor(w / 2) + irand(-2, 2);
-  const startCenterX = Math.floor(w / 2) + irand(-6, 6);
-  const randomBossRoomZone = shuffle<BossRoomZone>(['west', 'north', 'east'])[0];
-  const exitZone: BossRoomZone = forcedBossRoomZone === 'west' || forcedBossRoomZone === 'east'
+  type CardinalZone = Exclude<BossRoomZone, 'center'>;
+  const cardinalZones: CardinalZone[] = ['north', 'south', 'west', 'east'];
+  const forcedCardinalZone = forcedBossRoomZone && forcedBossRoomZone !== 'center'
     ? forcedBossRoomZone
-    : forcedBossRoomZone === 'north' || forcedBossRoomZone === 'center'
-      ? 'north'
-      : randomBossRoomZone;
-  const exitCenterX = exitZone === 'west'
-    ? irand(7, 12)
-    : exitZone === 'east'
-      ? irand(w - 13, w - 8)
-      : Math.floor(w / 2) + irand(-4, 4);
+    : undefined;
+  const exitZone: CardinalZone = forcedCardinalZone ?? shuffle([...cardinalZones])[0];
+  const hubCenterX = Math.floor(w / 2);
   const hallCenterY = Math.floor(h / 2);
-  const leftHeight = lakeSide === 'left' ? 7 : 5;
-  const rightHeight = lakeSide === 'right' ? 7 : 5;
-  const exitSize = hasFieldBossRoom ? 7 : 5;
-  const startRoom = roomAt(startCenterX - 2, h - 6, 5, 3);
-  const hubRoom = roomAt(hubCenterX - 3, Math.floor(h / 2) - 2, 7, 5);
-  const leftHall = roomAt(3, hallCenterY + irand(-3, 3) - Math.floor(leftHeight / 2), 7, leftHeight);
-  const rightHall = roomAt(w - 10, hallCenterY + irand(-3, 3) - Math.floor(rightHeight / 2), 7, rightHeight);
-  const exitRoom = roomAt(exitCenterX - Math.floor(exitSize / 2), 2, exitSize, exitSize);
-  const lakeRoom = lakeSide === 'left' ? leftHall : lakeSide === 'right' ? rightHall : undefined;
-  const mainRooms = [startRoom, hubRoom, leftHall, rightHall, exitRoom];
+  const hubRoom = roomAt(hubCenterX - 3, hallCenterY - 3, 7, 7);
+  const northRoom = roomAt(hubCenterX + irand(-4, 4) - 3, 2, 7, 7);
+  const southRoom = roomAt(hubCenterX + irand(-4, 4) - 3, h - 9, 7, 7);
+  const westRoom = roomAt(2, hallCenterY + irand(-3, 3) - 3, 7, 7);
+  const eastRoom = roomAt(w - 9, hallCenterY + irand(-3, 3) - 3, 7, 7);
+  const roomsByZone: Record<CardinalZone, Room> = {
+    north: northRoom, south: southRoom, west: westRoom, east: eastRoom
+  };
+  const exitRoom = roomsByZone[exitZone];
+  const lakeZone = needsHealingLake
+    ? shuffle(cardinalZones.filter((zone) => zone !== exitZone))[0]
+    : undefined;
+  const lakeRoom = lakeZone ? roomsByZone[lakeZone] : undefined;
+  const mainRooms = [hubRoom, northRoom, southRoom, westRoom, eastRoom];
   for (const room of mainRooms) carveRoom(tiles, room);
 
   // 広間同士を直線で結ばず、四方向の迷路帯を必ず抜ける構成にする。
@@ -288,21 +285,21 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
   const westMaze = { columns: 6, rows: 5 };
   const eastMaze = { columns: 6, rows: 5 };
   const northMaze = { columns: 7, rows: 5 };
-  const southMaze = { columns: 7, rows: 6 };
+  const southMaze = { columns: 7, rows: 5 };
   const westMazeOrigin = {
-    x: leftHall.x + leftHall.w + 1,
-    y: Math.floor((leftHall.cy + hubRoom.cy) / 2) - (westMaze.rows - 1)
+    x: westRoom.x + westRoom.w + 1,
+    y: Math.floor((westRoom.cy + hubRoom.cy) / 2) - (westMaze.rows - 1)
   };
   const eastMazeOrigin = {
     x: hubRoom.x + hubRoom.w + 1,
-    y: Math.floor((rightHall.cy + hubRoom.cy) / 2) - (eastMaze.rows - 1)
+    y: Math.floor((eastRoom.cy + hubRoom.cy) / 2) - (eastMaze.rows - 1)
   };
   const northMazeOrigin = {
-    x: Math.floor((exitRoom.cx + hubRoom.cx) / 2) - (northMaze.columns - 1),
-    y: exitRoom.y + exitRoom.h + 1
+    x: Math.floor((northRoom.cx + hubRoom.cx) / 2) - (northMaze.columns - 1),
+    y: northRoom.y + northRoom.h + 1
   };
   const southMazeOrigin = {
-    x: Math.floor((startRoom.cx + hubRoom.cx) / 2) - (southMaze.columns - 1),
+    x: Math.floor((southRoom.cx + hubRoom.cx) / 2) - (southMaze.columns - 1),
     y: hubRoom.y + hubRoom.h + 1
   };
   carveMazeRegion(tiles, westMazeOrigin, westMaze.columns, westMaze.rows, irand(1, 3));
@@ -318,15 +315,26 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
   const northExit = { x: northMazeOrigin.x + irand(0, northMaze.columns - 1) * 2, y: northMazeOrigin.y + (northMaze.rows - 1) * 2 };
   const southEntry = { x: southMazeOrigin.x + irand(0, southMaze.columns - 1) * 2, y: southMazeOrigin.y };
   const southExit = { x: southMazeOrigin.x + irand(0, southMaze.columns - 1) * 2, y: southMazeOrigin.y + (southMaze.rows - 1) * 2 };
-  carveThinCorridor(tiles, { x: leftHall.x + leftHall.w - 1, y: leftHall.cy }, westEntry);
+  const westRoomApproach = { x: westRoom.x + westRoom.w, y: westRoom.cy };
+  const westRoomStaging = { x: westRoomApproach.x + 1, y: westRoom.cy };
+  carveThinCorridor(tiles, westRoomApproach, westRoomStaging);
+  carveThinCorridor(tiles, westRoomStaging, westEntry);
   carveThinCorridor(tiles, westExit, { x: hubRoom.x, y: hubRoom.cy });
   carveThinCorridor(tiles, { x: hubRoom.x + hubRoom.w - 1, y: hubRoom.cy }, eastEntry);
-  carveThinCorridor(tiles, eastExit, { x: rightHall.x, y: rightHall.cy });
-  const exitMazeStaging = { x: exitRoom.cx, y: exitRoom.y + exitRoom.h + 1 };
-  carveThinCorridor(tiles, exitMazeStaging, northEntry);
+  const eastRoomApproach = { x: eastRoom.x - 1, y: eastRoom.cy };
+  const eastRoomStaging = { x: eastRoomApproach.x - 1, y: eastRoom.cy };
+  carveThinCorridor(tiles, eastExit, eastRoomStaging);
+  carveThinCorridor(tiles, eastRoomStaging, eastRoomApproach);
+  const northRoomApproach = { x: northRoom.cx, y: northRoom.y + northRoom.h };
+  const northRoomStaging = { x: northRoom.cx, y: northRoomApproach.y + 1 };
+  carveThinCorridor(tiles, northRoomApproach, northRoomStaging);
+  carveThinCorridor(tiles, northRoomStaging, northEntry);
   carveThinCorridor(tiles, northExit, { x: hubRoom.cx, y: hubRoom.y });
   carveThinCorridor(tiles, { x: hubRoom.cx, y: hubRoom.y + hubRoom.h - 1 }, southEntry);
-  carveThinCorridor(tiles, southExit, { x: startRoom.cx, y: startRoom.y });
+  const southRoomApproach = { x: southRoom.cx, y: southRoom.y - 1 };
+  const southRoomStaging = { x: southRoom.cx, y: southRoomApproach.y - 1 };
+  carveThinCorridor(tiles, southExit, southRoomStaging);
+  carveThinCorridor(tiles, southRoomStaging, southRoomApproach);
 
   // 迷路の一部だけ3x3の小広場にして、細道だけが続く窮屈さを和らげる。
   const mazePocketCandidates = shuffle([
@@ -336,17 +344,33 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
     roomAt(southMazeOrigin.x + 6, southMazeOrigin.y + 4, 3, 3)
   ]);
   for (const mazePocket of mazePocketCandidates.slice(0, irand(1, 2))) carveRoom(tiles, mazePocket);
-  const exitApproach = { x: exitRoom.cx, y: exitRoom.y + exitRoom.h };
-
-  const start = { x: startRoom.cx, y: startRoom.cy };
+  const start = { x: hubRoom.cx, y: hubRoom.cy };
   const stairs = { x: exitRoom.cx, y: exitRoom.cy };
   let bossRoom: Room | undefined;
   let bossEntrance: Vec2 | undefined;
   let bossEntry: Vec2 | undefined;
   if (hasFieldBossRoom) {
     bossRoom = exitRoom;
-    bossEntrance = exitApproach;
-    bossEntry = { x: exitRoom.cx, y: exitRoom.y + exitRoom.h - 1 };
+    const doorway: Record<CardinalZone, { entrance: Vec2; entry: Vec2 }> = {
+      north: {
+        entrance: { x: exitRoom.cx, y: exitRoom.y + exitRoom.h },
+        entry: { x: exitRoom.cx, y: exitRoom.y + exitRoom.h - 1 }
+      },
+      south: {
+        entrance: { x: exitRoom.cx, y: exitRoom.y - 1 },
+        entry: { x: exitRoom.cx, y: exitRoom.y }
+      },
+      west: {
+        entrance: { x: exitRoom.x + exitRoom.w, y: exitRoom.cy },
+        entry: { x: exitRoom.x + exitRoom.w - 1, y: exitRoom.cy }
+      },
+      east: {
+        entrance: { x: exitRoom.x - 1, y: exitRoom.cy },
+        entry: { x: exitRoom.x, y: exitRoom.cy }
+      }
+    };
+    bossEntrance = doorway[exitZone].entrance;
+    bossEntry = doorway[exitZone].entry;
     for (let y = exitRoom.y - 1; y <= exitRoom.y + exitRoom.h; y++) {
       for (let x = exitRoom.x - 1; x <= exitRoom.x + exitRoom.w; x++) {
         const ring = x === exitRoom.x - 1 || x === exitRoom.x + exitRoom.w
@@ -359,8 +383,6 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
     tiles[bossEntry.y][bossEntry.x] = 'floor';
     tiles[stairs.y][stairs.x] = 'door';
   } else {
-    tiles[exitApproach.y][exitApproach.x] = 'floor';
-    tiles[exitRoom.y + exitRoom.h - 1][exitRoom.cx] = 'floor';
     tiles[stairs.y][stairs.x] = 'door';
   }
 
@@ -381,7 +403,7 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
   for (const room of candidates) {
     if (optionalRooms.length >= requestedRooms) break;
     if (optionalRooms.some((other) => roomsOverlap(room, other.room, 3))) continue;
-    const target = nearestMainRoom(room, [leftHall, rightHall, hubRoom]);
+    const target = nearestMainRoom(room, mainRooms);
     const doorway = roomDoorToward(room, target);
     const optional: OptionalRoom = {
       room, door: doorway.door, entry: doorway.entry,
@@ -403,9 +425,8 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
   let placed = 0;
   for (let tries = 0; tries < hazardCount * 20 && placed < hazardCount; tries++) {
     const x = irand(2, w - 3), y = irand(2, h - 3);
-    if (tiles[y][x] !== 'floor' || Math.abs(x - hubRoom.cx) <= 1
-      || x === hubRoom.cx || x === hubRoom.cx + 1
-      || pointInRoom({ x, y }, startRoom, 1) || pointInRoom({ x, y }, exitRoom, 1)
+    if (tiles[y][x] !== 'floor'
+      || pointInRoom({ x, y }, hubRoom, 1) || pointInRoom({ x, y }, exitRoom, 1)
       || protectedRooms.some((room) => pointInRoom({ x, y }, room, 1))) continue;
     const biomeHazards = hazardByBiome[biome];
     if (!biomeHazards.length) break;

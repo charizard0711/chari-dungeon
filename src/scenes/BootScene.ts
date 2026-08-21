@@ -114,7 +114,7 @@ const TERRAIN_PROP_ART = {
   terrain_stairs: 'assets/terrain/stairs.png',
   terrain_boss_brazier: 'assets/terrain/boss-brazier.png',
   terrain_rune_lamp: 'assets/terrain/rune-lamp.png',
-  terrain_healing_fountain: 'assets/terrain/objects/healing-fountain.png',
+  terrain_healing_fountain: 'assets/terrain/objects/healing-fountain-pixel.png',
   terrain_healing_lake: 'assets/terrain/objects/healing-lake.png',
   terrain_midboss_floor_7x7: 'assets/terrain/objects/midboss-floor-7x7.png',
   terrain_prop_barrel: 'assets/terrain/objects/room-props/barrel.png',

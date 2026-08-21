@@ -167,6 +167,9 @@ interface DungeonObject {
   w: number;
   h: number;
   sprite: Phaser.GameObjects.Image;
+  waterFx?: Phaser.GameObjects.Container;
+  waterDrops?: { sprite: Phaser.GameObjects.Rectangle; x: number; phase: number }[];
+  waterRipples?: { sprite: Phaser.GameObjects.Rectangle; phase: number }[];
   used: boolean;
   breakable: boolean;
 }
@@ -682,13 +685,17 @@ export class GameScene extends Phaser.Scene {
     this.bossRoomBackdrop = undefined;
     for (const sprite of this.bossRoomDecorSprites) sprite.destroy();
     this.bossRoomDecorSprites = [];
-    for (const object of this.dungeonObjects) object.sprite.destroy();
+    for (const object of this.dungeonObjects) {
+      object.waterFx?.destroy(true);
+      object.sprite.destroy();
+    }
     this.dungeonObjects = [];
     for (const row of this.tileSprites) for (const s of row) s.destroy();
     this.tileSprites = [];
     for (const facade of this.wallFacades) facade.sprite.destroy();
     this.wallFacades = [];
     for (const e of this.enemies) {
+      this.destroyEnemyMoveMarker(e);
       this.destroyEnemyFreezeFx(e);
       if (e.aura) { this.tweens.killTweensOf(e.aura); e.aura.destroy(); }
       e.sprite.destroy();
@@ -804,7 +811,7 @@ export class GameScene extends Phaser.Scene {
 
     this.updateVisibility();
     const floorIntro = bossRoom
-      ? `${floor}.5F 強ボス部屋へ転送された。ボスと配下を倒せ！`
+      ? `${floor}.5F 強ボス部屋へ転送された。水色の矢印は配下が次に歩くマスで、暗闇でも見える。`
       : floor === 5
         ? `${floor}F「${getTheme(floor).name}」に到達。この階に中ボスはおらず、最奥の扉は${floor}.5Fへ通じている。`
         : floor % 5 === 0
@@ -927,56 +934,10 @@ export class GameScene extends Phaser.Scene {
   createBossRoomVisuals(era: number, accent: number) {
     const room = this.dungeon.bossRoom;
     if (!room) return;
-    if (room.w !== 7 || room.h !== 7) {
-      this.createBossFloorDecor(accent);
-      return;
-    }
-
-    const cx = room.x * TILE + room.w * TILE / 2;
-    const cy = room.y * TILE + room.h * TILE / 2;
-    this.bossRoomBackdrop = this.add.image(cx, cy, `terrain_boss_floor_${era}`)
-      .setTexture('terrain_midboss_floor_7x7')
-      .setDepth(0.35)
-      .setDisplaySize(room.w * TILE + 2, room.h * TILE + 2)
-      .setVisible(false);
-
-    const brazierInset = 16;
-    const braziers = [
-      [room.x * TILE + brazierInset, room.y * TILE + brazierInset],
-      [(room.x + room.w) * TILE - brazierInset, room.y * TILE + brazierInset],
-      [room.x * TILE + brazierInset, (room.y + room.h) * TILE - brazierInset],
-      [(room.x + room.w) * TILE - brazierInset, (room.y + room.h) * TILE - brazierInset]
-    ];
-    for (const [x, y] of braziers) {
-      const sprite = this.add.image(x, y, 'terrain_boss_brazier')
-        .setDepth(this.worldDepth(y, 8))
-        .setDisplaySize(20, 20)
-        .setTint(accent)
-        .setVisible(false);
-      this.bossRoomDecorSprites.push(sprite);
-    }
-
-    const entrance = this.dungeon.bossEntrance;
-    const lamps = [
-      { side: 'top', x: cx, y: room.y * TILE - 7 },
-      { side: 'right', x: (room.x + room.w) * TILE + 7, y: cy },
-      { side: 'bottom', x: cx, y: (room.y + room.h) * TILE + 7 },
-      { side: 'left', x: room.x * TILE - 7, y: cy }
-    ];
-    const entranceSide = entrance
-      ? entrance.x < room.x ? 'left'
-        : entrance.x >= room.x + room.w ? 'right'
-          : entrance.y < room.y ? 'top' : 'bottom'
-      : '';
-    for (const lamp of lamps) {
-      if (lamp.side === entranceSide) continue;
-      const sprite = this.add.image(lamp.x, lamp.y, 'terrain_rune_lamp')
-        .setDepth(this.worldDepth(lamp.y, 9))
-        .setDisplaySize(13, 18)
-        .setTint(accent)
-        .setVisible(false);
-      this.bossRoomDecorSprites.push(sprite);
-    }
+    // 埋め込み型の7x7中ボス部屋は、通常タイルの床だけで描く。
+    // 大きな背景絵に含まれていた内壁と、外周の実壁が二重に見えるのを防ぐ。
+    if (room.w === 7 && room.h === 7) return;
+    this.createBossFloorDecor(accent);
   }
 
   createBossFloorDecor(accent: number) {
@@ -1203,9 +1164,8 @@ export class GameScene extends Phaser.Scene {
   isInsideBossCombatFrame(x: number, y: number): boolean {
     const room = this.dungeon?.bossRoom;
     if (!room) return true;
-    // The carved room edge sits under the oversized wall art, so it must never be occupied.
-    // Dedicated N.5F arenas may use the visible floor edge; field mid-bosses stay one tile farther in.
-    const inset = this.inBossRoom ? 1 : 2;
+    // N.5Fの専用アリーナは端まで開放する。7x7中ボス部屋は大型ボスが外壁へ重ならないよう1マスだけ空ける。
+    const inset = this.inBossRoom ? 0 : 1;
     return x >= room.x + inset && x < room.x + room.w - inset
       && y >= room.y + inset && y < room.y + room.h - inset;
   }
@@ -2246,7 +2206,7 @@ export class GameScene extends Phaser.Scene {
     const texture = kind === 'fountain' ? 'terrain_healing_fountain'
       : kind === 'healingLake' ? 'terrain_healing_lake'
         : this.roomPropTexture(kind);
-    const renderTiles = kind === 'fountain' ? 3.25 : kind === 'healingLake' ? 5.25 : this.roomPropRenderTiles(kind);
+    const renderTiles = kind === 'fountain' ? 3 : kind === 'healingLake' ? 5.25 : this.roomPropRenderTiles(kind);
     const worldX = centerX * TILE + TILE / 2;
     const worldY = centerY * TILE + TILE / 2;
     const sprite = this.add.image(worldX, worldY, texture)
@@ -2254,7 +2214,29 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5, isHealing ? 0.5 : 0.72)
       .setDepth(this.worldDepth(worldY + h * TILE / 2, 10))
       .setVisible(false);
-    this.dungeonObjects.push({ kind, x: centerX, y: centerY, w, h, sprite, used: false, breakable });
+    let waterFx: Phaser.GameObjects.Container | undefined;
+    let waterDrops: { sprite: Phaser.GameObjects.Rectangle; x: number; phase: number }[] | undefined;
+    let waterRipples: { sprite: Phaser.GameObjects.Rectangle; phase: number }[] | undefined;
+    if (kind === 'fountain') {
+      this.textures.get(texture).setFilter(Phaser.Textures.FilterMode.NEAREST);
+      waterDrops = [
+        { sprite: this.add.rectangle(-2, -16, 2, 7, 0xd8ffff, 0.92), x: -2, phase: 0 },
+        { sprite: this.add.rectangle(2, -13, 2, 6, 0x42e9ff, 0.86), x: 2, phase: 8 },
+        { sprite: this.add.rectangle(0, -8, 2, 5, 0x8df9ff, 0.78), x: 0, phase: 15 }
+      ];
+      waterRipples = [
+        { sprite: this.add.rectangle(0, 8, 12, 2, 0xa6ffff, 0.62), phase: 0 },
+        { sprite: this.add.rectangle(0, 11, 20, 2, 0x35ddeb, 0.48), phase: 0.52 }
+      ];
+      waterFx = this.add.container(worldX, worldY, [
+        ...waterDrops.map((drop) => drop.sprite),
+        ...waterRipples.map((ripple) => ripple.sprite)
+      ]).setDepth(sprite.depth + 0.12).setVisible(false);
+    }
+    this.dungeonObjects.push({
+      kind, x: centerX, y: centerY, w, h, sprite, waterFx, waterDrops, waterRipples,
+      used: false, breakable
+    });
   }
 
   dungeonObjectAt(x: number, y: number): DungeonObject | null {
@@ -2277,6 +2259,7 @@ export class GameScene extends Phaser.Scene {
     this.player.poisonTurns = 0;
     object.used = true;
     object.sprite.setTint(0x7b8c8a).setAlpha(0.72);
+    object.waterFx?.setVisible(false);
     this.effectFx(object.x, object.y, 'fx_magic', object.kind === 'healingLake' ? 2.4 : 1.8, 720, 0x62f7e8);
     this.healFx();
     Audio.playSe('heal');
@@ -2980,6 +2963,7 @@ export class GameScene extends Phaser.Scene {
       this.bossStates.delete(e);
     }
     this.destroyEnemyFreezeFx(e);
+    this.destroyEnemyMoveMarker(e);
     if (e.aura) { this.tweens.killTweensOf(e.aura); e.aura.destroy(); }
     e.sprite.destroy();
     e.hpBar?.destroy();
@@ -3741,6 +3725,7 @@ export class GameScene extends Phaser.Scene {
 
   async enemyTurn() {
     const anims: Promise<void>[] = [];
+    for (const enemy of this.enemies) this.destroyEnemyMoveMarker(enemy);
     for (const e of this.enemies) {
       if (!e.alive) continue;
       const sealedRoom = this.optionalRoomContaining(e.x, e.y);
@@ -3787,6 +3772,7 @@ export class GameScene extends Phaser.Scene {
       if (p) anims.push(p);
     }
     await Promise.all(anims);
+    for (const enemy of this.enemies) enemy.plannedMove = undefined;
   }
 
   enemyAct(e: Enemy): Promise<void> | null {
@@ -3827,21 +3813,31 @@ export class GameScene extends Phaser.Scene {
     // 行動パターンによる移動
     let mv: Vec2 | null = null;
     const aggro = !unseen && dist <= 9;
-    switch (e.def.behavior) {
-      case 'chase':
-      case 'slow':
-      case 'ranged':
-        mv = aggro ? this.stepToward(e, this.player.x, this.player.y) : this.stepRandom(e);
-        break;
-      case 'random':
-        mv = this.stepRandom(e);
-        break;
-      case 'loop':
-        mv = this.stepLoop(e);
-        break;
-      case 'line':
-        mv = this.stepLine(e);
-        break;
+    const hasBossRoomPlan = this.inBossRoom && !e.def.isFloorBoss && e.plannedMove !== undefined;
+    if (hasBossRoomPlan) {
+      const planned = e.plannedMove;
+      e.plannedMove = undefined;
+      if (planned && Math.abs(planned.x - e.x) + Math.abs(planned.y - e.y) === 1
+        && this.passable(e, planned.x, planned.y)) {
+        mv = planned;
+      }
+    } else {
+      switch (e.def.behavior) {
+        case 'chase':
+        case 'slow':
+        case 'ranged':
+          mv = aggro ? this.stepToward(e, this.player.x, this.player.y) : this.stepRandom(e);
+          break;
+        case 'random':
+          mv = this.stepRandom(e);
+          break;
+        case 'loop':
+          mv = this.stepLoop(e);
+          break;
+        case 'line':
+          mv = this.stepLine(e);
+          break;
+      }
     }
     if (mv) {
       const from = { x: e.x, y: e.y };
@@ -3849,6 +3845,12 @@ export class GameScene extends Phaser.Scene {
       const moveDy = mv.y - e.y;
       if (Math.abs(moveDx) > Math.abs(moveDy)) e.facing = moveDx > 0 ? 'right' : 'left';
       else if (moveDy !== 0) e.facing = moveDy > 0 ? 'down' : 'up';
+      if (e.def.behavior === 'loop') {
+        const loopDirections = [{ x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 0, y: -1 }];
+        const directionIndex = loopDirections.findIndex((direction) => direction.x === moveDx && direction.y === moveDy);
+        if (directionIndex >= 0) e.loopDir = directionIndex;
+      }
+      if (e.def.behavior === 'line') e.lineDir = { x: moveDx, y: moveDy };
       e.x = mv.x;
       e.y = mv.y;
       e.moveSteps++;
@@ -4144,6 +4146,97 @@ export class GameScene extends Phaser.Scene {
     return null;
   }
 
+  private stableMoveDirections(e: Enemy): Vec2[] {
+    const directions = [{ x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 0, y: -1 }];
+    const keyHash = [...e.def.key].reduce((sum, character) => sum + character.charCodeAt(0), 0);
+    const offset = Math.abs(keyHash + e.x * 7 + e.y * 11 + this.turn * 13) % directions.length;
+    return directions.map((_, index) => directions[(index + offset) % directions.length]);
+  }
+
+  private previewBossMinionMove(e: Enemy, reserved: Set<string>): Vec2 | null {
+    if (!this.inBossRoom || e.def.isFloorBoss || !e.alive || !this.isInsideBossCombatFrame(e.x, e.y)) return null;
+    if (e.freezeTurns > 0 || e.sealTurns > 0 || e.stunnedTurns > 0 || e.charging) return null;
+    if (e.def.behavior === 'slow' && e.slowToggle) return null;
+
+    const dx = this.player.x - e.x;
+    const dy = this.player.y - e.y;
+    const dist = Math.abs(dx) + Math.abs(dy);
+    const unseen = this.invisTurns > 0;
+    if (!unseen && dist === 1) return null;
+    if (!unseen && e.def.ranged && (dx === 0 || dy === 0) && dist <= 5
+      && this.lineOfSight(e.x, e.y, this.player.x, this.player.y)) return null;
+
+    const available = (position: Vec2) => this.passable(e, position.x, position.y)
+      && !reserved.has(`${position.x},${position.y}`);
+    const directions = this.stableMoveDirections(e);
+    let move: Vec2 | null = null;
+
+    if (e.def.isTreasureRabbit) {
+      move = directions
+        .map((direction) => ({ x: e.x + direction.x, y: e.y + direction.y }))
+        .filter(available)
+        .sort((a, b) => (Math.abs(b.x - this.player.x) + Math.abs(b.y - this.player.y))
+          - (Math.abs(a.x - this.player.x) + Math.abs(a.y - this.player.y)))[0] ?? null;
+    } else if (['chase', 'slow', 'ranged'].includes(e.def.behavior) && !unseen && dist <= 9) {
+      const toward = this.stepToward(e, this.player.x, this.player.y);
+      move = toward && available(toward) ? toward : null;
+    } else if (e.def.behavior === 'loop') {
+      const loopDirections = [{ x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 0, y: -1 }];
+      for (let index = 0; index < loopDirections.length; index++) {
+        const direction = loopDirections[(e.loopDir + index) % loopDirections.length];
+        const candidate = { x: e.x + direction.x, y: e.y + direction.y };
+        if (available(candidate)) { move = candidate; break; }
+      }
+    } else if (e.def.behavior === 'line' && e.lineDir) {
+      const candidate = { x: e.x + e.lineDir.x, y: e.y + e.lineDir.y };
+      move = available(candidate) ? candidate : null;
+    }
+
+    if (!move) {
+      for (const direction of directions) {
+        const candidate = { x: e.x + direction.x, y: e.y + direction.y };
+        if (available(candidate)) { move = candidate; break; }
+      }
+    }
+    if (move) reserved.add(`${move.x},${move.y}`);
+    return move;
+  }
+
+  private destroyEnemyMoveMarker(e: Enemy) {
+    if (!e.moveMarker) return;
+    this.tweens.killTweensOf(e.moveMarker);
+    for (const child of e.moveMarker.getAll()) this.tweens.killTweensOf(child);
+    e.moveMarker.destroy(true);
+    e.moveMarker = undefined;
+  }
+
+  private refreshBossMinionMoveMarkers() {
+    const reserved = new Set<string>();
+    for (const e of this.enemies) {
+      this.destroyEnemyMoveMarker(e);
+      if (!this.inBossRoom || e.def.isFloorBoss || !e.alive) {
+        e.plannedMove = undefined;
+        continue;
+      }
+      if (e.plannedMove === undefined) e.plannedMove = this.previewBossMinionMove(e, reserved);
+      const move = e.plannedMove;
+      if (!move) continue;
+      reserved.add(`${move.x},${move.y}`);
+      const plate = this.add.rectangle(0, 0, TILE - 6, TILE - 6, 0x3ee7ff, 0.2)
+        .setStrokeStyle(2, 0x8ff5ff, 0.96).setBlendMode(Phaser.BlendModes.ADD);
+      const arrow = this.add.text(0, 0, '→', {
+        fontFamily: 'Arial Black, "Yu Gothic UI"', fontSize: '18px', color: '#d9fdff',
+        stroke: '#064e62', strokeThickness: 4, fontStyle: 'bold'
+      }).setOrigin(0.5);
+      const moveDx = move.x - e.x;
+      const moveDy = move.y - e.y;
+      arrow.setAngle(moveDx < 0 ? 180 : moveDy > 0 ? 90 : moveDy < 0 ? -90 : 0);
+      e.moveMarker = this.add.container(move.x * TILE + TILE / 2, move.y * TILE + TILE / 2, [plate, arrow])
+        .setDepth(8.6).setVisible(true);
+      this.tweens.add({ targets: plate, alpha: 0.72, duration: 360, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    }
+  }
+
   lineOfSight(x0: number, y0: number, x1: number, y1: number): boolean {
     // 直線上に壁がないか（水平/垂直のみ）
     if (x0 === x1) {
@@ -4354,6 +4447,7 @@ export class GameScene extends Phaser.Scene {
       }
       const v = (!room || room.opened) && anyVisible;
       object.sprite.setVisible(v).setAlpha(v ? (object.used && (object.kind === 'fountain' || object.kind === 'healingLake') ? 0.72 : 1) : 0);
+      object.waterFx?.setVisible(v && !object.used);
     }
     for (const m of this.ambientMotes) m.sprite.setVisible(!!visible[m.y]?.[m.x]);
     for (const state of this.bossStates.values()) {
@@ -4368,6 +4462,7 @@ export class GameScene extends Phaser.Scene {
       const v = !!visible[obstacle.y]?.[obstacle.x];
       obstacle.sprite.setVisible(v).setAlpha(v ? 1 : 0);
     }
+    this.refreshBossMinionMoveMarkers();
   }
 
   isTileCurrentlyVisible(x: number, y: number) {
@@ -4754,6 +4849,26 @@ export class GameScene extends Phaser.Scene {
   }
 
   redeemCode(code: string): boolean {
+    if (code === '1111111111') {
+      const owned = this.player.weapons.find((weapon) => weapon.key === 'w_handgun_fire' && weapon.plus >= 10);
+      if (owned) {
+        this.log(`${weaponFullName(owned)}はすでに所持している。`, 'sys');
+        return true;
+      }
+      const weapon = makeWeapon('w_handgun_fire', []);
+      weapon.plus = 10;
+      const added = this.receiveWeapon(weapon, 'コード入力');
+      if (added) {
+        this.player.weapon = weapon;
+        this.updatePlayerAura();
+        this.log(`炎の秘蔵銃 ${weaponFullName(weapon)} を装備した！`, 'special');
+      } else {
+        this.log(`炎の秘蔵銃 ${weaponFullName(weapon)} が現れた！ 売却後に受け取れます。`, 'special');
+      }
+      Audio.playSe('levelup');
+      this.emitRefresh();
+      return true;
+    }
     if (code !== '0000000000') {
       this.log('コードが違うようだ。', 'sys');
       Audio.playSe('deny');
@@ -4780,6 +4895,7 @@ export class GameScene extends Phaser.Scene {
       this.log(`秘蔵装備 ${weaponFullName(weapon)} が現れた！ 売却後に受け取れます。`, 'special');
     }
     Audio.playSe('levelup');
+    this.emitRefresh();
     return true;
   }
 
@@ -5589,6 +5705,19 @@ export class GameScene extends Phaser.Scene {
     for (const object of this.dungeonObjects) {
       if (!object.sprite.visible) continue;
       object.sprite.setDepth(this.worldDepth(object.sprite.y + object.h * TILE / 2, 10));
+      if (object.waterFx?.visible && object.waterDrops && object.waterRipples) {
+        object.waterFx.setPosition(object.sprite.x, object.sprite.y).setDepth(object.sprite.depth + 0.12);
+        for (const drop of object.waterDrops) {
+          const travel = (time * 0.032 + drop.phase) % 23;
+          drop.sprite.x = drop.x;
+          drop.sprite.y = Math.floor(-17 + travel);
+          drop.sprite.setAlpha(0.35 + (1 - travel / 23) * 0.62);
+        }
+        for (const ripple of object.waterRipples) {
+          const progress = (time * 0.00145 + ripple.phase) % 1;
+          ripple.sprite.setScale(0.55 + progress * 0.72, 1).setAlpha((1 - progress) * 0.62);
+        }
+      }
     }
 
     for (const m of this.ambientMotes) {
@@ -5600,8 +5729,11 @@ export class GameScene extends Phaser.Scene {
     }
   }
   flashSprite(spr: Phaser.GameObjects.Image) {
+    if (!spr.active || !spr.scene) return;
     spr.setTintFill(0xffffff);
-    this.time.delayedCall(90, () => spr.clearTint());
+    this.time.delayedCall(90, () => {
+      if (spr.active && spr.scene) spr.clearTint();
+    });
   }
   drawEnemyHp(e: Enemy) {
     if (!e.hpBar) e.hpBar = this.add.graphics().setDepth(e.sprite.depth + 0.45);
