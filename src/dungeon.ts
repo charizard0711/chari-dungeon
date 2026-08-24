@@ -34,6 +34,7 @@ export interface DungeonData {
   bossRoomZone?: BossRoomZone;
   bossEntrance?: Vec2;
   bossEntry?: Vec2;
+  bossCompass?: Vec2;
   teleportPads: TeleportPad[];
   biome: DungeonBiome;
   optionalRooms: OptionalRoom[];
@@ -364,6 +365,9 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
   ]);
   for (const mazePocket of mazePocketCandidates.slice(0, irand(1, 2))) carveRoom(tiles, mazePocket);
   const start = { x: hubRoom.cx, y: hubRoom.cy };
+  // 開始位置の少し北側に、通行可能なボス探知の方位盤を置く。
+  // 5の倍数階でも石盤自体は残るが、中ボスがいないため反応しない。
+  const bossCompass = { x: hubRoom.cx, y: hubRoom.cy - 2 };
   const stairs = { x: exitRoom.cx, y: exitRoom.cy };
   let bossRoom: Room | undefined;
   let bossEntrance: Vec2 | undefined;
@@ -473,7 +477,7 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
 
   return {
     w, h, tiles, rooms: [...mainRooms, ...optionalRooms.map((optional) => optional.room)],
-    start, stairs, hazards, exitRoom, lakeRoom, bossRoom, bossEntrance, bossEntry,
+    start, stairs, hazards, exitRoom, lakeRoom, bossRoom, bossEntrance, bossEntry, bossCompass,
     bossRoomZone: bossRoom ? exitZone : undefined, teleportPads, biome, optionalRooms
   };
 }

@@ -1295,8 +1295,8 @@ export class UIScene extends Phaser.Scene {
 
     const rows: { kind: 'potion' | 'slime_scroll' | 'boss5_scroll'; price: number; label: string }[] = [
       { kind: 'potion', price: 25, label: '回復ポーション　体力を40回復' },
-      { kind: 'slime_scroll', price: 500, label: 'スライム変身スクロール　装備効果を継承して30ターン変身' },
-      { kind: 'boss5_scroll', price: 500, label: '封印王変身スクロール　5Fボスへ30ターン変身' }
+      { kind: 'slime_scroll', price: 500, label: 'スライム変身　30ターン／攻撃+5%・防御+1' },
+      { kind: 'boss5_scroll', price: 500, label: '封印王アウレリウス変身　30ターン／攻撃+10%・防御+3' }
     ];
     let cy = y + (IS_MOBILE ? 112 : 102);
     for (const row of rows) {

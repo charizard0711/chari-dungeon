@@ -26,6 +26,8 @@ export class Player {
   baseAtkMin = 5;
   baseAtkMax = 12;
   baseDef = 3;
+  transformationAttackRate = 1;
+  transformationDefBonus = 0;
   gold = 0;
 
   x = 0;
@@ -65,7 +67,7 @@ export class Player {
         if (m.code === 'A') v += m.level;
       }
     }
-    return v;
+    return Math.max(1, Math.floor(v * this.transformationAttackRate));
   }
 
   get atkMax(): number {
@@ -78,14 +80,14 @@ export class Player {
         if (m.code === 'B') v += m.level;
       }
     }
-    return v;
+    return Math.max(1, Math.floor(v * this.transformationAttackRate));
   }
 
   get def(): number {
     let v = this.baseDef + Math.floor(this.level * 0.4);
     if (this.armor && this.armor.dur > 0) v += this.armor.defBonus + (this.armor.plus ?? 0);
     if (this.shield && this.shield.dur > 0) v += this.shield.defBonus + (this.shield.plus ?? 0);
-    return v;
+    return v + this.transformationDefBonus;
   }
 
   hasMagic(code: MagicCode): Magic | undefined {

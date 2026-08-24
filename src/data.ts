@@ -224,8 +224,8 @@ export const ITEM_DEFS: Record<ItemKind, Omit<Item, 'kind'>> = {
   seal:    { name: '封印の魔導書', desc: '周囲の敵を数ターン止める', textureKey: 'i_seal' },
   stone:   { name: '武器強化スクロール', desc: '装備中の武器を強化。成功率90%から強化ごとに10%低下（最低30%）', textureKey: 'i_stone' },
   shieldstone: { name: '防具強化スクロール', desc: '装備中の盾を強化。成功率90%から強化ごとに10%低下（最低30%）', textureKey: 'i_shieldstone' },
-  slime_scroll: { name: 'スライム変身スクロール', desc: '30ターンの間スライムへ変身。装備の能力・属性・追加効果はすべて引き継ぐ', textureKey: 'i_slime_scroll' },
-  boss5_scroll: { name: '封印王変身スクロール', desc: '30ターンの間5Fボス「封印王アウレリウス」へ変身。装備効果も引き継ぐ', textureKey: 'i_boss5_scroll' },
+  slime_scroll: { name: 'スライム変身スクロール', desc: '30ターンの間スライムへ変身。装備効果を引き継ぎ、攻撃力+5%・防御力+1', textureKey: 'i_slime_scroll' },
+  boss5_scroll: { name: '封印王アウレリウス変身スクロール', desc: '30ターンの間「封印王アウレリウス」へ変身。装備効果を引き継ぎ、攻撃力+10%・防御力+3', textureKey: 'i_boss5_scroll' },
   invis:   { name: '透明ポーション', desc: '20ターンの間、敵から完全に見えなくなる', textureKey: 'i_invis' },
   dash:    { name: '疾風の羽', desc: '20歩の間、1歩で2マス進めるようになる', textureKey: 'i_dash' }
 };

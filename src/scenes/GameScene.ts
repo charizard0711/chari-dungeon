@@ -134,6 +134,8 @@ interface PlayerTransformation {
   name: string;
   textureKey: 'm_jelly' | 'm_archdemon';
   displaySize: number;
+  attackRate: number;
+  defenseBonus: number;
 }
 
 type PendingEquipment =
@@ -179,6 +181,14 @@ interface TeleportPadVisual {
   sprite: Phaser.GameObjects.Image;
   phase: number;
   baseScale: number;
+}
+
+interface BossCompassVisual {
+  x: number;
+  y: number;
+  base: Phaser.GameObjects.Arc;
+  glow: Phaser.GameObjects.Arc;
+  arrow: Phaser.GameObjects.Graphics;
 }
 
 interface TerrainVisual {
@@ -284,6 +294,7 @@ export class GameScene extends Phaser.Scene {
   bossRoomDecorSprites: Phaser.GameObjects.Image[] = [];
   dungeonObjects: DungeonObject[] = [];
   teleportPadVisuals: TeleportPadVisual[] = [];
+  bossCompassVisual?: BossCompassVisual;
   discovered: Set<string> = new Set();
   pendingEquipment: PendingEquipment | null = null;
   secretDualUnlocked = false;
@@ -428,6 +439,7 @@ export class GameScene extends Phaser.Scene {
     this.bossObstacles = [];
     this.dungeonObjects = [];
     this.teleportPadVisuals = [];
+    this.bossCompassVisual = undefined;
     this.explored = [];
     this.visibleTiles = [];
 
@@ -701,6 +713,7 @@ export class GameScene extends Phaser.Scene {
     this.dungeonObjects = [];
     for (const pad of this.teleportPadVisuals) pad.sprite.destroy();
     this.teleportPadVisuals = [];
+    this.destroyBossCompass();
     for (const row of this.tileSprites) for (const s of row) s.destroy();
     this.tileSprites = [];
     for (const facade of this.wallFacades) facade.sprite.destroy();
@@ -751,6 +764,7 @@ export class GameScene extends Phaser.Scene {
     this.createBossRoomVisuals(theme.era, theme.accent);
     this.spawnAmbientMotes(floor);
     this.spawnTeleportPads();
+    this.spawnBossCompass();
 
     // 小さなフロアもビューポート中央に配置し、左右に大きな空白を作らない
     const worldW = d.w * TILE, worldH = d.h * TILE;
@@ -848,6 +862,10 @@ export class GameScene extends Phaser.Scene {
           ? `${floor}F「${getTheme(floor).name}」に到達。迷路内の7×7部屋で中ボスを倒すと、同じ部屋の扉から${floor}.5Fへ進める。`
           : `${floor}F「${getTheme(floor).name}」に到達。迷路内の7×7部屋で中ボスを倒すと、同じ部屋に階段が現れる。`;
     this.log(floorIntro, 'sys');
+    const bossDirection = this.bossCompassDirection();
+    if (!bossRoom && bossDirection) {
+      this.log(`${bossDirection.label}から禍々しい気配を感じる……石の方位盤が赤紫に脈打っている。`, 'special');
+    }
     this.events.emit('floor', floor);
     // BGMは2階ごとに切り替わる。
     Audio.playBgm(bossRoom ? 'boss' : bgmForFloor(floor));
@@ -1051,6 +1069,79 @@ export class GameScene extends Phaser.Scene {
         baseScale: sprite.scaleX
       });
     }
+  }
+
+  bossCompassDirection() {
+    const zone = this.dungeon?.bossRoomZone;
+    const directions = {
+      north: { dx: 0, dy: -1, angle: 0, label: '北' },
+      east: { dx: 1, dy: 0, angle: 90, label: '東' },
+      south: { dx: 0, dy: 1, angle: 180, label: '南' },
+      west: { dx: -1, dy: 0, angle: -90, label: '西' }
+    } as const;
+    return zone && zone !== 'center' ? directions[zone] : undefined;
+  }
+
+  spawnBossCompass() {
+    const pos = this.dungeon.bossCompass;
+    if (!pos) return;
+    const cx = pos.x * TILE + TILE / 2;
+    const cy = pos.y * TILE + TILE / 2;
+    const base = this.add.circle(cx, cy, 12, 0x071319, 0.88)
+      .setStrokeStyle(1.5, 0x6bcac8, 0.62)
+      .setDepth(2.72);
+    const glow = this.add.circle(cx, cy, 13, 0xe53f83, 0.2)
+      .setDepth(2.76).setBlendMode(Phaser.BlendModes.ADD);
+    // 装飾を入れず、一本の太い矢印だけでボス方向を読ませる。
+    const arrow = this.add.graphics().setPosition(cx, cy).setDepth(2.82);
+    arrow.lineStyle(1.5, 0xffd7e5, 1);
+    arrow.fillStyle(0xff4f86, 1);
+    arrow.beginPath();
+    arrow.moveTo(0, -11);
+    arrow.lineTo(8, -2);
+    arrow.lineTo(3, -2);
+    arrow.lineTo(3, 9);
+    arrow.lineTo(-3, 9);
+    arrow.lineTo(-3, -2);
+    arrow.lineTo(-8, -2);
+    arrow.closePath();
+    arrow.fillPath();
+    arrow.strokePath();
+    this.bossCompassVisual = { ...pos, base, glow, arrow };
+    this.refreshBossCompassVisual();
+  }
+
+  destroyBossCompass() {
+    const visual = this.bossCompassVisual;
+    if (!visual) return;
+    visual.base.destroy();
+    visual.glow.destroy();
+    visual.arrow.destroy();
+    this.bossCompassVisual = undefined;
+  }
+
+  refreshBossCompassVisual() {
+    const visual = this.bossCompassVisual;
+    if (!visual) return;
+    const direction = this.bossCompassDirection();
+    const active = !!direction && !this.floorBossDefeated;
+    visual.base
+      .setFillStyle(active ? 0x071319 : 0x252a2e, active ? 0.88 : 0.62)
+      .setStrokeStyle(1.5, active ? 0x6bcac8 : 0x667078, active ? 0.62 : 0.42);
+    visual.glow.setVisible(active);
+    visual.arrow.setVisible(active);
+    if (!direction) return;
+    const cx = visual.x * TILE + TILE / 2;
+    const cy = visual.y * TILE + TILE / 2;
+    visual.arrow.setPosition(cx, cy).setAngle(direction.angle);
+    visual.glow.setPosition(cx, cy);
+  }
+
+  inspectBossCompass() {
+    const direction = this.bossCompassDirection();
+    if (!direction || this.floorBossDefeated) return;
+    this.log(`方位盤の矢印が${direction.label}を指している。${direction.label}から禍々しい気配を感じる……`, 'special');
+    this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.15, 360, 0xc342ff);
   }
 
   spawnEnemies(floor: number) {
@@ -2433,6 +2524,7 @@ export class GameScene extends Phaser.Scene {
 
   occupiedPositions(): Vec2[] {
     const arr: Vec2[] = [{ x: this.dungeon.start.x, y: this.dungeon.start.y }, this.dungeon.stairs];
+    if (this.dungeon.bossCompass) arr.push(this.dungeon.bossCompass);
     for (const pad of this.dungeon.teleportPads) arr.push({ x: pad.x, y: pad.y });
     for (const e of this.enemies) arr.push({ x: e.x, y: e.y });
     for (const c of this.chests) arr.push({ x: c.x, y: c.y });
@@ -2660,6 +2752,7 @@ export class GameScene extends Phaser.Scene {
   onEnterTile(x: number, y: number) {
     this.closeBossEntranceOnEntry(x, y);
     if (this.activateTeleportPad(x, y)) return;
+    if (this.dungeon.bossCompass?.x === x && this.dungeon.bossCompass.y === y) this.inspectBossCompass();
     const t = this.dungeon.tiles[y][x];
     if (t === 'poison') {
       this.player.poisonTurns = Math.max(this.player.poisonTurns, 3);
@@ -3136,6 +3229,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.floorBossDefeated = true;
+    this.refreshBossCompassVisual();
     Audio.playSe('seal');
     this.setBossEntranceClosed(false);
     this.dropBossRewards(defeatedAt);
@@ -4176,6 +4270,7 @@ export class GameScene extends Phaser.Scene {
     if (this.bossObstacleAt(x, y)) return false;
     if (this.dungeonObjectAt(x, y)) return false;
     if (this.dungeon.teleportPads.some((pad) => pad.x === x && pad.y === y)) return false;
+    if (this.dungeon.bossCompass?.x === x && this.dungeon.bossCompass.y === y) return false;
     return true;
   }
 
@@ -4531,6 +4626,14 @@ export class GameScene extends Phaser.Scene {
       const v = !!visible[pad.y]?.[pad.x];
       pad.sprite.setVisible(v).setAlpha(v ? 1 : 0);
     }
+    const compass = this.bossCompassVisual;
+    if (compass) {
+      const v = !!visible[compass.y]?.[compass.x];
+      compass.base.setVisible(v);
+      const active = v && !!this.bossCompassDirection() && !this.floorBossDefeated;
+      compass.glow.setVisible(active);
+      compass.arrow.setVisible(active);
+    }
     for (const object of this.dungeonObjects) {
       const room = this.dungeon.optionalRooms.find((optional) => object.x >= optional.room.x
         && object.x < optional.room.x + optional.room.w && object.y >= optional.room.y
@@ -4721,18 +4824,23 @@ export class GameScene extends Phaser.Scene {
 
   startTransformation(kind: TransformationKind) {
     const transformation: PlayerTransformation = kind === 'slime'
-      ? { kind, turns: 30, name: 'スライム', textureKey: 'm_jelly', displaySize: 35 }
-      : { kind, turns: 30, name: '封印王アウレリウス', textureKey: 'm_archdemon', displaySize: 43 };
+      ? { kind, turns: 30, name: 'スライム', textureKey: 'm_jelly', displaySize: 35, attackRate: 1.05, defenseBonus: 1 }
+      : { kind, turns: 30, name: '封印王アウレリウス', textureKey: 'm_archdemon', displaySize: 43, attackRate: 1.1, defenseBonus: 3 };
     this.transformation = transformation;
+    this.player.transformationAttackRate = transformation.attackRate;
+    this.player.transformationDefBonus = transformation.defenseBonus;
     this.refreshTransformationVisual();
     this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.9, 650, kind === 'slime' ? 0x70e2c2 : 0xffc96b);
     Audio.playSe('warp');
-    this.log(`${transformation.name}へ変身した！ 30ターンの間、装備の能力・属性・追加効果をすべて引き継ぐ。`, 'special');
+    const attackBonus = Math.round((transformation.attackRate - 1) * 100);
+    this.log(`${transformation.name}へ変身した！ 装備効果を引き継ぎ、30ターンの間は攻撃力+${attackBonus}%・防御力+${transformation.defenseBonus}。`, 'special');
   }
 
   clearTransformation(announce = false) {
     const previous = this.transformation;
     this.transformation = null;
+    this.player.transformationAttackRate = 1;
+    this.player.transformationDefBonus = 0;
     this.transformationSprite?.destroy();
     this.transformationSprite = undefined;
     this.transformationBaseScale = 1;
@@ -5805,6 +5913,14 @@ export class GameScene extends Phaser.Scene {
       const pulse = Math.sin(time * 0.004 + pad.phase);
       pad.sprite.setScale(pad.baseScale * (1 + pulse * 0.035));
       pad.sprite.setAlpha(0.9 + pulse * 0.1);
+    }
+
+    const compass = this.bossCompassVisual;
+    const direction = this.bossCompassDirection();
+    if (compass && direction && !this.floorBossDefeated && compass.base.visible) {
+      const pulse = (Math.sin(time * 0.006) + 1) * 0.5;
+      compass.glow.setScale(0.9 + pulse * 0.2).setAlpha(0.14 + pulse * 0.2);
+      compass.arrow.setAlpha(0.76 + pulse * 0.24).setScale(0.96 + pulse * 0.08);
     }
 
     for (const object of this.dungeonObjects) {
