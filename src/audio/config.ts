@@ -25,7 +25,7 @@ export const BGM_DEFS = {
   floor09:  { key: 'bgm_floor09',  path: 'assets/audio/bgm_floors_09_10.wav', volume: 0.5, loop: true },
   // 7x7中ボス部屋：入口封鎖から撃破まで流れる高速メタル戦闘曲
   midboss:  { key: 'bgm_midboss',  path: 'assets/audio/bgm_midboss.wav', volume: 0.44, loop: true },
-  // 5階ごとの大ボス部屋：暴君のレクイエム
+  // 5階ごとの大ボス部屋：氷晶大聖堂（チェレスタ＋弦楽＋控えめな合唱）
   boss:     { key: 'bgm_boss',     path: 'assets/audio/bgm_boss.wav', volume: 0.46, loop: true },
   // クリア：短い勝利ジングル
   clear:    { key: 'bgm_clear',    path: 'assets/audio/bgm_clear.mp3',    volume: 0.6,  loop: false },
