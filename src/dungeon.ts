@@ -1,4 +1,6 @@
 import type { TileType, Vec2 } from './types';
+import { getFloorLayoutProfile } from './floorLayout';
+import type { RoomShape } from './floorLayout';
 
 export interface Room {
   x: number;
@@ -106,6 +108,54 @@ function generateSinglePathMaze(tiles: TileType[][], columns: number, rows: numb
 function carveRoom(tiles: TileType[][], room: Room) {
   for (let y = room.y; y < room.y + room.h; y++) {
     for (let x = room.x; x < room.x + room.w; x++) tiles[y][x] = 'floor';
+  }
+}
+
+function carveStyledRoom(tiles: TileType[][], room: Room, shape: RoomShape, seed: number) {
+  carveRoom(tiles, room);
+  if (shape === 'square') return;
+
+  const setWall = (x: number, y: number) => {
+    // 中央の十字と各辺中央は、出入口・噴水・方位盤・転送床のため常に空ける。
+    if (x === room.cx || y === room.cy) return;
+    if (x < room.x || y < room.y || x >= room.x + room.w || y >= room.y + room.h) return;
+    tiles[y][x] = 'wall';
+  };
+  const innerCorners = [
+    { x: room.x + 1, y: room.y + 1, dx: 1, dy: 1 },
+    { x: room.x + room.w - 2, y: room.y + 1, dx: -1, dy: 1 },
+    { x: room.x + 1, y: room.y + room.h - 2, dx: 1, dy: -1 },
+    { x: room.x + room.w - 2, y: room.y + room.h - 2, dx: -1, dy: -1 }
+  ];
+  const outerCorners = [
+    { x: room.x, y: room.y, dx: 1, dy: 1 },
+    { x: room.x + room.w - 1, y: room.y, dx: -1, dy: 1 },
+    { x: room.x, y: room.y + room.h - 1, dx: 1, dy: -1 },
+    { x: room.x + room.w - 1, y: room.y + room.h - 1, dx: -1, dy: -1 }
+  ];
+
+  if (shape === 'notched') {
+    for (const corner of outerCorners) setWall(corner.x, corner.y);
+    return;
+  }
+  if (shape === 'pillared') {
+    for (const corner of innerCorners) setWall(corner.x, corner.y);
+    return;
+  }
+  if (shape === 'cross') {
+    for (const corner of outerCorners) {
+      setWall(corner.x, corner.y);
+      setWall(corner.x + corner.dx, corner.y);
+      setWall(corner.x, corner.y + corner.dy);
+    }
+    return;
+  }
+
+  // 対角だけを深く欠き、左右対称ではない古い増改築の形にする。
+  const offsetCorners = seed % 2 === 0 ? [outerCorners[0], outerCorners[3]] : [outerCorners[1], outerCorners[2]];
+  for (const corner of offsetCorners) {
+    setWall(corner.x, corner.y);
+    setWall(corner.x + corner.dx, corner.y);
   }
 }
 
@@ -326,6 +376,7 @@ function closeOptionalRoom(tiles: TileType[][], optional: OptionalRoom) {
 }
 
 function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone): DungeonData {
+  const layout = getFloorLayoutProfile(floor);
   const biome = biomeForFloor(floor);
   const w = 57 + Math.min(6, Math.floor(floor / 10) * 2);
   const h = 47 + Math.min(4, Math.floor(floor / 15) * 2);
@@ -354,7 +405,11 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
     : undefined;
   const lakeRoom = lakeZone ? roomsByZone[lakeZone] : undefined;
   const mainRooms = [hubRoom, northRoom, southRoom, westRoom, eastRoom];
-  for (const room of mainRooms) carveRoom(tiles, room);
+  for (let index = 0; index < mainRooms.length; index++) {
+    const room = mainRooms[index];
+    const shape = room === exitRoom && hasFieldBossRoom ? 'square' : layout.roomShape;
+    carveStyledRoom(tiles, room, shape, layout.seed + index);
+  }
 
   // 広間同士を直線で結ばず、四方向の迷路帯を必ず抜ける構成にする。
   // 小さな再合流はあるが行き止まりも残るため、地図を覚える探索感が生まれる。
@@ -380,10 +435,11 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
     x: Math.floor((southRoom.cx + hubRoom.cx) / 2) - (southMaze.columns - 1),
     y: hubRoom.y + hubRoom.h + 1
   };
-  carveMazeRegion(tiles, westMazeOrigin, westMaze.columns, westMaze.rows, irand(1, 3));
-  carveMazeRegion(tiles, eastMazeOrigin, eastMaze.columns, eastMaze.rows, irand(1, 3));
-  carveMazeRegion(tiles, northMazeOrigin, northMaze.columns, northMaze.rows, irand(1, 3));
-  carveMazeRegion(tiles, southMazeOrigin, southMaze.columns, southMaze.rows, irand(1, 3));
+  const mazeLoops = () => Math.max(1, layout.mazeLoops + irand(-1, 1));
+  carveMazeRegion(tiles, westMazeOrigin, westMaze.columns, westMaze.rows, mazeLoops());
+  carveMazeRegion(tiles, eastMazeOrigin, eastMaze.columns, eastMaze.rows, mazeLoops());
+  carveMazeRegion(tiles, northMazeOrigin, northMaze.columns, northMaze.rows, mazeLoops());
+  carveMazeRegion(tiles, southMazeOrigin, southMaze.columns, southMaze.rows, mazeLoops());
 
   const westEntry = { x: westMazeOrigin.x, y: westMazeOrigin.y + irand(0, westMaze.rows - 1) * 2 };
   const westExit = { x: westMazeOrigin.x + (westMaze.columns - 1) * 2, y: westMazeOrigin.y + irand(0, westMaze.rows - 1) * 2 };
@@ -397,7 +453,10 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
   const westRoomStaging = { x: westRoomApproach.x + 1, y: westRoom.cy };
   carveThinCorridor(tiles, westRoomApproach, westRoomStaging);
   carveThinCorridor(tiles, westRoomStaging, westEntry);
-  carveThinCorridor(tiles, westExit, { x: hubRoom.x, y: hubRoom.cy });
+  const hubWestApproach = { x: hubRoom.x, y: hubRoom.cy };
+  const hubWestStaging = { x: hubRoom.x - 1, y: hubRoom.cy };
+  carveThinCorridor(tiles, westExit, hubWestStaging);
+  carveThinCorridor(tiles, hubWestStaging, hubWestApproach);
   carveThinCorridor(tiles, { x: hubRoom.x + hubRoom.w - 1, y: hubRoom.cy }, eastEntry);
   const eastRoomApproach = { x: eastRoom.x - 1, y: eastRoom.cy };
   const eastRoomStaging = { x: eastRoomApproach.x - 1, y: eastRoom.cy };
@@ -408,7 +467,11 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
   carveThinCorridor(tiles, northRoomApproach, northRoomStaging);
   carveThinCorridor(tiles, northRoomStaging, northEntry);
   carveThinCorridor(tiles, northExit, { x: hubRoom.cx, y: hubRoom.y });
-  carveThinCorridor(tiles, { x: hubRoom.cx, y: hubRoom.y + hubRoom.h - 1 }, southEntry);
+  // 広間の外へ1マス出てから横へ曲がる。部屋角の欠きで通路が分断されないようにする。
+  const hubSouthApproach = { x: hubRoom.cx, y: hubRoom.y + hubRoom.h - 1 };
+  const hubSouthStaging = { x: hubRoom.cx, y: hubRoom.y + hubRoom.h };
+  carveThinCorridor(tiles, hubSouthApproach, hubSouthStaging);
+  carveThinCorridor(tiles, hubSouthStaging, southEntry);
   const southRoomApproach = { x: southRoom.cx, y: southRoom.y - 1 };
   const southRoomStaging = { x: southRoom.cx, y: southRoomApproach.y - 1 };
   carveThinCorridor(tiles, southExit, southRoomStaging);
@@ -421,7 +484,9 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
     roomAt(northMazeOrigin.x + 4, northMazeOrigin.y + 2, 3, 3),
     roomAt(southMazeOrigin.x + 6, southMazeOrigin.y + 4, 3, 3)
   ]);
-  for (const mazePocket of mazePocketCandidates.slice(0, irand(1, 2))) carveRoom(tiles, mazePocket);
+  for (const mazePocket of mazePocketCandidates.slice(0, Math.min(mazePocketCandidates.length, layout.mazePockets))) {
+    carveRoom(tiles, mazePocket);
+  }
   const start = { x: hubRoom.cx, y: hubRoom.cy };
   // 開始位置の少し北側に、通行可能なボス探知の方位盤を置く。
   // 5の倍数階でも石盤自体は残るが、中ボスがいないため反応しない。
@@ -484,7 +549,8 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
   for (const room of candidates) {
     if (optionalRooms.length >= requestedRooms) break;
     if (optionalRooms.some((other) => roomsOverlap(room, other.room, 3))) continue;
-    const target = nearestMainRoom(room, mainRooms);
+    // 出口／中ボス部屋へ秘密部屋の通路を直結すると、封印扉や専用外周を削るため接続先から外す。
+    const target = nearestMainRoom(room, mainRooms.filter((main) => main !== exitRoom));
     const doorway = roomDoorToward(room, target);
     const optional: OptionalRoom = {
       room, door: doorway.door, entry: doorway.entry,
@@ -496,12 +562,30 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
     optionalRooms.push(optional);
   }
 
+  // 秘密部屋へ向かう2マス通路が主要広間の角を横切った場合も、階固有の輪郭を復元する。
+  // 出口部屋は接続先から除外済みで、封印扉を保持するためここでは掘り直さない。
+  for (let index = 0; index < mainRooms.length; index++) {
+    const room = mainRooms[index];
+    if (room === exitRoom) continue;
+    carveStyledRoom(tiles, room, layout.roomShape, layout.seed + index);
+  }
+
+  // 一部の一本道を2マス幅にし、途中へ短い戦闘広場を挟む。
+  // 主要部屋と秘密部屋は保護するため、入口や部屋内レイアウトは壊さない。
+  const passageRooms = addPassageVariety(
+    tiles,
+    start,
+    [...mainRooms, ...optionalRooms.map((optional) => optional.room)],
+    layout.passageWidenings,
+    layout.sidePockets
+  );
+
   // 全通路を掘った後、開始部屋とボス部屋を除く部屋端の中央へ転送床を置く。
   // 通路入口と重なる辺は避け、通常階は残り3部屋、5の倍数階は四方4部屋が配置先になる。
   const teleportRooms = shuffle(mainRooms.filter((room) => room !== hubRoom && room !== bossRoom)).slice(0, 4);
   const teleportPads: TeleportPad[] = teleportRooms.map((room) => {
+    // 上辺は壁際の装飾や宝箱と重なって窮屈に見えるため、転送床の配置先に使わない。
     const edgeCenters = [
-      { pad: { x: room.cx, y: room.y }, outside: { x: room.cx, y: room.y - 1 } },
       { pad: { x: room.cx, y: room.y + room.h - 1 }, outside: { x: room.cx, y: room.y + room.h } },
       { pad: { x: room.x, y: room.cy }, outside: { x: room.x - 1, y: room.cy } },
       { pad: { x: room.x + room.w - 1, y: room.cy }, outside: { x: room.x + room.w, y: room.cy } }
@@ -526,6 +610,8 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
   ]);
   hazards.push(...placeStraightIce(tiles, iceTarget, blockedIce));
   const randomHazardTarget = Math.max(0, hazardCount - hazards.length);
+  const exitAccess = bossEntrance ?? { x: stairs.x + 1, y: stairs.y };
+  const reachabilityTargets = [...teleportPads, exitAccess];
   let placed = 0;
   for (let tries = 0; tries < randomHazardTarget * 20 && placed < randomHazardTarget; tries++) {
     const x = irand(2, w - 3), y = irand(2, h - 3);
@@ -537,7 +623,7 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
     if (!biomeHazards.length) break;
     const type = biomeHazards[irand(0, biomeHazards.length - 1)];
     tiles[y][x] = type;
-    if (type === 'pit' && !allTargetsWalkablyReachable(tiles, start, teleportPads)) {
+    if (type === 'pit' && !allTargetsWalkablyReachable(tiles, start, reachabilityTargets)) {
       tiles[y][x] = 'floor';
       continue;
     }
@@ -546,7 +632,7 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
   }
 
   return {
-    w, h, tiles, rooms: [...mainRooms, ...optionalRooms.map((optional) => optional.room)],
+    w, h, tiles, rooms: [...mainRooms, ...optionalRooms.map((optional) => optional.room), ...passageRooms],
     start, stairs, hazards, exitRoom, lakeRoom, bossRoom, bossEntrance, bossEntry, bossCompass,
     bossRoomZone: bossRoom ? exitZone : undefined, teleportPads, biome, optionalRooms
   };
@@ -572,9 +658,10 @@ function overlapsProtectedRoom(x: number, y: number, protectedRooms: Room[], pad
 
 function addPassageVariety(
   tiles: TileType[][],
-  floor: number,
   start: Vec2,
-  protectedRooms: Room[]
+  protectedRooms: Room[],
+  passageTarget: number,
+  pocketTarget: number
 ): Room[] {
   const h = tiles.length;
   const w = tiles[0].length;
@@ -594,7 +681,6 @@ function addPassageVariety(
     }
   }
 
-  const passageTarget = Math.min(12, 6 + Math.floor(floor / 5));
   let passageCount = 0;
   for (const candidate of shuffle(passageCandidates)) {
     if (passageCount >= passageTarget) break;
@@ -643,7 +729,6 @@ function addPassageVariety(
     }
   }
 
-  const pocketTarget = Math.min(7, 3 + Math.floor(floor / 8));
   const pocketRooms: Room[] = [];
   for (const center of shuffle(pocketCandidates)) {
     if (pocketRooms.length >= pocketTarget) break;

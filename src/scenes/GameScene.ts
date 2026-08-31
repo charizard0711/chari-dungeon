@@ -13,6 +13,7 @@ import { computePlayerAttack, computeEnemyAttack } from '../combat';
 import { Audio } from '../audio/manager';
 import { bgmForFloor, elementAttackSe, weaponAttackSe } from '../audio/config';
 import { enhancementChance, EQUIPMENT_LIMIT, SCROLL_DROP_RATE } from '../balance';
+import { getFloorLayoutProfile } from '../floorLayout';
 import {
   armorForGrade,
   armorFullName,
@@ -157,6 +158,14 @@ interface WallFacade {
   sprite: Phaser.GameObjects.Image;
 }
 
+interface TerrainDetailVisual {
+  x: number;
+  y: number;
+  wall: boolean;
+  alpha: number;
+  sprite: Phaser.GameObjects.Image;
+}
+
 type HealingDungeonObjectKind = 'fountain';
 type RoomPropKind = 'barrel' | 'jar' | 'crates' | 'weaponRack' | 'mapTable' | 'cookingPot' | 'minecart' | 'bonePile';
 type DungeonObjectKind = HealingDungeonObjectKind | RoomPropKind;
@@ -281,6 +290,7 @@ export class GameScene extends Phaser.Scene {
 
   tileSprites: Phaser.GameObjects.Image[][] = [];
   wallFacades: WallFacade[] = [];
+  terrainDetails: TerrainDetailVisual[] = [];
   explored: boolean[][] = [];
   visibleTiles: boolean[][] = [];
   enemies: Enemy[] = [];
@@ -719,6 +729,8 @@ export class GameScene extends Phaser.Scene {
     this.tileSprites = [];
     for (const facade of this.wallFacades) facade.sprite.destroy();
     this.wallFacades = [];
+    for (const detail of this.terrainDetails) detail.sprite.destroy();
+    this.terrainDetails = [];
     for (const e of this.enemies) {
       this.destroyEnemyFreezeFx(e);
       if (e.aura) { this.tweens.killTweensOf(e.aura); e.aura.destroy(); }
@@ -762,6 +774,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.createWallFacades(theme.era);
+    this.createTerrainDetails(floor);
     this.createBossRoomVisuals(theme.era, theme.accent);
     this.spawnAmbientMotes(floor);
     this.spawnTeleportPads();
@@ -4425,6 +4438,150 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  terrainDetailHash(floor: number, x: number, y: number, salt: number) {
+    let value = Math.imul(x + 37, 73856093) ^ Math.imul(y + 71, 19349663)
+      ^ Math.imul(floor + salt, 83492791);
+    value = Math.imul(value ^ (value >>> 13), 1274126177);
+    return (value >>> 0) / 0xffffffff;
+  }
+
+  roomContainingTile(x: number, y: number): Room | undefined {
+    return this.dungeon.rooms.find((room) => x >= room.x && x < room.x + room.w
+      && y >= room.y && y < room.y + room.h);
+  }
+
+  createTerrainDetails(floor: number) {
+    if (this.inBossRoom) return;
+    const d = this.dungeon;
+    const layout = getFloorLayoutProfile(floor);
+    const reserved = new Set<string>([
+      `${d.start.x},${d.start.y}`,
+      `${d.stairs.x},${d.stairs.y}`,
+      ...(d.bossCompass ? [`${d.bossCompass.x},${d.bossCompass.y}`] : []),
+      ...(d.bossEntrance ? [`${d.bossEntrance.x},${d.bossEntrance.y}`] : []),
+      ...(d.bossEntry ? [`${d.bossEntry.x},${d.bossEntry.y}`] : []),
+      ...d.teleportPads.map((pad) => `${pad.x},${pad.y}`)
+    ]);
+    const insideBossRoom = (x: number, y: number, padding = 0) => !!d.bossRoom
+      && x >= d.bossRoom.x - padding && x < d.bossRoom.x + d.bossRoom.w + padding
+      && y >= d.bossRoom.y - padding && y < d.bossRoom.y + d.bossRoom.h + padding;
+    const addDetail = (
+      x: number,
+      y: number,
+      key: string,
+      angle: number,
+      size: number,
+      alpha: number,
+      wall: boolean
+    ) => {
+      const sprite = this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, key)
+        .setAngle(angle)
+        .setDisplaySize(size, size)
+        .setAlpha(alpha)
+        .setDepth(wall ? .44 : .22);
+      if (wall) sprite.setTint(this.themeTileTint);
+      this.terrainDetails.push({ x, y, wall, alpha, sprite });
+    };
+
+    for (let y = 1; y < d.h - 1; y++) {
+      for (let x = 1; x < d.w - 1; x++) {
+        if (d.tiles[y][x] !== 'floor' || reserved.has(`${x},${y}`) || insideBossRoom(x, y)) continue;
+        const room = this.roomContainingTile(x, y);
+        const random = this.terrainDetailHash(floor + layout.seed, x, y, 11);
+        const secondary = this.terrainDetailHash(floor + layout.seed, x, y, 29);
+        let key: string | undefined;
+        let angle = secondary < .5 ? 0 : secondary < .75 ? 90 : secondary < .875 ? 180 : 270;
+        let size = TILE + 1;
+        let alpha = .58;
+
+        if (!room) {
+          if (random < layout.detailDensity * .34) key = 'terrain_detail_floor_wear';
+          else if (layout.floorPattern === 'patchwork' && random < layout.detailDensity * .44) {
+            key = 'terrain_detail_floor_repair';
+            size = TILE - 5;
+            alpha = .48;
+          }
+        } else {
+          const onHorizontalEdge = y === room.y || y === room.y + room.h - 1;
+          const onVerticalEdge = x === room.x || x === room.x + room.w - 1;
+          const onHorizontalRunner = y === room.cy;
+          const onVerticalRunner = x === room.cx;
+          switch (layout.floorPattern) {
+            case 'border':
+              if ((onHorizontalEdge || onVerticalEdge) && random < layout.trimCoverage) {
+                key = 'terrain_detail_floor_trim';
+                angle = onVerticalEdge && !onHorizontalEdge ? 90 : 0;
+                size = TILE + 2;
+                alpha = .66;
+              } else if (random < layout.detailDensity * .42) key = 'terrain_detail_floor_wear';
+              break;
+            case 'runner':
+              if (onHorizontalRunner && onVerticalRunner) {
+                key = 'terrain_detail_floor_repair';
+                size = TILE - 4;
+                alpha = .50;
+              } else if ((onHorizontalRunner || onVerticalRunner) && random < layout.trimCoverage) {
+                key = 'terrain_detail_floor_trim';
+                angle = onVerticalRunner ? 90 : 0;
+                size = TILE + 2;
+                alpha = .68;
+              } else if (random < layout.detailDensity * .36) key = 'terrain_detail_floor_wear';
+              break;
+            case 'mosaic':
+              if ((x + y + layout.seed) % 4 === 0 && random < layout.trimCoverage * .62) {
+                key = 'terrain_detail_floor_repair';
+                size = TILE - 5;
+                alpha = .48;
+              } else if (random < layout.detailDensity * .48) key = 'terrain_detail_floor_wear';
+              break;
+            case 'patchwork':
+              if (random < layout.detailDensity * .48) {
+                key = 'terrain_detail_floor_repair';
+                size = TILE - 5;
+                alpha = .48;
+              } else if (random < layout.detailDensity) key = 'terrain_detail_floor_wear';
+              break;
+            case 'fractured':
+              if (random < layout.detailDensity * 1.18) {
+                key = 'terrain_detail_floor_wear';
+                alpha = .67;
+              } else if (random < layout.detailDensity * 1.34) {
+                key = 'terrain_detail_floor_repair';
+                size = TILE - 6;
+                alpha = .44;
+              }
+              break;
+            default:
+              if (random < layout.detailDensity) key = 'terrain_detail_floor_wear';
+              break;
+          }
+        }
+        if (key) addDetail(x, y, key, angle, size, alpha, false);
+      }
+    }
+
+    for (let y = 1; y < d.h - 1; y++) {
+      for (let x = 1; x < d.w - 1; x++) {
+        if (d.tiles[y][x] !== 'wall' || insideBossRoom(x, y, 1)) continue;
+        const northOpen = d.tiles[y - 1]?.[x] !== 'wall';
+        const southOpen = d.tiles[y + 1]?.[x] !== 'wall';
+        const westOpen = d.tiles[y]?.[x - 1] !== 'wall';
+        const eastOpen = d.tiles[y]?.[x + 1] !== 'wall';
+        if (!northOpen && !southOpen && !westOpen && !eastOpen) continue;
+        const random = this.terrainDetailHash(floor + layout.seed, x, y, 71);
+        const densityScale = layout.wallPattern === 'sparse' ? .58
+          : layout.wallPattern === 'rhythm' ? .86
+            : layout.wallPattern === 'recessed' ? 1
+              : layout.wallPattern === 'broken' ? .72 : 1.22;
+        const rhythmic = (x * 3 + y * 5 + layout.seed) % layout.wallDetailStep === 0;
+        if (!rhythmic && random >= densityScale / layout.wallDetailStep) continue;
+        const angle = !northOpen && !southOpen && (westOpen || eastOpen) ? 90 : 0;
+        const alpha = layout.wallPattern === 'broken' ? .58 : layout.wallPattern === 'fortified' ? .82 : .70;
+        addDetail(x, y, 'terrain_detail_wall_buttress', angle, TILE - 2, alpha, true);
+      }
+    }
+  }
+
   lineOfSight(x0: number, y0: number, x1: number, y1: number): boolean {
     // 直線上に壁がないか（水平/垂直のみ）
     if (x0 === x1) {
@@ -4579,6 +4736,12 @@ export class GameScene extends Phaser.Scene {
       const active = !!visible[facade.y]?.[facade.x];
       facade.sprite.setVisible(active);
       if (active) facade.sprite.setTint(WALL_VISIBLE_TINT).setAlpha(1);
+    }
+    for (const detail of this.terrainDetails) {
+      const tile = d.tiles[detail.y]?.[detail.x];
+      const active = !!visible[detail.y]?.[detail.x]
+        && (detail.wall ? tile === 'wall' : tile === 'floor');
+      detail.sprite.setVisible(active).setAlpha(active ? detail.alpha : 0);
     }
     if (d.bossRoom) {
       let roomFullyVisible = true;
