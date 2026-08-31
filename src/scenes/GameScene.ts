@@ -157,7 +157,7 @@ interface WallFacade {
   sprite: Phaser.GameObjects.Image;
 }
 
-type HealingDungeonObjectKind = 'fountain' | 'healingLake';
+type HealingDungeonObjectKind = 'fountain';
 type RoomPropKind = 'barrel' | 'jar' | 'crates' | 'weaponRack' | 'mapTable' | 'cookingPot' | 'minecart' | 'bonePile';
 type DungeonObjectKind = HealingDungeonObjectKind | RoomPropKind;
 
@@ -197,6 +197,7 @@ interface TerrainVisual {
   size?: number;
   depth?: number;
   flipX?: boolean;
+  angle?: number;
 }
 
 type BossGimmickKind =
@@ -719,7 +720,6 @@ export class GameScene extends Phaser.Scene {
     for (const facade of this.wallFacades) facade.sprite.destroy();
     this.wallFacades = [];
     for (const e of this.enemies) {
-      this.destroyEnemyMoveMarker(e);
       this.destroyEnemyFreezeFx(e);
       if (e.aura) { this.tweens.killTweensOf(e.aura); e.aura.destroy(); }
       e.sprite.destroy();
@@ -755,6 +755,7 @@ export class GameScene extends Phaser.Scene {
         const visual = this.tileVisual(t, theme.era, x, y);
         const spr = this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, visual.key, visual.frame)
           .setFlipX(visual.flipX ?? false)
+          .setAngle(visual.angle ?? 0)
           .setDepth(visual.depth ?? 0)
           .setDisplaySize(visual.size ?? TERRAIN_RENDER_SIZE, visual.size ?? TERRAIN_RENDER_SIZE);
         this.tileSprites[y][x] = spr;
@@ -837,6 +838,22 @@ export class GameScene extends Phaser.Scene {
         this.placeSprite(this.playerSprite, qaPos.x, qaPos.y);
       }
     }
+    const qaHazard = qaParamsForFloor.get('qa-hazard') as TileType | null;
+    if (location.hostname === 'localhost'
+      && qaHazard && ['poison', 'cracked', 'lava', 'lightning', 'voidRift'].includes(qaHazard)) {
+      const qaHazardPos = [
+        { x: this.player.x + 1, y: this.player.y }, { x: this.player.x - 1, y: this.player.y },
+        { x: this.player.x, y: this.player.y + 1 }, { x: this.player.x, y: this.player.y - 1 },
+        { x: this.player.x + 2, y: this.player.y }, { x: this.player.x - 2, y: this.player.y }
+      ].find((position) => d.tiles[position.y]?.[position.x] === 'floor'
+        && !this.enemyAt(position.x, position.y) && !this.chestAt(position.x, position.y)
+        && !this.dungeonObjectAt(position.x, position.y));
+      if (qaHazardPos) {
+        d.tiles[qaHazardPos.y][qaHazardPos.x] = qaHazard;
+        this.applyTileVisual(this.tileSprites[qaHazardPos.y][qaHazardPos.x], qaHazard, theme.era,
+          qaHazardPos.x, qaHazardPos.y);
+      }
+    }
 
     if (this.qaBossMode && d.bossRoom) {
       const candidates = [
@@ -855,7 +872,7 @@ export class GameScene extends Phaser.Scene {
 
     this.updateVisibility();
     const floorIntro = bossRoom
-      ? `${floor}.5F 強ボス部屋へ転送された。水色の矢印は配下が次に歩くマスで、暗闇でも見える。`
+      ? `${floor}.5F 強ボス部屋へ転送された。`
       : floor === 5
         ? `${floor}F「${getTheme(floor).name}」に到達。この階に中ボスはおらず、最奥の扉は${floor}.5Fへ通じている。`
         : floor % 5 === 0
@@ -950,15 +967,21 @@ export class GameScene extends Phaser.Scene {
             : { key: 'terrain_boss_gate', size: TILE, depth: 4.2 };
       }
       case 'roomDoor': return { key: 'terrain_boss_gate', size: TILE, depth: 4.2 };
-      case 'ice':
-      case 'lava':
-      case 'lightning':
-      case 'voidRift': return { key: `terrain_biome_hazard_${this.dungeon.biome}` };
-      case 'water': return { key: `water${suffix}` };
-      case 'poison': return { key: `poison${suffix}` };
+      case 'ice': {
+        const open = (px: number, py: number) => {
+          const tile = this.dungeon.tiles[py]?.[px];
+          return !!tile && isWalkable(tile) && tile !== 'pit';
+        };
+        const vertical = open(x, y - 1) && open(x, y + 1) && !open(x - 1, y) && !open(x + 1, y);
+        return { key: 'terrain_hazard_ice', angle: vertical ? 90 : 0 };
+      }
+      case 'lava': return { key: 'terrain_hazard_lava' };
+      case 'lightning': return { key: 'terrain_hazard_lightning' };
+      case 'voidRift': return { key: 'terrain_hazard_void' };
+      case 'poison': return { key: 'terrain_hazard_poison' };
       case 'pit': return { key: `pit${suffix}` };
       case 'rune': return { key: `rune${suffix}` };
-      case 'cracked': return { key: `cracked${suffix}` };
+      case 'cracked': return { key: 'terrain_hazard_cracked' };
       case 'floor':
       default:
         return this.inBossRoom
@@ -982,6 +1005,7 @@ export class GameScene extends Phaser.Scene {
     const visual = this.tileVisual(t, era, x, y);
     sprite.setTexture(visual.key, visual.frame)
       .setFlipX(visual.flipX ?? false)
+      .setAngle(visual.angle ?? 0)
       .setDepth(visual.depth ?? 0)
       .setDisplaySize(visual.size ?? TERRAIN_RENDER_SIZE, visual.size ?? TERRAIN_RENDER_SIZE);
   }
@@ -1361,11 +1385,11 @@ export class GameScene extends Phaser.Scene {
     Audio.playSe('seal');
 
     if (optional.kind === 'hazard') {
-      const hazard: TileType = this.dungeon.biome === 'frost' ? 'ice'
+      const hazard: TileType = this.dungeon.biome === 'frost' ? 'cracked'
         : this.dungeon.biome === 'magma' ? 'lava'
           : this.dungeon.biome === 'storm' ? 'lightning'
             : this.dungeon.biome === 'void' ? 'voidRift'
-              : this.dungeon.biome === 'aqueduct' ? 'water' : 'pit';
+              : this.dungeon.biome === 'aqueduct' ? 'poison' : 'pit';
       for (const pos of [{ x: room.cx, y: room.cy }, { x: room.cx - 2, y: room.cy }, { x: room.cx + 2, y: room.cy }]) {
         this.dungeon.tiles[pos.y][pos.x] = hazard;
         this.applyTileVisual(this.tileSprites[pos.y][pos.x], hazard, getTheme(this.floor).era, pos.x, pos.y);
@@ -2226,13 +2250,13 @@ export class GameScene extends Phaser.Scene {
       && !(this.dungeon.start.x >= room.x && this.dungeon.start.x < room.x + room.w
         && this.dungeon.start.y >= room.y && this.dungeon.start.y < room.y + room.h)));
     const candidates = [...rooms, ...fallbackRooms].filter((room) => room !== lakeRoom);
-    const wanted: HealingDungeonObjectKind[] = lakeRoom ? ['healingLake', 'fountain'] : ['fountain'];
-    for (const kind of wanted) {
-      const room = (kind === 'healingLake' ? lakeRoom : undefined)
+    const wanted: HealingDungeonObjectKind[] = lakeRoom ? ['fountain', 'fountain'] : ['fountain'];
+    for (let index = 0; index < wanted.length; index++) {
+      const kind = wanted[index];
+      const room = (index === 0 ? lakeRoom : undefined)
         ?? candidates.find((candidate) => !this.dungeonObjects.some((object) => object.x === candidate.cx && object.y === candidate.cy));
       if (!room) break;
-      const size = kind === 'healingLake' ? 5 : 3;
-      this.addDungeonObject(kind, room.cx, room.cy, size, size, false);
+      this.addDungeonObject(kind, room.cx, room.cy, 3, 3, false);
     }
   }
 
@@ -2360,11 +2384,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   addDungeonObject(kind: DungeonObjectKind, centerX: number, centerY: number, w: number, h: number, breakable = false) {
-    const isHealing = kind === 'fountain' || kind === 'healingLake';
-    const texture = kind === 'fountain' ? 'terrain_healing_fountain'
-      : kind === 'healingLake' ? 'terrain_healing_lake'
-        : this.roomPropTexture(kind);
-    const renderTiles = kind === 'fountain' ? 3 : kind === 'healingLake' ? 5.25 : this.roomPropRenderTiles(kind);
+    const isHealing = kind === 'fountain';
+    const texture = kind === 'fountain' ? 'terrain_healing_fountain' : this.roomPropTexture(kind);
+    const renderTiles = kind === 'fountain' ? 3 : this.roomPropRenderTiles(kind);
     const worldX = centerX * TILE + TILE / 2;
     const worldY = centerY * TILE + TILE / 2;
     const sprite = this.add.image(worldX, worldY, texture)
@@ -2408,7 +2430,7 @@ export class GameScene extends Phaser.Scene {
 
   useHealingObject(object: DungeonObject) {
     if (object.used) {
-      this.log(object.kind === 'healingLake' ? '癒やしの湖は静かに澄んでいる。' : '噴水の魔力は失われている。', 'sys');
+      this.log('噴水の魔力は失われている。', 'sys');
       Audio.playSe('deny');
       return;
     }
@@ -2418,12 +2440,10 @@ export class GameScene extends Phaser.Scene {
     object.used = true;
     object.sprite.setTint(0x7b8c8a).setAlpha(0.72);
     object.waterFx?.setVisible(false);
-    this.effectFx(object.x, object.y, 'fx_magic', object.kind === 'healingLake' ? 2.4 : 1.8, 720, 0x62f7e8);
+    this.effectFx(object.x, object.y, 'fx_magic', 1.8, 720, 0x62f7e8);
     this.healFx();
     Audio.playSe('heal');
-    this.log(object.kind === 'healingLake'
-      ? `癒やしの湖の光に包まれ、体力が全回復した。${healed > 0 ? `（+${healed}）` : ''}`
-      : `古代の噴水で体力が全回復した。${healed > 0 ? `（+${healed}）` : ''}`, 'item');
+    this.log(`古代の噴水で体力が全回復した。${healed > 0 ? `（+${healed}）` : ''}`, 'item');
     this.emitRefresh();
   }
 
@@ -2572,7 +2592,7 @@ export class GameScene extends Phaser.Scene {
           this.busy = false;
         } else {
           this.setPlayerVisual(dir, 'idle');
-          if (dungeonObject.kind === 'fountain' || dungeonObject.kind === 'healingLake') this.useHealingObject(dungeonObject);
+          if (dungeonObject.kind === 'fountain') this.useHealingObject(dungeonObject);
           else this.inspectRoomProp(dungeonObject);
         }
         return;
@@ -2717,7 +2737,7 @@ export class GameScene extends Phaser.Scene {
       this.setPlayerVisual(dir, 'idle');
       this.onEnterTile(nx, ny);
       const teleported = this.player.x !== nx || this.player.y !== ny;
-      const slidOnIce = teleported ? false : await this.slidePlayerOnBossIce(dir, moveDuration);
+      const slidOnIce = teleported ? false : await this.slidePlayerOnIce(dir, moveDuration);
       // 階段を踏んだら確認なしで即降りる（doDescendがbusyを管理）
       if (this.dungeon.tiles[this.player.y]?.[this.player.x] === 'stairs') {
         this.doDescend();
@@ -2769,8 +2789,6 @@ export class GameScene extends Phaser.Scene {
         const era = getTheme(this.floor).era;
         this.applyTileVisual(this.tileSprites[y][x], 'floor', era, x, y);
       }
-    } else if (t === 'water') {
-      // 減速なし、演出のみ
     } else if (t === 'cracked') {
       if (Math.random() < 0.2) {
         this.damagePlayer(6, 'ひび割れ床が崩れた！');
@@ -2813,26 +2831,29 @@ export class GameScene extends Phaser.Scene {
     return true;
   }
 
-  async slidePlayerOnBossIce(dir: Dir, moveDuration: number): Promise<boolean> {
-    const icy = this.dungeon.tiles[this.player.y]?.[this.player.x] === 'ice'
-      || this.bossHazards.some((hazard) => hazard.kind === 'ice' && hazard.x === this.player.x && hazard.y === this.player.y);
-    if (!icy) return false;
+  async slidePlayerOnIce(dir: Dir, moveDuration: number): Promise<boolean> {
     const [dx, dy] = this.dirVec(dir);
-    const nx = this.player.x + dx;
-    const ny = this.player.y + dy;
-    const tile = this.dungeon.tiles[ny]?.[nx];
-    if (!tile || !isWalkable(tile) || tile === 'pit'
-      || (this.inBossRoom && !this.isInsideBossCombatFrame(nx, ny))
-      || this.enemyAt(nx, ny) || this.chestAt(nx, ny) || this.bossObstacleAt(nx, ny)) {
-      this.log('氷の上で滑ったが、障害物にぶつかった！', 'sys');
-      return false;
+    let slid = false;
+    while (this.dungeon.tiles[this.player.y]?.[this.player.x] === 'ice'
+      || this.bossHazards.some((hazard) => hazard.kind === 'ice' && hazard.x === this.player.x && hazard.y === this.player.y)) {
+      const nx = this.player.x + dx;
+      const ny = this.player.y + dy;
+      const tile = this.dungeon.tiles[ny]?.[nx];
+      if (!tile || !isWalkable(tile) || tile === 'pit'
+        || (this.inBossRoom && !this.isInsideBossCombatFrame(nx, ny))
+        || this.enemyAt(nx, ny) || this.chestAt(nx, ny) || this.bossObstacleAt(nx, ny)) {
+        this.log('氷の上で滑ったが、障害物にぶつかった！', 'sys');
+        return slid;
+      }
+      if (!slid) this.log('氷床に乗り、進行方向へ滑り出した！', 'dmg');
+      this.player.x = nx;
+      this.player.y = ny;
+      await this.tween(this.playerSprite, { x: nx * TILE + TILE / 2, y: ny * TILE + TILE / 2 }, moveDuration * 0.5, 'Sine.easeOut');
+      this.onEnterTile(nx, ny);
+      slid = true;
+      if (this.player.x !== nx || this.player.y !== ny || tile === 'stairs') break;
     }
-    this.log('凍結マスで足を取られ、もう1マス滑った！', 'dmg');
-    this.player.x = nx;
-    this.player.y = ny;
-    await this.tween(this.playerSprite, { x: nx * TILE + TILE / 2, y: ny * TILE + TILE / 2 }, moveDuration * 0.58, 'Sine.easeOut');
-    this.onEnterTile(nx, ny);
-    return true;
+    return slid;
   }
 
   updateStairsHint() {
@@ -3119,7 +3140,6 @@ export class GameScene extends Phaser.Scene {
       }
     } else {
       // 通常敵からは消耗品と素材を落とす。
-      if (def.key === 'm_snake' && Math.random() < 0.7) this.dropItem(e.x, e.y, 'oldkey');
       // ゴールドは高確率で多めに
       if (Math.random() < 0.7) this.dropItem(e.x, e.y, 'coin', def.gold * 3 + Math.floor(Math.random() * this.floor * 4));
       // 通常消耗品とは別枠で抽選する。
@@ -3149,7 +3169,6 @@ export class GameScene extends Phaser.Scene {
       this.bossStates.delete(e);
     }
     this.destroyEnemyFreezeFx(e);
-    this.destroyEnemyMoveMarker(e);
     if (e.aura) { this.tweens.killTweensOf(e.aura); e.aura.destroy(); }
     e.sprite.destroy();
     e.hpBar?.destroy();
@@ -3301,7 +3320,10 @@ export class GameScene extends Phaser.Scene {
   async knockbackEnemy(e: Enemy, dx: number, dy: number): Promise<boolean> {
     const nx = e.x + dx;
     const ny = e.y + dy;
-    if (!this.passable(e, nx, ny)) return false;
+    const destinationTile = this.dungeon.tiles[ny]?.[nx];
+    // 壁抜けできる敵でも、ノックバックでは壁や封鎖床の中へ押し込まない。
+    if (!destinationTile || !isWalkable(destinationTile) || destinationTile === 'pit'
+      || !this.passable(e, nx, ny)) return false;
     e.x = nx;
     e.y = ny;
     this.effectFx(nx, ny, 'fx_hit', 1.35, 260, 0xffd477);
@@ -3334,10 +3356,12 @@ export class GameScene extends Phaser.Scene {
     // 5階刻みの強ボスは服を確定、中ボスは5%で服を落とす。
     if (isMilestoneBoss || (!this.inBossRoom && (forceArmorDrop || Math.random() < 0.05))) {
       const armorDef = armorForGrade(bossEquipmentGrade);
-      this.dropEquipment(origin.x, origin.y, 'armor', makePlayerArmor(armorDef.key));
-      this.log(isMilestoneBoss
-        ? `強ボス撃破報酬として「${armorDef.name}」が確定ドロップした！`
-        : `中ボスから希少な服「${armorDef.name}」がドロップした！`, 'special');
+      if (!this.ownsArmor(armorDef.key)) {
+        this.dropEquipment(origin.x, origin.y, 'armor', makePlayerArmor(armorDef.key));
+        this.log(isMilestoneBoss
+          ? `強ボス撃破報酬として「${armorDef.name}」が確定ドロップした！`
+          : `中ボスから希少な服「${armorDef.name}」がドロップした！`, 'special');
+      }
     }
 
     const rewardRoll = Math.random();
@@ -3394,6 +3418,7 @@ export class GameScene extends Phaser.Scene {
   dropEquipment(x: number, y: number, kind: 'shield', equipment: Shield): void;
   dropEquipment(x: number, y: number, kind: 'armor', equipment: Armor): void;
   dropEquipment(x: number, y: number, kind: 'weapon' | 'shield' | 'armor', equipment: Weapon | Shield | Armor) {
+    if (kind === 'armor' && this.ownsArmor((equipment as Armor).key)) return;
     const pos = this.findGroundDropPosition(x, y);
     if (!pos) {
       if (kind === 'weapon') this.receiveWeapon(equipment as Weapon, 'ボスドロップ');
@@ -3463,11 +3488,6 @@ export class GameScene extends Phaser.Scene {
 
     if (shieldResult.message) this.log(shieldResult.message, 'special');
     if (dmg > 0) {
-      const armor = this.player.armor;
-      if (armor && armor.dur > 0) {
-        armor.dur = Math.max(0, armor.dur - 1);
-        if (armor.dur === 0) this.log(`${armor.name}が破損し、防御力を失った！`, 'dmg');
-      }
       this.player.hp -= dmg;
       this.floorDamaged = true;
       if (reason) this.log(`${reason} ${dmg}ダメージ！`, 'dmg');
@@ -3912,7 +3932,6 @@ export class GameScene extends Phaser.Scene {
 
   async enemyTurn() {
     const anims: Promise<void>[] = [];
-    for (const enemy of this.enemies) this.destroyEnemyMoveMarker(enemy);
     for (const e of this.enemies) {
       if (!e.alive) continue;
       const sealedRoom = this.optionalRoomContaining(e.x, e.y);
@@ -4391,38 +4410,18 @@ export class GameScene extends Phaser.Scene {
     return move;
   }
 
-  private destroyEnemyMoveMarker(e: Enemy) {
-    if (!e.moveMarker) return;
-    this.tweens.killTweensOf(e.moveMarker);
-    for (const child of e.moveMarker.getAll()) this.tweens.killTweensOf(child);
-    e.moveMarker.destroy(true);
-    e.moveMarker = undefined;
-  }
-
-  private refreshBossMinionMoveMarkers() {
+  private refreshBossMinionMovePlans() {
     const reserved = new Set<string>();
     for (const e of this.enemies) {
-      this.destroyEnemyMoveMarker(e);
       if (!this.inBossRoom || e.def.isFloorBoss || !e.alive) {
         e.plannedMove = undefined;
         continue;
       }
-      if (e.plannedMove === undefined) e.plannedMove = this.previewBossMinionMove(e, reserved);
-      const move = e.plannedMove;
-      if (!move) continue;
-      reserved.add(`${move.x},${move.y}`);
-      const plate = this.add.rectangle(0, 0, TILE - 6, TILE - 6, 0x3ee7ff, 0.2)
-        .setStrokeStyle(2, 0x8ff5ff, 0.96).setBlendMode(Phaser.BlendModes.ADD);
-      const arrow = this.add.text(0, 0, '→', {
-        fontFamily: 'Arial Black, "Yu Gothic UI"', fontSize: '18px', color: '#d9fdff',
-        stroke: '#064e62', strokeThickness: 4, fontStyle: 'bold'
-      }).setOrigin(0.5);
-      const moveDx = move.x - e.x;
-      const moveDy = move.y - e.y;
-      arrow.setAngle(moveDx < 0 ? 180 : moveDy > 0 ? 90 : moveDy < 0 ? -90 : 0);
-      e.moveMarker = this.add.container(move.x * TILE + TILE / 2, move.y * TILE + TILE / 2, [plate, arrow])
-        .setDepth(8.6).setVisible(true);
-      this.tweens.add({ targets: plate, alpha: 0.72, duration: 360, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      if (e.plannedMove === undefined) {
+        e.plannedMove = this.previewBossMinionMove(e, reserved);
+      } else if (e.plannedMove) {
+        reserved.add(`${e.plannedMove.x},${e.plannedMove.y}`);
+      }
     }
   }
 
@@ -4647,7 +4646,7 @@ export class GameScene extends Phaser.Scene {
         }
       }
       const v = (!room || room.opened) && anyVisible;
-      object.sprite.setVisible(v).setAlpha(v ? (object.used && (object.kind === 'fountain' || object.kind === 'healingLake') ? 0.72 : 1) : 0);
+      object.sprite.setVisible(v).setAlpha(v ? (object.used && object.kind === 'fountain' ? 0.72 : 1) : 0);
       object.waterFx?.setVisible(v && !object.used);
     }
     for (const m of this.ambientMotes) m.sprite.setVisible(!!visible[m.y]?.[m.x]);
@@ -4663,7 +4662,7 @@ export class GameScene extends Phaser.Scene {
       const v = !!visible[obstacle.y]?.[obstacle.x];
       obstacle.sprite.setVisible(v).setAlpha(v ? 1 : 0);
     }
-    this.refreshBossMinionMoveMarkers();
+    this.refreshBossMinionMovePlans();
   }
 
   isTileCurrentlyVisible(x: number, y: number) {
@@ -4709,10 +4708,15 @@ export class GameScene extends Phaser.Scene {
         const s = rollShield(Math.max(8, this.floor));
         if (this.receiveShield(s, '金の宝箱')) this.log(`さらに「${s.name}」も入っていた！`, 'item');
       } else if (rr < 0.68) {
-        const candidates = Object.values(PLAYER_ARMOR_DEFS).filter((armor) => armor.minFloor <= Math.max(8, this.floor));
-        const def = candidates[Math.floor(Math.random() * candidates.length)] ?? PLAYER_ARMOR_DEFS.leather;
-        const armor = makePlayerArmor(def.key);
-        if (this.receiveArmor(armor, '金の宝箱')) this.log(`さらに「${armor.name}」も入っていた！`, 'item');
+        const candidates = this.availableArmorDefs(Math.max(8, this.floor));
+        const def = candidates[Math.floor(Math.random() * candidates.length)];
+        if (def) {
+          const armor = makePlayerArmor(def.key);
+          if (this.receiveArmor(armor, '金の宝箱')) this.log(`さらに「${armor.name}」も入っていた！`, 'item');
+        } else {
+          this.player.inventory.push(makeItem('potion'));
+          this.log('入手できる新しい服がないため、代わりに回復ポーションが入っていた。', 'item');
+        }
       } else {
         const scroll = this.grantRegularEnhancementScroll();
         if (scroll) this.log(`${ITEM_DEFS[scroll].name}も入っていた！`, 'item');
@@ -4736,10 +4740,15 @@ export class GameScene extends Phaser.Scene {
           const s = rollShield(this.floor);
           if (this.receiveShield(s, '宝箱')) this.log(`宝箱から「${s.name}」を発見！`, 'item');
         } else if (this.floor >= 5 && eq < 0.43) {
-          const candidates = Object.values(PLAYER_ARMOR_DEFS).filter((armor) => armor.minFloor <= this.floor);
-          const def = candidates[Math.floor(Math.random() * candidates.length)] ?? PLAYER_ARMOR_DEFS.leather;
-          const armor = makePlayerArmor(def.key);
-          if (this.receiveArmor(armor, '宝箱')) this.log(`宝箱から「${armor.name}」を発見！`, 'item');
+          const candidates = this.availableArmorDefs(this.floor);
+          const def = candidates[Math.floor(Math.random() * candidates.length)];
+          if (def) {
+            const armor = makePlayerArmor(def.key);
+            if (this.receiveArmor(armor, '宝箱')) this.log(`宝箱から「${armor.name}」を発見！`, 'item');
+          } else {
+            this.player.inventory.push(makeItem('potion'));
+            this.log('入手できる新しい服がないため、宝箱から回復ポーションを入手。', 'item');
+          }
         } else {
           const consumableKinds: ItemKind[] = ['potion', 'torch', 'warp', 'invis'];
           const regularScroll = Math.random() < SCROLL_DROP_RATE ? this.grantRegularEnhancementScroll() : null;
@@ -4789,7 +4798,7 @@ export class GameScene extends Phaser.Scene {
       case 'warp': this.useWarp(); passTurn = false; break;
       case 'seal': this.useSeal(); break;
       case 'revive': this.log('復活のタネは倒れた時に自動で使われる。', 'sys'); Audio.playSe('deny'); consumed = false; passTurn = false; break;
-      case 'oldkey': case 'floorkey': this.log('近くに対応する扉がない。', 'sys'); Audio.playSe('deny'); consumed = false; passTurn = false; break;
+      case 'floorkey': this.log('近くに対応する扉がない。', 'sys'); Audio.playSe('deny'); consumed = false; passTurn = false; break;
       case 'invis': {
         // 20ターンの間、敵から完全に見えなくなる
         this.invisTurns = 20;
@@ -5016,7 +5025,21 @@ export class GameScene extends Phaser.Scene {
     return false;
   }
 
+  ownsArmor(key: string): boolean {
+    return this.player.armors.some((armor) => armor.key === key)
+      || (this.pendingEquipment?.kind === 'armor' && this.pendingEquipment.item.key === key);
+  }
+
+  availableArmorDefs(maxFloor: number) {
+    return Object.values(PLAYER_ARMOR_DEFS)
+      .filter((armor) => armor.minFloor <= maxFloor && !this.ownsArmor(armor.key));
+  }
+
   receiveArmor(armor: Armor, source: string): boolean {
+    if (this.ownsArmor(armor.key)) {
+      this.log(`${armorFullName(armor)}はすでに持っているため、重複して入手しなかった。`, 'sys');
+      return false;
+    }
     if (this.player.armors.length < EQUIPMENT_LIMIT) {
       this.player.armors.push(armor);
       return true;
@@ -5150,12 +5173,13 @@ export class GameScene extends Phaser.Scene {
     // 排出カテゴリは武器50%・盾40%・服10%。
     // この階で武器を取得済みの場合だけ、残りの比率を盾80%・服20%へ振り分ける。
     const categoryRoll = Math.random();
-    const prizeCategory: 'weapon' | 'shield' | 'armor' =
+    let prizeCategory: 'weapon' | 'shield' | 'armor' =
       forcedCategory === 'weapon' || forcedCategory === 'shield' || forcedCategory === 'armor'
         ? forcedCategory
         : this.weaponWonThisFloor
           ? categoryRoll < 0.8 ? 'shield' : 'armor'
           : categoryRoll < 0.5 ? 'weapon' : categoryRoll < 0.9 ? 'shield' : 'armor';
+    if (prizeCategory === 'armor' && this.ownsArmor(armorForGrade(grade).key)) prizeCategory = 'shield';
     if (prizeCategory === 'armor') {
       const armor = armorForGrade(grade);
       const item = makePlayerArmor(armor.key);
@@ -5282,8 +5306,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   armorSellPrice(armor: Armor): number {
-    const condition = 0.4 + 0.6 * Math.max(0, armor.dur / Math.max(1, armor.durMax));
-    return Math.max(5, Math.round((this.equipmentSellBase(armor.grade) + armor.plus * 25) * condition));
+    return Math.max(5, this.equipmentSellBase(armor.grade) + armor.plus * 25);
   }
 
   sellWeapon(index: number): boolean {
@@ -5780,7 +5803,7 @@ export class GameScene extends Phaser.Scene {
     if (this.enemyAt(nx, ny)) return true;
     if (this.bossObstacleAt(nx, ny)) return true;
     const object = this.dungeonObjectAt(nx, ny);
-    if (object) return object.breakable || object.kind === 'fountain' || object.kind === 'healingLake';
+    if (object) return object.breakable || object.kind === 'fountain';
     const c = this.chestAt(nx, ny);
     if (c && !c.opened) return true;
     const t = this.dungeon.tiles[ny]?.[nx];

@@ -226,33 +226,6 @@ export function buildTileTextures(scene: Phaser.Scene) {
       }
     }
 
-    // 水
-    {
-      const g = scene.add.graphics();
-      px(g, 0, 0, TILE, TILE, 0x1c4a63);
-      for (let i = 0; i < 6; i++) px(g, 2 + i * 5, 6 + (i % 3) * 8, 4, 2, 0x3f9bd0, 0.7);
-      g.generateTexture(`water${suffix}`, TILE, TILE);
-      g.destroy();
-    }
-    // 毒床
-    {
-      const g = scene.add.graphics();
-      px(g, 0, 0, TILE, TILE, 0x2a4a1e);
-      for (let i = 0; i < 8; i++) px(g, (i * 7) % TILE, (i * 11) % TILE, 4, 4, 0x6fae2a, 0.8);
-      px(g, 12, 12, 6, 6, 0x9fdf3a, 0.6);
-      g.generateTexture(`poison${suffix}`, TILE, TILE);
-      g.destroy();
-    }
-    // ひび割れ床
-    {
-      const g = scene.add.graphics();
-      px(g, 0, 0, TILE, TILE, th.floorColor);
-      g.lineStyle(1, shade(th.floorColor, 0.5), 1);
-      g.beginPath(); g.moveTo(4, 4); g.lineTo(16, 14); g.lineTo(12, 26); g.strokePath();
-      g.beginPath(); g.moveTo(16, 14); g.lineTo(28, 10); g.strokePath();
-      g.generateTexture(`cracked${suffix}`, TILE, TILE);
-      g.destroy();
-    }
     // 落とし穴
     {
       const g = scene.add.graphics();
@@ -559,7 +532,6 @@ function buildItemTextures(scene: Phaser.Scene) {
     bomb: (g) => { px(g, 6, 8, 12, 12, 0x202028); px(g, 12, 3, 2, 5, 0x8a6a4a); px(g, 12, 2, 3, 2, 0xf5a020); px(g, 9, 12, 3, 3, 0x4a4a55); },
     warp: (g) => { px(g, 8, 4, 8, 12, 0xf5c542); px(g, 6, 16, 12, 3, 0xd0a020); px(g, 11, 6, 2, 8, 0x4fd0e0); },
     revive: (g) => { px(g, 11, 8, 2, 12, 0x8a5a2a); px(g, 6, 4, 5, 5, 0x6fae2a); px(g, 13, 4, 5, 5, 0x6fae2a); px(g, 10, 2, 4, 4, 0x9fdf3a); },
-    oldkey: (g) => { g.lineStyle(3, 0xc0a040); g.strokeCircle(8, 8, 4); px(g, 9, 10, 3, 10, 0xc0a040); px(g, 12, 16, 4, 3, 0xc0a040); },
     floorkey: (g) => { g.lineStyle(3, 0x4fd0e0); g.strokeCircle(8, 8, 4); px(g, 9, 10, 3, 10, 0x4fd0e0); px(g, 12, 16, 4, 3, 0x4fd0e0); },
     seal: (g) => { px(g, 5, 4, 14, 16, 0x2a2450); px(g, 7, 6, 10, 12, 0x4a3a7a); px(g, 10, 9, 4, 4, 0xa06bff); },
     // 武器強化スクロール：赤い羊皮紙＋剣のルーン

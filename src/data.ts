@@ -219,7 +219,6 @@ export const ITEM_DEFS: Record<ItemKind, Omit<Item, 'kind'>> = {
   bomb:    { name: 'ボムナッツ', desc: '周囲の敵に範囲ダメージ', textureKey: 'i_bomb' },
   warp:    { name: 'ワープベル', desc: '同じ階のランダム地点へ移動', textureKey: 'i_warp' },
   revive:  { name: '復活のタネ', desc: '倒れた時に一度だけ復活', textureKey: 'i_revive' },
-  oldkey:  { name: '古びた鍵', desc: 'ロックされた扉を開ける', textureKey: 'i_oldkey' },
   floorkey:{ name: 'フロアキー', desc: '特殊な扉を開ける', textureKey: 'i_floorkey' },
   seal:    { name: '封印の魔導書', desc: '周囲の敵を数ターン止める', textureKey: 'i_seal' },
   stone:   { name: '武器強化スクロール', desc: '装備中の武器を強化。成功率90%から強化ごとに10%低下（最低30%）', textureKey: 'i_stone' },

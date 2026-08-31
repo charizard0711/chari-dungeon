@@ -492,10 +492,9 @@ export class UIScene extends Phaser.Scene {
     if (kind === 'armor') {
       const armor = p.armor;
       if (!armor) return this.showTooltip('服', '服を装備していない', anchorX, anchorY);
-      const risk = durabilityRisk(armor.dur, armor.durMax);
       return this.showTooltip(
         armorFullName(armor),
-        `防御力 +${armor.defBonus + armor.plus}\n耐久 ${armor.dur} / ${armor.durMax}（${risk.label}）\n見た目 ${PLAYER_ARMOR_DEFS[armor.key as keyof typeof PLAYER_ARMOR_DEFS]?.name ?? armor.name}`,
+        `防御力 +${armor.defBonus + armor.plus}\n見た目 ${PLAYER_ARMOR_DEFS[armor.key as keyof typeof PLAYER_ARMOR_DEFS]?.name ?? armor.name}`,
         anchorX, anchorY
       );
     }
@@ -865,11 +864,10 @@ export class UIScene extends Phaser.Scene {
       if (p.armors.length === 0) { empty('（服を持っていない）'); return; }
       p.armors.forEach((armor, i) => {
         const equipped = armor === p.armor;
-        const risk = durabilityRisk(armor.dur, armor.durMax);
         const texKey = isPlayerArmor(armor.key) ? armorTextureKey(armor.key) : 'armor_leather';
         const icon = this.framedIcon(x + 34, cy + 16, texKey, gradeColor(armor.grade), 36);
         const row = this.rowButton(x + 58, cy, w - 74,
-          `${equipped ? '▶ ' : '　'}${armorFullName(armor)}  防御+${armor.defBonus + armor.plus}  耐久${armor.dur}/${armor.durMax}(${risk.label})`,
+          `${equipped ? '▶ ' : '　'}${armorFullName(armor)}  防御+${armor.defBonus + armor.plus}`,
           equipped, () => this.gs.equipArmor(i));
         this.overlay.add([...icon, row]);
         cy += 38;
@@ -958,11 +956,10 @@ export class UIScene extends Phaser.Scene {
       } else if (entry.kind === 'armor') {
         const armor = entry.item;
         const equipped = armor === p.armor;
-        const risk = durabilityRisk(armor.dur, armor.durMax);
         const texKey = isPlayerArmor(armor.key) ? armorTextureKey(armor.key) : 'armor_leather';
         const icon = this.framedIcon(x + 34, cy + 14, texKey, gradeColor(armor.grade), 34);
         const row = this.rowButton(x + 56, cy, w - 78 - sellW,
-          `服 ${equipped ? '▶ ' : ''}${armorFullName(armor)}  防御+${armor.defBonus + armor.plus}  耐久${armor.dur}/${armor.durMax}(${risk.label})`,
+          `服 ${equipped ? '▶ ' : ''}${armorFullName(armor)}  防御+${armor.defBonus + armor.plus}`,
           equipped, () => this.gs.equipArmor(entry.index));
         const sell = this.rowButton(x + w - sellW - 10, cy, sellW,
           equipped ? '装備中' : `${IS_MOBILE ? '売' : '売却'} ${this.gs.armorSellPrice(armor)}G`, false,
@@ -1037,7 +1034,7 @@ export class UIScene extends Phaser.Scene {
       {
         label: '服',
         name: armor ? armorFullName(armor) : '装備なし',
-        sub: armor ? `防+${armor.defBonus + armor.plus}　耐久${armor.dur}/${armor.durMax}` : '装備なし',
+        sub: armor ? `防+${armor.defBonus + armor.plus}` : '装備なし',
         texture: armor ? armorTextureKey(armor.key) : undefined,
         color: armor ? gradeColor(armor.grade) : 0x36585d,
         slot: 1
@@ -1139,11 +1136,10 @@ export class UIScene extends Phaser.Scene {
       } else if (entry.type === 'armor') {
         const armor = entry.item;
         const equipped = armor === p.armor;
-        const risk = durabilityRisk(armor.dur, armor.durMax);
         const texKey = isPlayerArmor(armor.key) ? armorTextureKey(armor.key) : 'armor_leather';
         const icon = this.framedIcon(x + 33, cy + 14, texKey, gradeColor(armor.grade), 32);
         const row = this.rowButton(x + 54, cy, w - 76 - actionW,
-          `服 ${equipped ? '▶ ' : ''}${armorFullName(armor)}　防+${armor.defBonus + armor.plus}　耐久${armor.dur}/${armor.durMax}(${risk.label})`,
+          `服 ${equipped ? '▶ ' : ''}${armorFullName(armor)}　防+${armor.defBonus + armor.plus}`,
           equipped, () => this.gs.equipArmor(entry.index));
         const action = this.rowButton(x + w - actionW - 10, cy, actionW,
           equipped ? '装備中' : `売却 ${this.gs.armorSellPrice(armor)}G`, false,

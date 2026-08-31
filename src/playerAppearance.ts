@@ -19,16 +19,15 @@ export interface PlayerArmorDef {
   name: string;
   grade: EquipmentGrade;
   defBonus: number;
-  durMax: number;
   minFloor: number;
 }
 
 export const PLAYER_ARMOR_DEFS: Record<PlayerArmor, PlayerArmorDef> = {
-  leather: { key: 'leather', name: '旅人の革装', grade: 'D', defBonus: 1, durMax: 90, minFloor: 1 },
-  chain: { key: 'chain', name: '鎖帷子', grade: 'C', defBonus: 3, durMax: 120, minFloor: 5 },
-  plate: { key: 'plate', name: '騎士の板金鎧', grade: 'B', defBonus: 5, durMax: 155, minFloor: 10 },
-  arcane: { key: 'arcane', name: '秘術装甲', grade: 'A', defBonus: 8, durMax: 190, minFloor: 17 },
-  dragon: { key: 'dragon', name: '竜鱗神鎧', grade: 'S', defBonus: 12, durMax: 240, minFloor: 24 }
+  leather: { key: 'leather', name: '旅人の革装', grade: 'D', defBonus: 1, minFloor: 1 },
+  chain: { key: 'chain', name: '鎖帷子', grade: 'C', defBonus: 3, minFloor: 5 },
+  plate: { key: 'plate', name: '騎士の板金鎧', grade: 'B', defBonus: 5, minFloor: 10 },
+  arcane: { key: 'arcane', name: '秘術装甲', grade: 'A', defBonus: 8, minFloor: 17 },
+  dragon: { key: 'dragon', name: '竜鱗神鎧', grade: 'S', defBonus: 12, minFloor: 24 }
 };
 
 const GENDER_STORAGE_KEY = 'chari-dungeon:player-gender';
@@ -67,8 +66,6 @@ export function makePlayerArmor(key: PlayerArmor): Armor {
     name: def.name,
     grade: def.grade,
     defBonus: def.defBonus,
-    durMax: def.durMax,
-    dur: def.durMax,
     plus: 0
   };
 }

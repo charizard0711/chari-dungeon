@@ -81,8 +81,6 @@ export interface Armor {
   key: string;
   name: string;
   defBonus: number;
-  durMax: number;
-  dur: number;
   grade: EquipmentGrade;
   plus: number;
 }
@@ -94,7 +92,6 @@ export type ItemKind =
   | 'bomb'        // ボムナッツ
   | 'warp'        // ワープベル
   | 'revive'      // 復活のタネ
-  | 'oldkey'      // 古びた鍵
   | 'floorkey'    // フロアキー
   | 'seal'        // 封印の魔導書
   | 'stone'       // 武器強化スクロール＝横の強化（保存互換のためIDは維持）
@@ -164,7 +161,6 @@ export type TileType =
   | 'wall'
   | 'floor'
   | 'stairs'
-  | 'water'
   | 'poison'
   | 'pit'
   | 'rune'

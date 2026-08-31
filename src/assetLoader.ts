@@ -89,7 +89,6 @@ const FRAME_DEFS: FrameDef[] = [
   { key: 'i_revive', sheet: 'items', r: [1245, 505, 1356, 645], mode: 'sprite', size: 48},
 
   // ---- お宝・キーアイテム ----
-  { key: 'i_oldkey', sheet: 'items', r: [428, 715, 538, 848], mode: 'sprite', size: 48},
   { key: 'i_floorkey', sheet: 'items', r: [583, 715, 693, 848], mode: 'sprite', size: 48},
   // i_stone / i_shieldstone / i_invis / i_dash は専用のオリジナル画像を使用する。
   { key: 'i_seal', sheet: 'items', r: [1085, 715, 1196, 848], mode: 'sprite', size: 48},
@@ -138,7 +137,7 @@ function tileDefs(): FrameDef[] {
   }
   // ハザード床（全テーマ共通で同じ絵を使用）
   const hazards: Record<string, [number, number]> = {
-    cracked: [413, 330], poison: [512, 330], pit: [612, 330], rune: [710, 330], water: [800, 330]
+    pit: [612, 330], rune: [710, 330]
   };
   for (const [name, [cx, cy]] of Object.entries(hazards)) {
     for (const suffix of ['_1', '_11', '_21', '_30']) {
@@ -156,7 +155,7 @@ const INDIVIDUAL_ART_OVERRIDES = new Set(['m_mush', 'm_mole', 'i_revive']);
 // タイル素材の外周には、素材シート上で単体表示するための暗い縁が入っている。
 // ゲーム内では隣接タイル同士を連続して見せたい地形だけ、縁を少しクロップする。
 function shouldCropTerrainEdge(key: string): boolean {
-  return /^(floor|wall|water|poison|cracked)/.test(key);
+  return /^(floor|wall)/.test(key);
 }
 
 // ========================================================================

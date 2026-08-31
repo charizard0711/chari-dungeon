@@ -37,7 +37,6 @@ export class Enemy {
   charging = false;
   chargeDir: { x: number; y: number } | null = null;
   plannedMove?: Vec2 | null;
-  moveMarker?: Phaser.GameObjects.Container;
 
   constructor(def: MonsterDef, x: number, y: number, hpScale: number) {
     this.def = def;

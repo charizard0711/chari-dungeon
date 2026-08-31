@@ -85,7 +85,7 @@ export class Player {
 
   get def(): number {
     let v = this.baseDef + Math.floor(this.level * 0.4);
-    if (this.armor && this.armor.dur > 0) v += this.armor.defBonus + (this.armor.plus ?? 0);
+    if (this.armor) v += this.armor.defBonus + (this.armor.plus ?? 0);
     if (this.shield && this.shield.dur > 0) v += this.shield.defBonus + (this.shield.plus ?? 0);
     return v + this.transformationDefBonus;
   }

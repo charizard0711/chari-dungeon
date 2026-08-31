@@ -217,6 +217,64 @@ function allTargetsWalkablyReachable(tiles: TileType[][], start: Vec2, targets: 
   return targets.every((target) => seen.has(`${target.x},${target.y}`));
 }
 
+type StraightCorridorAxis = 'horizontal' | 'vertical';
+
+function straightCorridorAxisAt(tiles: TileType[][], x: number, y: number): StraightCorridorAxis | null {
+  if (tiles[y]?.[x] !== 'floor') return null;
+  const floorAt = (px: number, py: number) => tiles[py]?.[px] === 'floor';
+  const left = floorAt(x - 1, y), right = floorAt(x + 1, y);
+  const up = floorAt(x, y - 1), down = floorAt(x, y + 1);
+  if (left && right && !up && !down) return 'horizontal';
+  if (up && down && !left && !right) return 'vertical';
+  return null;
+}
+
+// 曲がり角・交差点・部屋を避け、十分に長い1マス幅の直線通路だけを返す。
+function straightCorridorRuns(tiles: TileType[][], minLength = 5): Vec2[][] {
+  const runs: Vec2[][] = [];
+  for (const axis of ['horizontal', 'vertical'] as const) {
+    const visited = new Set<string>();
+    for (let y = 1; y < tiles.length - 1; y++) {
+      for (let x = 1; x < tiles[0].length - 1; x++) {
+        const key = `${x},${y}`;
+        if (visited.has(key) || straightCorridorAxisAt(tiles, x, y) !== axis) continue;
+        const [dx, dy] = axis === 'horizontal' ? [1, 0] : [0, 1];
+        let startX = x, startY = y;
+        while (straightCorridorAxisAt(tiles, startX - dx, startY - dy) === axis) {
+          startX -= dx;
+          startY -= dy;
+        }
+        const run: Vec2[] = [];
+        for (let px = startX, py = startY; straightCorridorAxisAt(tiles, px, py) === axis; px += dx, py += dy) {
+          run.push({ x: px, y: py });
+          visited.add(`${px},${py}`);
+        }
+        if (run.length >= minLength) runs.push(run);
+      }
+    }
+  }
+  return runs;
+}
+
+function placeStraightIce(tiles: TileType[][], targetCount: number, blocked: Set<string>): Vec2[] {
+  const placed: Vec2[] = [];
+  for (const run of shuffle(straightCorridorRuns(tiles))) {
+    if (placed.length >= targetCount) break;
+    // 端から1マス空け、曲がり角へ進入する直前・直後には氷を置かない。
+    const interior = run.slice(1, -1).filter((cell) => !blocked.has(`${cell.x},${cell.y}`));
+    if (interior.length < 2) continue;
+    const remaining = targetCount - placed.length;
+    const segmentLength = Math.min(interior.length, remaining, irand(2, 4));
+    const start = irand(0, interior.length - segmentLength);
+    for (const cell of interior.slice(start, start + segmentLength)) {
+      if (tiles[cell.y][cell.x] !== 'floor') continue;
+      tiles[cell.y][cell.x] = 'ice';
+      placed.push(cell);
+    }
+  }
+  return placed;
+}
+
 export function biomeForFloor(floor: number): DungeonBiome {
   if (floor <= 5) return 'ruins';
   if (floor <= 10) return 'aqueduct';
@@ -409,17 +467,6 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
     tiles[stairs.y][stairs.x] = 'door';
   }
 
-  // 通路を塞がないよう、転送床はボス部屋を除いた通常部屋の隅へ置く。
-  // 5の倍数階は中ボス部屋がないため、5部屋から毎回ランダムに4部屋を選ぶ。
-  const teleportRooms = shuffle(mainRooms.filter((room) => room !== bossRoom)).slice(0, 4);
-  const teleportPads: TeleportPad[] = teleportRooms.map((room) => shuffle([
-    { x: room.x, y: room.y },
-    { x: room.x + room.w - 1, y: room.y },
-    { x: room.x, y: room.y + room.h - 1 },
-    { x: room.x + room.w - 1, y: room.y + room.h - 1 }
-  ])[0]);
-  for (const pad of teleportPads) tiles[pad.y][pad.x] = 'floor';
-
   const roomBudget = Math.min(3, 1 + Math.floor((floor - 1) / 4));
   const requestedRooms = Math.max(0, roomBudget - (hasFieldBossRoom ? 1 : 0));
   const candidates = shuffle([
@@ -449,15 +496,38 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
     optionalRooms.push(optional);
   }
 
+  // 全通路を掘った後、開始部屋とボス部屋を除く部屋端の中央へ転送床を置く。
+  // 通路入口と重なる辺は避け、通常階は残り3部屋、5の倍数階は四方4部屋が配置先になる。
+  const teleportRooms = shuffle(mainRooms.filter((room) => room !== hubRoom && room !== bossRoom)).slice(0, 4);
+  const teleportPads: TeleportPad[] = teleportRooms.map((room) => {
+    const edgeCenters = [
+      { pad: { x: room.cx, y: room.y }, outside: { x: room.cx, y: room.y - 1 } },
+      { pad: { x: room.cx, y: room.y + room.h - 1 }, outside: { x: room.cx, y: room.y + room.h } },
+      { pad: { x: room.x, y: room.cy }, outside: { x: room.x - 1, y: room.cy } },
+      { pad: { x: room.x + room.w - 1, y: room.cy }, outside: { x: room.x + room.w, y: room.cy } }
+    ];
+    const awayFromEntrances = edgeCenters.filter(({ outside }) => tiles[outside.y]?.[outside.x] === 'wall');
+    return shuffle(awayFromEntrances.length ? awayFromEntrances : edgeCenters)[0].pad;
+  });
+  for (const pad of teleportPads) tiles[pad.y][pad.x] = 'floor';
+
   const hazards: Vec2[] = [];
   const hazardByBiome: Record<DungeonBiome, TileType[]> = {
-    ruins: [], aqueduct: ['water', 'poison'], frost: ['ice'],
+    ruins: [], aqueduct: ['poison'], frost: [],
     magma: ['lava'], storm: ['lightning'], void: ['voidRift', 'pit']
   };
   const protectedRooms = optionalRooms.map((optional) => optional.room);
   const hazardCount = 8 + Math.floor(floor / 3);
+  const iceTarget = biome === 'frost' ? hazardCount : biome === 'aqueduct' ? Math.ceil(hazardCount * 0.45) : 0;
+  const blockedIce = new Set<string>([
+    `${start.x},${start.y}`, `${stairs.x},${stairs.y}`,
+    ...teleportPads.map((pad) => `${pad.x},${pad.y}`),
+    ...optionalRooms.flatMap((optional) => [optional.door, optional.entry].map((cell) => `${cell.x},${cell.y}`))
+  ]);
+  hazards.push(...placeStraightIce(tiles, iceTarget, blockedIce));
+  const randomHazardTarget = Math.max(0, hazardCount - hazards.length);
   let placed = 0;
-  for (let tries = 0; tries < hazardCount * 20 && placed < hazardCount; tries++) {
+  for (let tries = 0; tries < randomHazardTarget * 20 && placed < randomHazardTarget; tries++) {
     const x = irand(2, w - 3), y = irand(2, h - 3);
     if (tiles[y][x] !== 'floor'
       || pointInRoom({ x, y }, hubRoom, 1) || pointInRoom({ x, y }, exitRoom, 1)
@@ -471,7 +541,7 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
       tiles[y][x] = 'floor';
       continue;
     }
-    if (type !== 'water' && type !== 'rune') hazards.push({ x, y });
+    if (type !== 'rune') hazards.push({ x, y });
     placed++;
   }
 
@@ -772,7 +842,7 @@ export function generateDungeon(floor: number, _forcedBossRoomZone?: BossRoomZon
   removeUnreachableFloors(tiles, start);
 
   const hazards: Vec2[] = [];
-  const hazardTypes: TileType[] = ['poison', 'cracked', 'rune', 'water'];
+  const hazardTypes: TileType[] = ['poison', 'cracked', 'rune'];
   const hazardCount = 3 + Math.floor(floor / 4);
   for (let i = 0; i < hazardCount; i++) {
     const x = irand(1, w - 2);
