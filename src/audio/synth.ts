@@ -189,10 +189,6 @@ const SONGS: Record<BgmName, () => Song> = {
   title: songTitle,
   // 実音源が取得できない場合だけ使うフォールバック。
   floor01: songTitle,
-  floor03: songRuins,
-  floor05: songTitle,
-  floor07: songMachine,
-  floor09: songFinal,
   midboss: songMachine,
   boss: songFinal,
   clear: songClear,

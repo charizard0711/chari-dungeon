@@ -17,13 +17,9 @@ export interface AudioDef {
 export const BGM_DEFS = {
   // タイトル画面：明るく不思議なレトロBGM
   title:    { key: 'bgm_title',    path: 'assets/audio/bgm_title.mp3',    volume: 0.5,  loop: true },
-  // ダンジョン：明るい冒険曲を2階ごとに切り替え、10階で一巡する
+  // 通常探索：1F〜30Fを通して「古樹と石環（ハープ版）」を流す
   floor01:  { key: 'bgm_floor01',  path: 'assets/audio/bgm_floors_01_02.wav', volume: 0.5, loop: true },
-  floor03:  { key: 'bgm_floor03',  path: 'assets/audio/bgm_floors_03_04.wav', volume: 0.5, loop: true },
-  floor05:  { key: 'bgm_floor05',  path: 'assets/audio/bgm_floors_05_06.wav', volume: 0.5, loop: true },
-  floor07:  { key: 'bgm_floor07',  path: 'assets/audio/bgm_floors_07_08.wav', volume: 0.5, loop: true },
-  floor09:  { key: 'bgm_floor09',  path: 'assets/audio/bgm_floors_09_10.wav', volume: 0.5, loop: true },
-  // 7x7中ボス部屋：入口封鎖から撃破まで流れる高速メタル戦闘曲
+  // 7x7中ボス部屋：入口封鎖から撃破まで流れる「蝕の儀式」（合唱・弦・ピアノ）
   midboss:  { key: 'bgm_midboss',  path: 'assets/audio/bgm_midboss.wav', volume: 0.44, loop: true },
   // 5階ごとの大ボス部屋：氷晶大聖堂（チェレスタ＋弦楽＋控えめな合唱）
   boss:     { key: 'bgm_boss',     path: 'assets/audio/bgm_boss.wav', volume: 0.46, loop: true },
@@ -36,10 +32,8 @@ export const BGM_DEFS = {
 export type BgmName = keyof typeof BGM_DEFS;
 
 // 階層 → BGMトラックのマッピング
-export function bgmForFloor(floor: number): BgmName {
-  // 2階ごとに曲を切り替え、5曲を循環させる（29F〜30Fは「黄金のゴール」）。
-  const band = Math.floor((Math.max(1, floor) - 1) / 2);
-  return (['floor01', 'floor03', 'floor05', 'floor07', 'floor09'] as const)[band % 5];
+export function bgmForFloor(_floor: number): BgmName {
+  return 'floor01';
 }
 
 // ---- 効果音（システム音）----
