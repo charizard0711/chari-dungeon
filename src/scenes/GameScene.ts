@@ -12,7 +12,7 @@ import { Enemy } from '../enemy';
 import { computePlayerAttack, computeEnemyAttack } from '../combat';
 import { Audio } from '../audio/manager';
 import { bgmForFloor, elementAttackSe, weaponAttackSe } from '../audio/config';
-import { enhancementChance, EQUIPMENT_LIMIT, SCROLL_DROP_RATE } from '../balance';
+import { enhancementChance, EQUIPMENT_LIMIT, ITEM_SELL_PRICES, SCROLL_DROP_RATE } from '../balance';
 import { getFloorLayoutProfile } from '../floorLayout';
 import {
   armorForGrade,
@@ -5414,6 +5414,24 @@ export class GameScene extends Phaser.Scene {
     this.player.inventory.push(makeItem(kind));
     this.shopPurchases[kind]++;
     this.log(`${ITEM_DEFS[kind].name}を${price}Gで購入した。`, 'item');
+    Audio.playSe('coin');
+    this.emitRefresh();
+    return true;
+  }
+
+  itemSellPrice(kind: ItemKind): number {
+    return ITEM_SELL_PRICES[kind];
+  }
+
+  sellItem(kind: ItemKind): boolean {
+    if (this.busy || this.gameEnded) return false;
+    const index = this.player.inventory.findIndex((item) => item.kind === kind);
+    if (index < 0) return false;
+    const item = this.player.inventory[index];
+    const price = this.itemSellPrice(kind);
+    this.player.inventory.splice(index, 1);
+    this.player.gold += price;
+    this.log(`${item.name}を1個、${price}Gで売却した。`, 'gold');
     Audio.playSe('coin');
     this.emitRefresh();
     return true;

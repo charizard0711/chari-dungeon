@@ -19,8 +19,8 @@ export const BGM_DEFS = {
   title:    { key: 'bgm_title',    path: 'assets/audio/bgm_title.mp3',    volume: 0.5,  loop: true },
   // 通常探索：1F〜30Fを通して「古樹と石環（ハープ版）」を流す
   floor01:  { key: 'bgm_floor01',  path: 'assets/audio/bgm_floors_01_02.wav', volume: 0.5, loop: true },
-  // 7x7中ボス部屋：入口封鎖から撃破まで流れる「蝕の儀式」（合唱・弦・ピアノ）
-  midboss:  { key: 'bgm_midboss',  path: 'assets/audio/bgm_midboss.wav', volume: 0.44, loop: true },
+  // 7x7中ボス部屋：入口封鎖から撃破まで「紅蓮ブースト」（184 BPM）
+  midboss:  { key: 'bgm_midboss',  path: 'assets/audio/bgm_midboss_crimson_boost.wav', volume: 0.16, loop: true },
   // 5階ごとの大ボス部屋：氷晶大聖堂（チェレスタ＋弦楽＋控えめな合唱）
   boss:     { key: 'bgm_boss',     path: 'assets/audio/bgm_boss.wav', volume: 0.46, loop: true },
   // クリア：短い勝利ジングル

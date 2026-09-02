@@ -1103,14 +1103,15 @@ export class UIScene extends Phaser.Scene {
     const listTitle = this.inventoryTab === 'equip'
       ? `所持装備　武器 ${p.weapons.length}/${EQUIPMENT_LIMIT}　服 ${p.armors.length}/${EQUIPMENT_LIMIT}　盾 ${p.shields.length}/${EQUIPMENT_LIMIT}`
       : this.inventoryTab === 'items'
-        ? `道具　${p.inventory.length}/60`
+        ? `道具　${p.inventory.length}/60　／ 売却は1個ずつ`
         : `所持品一覧　装備 ${equipmentEntries.length}　道具 ${p.inventory.length}`;
     this.overlay.add(this.add.text(x + 16, y + 160, listTitle, {
       fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '10px' : '12px', color: '#b8d8d6'
     }));
 
     const listY = y + 181;
-    const visibleCount = Math.max(4, Math.floor((h - 223) / 36));
+    const rowHeight = IS_MOBILE ? 64 : 36;
+    const visibleCount = Math.max(4, Math.floor((h - 223) / rowHeight));
     this.inventoryScrollMax = Math.max(0, entries.length - visibleCount);
     this.inventoryScrollIndex = Phaser.Math.Clamp(this.inventoryScrollIndex, 0, this.inventoryScrollMax);
 
@@ -1121,7 +1122,7 @@ export class UIScene extends Phaser.Scene {
     }
 
     entries.slice(this.inventoryScrollIndex, this.inventoryScrollIndex + visibleCount).forEach((entry, visibleIndex) => {
-      const cy = listY + visibleIndex * 36;
+      const cy = listY + visibleIndex * rowHeight;
       const actionW = IS_MOBILE ? 72 : 94;
       if (entry.type === 'weapon') {
         const wp = entry.item;
@@ -1157,12 +1158,20 @@ export class UIScene extends Phaser.Scene {
         this.overlay.add([...icon, row, action]);
       } else {
         const group = entry.group;
-        const count = group.count > 1 ? ` ×${group.count}` : '';
+        const count = ` ×${group.count}`;
         const icon = this.framedIcon(x + 33, cy + 14, group.item.textureKey, isRareItem(group.kind) ? 0xff5f67 : 0x2f6f6a, 32);
         const use = () => { this.gs.useItem(group.firstIndex); this.setOverlay('inv'); };
-        const row = this.rowButton(x + 54, cy, w - 76 - actionW, `${group.item.name}${count}　—　${group.item.desc}`, false, use);
-        const action = this.rowButton(x + w - actionW - 10, cy, actionW, '使用', false, use);
-        this.overlay.add([...icon, row, action]);
+        const sellW = 112;
+        const useW = 64;
+        const actionY = IS_MOBILE ? cy + 30 : cy;
+        const sellX = x + w - sellW - 10;
+        const useX = sellX - useW - 6;
+        const row = this.rowButton(x + 54, cy, IS_MOBILE ? w - 64 : useX - x - 60,
+          `${group.item.name}${count}　—　${group.item.desc}`, false, use);
+        const action = this.rowButton(useX, actionY, useW, '使用', false, use);
+        const sell = this.rowButton(sellX, actionY, sellW, `売却 ${this.gs.itemSellPrice(group.kind)}G`, false,
+          () => this.gs.sellItem(group.kind));
+        this.overlay.add([...icon, row, action, sell]);
       }
     });
 
@@ -1325,6 +1334,8 @@ export class UIScene extends Phaser.Scene {
       this.overlay.add([card, icon, title, stock, button]);
       cy += IS_MOBILE ? 116 : 102;
     }
+    this.overlay.add(this.rowButton(x + 20, cy + 8, w - 40, '消耗品を売る → 所持品の道具欄', false,
+      () => this.openInventory('items')));
   }
 
   // ============ ガチャ ============
