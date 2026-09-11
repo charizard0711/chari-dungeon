@@ -6,10 +6,12 @@ import { Audio } from '../audio/manager';
 import { PLAYER_SHEETS } from '../playerAppearance';
 import { MONSTER_ANIMATIONS } from '../monsterAnimation';
 import { DIRECTIONAL_MONSTERS } from '../monsterDirections';
+import { RUIN_TERRAIN_FLOORS, RUIN_TERRAIN_PARTS, ruinTerrainKey } from '../ruinTerrain';
 
 const EXPANSION_MONSTER_KEYS = [
   'm_black_mage', 'm_rival_male', 'm_rival_female',
   'm_silver_seraph', 'm_abyss_dragon', 'm_ice_knight', 'm_thunder_sovereign',
+  'm_fallen_angel', 'm_phoenix', 'm_unicorn', 'm_bone_reaper', 'm_ice_behemoth',
   'm_mush', 'm_mole', 'm_golem', 'm_spider', 'm_beetle', 'm_eye', 'm_wraith', 'm_reaper',
   'm_dark_ninja', 'm_obsidian_shogun', 'm_storm_minotaur', 'm_star_griffin', 'm_lucky_rabbit',
   'm_skel', 'm_archer', 'm_slime',
@@ -139,7 +141,13 @@ const TERRAIN_PROP_ART = {
   terrain_prop_map_table: 'assets/terrain/objects/room-props/map-table.png',
   terrain_prop_cooking_pot: 'assets/terrain/objects/room-props/cooking-pot.png',
   terrain_prop_minecart: 'assets/terrain/objects/room-props/minecart.png',
-  terrain_prop_bone_pile: 'assets/terrain/objects/room-props/bone-pile.png'
+  terrain_prop_bone_pile: 'assets/terrain/objects/room-props/bone-pile.png',
+  terrain_glacial_floor: 'assets/terrain/glacial/floor.png',
+  terrain_glacial_wall: 'assets/terrain/glacial/wall.png',
+  terrain_glacial_crystal: 'assets/terrain/glacial/crystal.png',
+  terrain_glacial_obelisk: 'assets/terrain/glacial/obelisk.png',
+  terrain_glacial_boulder: 'assets/terrain/glacial/boulder.png',
+  terrain_glacial_altar: 'assets/terrain/glacial/altar.png'
 } as const;
 
 export class BootScene extends Phaser.Scene {
@@ -148,6 +156,9 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload() {
+    for (const floor of RUIN_TERRAIN_FLOORS) for (const part of RUIN_TERRAIN_PARTS) {
+      this.load.image(ruinTerrainKey(floor, part), `assets/terrain/ruins-low-v1/${floor}/${part}.png`);
+    }
     // アセットシート（public/assets/）を読み込む
     this.load.image('sheet_characters', 'assets/characters.png');
     this.load.image('sheet_monsters', 'assets/monsters.png');

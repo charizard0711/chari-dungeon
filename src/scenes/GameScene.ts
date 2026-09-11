@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { TILE } from '../textures';
+import { hasRuinTerrain, ruinTerrainKey } from '../ruinTerrain';
 import { generateDungeon, generateBossArena, DungeonData, randomFloor, isWalkable } from '../dungeon';
 import type { BossRoomZone, OptionalRoom, OptionalRoomKind, Room } from '../dungeon';
 import { getTheme, eraSuffix, MONSTER_DEFS, WEAPON_DEFS, makeItem, gradeColor, ITEM_DEFS, ELEMENT_INFO, monsterElement } from '../data';
@@ -87,7 +88,7 @@ const MILESTONE_BOSSES: Record<number, { key: string; name: string; tint: number
   5: { key: 'm_archdemon', name: '封印王アウレリウス', tint: 0xffc96b, scale: 1.72, hp: 96, atkMin: 6, atkMax: 11, def: 4 },
   10: { key: 'm_horn_demon', name: 'グランドバイソン', tint: 0xc98b52, scale: 1.82, hp: 150, atkMin: 9, atkMax: 16, def: 7 },
   15: { key: 'm_bone_colossus', name: '炉心王タイタン', tint: 0xff9a45, scale: 1.9, hp: 220, atkMin: 11, atkMax: 19, def: 10 },
-  20: { key: 'm_frost_wyrm', name: 'アズールドラゴン', tint: 0x4fa8ff, scale: 1.85, hp: 310, atkMin: 14, atkMax: 23, def: 12 },
+  20: { key: 'm_ice_behemoth', name: '氷晶王ベヒーモス', tint: 0x8adfff, scale: 1.85, hp: 310, atkMin: 14, atkMax: 23, def: 12 },
   25: { key: 'm_brass_dragon', name: 'エンシェントドラゴン', tint: 0xff8c42, scale: 1.92, hp: 410, atkMin: 17, atkMax: 28, def: 15 },
   30: { key: 'm_hydra', name: 'トライヘッド・ドラゴン', tint: 0xb072ff, scale: 2.05, hp: 580, atkMin: 20, atkMax: 34, def: 18 }
 };
@@ -172,7 +173,8 @@ interface TerrainDetailVisual {
 }
 
 type HealingDungeonObjectKind = 'fountain';
-type RoomPropKind = 'barrel' | 'jar' | 'crates' | 'weaponRack' | 'mapTable' | 'cookingPot' | 'minecart' | 'bonePile';
+type RoomPropKind = 'barrel' | 'jar' | 'crates' | 'weaponRack' | 'mapTable' | 'cookingPot' | 'minecart' | 'bonePile'
+  | 'iceCrystal' | 'iceObelisk' | 'snowBoulder' | 'iceAltar' | 'ruinRelic' | 'ruinRubble';
 type DungeonObjectKind = HealingDungeonObjectKind | RoomPropKind;
 
 interface DungeonObject {
@@ -217,7 +219,7 @@ interface TerrainVisual {
 type BossGimmickKind =
   | 'mid_fire' | 'mid_frost' | 'mid_storm' | 'mid_void' | 'mid_bone' | 'mid_poison'
   | 'mid_magic' | 'mid_rival'
-  | 'bull_charge' | 'furnace_titan' | 'azure_flight' | 'ancient_fire' | 'tri_head';
+  | 'bull_charge' | 'furnace_titan' | 'glacial_slam' | 'ancient_fire' | 'tri_head';
 
 type BossHazardKind = 'fire' | 'ice' | 'poison' | 'slow' | 'web' | 'lightning';
 type BossStrikeChannel = 'primary' | 'secondary' | 'tertiary';
@@ -595,7 +597,8 @@ export class GameScene extends Phaser.Scene {
       }
     }
     if (location.hostname === 'localhost' && qaParams.has('qa-room-props')) {
-      const prop = this.dungeonObjects.find((object) => object.kind === 'barrel' || object.kind === 'jar');
+      const prop = this.dungeonObjects.find((object) => qaParams.get('qa-room-props') === 'ice'
+        ? object.kind === 'iceCrystal' : object.kind === 'barrel' || object.kind === 'jar');
       if (prop) {
         const containingRoom = this.optionalRoomContaining(prop.x, prop.y);
         if (containingRoom && !containingRoom.opened) this.openOptionalRoom(containingRoom);
@@ -862,7 +865,8 @@ export class GameScene extends Phaser.Scene {
       if (containingRoom && !containingRoom.opened) this.openOptionalRoom(containingRoom);
     }
     if (location.hostname === 'localhost' && qaParamsForFloor.has('qa-room-props')) {
-      const prop = this.dungeonObjects.find((object) => object.kind === 'barrel' || object.kind === 'jar');
+      const prop = this.dungeonObjects.find((object) => qaParamsForFloor.get('qa-room-props') === 'ice'
+        ? object.kind === 'iceCrystal' : object.kind === 'barrel' || object.kind === 'jar');
       const containingRoom = prop ? this.optionalRoomContaining(prop.x, prop.y) : undefined;
       if (containingRoom && !containingRoom.opened) this.openOptionalRoom(containingRoom);
     }
@@ -921,8 +925,8 @@ export class GameScene extends Phaser.Scene {
       : floor === 5
         ? `${floor}F「${getTheme(floor).name}」に到達。この階に中ボスはおらず、最奥の扉は${floor}.5Fへ通じている。`
         : floor % 5 === 0
-          ? `${floor}F「${getTheme(floor).name}」に到達。迷路内の7×7部屋で中ボスを倒すと、同じ部屋の扉から${floor}.5Fへ進める。`
-          : `${floor}F「${getTheme(floor).name}」に到達。迷路内の7×7部屋で中ボスを倒すと、同じ部屋に階段が現れる。`;
+          ? `${floor}F「${getTheme(floor).name}」に到達。迷路内の10×10部屋で中ボスを倒すと、同じ部屋の扉から${floor}.5Fへ進める。`
+          : `${floor}F「${getTheme(floor).name}」に到達。迷路内の10×10部屋で中ボスを倒すと、同じ部屋に階段が現れる。`;
     this.log(floorIntro, 'sys');
     const bossDirection = this.bossCompassDirection();
     if (!bossRoom && bossDirection) {
@@ -946,7 +950,12 @@ export class GameScene extends Phaser.Scene {
     return WORLD_DEPTH_BASE + (worldY + offset) * WORLD_DEPTH_Y_SCALE;
   }
 
+  usesGlacialTerrain(): boolean {
+    return !!this.dungeon.glacialArena || (!this.inBossRoom && this.dungeon.biome === 'frost');
+  }
+
   createWallFacades(era: number) {
+    if (this.usesGlacialTerrain() || hasRuinTerrain(this.floor)) return;
     const d = this.dungeon;
     const texture = `terrain_wall_facade_${era}`;
     for (let y = 0; y < d.h; y++) {
@@ -990,6 +999,17 @@ export class GameScene extends Phaser.Scene {
   }
 
   tileVisual(t: TileType, era: number, x: number, y: number): TerrainVisual {
+    if (this.dungeon.glacialArena) {
+      const propCell = this.dungeon.glacialArena.props.some(p => p.blocking && p.x === x && p.y === y);
+      if (t === 'floor' || (t === 'wall' && propCell)) return { key: 'terrain_glacial_floor' };
+      if (t === 'wall') return { key: 'terrain_glacial_wall', flipX: (x + y) % 2 === 0 };
+    }
+    if (t === 'wall' && this.usesGlacialTerrain()) {
+      return { key: 'terrain_glacial_wall', flipX: (x + y) % 2 === 0 };
+    }
+    if (t === 'wall' && hasRuinTerrain(this.floor)) {
+      return { key: ruinTerrainKey(this.floor, (x * 13 + y * 7) % 3 === 0 ? 'wall-b' : 'wall-a') };
+    }
     const suffix = eraSuffix(era);
     const bossEntry = this.dungeon?.bossEntry;
     if (t === 'floor' && bossEntry && x === bossEntry.x && y === bossEntry.y
@@ -1066,9 +1086,24 @@ export class GameScene extends Phaser.Scene {
   createBossRoomVisuals(era: number, accent: number) {
     const room = this.dungeon.bossRoom;
     if (!room) return;
-    // 埋め込み型の7x7中ボス部屋は、通常タイルの床だけで描く。
+    if (this.dungeon.glacialArena) {
+      // Supply the floor beneath the sealed stair, whose own tile is an object.
+      const stairs = this.dungeon.stairs;
+      this.bossRoomDecorSprites.push(this.add.image(stairs.x * TILE + TILE / 2, stairs.y * TILE + TILE / 2,
+        'terrain_glacial_floor').setDisplaySize(TERRAIN_RENDER_SIZE, TERRAIN_RENDER_SIZE).setDepth(0));
+      for (const prop of this.dungeon.glacialArena.props) {
+        const size = prop.kind === 'altar' ? TILE * 3 : prop.kind === 'boulder' ? TILE * 1.65 : TILE * 2.2;
+        const sprite = this.add.image(prop.x * TILE + TILE / 2, prop.y * TILE + TILE / 2,
+          `terrain_glacial_${prop.kind}`).setDisplaySize(size, size)
+          .setOrigin(0.5, prop.kind === 'altar' ? 0.5 : 0.78)
+          .setDepth(prop.blocking ? this.worldDepth(prop.y * TILE + TILE, -0.2) : 0.3);
+        this.bossRoomDecorSprites.push(sprite);
+      }
+      return;
+    }
+    // 埋め込み型の中ボス部屋は、通常タイルの床だけで描く。
     // 大きな背景絵に含まれていた内壁と、外周の実壁が二重に見えるのを防ぐ。
-    if (room.w === 7 && room.h === 7) return;
+    if (!this.inBossRoom) return;
     this.createBossFloorDecor(accent);
   }
 
@@ -1301,14 +1336,15 @@ export class GameScene extends Phaser.Scene {
       ? `◆ ${floor}F 中ボス「${def.name}」が迷宮内のどこかに現れた！`
       : this.inBossRoom
         ? `◆ ${floor}.5F 中ボス「${def.name}」が現れた！`
-        : `◆ ${floor}F 7×7の専用部屋から強い気配がする。入口を探せ。`;
+        : `◆ ${floor}F 10×10の専用部屋から強い気配がする。入口を探せ。`;
     this.placeFloorBoss(def, custom && !custom.isDragonType ? 1 : 1.32, spec.tint, message, this.midBossGimmick(base.key), fieldPlacement);
   }
 
   spawnMilestoneBoss(floor: number) {
     const spec = MILESTONE_BOSSES[floor];
     if (!spec) return;
-    const base = MONSTER_DEFS.find((m) => m.key === spec.key) ?? MONSTER_DEFS[0];
+    const custom = customFloorBoss(floor, this.playerGender);
+    const base = custom ?? MONSTER_DEFS.find((m) => m.key === spec.key) ?? MONSTER_DEFS[0];
     const def: MonsterDef = {
       ...base,
       name: spec.name,
@@ -1324,8 +1360,8 @@ export class GameScene extends Phaser.Scene {
       isElite: true,
       isBoss: floor === 30,
       isFloorBoss: true,
-      isDragonType: floor >= 20,
-      bossTint: floor === 15 ? 0xffffff : spec.tint
+      isDragonType: custom ? custom.isDragonType : floor >= 20,
+      bossTint: custom || floor === 15 ? 0xffffff : spec.tint
     };
     const label = floor % 10 === 0
       ? `★★ ${floor}.5F 超ボス「${def.name}」が降臨した！`
@@ -1358,8 +1394,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   midBossGimmick(key: string): BossGimmickKind {
+    if (key === 'm_unicorn') return 'mid_magic';
+    if (key === 'm_ice_behemoth') return 'glacial_slam';
     if (key === 'm_black_mage' || key === 'm_silver_seraph') return 'mid_magic';
-    if (key === 'm_abyss_dragon') return 'mid_void';
+    if (key === 'm_abyss_dragon' || key === 'm_fallen_angel') return 'mid_void';
     if (key === 'm_ice_knight') return 'mid_frost';
     if (key === 'm_thunder_sovereign') return 'mid_storm';
     if (key.startsWith('m_rival_')) return 'mid_rival';
@@ -1374,7 +1412,7 @@ export class GameScene extends Phaser.Scene {
   milestoneGimmick(floor: number): BossGimmickKind {
     return ({
       5: 'mid_fire', 10: 'bull_charge', 15: 'furnace_titan',
-      20: 'azure_flight', 25: 'ancient_fire', 30: 'tri_head'
+      20: 'glacial_slam', 25: 'ancient_fire', 30: 'tri_head'
     } as Record<number, BossGimmickKind>)[floor] ?? 'mid_fire';
   }
 
@@ -1397,7 +1435,7 @@ export class GameScene extends Phaser.Scene {
   isInsideBossCombatFrame(x: number, y: number): boolean {
     const room = this.dungeon?.bossRoom;
     if (!room) return true;
-    // N.5Fの専用アリーナは端まで開放する。7x7中ボス部屋は大型ボスが外壁へ重ならないよう1マスだけ空ける。
+    // N.5Fの専用アリーナは端まで開放する。中ボス部屋は大型ボスが外壁へ重ならないよう1マスだけ空ける。
     const inset = this.inBossRoom ? 0 : 1;
     return x >= room.x + inset && x < room.x + room.w - inset
       && y >= room.y + inset && y < room.y + room.h - inset;
@@ -1518,7 +1556,7 @@ export class GameScene extends Phaser.Scene {
       for (let x = room.x; x < room.x + room.w; x++) candidates.push({ x, y });
     }
     if (entry) {
-      // 埋め込み7×7部屋の中ボスは、唯一の入口から最も遠い床を初期位置にする。
+      // 埋め込み10×10部屋の中ボスは、唯一の入口から最も遠い床を初期位置にする。
       candidates.sort((a, b) => {
         const distanceA = Math.abs(a.x - entry.x) + Math.abs(a.y - entry.y);
         const distanceB = Math.abs(b.x - entry.x) + Math.abs(b.y - entry.y);
@@ -1695,13 +1733,15 @@ export class GameScene extends Phaser.Scene {
     const tile = this.dungeon.tiles[y]?.[x];
     const insideGimmickArea = this.dungeon.bossRoom ? this.isInsideBossCombatFrame(x, y) : true;
     return insideGimmickArea && !!tile && isWalkable(tile)
-      && tile !== 'pit' && tile !== 'stairs' && tile !== 'door' && tile !== 'roomDoor';
+      && tile !== 'pit' && tile !== 'stairs' && tile !== 'door' && tile !== 'roomDoor'
+      && !this.dungeonObjectAt(x, y);
   }
 
   validMonsterTile(x: number, y: number): boolean {
     const tile = this.dungeon.tiles[y]?.[x];
     const insideCombatFrame = !this.inBossRoom || this.isInsideBossCombatFrame(x, y);
-    return insideCombatFrame && !!tile && isWalkable(tile) && tile !== 'pit' && tile !== 'stairs' && tile !== 'door';
+    return insideCombatFrame && !!tile && isWalkable(tile) && tile !== 'pit' && tile !== 'stairs' && tile !== 'door'
+      && !this.dungeonObjectAt(x, y);
   }
 
   uniqueBossTiles(tiles: Vec2[]): Vec2[] {
@@ -1883,13 +1923,9 @@ export class GameScene extends Phaser.Scene {
         tiles = this.bossCrossTiles(p.x, p.y, 2);
         message = '炉心王タイタンが大地を踏み砕く！ 灼熱の炉鉄壁に注意。';
         break;
-      case 'azure_flight': {
-        destination = this.findBossDestination(e, true) ?? undefined;
-        if (!destination) return null;
-        this.teleportBoss(e, destination);
-        const horizontal = destination.y === p.y;
-        tiles = this.bossRoomLine(horizontal, horizontal ? p.y : p.x);
-        message = 'アズールドラゴンが飛翔！ 氷結ブレスの射線から逃げろ。';
+      case 'glacial_slam': {
+        tiles = this.bossCrossTiles(p.x, p.y, state.phaseTwo ? 3 : 2);
+        message = '氷晶王ベヒーモスが両腕を振り上げた！ 氷晶震撃の予告マスから離れろ。';
         break;
       }
       case 'ancient_fire':
@@ -2028,8 +2064,8 @@ export class GameScene extends Phaser.Scene {
           if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.92, '炉心震撃！');
           this.spawnBossWalls(e, primary, state.phaseTwo ? 2 : 1, 'iron');
           break;
-        case 'azure_flight':
-          if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.86, '氷結ブレス！');
+        case 'glacial_slam':
+          if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.86, '氷晶震撃！');
           this.addBossHazards(primary, 'ice', 4);
           break;
         case 'ancient_fire':
@@ -2081,7 +2117,7 @@ export class GameScene extends Phaser.Scene {
       return channel === 'primary' ? 'fire' : channel === 'secondary' ? 'ice' : 'poison';
     }
     if (kind === 'mid_fire' || kind === 'ancient_fire') return 'fire';
-    if (kind === 'mid_frost' || kind === 'azure_flight') return 'ice';
+    if (kind === 'mid_frost' || kind === 'glacial_slam') return 'ice';
     if (kind === 'mid_storm') return 'lightning';
     if (kind === 'mid_void') return 'void';
     if (kind === 'mid_bone') return 'bone';
@@ -2356,10 +2392,22 @@ export class GameScene extends Phaser.Scene {
   }
 
   roomPropTexture(kind: RoomPropKind) {
+    if (kind === 'ruinRelic' || kind === 'ruinRubble') {
+      return ruinTerrainKey(this.floor, kind === 'ruinRelic' ? 'relic' : 'rubble');
+    }
+    const iceTextures: Partial<Record<RoomPropKind, string>> = {
+      iceCrystal: 'terrain_glacial_crystal', iceObelisk: 'terrain_glacial_obelisk',
+      snowBoulder: 'terrain_glacial_boulder', iceAltar: 'terrain_glacial_altar'
+    };
+    if (iceTextures[kind]) return iceTextures[kind]!;
     return `terrain_prop_${kind.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)}`;
   }
 
   roomPropRenderTiles(kind: RoomPropKind) {
+    if (kind === 'ruinRelic' || kind === 'ruinRubble') return 1.05;
+    if (kind === 'iceCrystal') return 1.45;
+    if (kind === 'iceObelisk') return 1.65;
+    if (kind === 'snowBoulder' || kind === 'iceAltar') return 1.25;
     if (kind === 'weaponRack' || kind === 'mapTable') return 0.84;
     if (kind === 'crates' || kind === 'minecart') return 0.82;
     if (kind === 'cookingPot') return 0.78;
@@ -2369,13 +2417,17 @@ export class GameScene extends Phaser.Scene {
   }
 
   roomPropChoices(kind?: OptionalRoomKind): RoomPropKind[] {
+    if (hasRuinTerrain(this.floor)) return ['ruinRubble', 'ruinRelic', 'crates', 'jar'];
+    if (this.dungeon.biome === 'frost') {
+      return kind === 'shrine' ? ['iceAltar', 'iceObelisk', 'iceCrystal']
+        : ['iceCrystal', 'iceObelisk', 'snowBoulder', 'iceAltar'];
+    }
     if (kind === 'treasure') return ['barrel', 'jar', 'crates', 'barrel', 'crates'];
     if (kind === 'ambush') return ['bonePile', 'weaponRack', 'barrel', 'jar'];
     if (kind === 'shrine') return ['cookingPot', 'mapTable', 'jar', 'bonePile'];
     if (kind === 'hazard') return ['minecart', 'bonePile', 'crates', 'jar'];
     const byBiome: Partial<Record<typeof this.dungeon.biome, RoomPropKind[]>> = {
       aqueduct: ['jar', 'barrel', 'crates', 'cookingPot'],
-      frost: ['crates', 'weaponRack', 'bonePile', 'barrel'],
       magma: ['cookingPot', 'minecart', 'crates', 'barrel'],
       storm: ['weaponRack', 'mapTable', 'crates', 'jar'],
       void: ['bonePile', 'jar', 'weaponRack', 'mapTable']
@@ -2398,7 +2450,13 @@ export class GameScene extends Phaser.Scene {
         || position.y < room.y || position.y >= room.y + room.h) continue;
       unique.set(`${position.x},${position.y}`, position);
     }
-    return Phaser.Utils.Array.Shuffle([...unique.values()]);
+    const edges = Phaser.Utils.Array.Shuffle([...unique.values()]);
+    // Rounded rooms may have few usable corners. Try their open interior only after the edges.
+    const interior: Vec2[] = [];
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      if (!unique.has(`${x},${y}`)) interior.push({ x, y });
+    }
+    return [...edges, ...Phaser.Utils.Array.Shuffle(interior)];
   }
 
   canPlaceRoomProp(position: Vec2) {
@@ -2426,6 +2484,15 @@ export class GameScene extends Phaser.Scene {
     return reserved.some((cell) => cell.x === position.x && cell.y === position.y);
   }
 
+  canPlacePermanentDecor(position: Vec2) {
+    // Keep a traversable ring around permanent props. Containers can still be broken to pass.
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const x = position.x + dx, y = position.y + dy, object = this.dungeonObjectAt(x, y);
+      if (this.dungeon.tiles[y]?.[x] !== 'floor' || (object && !object.breakable)) return false;
+    }
+    return true;
+  }
+
   spawnRoomProps(floor: number) {
     const optionalByRoom = new Map(this.dungeon.optionalRooms.map((optional) => [optional.room, optional.kind]));
     const rooms = this.dungeon.rooms.filter((room) => room !== this.dungeon.bossRoom
@@ -2434,14 +2501,18 @@ export class GameScene extends Phaser.Scene {
     for (const room of Phaser.Utils.Array.Shuffle([...rooms])) {
       if (room.w < 5 || room.h < 5) continue;
       const optionalKind = optionalByRoom.get(room);
-      const targetCount = optionalKind ? 2 : (room.w >= 7 && room.h >= 7 ? 3 : 1);
+      const targetCount = optionalKind ? 3 : (room.w >= 7 && room.h >= 7 ? 4 : 2);
       const choices = this.roomPropChoices(optionalKind);
       let placed = 0;
       for (const position of this.roomPropCandidates(room)) {
         if (placed >= targetCount || !this.canPlaceRoomProp(position)
           || this.isReservedOptionalRoomCell(room, optionalKind, position)) continue;
         let kind = choices[Math.floor(Math.random() * choices.length)];
+        if (this.dungeon.biome === 'frost') {
+          kind = choices.find(choice => !this.dungeonObjects.some(object => object.kind === choice)) ?? kind;
+        }
         if (breakableCount < 5 && placed === 0) kind = breakableCount % 2 === 0 ? 'barrel' : 'jar';
+        if (kind !== 'barrel' && kind !== 'jar' && !this.canPlacePermanentDecor(position)) continue;
         this.addDungeonObject(kind, position.x, position.y, 1, 1, kind === 'barrel' || kind === 'jar');
         if (kind === 'barrel' || kind === 'jar') breakableCount++;
         placed++;
@@ -2453,16 +2524,20 @@ export class GameScene extends Phaser.Scene {
     for (const room of fallbackRooms) {
       if (breakableCount >= 6) break;
       const optionalKind = optionalByRoom.get(room);
-      const position = this.roomPropCandidates(room).find((candidate) => this.canPlaceRoomProp(candidate)
-        && !this.isReservedOptionalRoomCell(room, optionalKind, candidate));
-      if (!position) continue;
-      const kind: RoomPropKind = breakableCount % 2 === 0 ? 'barrel' : 'jar';
-      this.addDungeonObject(kind, position.x, position.y, 1, 1, true);
-      breakableCount++;
+      do {
+        const position = this.roomPropCandidates(room).find((candidate) => this.canPlaceRoomProp(candidate)
+          && !this.isReservedOptionalRoomCell(room, optionalKind, candidate));
+        if (!position) break;
+        const kind: RoomPropKind = breakableCount % 2 === 0 ? 'barrel' : 'jar';
+        this.addDungeonObject(kind, position.x, position.y, 1, 1, true);
+        breakableCount++;
+      } while (breakableCount < 6);
     }
 
-    // 大部屋を見渡した時に用途の違いが出るよう、装飾6種も各階に最低1つずつ保証する。
-    const requiredDecor: RoomPropKind[] = ['crates', 'weaponRack', 'mapTable', 'cookingPot', 'minecart', 'bonePile'];
+    // 各テーマの装飾を一通り置く。氷マップには20階の氷オブジェクトを小さく配置する。
+    const requiredDecor: RoomPropKind[] = hasRuinTerrain(this.floor) ? ['ruinRelic', 'ruinRubble'] : this.dungeon.biome === 'frost'
+      ? ['iceCrystal', 'iceObelisk', 'snowBoulder', 'iceAltar']
+      : ['crates', 'weaponRack', 'mapTable', 'cookingPot', 'minecart', 'bonePile'];
     requiredDecor.forEach((kind, index) => {
       if (this.dungeonObjects.some((object) => object.kind === kind)) return;
       const offset = fallbackRooms.length ? (floor + index) % fallbackRooms.length : 0;
@@ -2470,11 +2545,29 @@ export class GameScene extends Phaser.Scene {
       for (const room of orderedRooms) {
         const optionalKind = optionalByRoom.get(room);
         const position = this.roomPropCandidates(room).find((candidate) => this.canPlaceRoomProp(candidate)
-          && !this.isReservedOptionalRoomCell(room, optionalKind, candidate));
+          && !this.isReservedOptionalRoomCell(room, optionalKind, candidate)
+          && this.canPlacePermanentDecor(candidate));
         if (!position) continue;
         this.addDungeonObject(kind, position.x, position.y, 1, 1, false);
         break;
       }
+    });
+    this.spawnFieldBossRoomProps();
+  }
+
+  spawnFieldBossRoomProps() {
+    const room = this.dungeon.bossRoom;
+    if (this.inBossRoom || !room) return;
+    const choices = this.roomPropChoices().filter(kind => kind !== 'barrel' && kind !== 'jar');
+    const kinds: RoomPropKind[] = [choices[0], 'barrel', 'jar', choices[1] ?? choices[0]];
+    const corners = [
+      { x: room.x + 1, y: room.y + 1 }, { x: room.x + room.w - 2, y: room.y + 1 },
+      { x: room.x + 1, y: room.y + room.h - 2 }, { x: room.x + room.w - 2, y: room.y + room.h - 2 }
+    ];
+    corners.forEach((position, index) => {
+      if (!this.canPlaceRoomProp(position) || !this.canPlacePermanentDecor(position)) return;
+      const kind = kinds[index];
+      this.addDungeonObject(kind, position.x, position.y, 1, 1, kind === 'barrel' || kind === 'jar');
     });
   }
 
@@ -2581,7 +2674,13 @@ export class GameScene extends Phaser.Scene {
       mapTable: '古い探索図だ。歩いた場所が書き足されている。',
       cookingPot: 'まだ少し温かい。誰かがここで休んでいたようだ。',
       minecart: '黒い鉱石を満載したトロッコだ。びくともしない。',
-      bonePile: '古い骨が積まれている。近づかないほうがよさそうだ。'
+      bonePile: '古い骨が積まれている。近づかないほうがよさそうだ。',
+      ruinRelic: '古い石造りの遺物だ。長い年月を感じさせる。',
+      ruinRubble: '崩れた石が積もっている。通り道は脇に続いている。',
+      iceCrystal: '透き通った氷晶だ。奥から青白い光が漏れている。',
+      iceObelisk: '厚い霜に覆われた氷の柱だ。紋様がかすかに光っている。',
+      snowBoulder: '雪をかぶった氷岩だ。表面は硬く凍りついている。',
+      iceAltar: '雪の結晶が刻まれた祭壇だ。静かな冷気が漂っている。'
     };
     this.log(message[object.kind] ?? '古びたダンジョンの置物だ。', 'sys');
   }
@@ -2761,7 +2860,7 @@ export class GameScene extends Phaser.Scene {
         } else {
           this.log(isExitDoor
             ? '中ボスを倒すまで階段の封印は解けない。'
-            : '戦闘中は7×7部屋の入口が封鎖されている。', 'sys');
+            : '戦闘中は10×10部屋の入口が封鎖されている。', 'sys');
           Audio.playSe('deny');
         }
         return;
@@ -3077,7 +3176,7 @@ export class GameScene extends Phaser.Scene {
   async playerAttack(e: Enemy, dir: Dir, ranged = false) {
     if (e.def.isFloorBoss && this.dungeon.bossRoom
       && (!this.isInsideBossRoom(this.player.x, this.player.y) || !this.isInsideBossRoom(e.x, e.y))) {
-      this.log('中ボスへの攻撃と技は7×7の専用エリア内でだけ使える。', 'sys');
+      this.log('中ボスへの攻撃と技は10×10の専用エリア内でだけ使える。', 'sys');
       Audio.playSe('deny');
       return;
     }
@@ -3364,8 +3463,8 @@ export class GameScene extends Phaser.Scene {
     this.log(this.inBossRoom
       ? `${bossName}を撃破！ 報酬がその場にドロップし、出口の封印が解けた。`
       : this.floorHasGate(this.floor)
-        ? `${bossName}を撃破！ 報酬がその場にドロップし、7×7部屋内の強ボス扉が開いた。`
-        : `${bossName}を撃破！ 報酬がその場にドロップし、7×7部屋内に階段が現れた。`, 'special');
+        ? `${bossName}を撃破！ 報酬がその場にドロップし、10×10部屋内の強ボス扉が開いた。`
+        : `${bossName}を撃破！ 報酬がその場にドロップし、10×10部屋内に階段が現れた。`, 'special');
     this.updateVisibility();
     this.emitRefresh();
   }
@@ -4693,6 +4792,9 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
+    // Painted low walls have their own faces; tall stone buttresses would cover them.
+    if (this.usesGlacialTerrain() || hasRuinTerrain(this.floor)) return;
+
     for (let y = 1; y < d.h - 1; y++) {
       for (let x = 1; x < d.w - 1; x++) {
         if (d.tiles[y][x] !== 'wall' || insideBossRoom(x, y, 1)) continue;
@@ -4807,8 +4909,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     // 視界内の床に接する最初の壁面は表示する。壁の先の床へは視界を伝播させない。
-    // 中ボス部屋へ入った後は、松明なしでも専用の7x7床全体を見せる。
-    if (playerInsideBossRoom && d.bossRoom && d.bossRoom.w === 7 && d.bossRoom.h === 7) {
+    // 中ボス部屋へ入った後は、松明なしでも部屋全体を見せる。
+    if (playerInsideBossRoom && d.bossRoom && (d.glacialArena || !this.inBossRoom)) {
       for (let y = d.bossRoom.y; y < d.bossRoom.y + d.bossRoom.h; y++) {
         for (let x = d.bossRoom.x; x < d.bossRoom.x + d.bossRoom.w; x++) {
           visible[y][x] = true;
@@ -4855,7 +4957,7 @@ export class GameScene extends Phaser.Scene {
         }
         if (visible[y][x]) {
           spr.setVisible(true);
-          spr.setTint(isWall ? WALL_VISIBLE_TINT : isBossRoomFloor ? BOSS_ROOM_FLOOR_TINT : this.themeTileTint);
+          spr.setTint(this.usesGlacialTerrain() ? 0xffffff : isWall ? WALL_VISIBLE_TINT : isBossRoomFloor ? BOSS_ROOM_FLOOR_TINT : this.themeTileTint);
           if (previousState !== 'visible') {
             spr.setAlpha(.16);
             this.tweens.add({ targets: spr, alpha: 1, duration: 260, ease: 'Quad.easeOut' });
@@ -5707,7 +5809,7 @@ export class GameScene extends Phaser.Scene {
   doDescend() {
     if (this.gameEnded) return;
     if (!this.inBossRoom && this.dungeon.bossRoom && !this.floorBossDefeated) {
-      this.log('7×7部屋の中ボスを倒すまで次の階へは進めない。', 'sys');
+      this.log('10×10部屋の中ボスを倒すまで次の階へは進めない。', 'sys');
       Audio.playSe('deny');
       this.busy = false;
       return;
@@ -6355,12 +6457,13 @@ export class GameScene extends Phaser.Scene {
     if (facePlayer) this.faceEnemyToward(e, this.player);
     this.updateEnemyDirection(e);
     e.animating = true;
-    const x = e.x * TILE + TILE / 2, y = e.y * TILE + TILE / 2;
     const [dx, dy] = this.dirVec(e.facing);
     const half = this.currentTurnAnimDuration(ANIM) / 2;
     e.directionMotion = { kind: 'attack', startedAt: this.time.now, duration: half * 2, dx, dy };
     // Ranged attacks launch immediately, keeping their existing projectile timing.
     const release = immediate && e.alive && !this.gameEnded ? impact() : undefined;
+    // A cast can teleport the enemy; sway and recovery must use its new position.
+    const x = e.x * TILE + TILE / 2, y = e.y * TILE + TILE / 2;
     await this.tween(e.sprite, { x: x + dx * 3, y: y + dy * 3 }, half, 'Sine.easeInOut');
     if (!e.sprite.active) return;
     const recovery = this.tween(e.sprite, { x, y }, half, 'Sine.easeInOut');

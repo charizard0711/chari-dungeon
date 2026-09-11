@@ -127,7 +127,7 @@ for (const boost of [0, 2]) {
     assert.equal(e.animating, false);
   }
 }
-assert.deepEqual(DIRECTIONAL_MONSTERS.map(art => art.monsterKey), ['m_ember_drake', 'm_frost_wyrm', 'm_storm_wyvern', 'm_brass_dragon', 'm_archdemon', 'm_bone_dragon', 'm_hydra', 'm_black_mage', 'm_rival_male', 'm_rival_female', 'm_horn_demon', 'm_silver_seraph', 'm_abyss_dragon', 'm_ice_knight', 'm_thunder_sovereign', 'm_bone_colossus']);
+assert.deepEqual(DIRECTIONAL_MONSTERS.map(art => art.monsterKey), ['m_ember_drake', 'm_frost_wyrm', 'm_storm_wyvern', 'm_brass_dragon', 'm_archdemon', 'm_bone_dragon', 'm_hydra', 'm_black_mage', 'm_rival_male', 'm_rival_female', 'm_horn_demon', 'm_silver_seraph', 'm_abyss_dragon', 'm_ice_knight', 'm_thunder_sovereign', 'm_bone_colossus', 'm_fallen_angel', 'm_phoenix', 'm_unicorn', 'm_bone_reaper', 'm_ice_behemoth']);
 assert.equal(new Set(DIRECTIONAL_MONSTERS.map(art => art.textureKey)).size, DIRECTIONAL_MONSTERS.length, 'each species needs its own drawings');
 assert.equal(new Set(Object.values(MONSTER_DIRECTION_FRAME)).size, 4);
 for (const art of DIRECTIONAL_MONSTERS) {
@@ -192,4 +192,21 @@ for (const art of DIRECTIONAL_MONSTERS) for (const facing of ['down', 'left', 'r
     assert.equal(e.animating, false);
   }
 }
-console.log('PASS: input buffering, held repeat, release, overlays, click/touch, four fixed direction frames, continuous pose joins, unchanged movement coordinates and scale, eased movement, and attack timing.');
+for (const key of ['m_abyss_dragon', 'm_fallen_angel']) {
+  const h = harness();
+  h.time = { now: 1000 }; h.dirVec = () => [1, 0];
+  h.updateEnemyDirection = () => {};
+  const e = { x: 1, y: 2, facing: 'right', alive: true, directionArt: DIRECTIONAL_MONSTERS.find(a => a.monsterKey === key),
+    sprite: { x: 48, y: 80, active: true } };
+  const targets = [];
+  h.tween = async (sprite, props) => { targets.push({ ...props }); Object.assign(sprite, props); };
+  await h.playDrawnEnemyAttack(e, 'cast', () => {
+    e.x = 7; e.y = 9;
+    e.sprite.x = e.x * TILE + TILE / 2; e.sprite.y = e.y * TILE + TILE / 2;
+  }, false);
+  assert.equal(targets[0].x, 7 * TILE + TILE / 2 + 3, 'cast motion must begin at teleport destination');
+  assert.equal(e.sprite.x, 7 * TILE + TILE / 2, 'attack recovery must not pull a teleported boss back');
+  assert.equal(e.sprite.y, 9 * TILE + TILE / 2);
+  assert.equal(e.animating, false);
+}
+console.log('PASS: input buffering, held repeat, release, overlays, click/touch, four fixed direction frames, continuous pose joins, unchanged scale, eased movement, attack timing, and teleport recovery coordinates.');

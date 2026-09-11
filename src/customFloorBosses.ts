@@ -4,6 +4,41 @@ import { makePlayerArmor, type PlayerGender } from './playerAppearance';
 
 // These replacements are floor-specific; later dragon variants stay intact.
 export function customFloorBoss(floor: number, playerGender: PlayerGender): MonsterDef | undefined {
+  if (floor === 17) return {
+    key: 'm_phoenix', name: '紅蓮のフェニックス',
+    description: '金色の冠羽と長い尾羽を持つ不死鳥。炎の翼を広げ、予告マスへ紅蓮の火を降らせる。',
+    hp: 34, atkMin: 7, atkMax: 13, def: 5, exp: 9, gold: 10, score: 65,
+    minFloor: 17, maxFloor: 17, behavior: 'chase',
+    element: 'fire', color: 0xff963c, isDragonType: false
+  };
+  if (floor === 18) return {
+    key: 'm_unicorn', name: '蒼鬣のユニコーン',
+    description: '白い体と青紫のたてがみを持つ一角獣。黄金の角で突き、銀色の予告マスへ魔力を放つ。',
+    hp: 40, atkMin: 9, atkMax: 16, def: 6, exp: 12, gold: 13, score: 80,
+    minFloor: 18, maxFloor: 18, behavior: 'chase',
+    element: null, color: 0xbbcaff, isDragonType: false
+  };
+  if (floor === 19) return {
+    key: 'm_bone_reaper', name: '骸骨の大鎌使い',
+    description: '赤い眼を灯す骸骨の戦士。長柄の大鎌を振るい、地面から骨片を突き上げる。',
+    hp: 58, atkMin: 11, atkMax: 19, def: 13, exp: 17, gold: 20, score: 105,
+    minFloor: 19, maxFloor: 19, behavior: 'chase',
+    element: 'dark', color: 0xd9c9a6, isDragonType: false
+  };
+  if (floor === 20) return {
+    key: 'm_ice_behemoth', name: '氷晶王ベヒーモス',
+    description: '巨大な氷晶を背負う氷の巨獣。太い腕で大地を叩き、十字の予告マスに氷晶の衝撃を走らせる。',
+    hp: 60, atkMin: 14, atkMax: 23, def: 9, exp: 20, gold: 24, score: 130,
+    minFloor: 20, maxFloor: 20, behavior: 'chase',
+    element: 'ice', color: 0x8adfff, isDragonType: false
+  };
+  if (floor === 16) return {
+    key: 'm_fallen_angel', name: '黒翼の堕天使',
+    description: '黒い羽翼と暗い鎧をまとう堕天使。闇の剣で斬りかかり、紫の予告マスへ転移して衝撃を放つ。',
+    hp: 28, atkMin: 5, atkMax: 10, def: 4, exp: 7, gold: 8, score: 55,
+    minFloor: 16, maxFloor: 16, behavior: 'chase',
+    element: 'dark', color: 0x9673d6, isDragonType: false
+  };
   if (floor === 11) return {
     key: 'm_silver_seraph', name: '白翼のセラフィム',
     description: '銀の鎧と白い翼を持つ槍の守護者。槍で間合いを詰め、銀色の予告マスへ魔力を放つ。',

@@ -150,9 +150,10 @@ for (let floor = 1; floor <= 30; floor++) {
       if (pad.y === room.y) fail(floor, run, `テレポート (${pad.x},${pad.y}) が部屋上辺にある`);
     }
     if (dungeon.bossRoom) {
+      if (dungeon.bossRoom.w !== 10 || dungeon.bossRoom.h !== 10) fail(floor, run, '中ボス部屋が10x10ではない');
       for (let y = dungeon.bossRoom.y; y < dungeon.bossRoom.y + dungeon.bossRoom.h; y++) {
         for (let x = dungeon.bossRoom.x; x < dungeon.bossRoom.x + dungeon.bossRoom.w; x++) {
-          if (dungeon.tiles[y][x] === 'wall') fail(floor, run, `7x7ボス部屋内 (${x},${y}) が壁で欠けている`);
+          if (dungeon.tiles[y][x] === 'wall') fail(floor, run, `10x10ボス部屋内 (${x},${y}) が壁で欠けている`);
         }
       }
     }

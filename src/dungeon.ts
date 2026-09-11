@@ -40,6 +40,7 @@ export interface DungeonData {
   teleportPads: TeleportPad[];
   biome: DungeonBiome;
   optionalRooms: OptionalRoom[];
+  glacialArena?: { props: (Vec2 & { kind: 'crystal' | 'obelisk' | 'boulder' | 'altar'; blocking: boolean })[] };
 }
 
 export type BossRoomZone = 'north' | 'south' | 'east' | 'west' | 'center';
@@ -378,10 +379,12 @@ function closeOptionalRoom(tiles: TileType[][], optional: OptionalRoom) {
 function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone): DungeonData {
   const layout = getFloorLayoutProfile(floor);
   const biome = biomeForFloor(floor);
-  const w = 57 + Math.min(6, Math.floor(floor / 10) * 2);
-  const h = 47 + Math.min(4, Math.floor(floor / 15) * 2);
-  const tiles: TileType[][] = Array.from({ length: h }, () => Array<TileType>(w).fill('wall'));
   const hasFieldBossRoom = floor % 5 !== 0;
+  // Reserve an outer margin so a larger boss room does not consume the maze bands.
+  const margin = hasFieldBossRoom ? 3 : 0;
+  const w = 57 + Math.min(6, Math.floor(floor / 10) * 2) + margin * 2;
+  const h = 47 + Math.min(4, Math.floor(floor / 15) * 2) + margin * 2;
+  const tiles: TileType[][] = Array.from({ length: h }, () => Array<TileType>(w).fill('wall'));
   const needsHealingLake = floor % 5 === 0 || (floor >= 6 && floor % 3 === 0);
   type CardinalZone = Exclude<BossRoomZone, 'center'>;
   const cardinalZones: CardinalZone[] = ['north', 'south', 'west', 'east'];
@@ -392,14 +395,20 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
   const hubCenterX = Math.floor(w / 2);
   const hallCenterY = Math.floor(h / 2);
   const hubRoom = roomAt(hubCenterX - 3, hallCenterY - 3, 7, 7);
-  const northRoom = roomAt(hubCenterX + irand(-4, 4) - 3, 2, 7, 7);
-  const southRoom = roomAt(hubCenterX + irand(-4, 4) - 3, h - 9, 7, 7);
-  const westRoom = roomAt(2, hallCenterY + irand(-3, 3) - 3, 7, 7);
-  const eastRoom = roomAt(w - 9, hallCenterY + irand(-3, 3) - 3, 7, 7);
+  const northRoom = roomAt(hubCenterX + irand(-4, 4) - 3, 2 + margin, 7, 7);
+  const southRoom = roomAt(hubCenterX + irand(-4, 4) - 3, h - 9 - margin, 7, 7);
+  const westRoom = roomAt(2 + margin, hallCenterY + irand(-3, 3) - 3, 7, 7);
+  const eastRoom = roomAt(w - 9 - margin, hallCenterY + irand(-3, 3) - 3, 7, 7);
   const roomsByZone: Record<CardinalZone, Room> = {
     north: northRoom, south: southRoom, west: westRoom, east: eastRoom
   };
   const exitRoom = roomsByZone[exitZone];
+  if (hasFieldBossRoom) {
+    // Expand toward the outer map edge; keep the side facing the maze in place.
+    const x = exitRoom.x - (exitZone === 'west' ? 3 : exitZone === 'east' ? 0 : 1);
+    const y = exitRoom.y - (exitZone === 'north' ? 3 : exitZone === 'south' ? 0 : 1);
+    Object.assign(exitRoom, roomAt(x, y, 10, 10));
+  }
   const lakeZone = needsHealingLake
     ? shuffle(cardinalZones.filter((zone) => zone !== exitZone))[0]
     : undefined;
@@ -959,8 +968,8 @@ export function generateBossArena(floor: number): DungeonData {
   const w = isSuper ? 35 : isStrong ? 31 : 25;
   const h = isSuper ? 25 : isStrong ? 23 : 19;
   const tiles: TileType[][] = Array.from({ length: h }, () => Array<TileType>(w).fill('wall'));
-  const roomW = isSuper ? 25 : isStrong ? 21 : 17;
-  const roomH = isSuper ? 17 : isStrong ? 15 : 13;
+  const roomW = floor === 20 ? 21 : isSuper ? 25 : isStrong ? 21 : 17;
+  const roomH = floor === 20 ? 15 : isSuper ? 17 : isStrong ? 15 : 13;
   const bossRoom = roomAt(Math.floor((w - roomW) / 2), Math.floor((h - roomH) / 2), roomW, roomH);
   carveRoom(tiles, bossRoom);
 
@@ -972,7 +981,33 @@ export function generateBossArena(floor: number): DungeonData {
     { x: bossRoom.x + pillarInset, y: bossRoom.y + bossRoom.h - 1 - pillarInset },
     { x: bossRoom.x + bossRoom.w - 1 - pillarInset, y: bossRoom.y + bossRoom.h - 1 - pillarInset }
   ];
-  for (const pillar of pillars) tiles[pillar.y][pillar.x] = 'wall';
+  let glacialArena: DungeonData['glacialArena'];
+  if (floor === 20) {
+    // Clip the four corners into an octagonal hall. The middle stays open for dodging.
+    for (let y = 0; y < roomH; y++) {
+      for (let x = 0; x < roomW; x++) {
+        if (Math.min(x, roomW - 1 - x) + Math.min(y, roomH - 1 - y) < 4) {
+          tiles[bossRoom.y + y][bossRoom.x + x] = 'wall';
+        }
+      }
+    }
+    const { cx, cy } = bossRoom;
+    glacialArena = { props: [
+      { x: cx - 6, y: cy - 3, kind: 'crystal', blocking: true },
+      { x: cx + 6, y: cy - 3, kind: 'crystal', blocking: true },
+      { x: cx - 6, y: cy + 3, kind: 'obelisk', blocking: true },
+      { x: cx + 6, y: cy + 3, kind: 'obelisk', blocking: true },
+      { x: cx - 9, y: cy, kind: 'boulder', blocking: true },
+      { x: cx + 9, y: cy, kind: 'boulder', blocking: true },
+      { x: cx - 3, y: cy - 6, kind: 'obelisk', blocking: true },
+      { x: cx + 3, y: cy - 6, kind: 'obelisk', blocking: true },
+      { x: cx, y: cy - 3, kind: 'altar', blocking: false }
+    ] };
+    // Real wall cells give the large props collision for movement, sight and projectiles.
+    for (const prop of glacialArena.props) if (prop.blocking) tiles[prop.y][prop.x] = 'wall';
+  } else {
+    for (const pillar of pillars) tiles[pillar.y][pillar.x] = 'wall';
+  }
 
   const start = { x: bossRoom.cx, y: bossRoom.y + bossRoom.h - 1 };
   // 強ボス撃破後の出口は見失わないよう、部屋の完全な中央に置く。
@@ -981,7 +1016,8 @@ export function generateBossArena(floor: number): DungeonData {
   tiles[stairs.y][stairs.x] = 'door';
   return {
     w, h, tiles, rooms: [bossRoom], start, stairs, hazards: [], bossRoom,
-    bossRoomZone: 'center', teleportPads: [], biome: biomeForFloor(floor), optionalRooms: []
+    bossRoomZone: 'center', teleportPads: [], biome: floor === 20 ? 'frost' : biomeForFloor(floor), optionalRooms: [],
+    ...(glacialArena ? { glacialArena } : {})
   };
 }
 

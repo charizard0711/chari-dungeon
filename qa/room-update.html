@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ja"><meta charset="utf-8"><title>低い壁と10×10中ボス部屋</title>
+<style>body{margin:16px;background:#172329;color:#eaf2ef;font:15px system-ui}button{padding:8px;margin:0 6px 8px 0}iframe{display:block;width:1000px;height:700px;border:1px solid #59706a}output{display:block;margin:8px 0}pre{white-space:pre-wrap}</style>
+<h1>低い壁と10×10中ボス部屋</h1><nav></nav><button id="arena">5.5階ボス部屋</button><button id="overview">部屋全景</button>
+<output>読み込み中</output><iframe title="壁と中ボス部屋の確認"></iframe><pre></pre>
+<script type="module">
+if(location.hostname!=='localhost')throw new Error('Local QA only');
+const frame=document.querySelector('iframe'),output=document.querySelector('output'),report=document.querySelector('pre');
+let floor=1,arena=false,loaded=false,reported=false;
+function load(n,boss=false){floor=n;arena=boss;loaded=false;reported=false;output.textContent='読み込み中';report.textContent='';frame.src=`/?qa-game&qa-floor=${n}&qa-field-arena${boss?'&qa-boss':''}`;}
+for(let n=1;n<=30;n++){const b=document.createElement('button');b.textContent=`${n}階`;b.onclick=()=>load(n);document.querySelector('nav').append(b);}
+document.querySelector('#arena').onclick=()=>load(5,true);
+document.querySelector('#overview').onclick=()=>{const gs=frame.contentWindow?.__game?.scene.getScene('GameScene'),r=gs?.dungeon?.bossRoom;if(r){gs.cameras.main.stopFollow();gs.cameras.main.setZoom(1.2);gs.cameras.main.centerOn((r.x+r.w/2)*32,(r.y+r.h/2)*32);}};
+frame.onload=()=>{loaded=true;};
+setInterval(()=>{
+ const gs=frame.contentWindow?.__game?.scene.getScene('GameScene');
+ if(!loaded||reported||!gs?.playerSprite||!gs.sys.isActive()||gs.floor!==floor)return;
+ const room=gs.dungeon.bossRoom,props=gs.dungeonObjects;
+ const inside=p=>room&&p.x>=room.x&&p.x<room.x+room.w&&p.y>=room.y&&p.y<room.y+room.h;
+ const walls=gs.tileSprites.flat().filter(s=>gs.dungeon.tiles[Math.floor(s.y/32)]?.[Math.floor(s.x/32)]==='wall');
+ const low= floor<=5;
+ const wallsOK=!low||walls.every(s=>s.texture.key.startsWith(`terrain_ruin_${floor}_`)&&gs.textures.exists(s.texture.key));
+ const roomTiles=room?gs.tileSprites.flat().filter(s=>inside({x:Math.floor(s.x/32),y:Math.floor(s.y/32)})):[];
+ const roomOK=arena||!room||(room.w===10&&room.h===10&&props.filter(inside).length===4&&roomTiles.every(s=>s.visible));
+ const enemiesOK=gs.enemies.every(e=>!gs.dungeonObjectAt(e.x,e.y));
+ const pass=wallsOK&&roomOK&&enemiesOK&&props.every(p=>gs.textures.exists(p.sprite.texture.key))&&(!low||gs.wallFacades.length===0);
+ output.textContent=(pass?'PASS':'FAIL')+`：${floor}${arena?'.5':''}階の壁・部屋・小物`;
+ report.textContent=JSON.stringify({floor,room,roomProps:props.filter(inside).map(p=>({kind:p.kind,x:p.x,y:p.y})),wallTextures:[...new Set(walls.map(s=>s.texture.key))],props:props.length,wallFacades:gs.wallFacades.length},null,2);reported=true;
+},100);
+load(1);
+</script></html>

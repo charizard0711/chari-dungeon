@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<title>氷マップの壁とオブジェクト</title>
+<style>body{margin:16px;background:#10232e;color:#dcf5ff;font:15px system-ui}button{padding:9px;margin:0 8px 10px 0}iframe{display:block;width:1000px;height:650px;border:1px solid #38718d}output{display:block;margin:8px 0}pre{white-space:pre-wrap}</style>
+<h1>氷マップの壁とオブジェクト</h1>
+<button data-floor="11">11階</button><button data-floor="12">12階</button><button data-floor="13">13階</button><button data-floor="14">14階</button><button data-floor="15">15階</button>
+<output>読み込み中</output><iframe title="氷マップ確認用ゲーム"></iframe><pre></pre>
+<script type="module">
+if(location.hostname!=='localhost')throw new Error('Local QA only');
+const frame=document.querySelector('iframe'),output=document.querySelector('output'),report=document.querySelector('pre');
+let floor=11,loaded=false,reported=false;
+function load(n){floor=n;loaded=false;reported=false;output.textContent='読み込み中';report.textContent='';frame.src=`/?qa-game&qa-floor=${n}&qa-room-props=ice`;}
+frame.onload=()=>{loaded=true;};
+document.querySelectorAll('[data-floor]').forEach(button=>button.onclick=()=>load(Number(button.dataset.floor)));
+setInterval(()=>{
+  const gs=frame.contentWindow?.__game?.scene.getScene('GameScene');
+  if(!loaded||reported||!gs?.playerSprite||!gs.sys.isActive()||gs.floor!==floor)return;
+  const kinds=['iceCrystal','iceObelisk','snowBoulder','iceAltar'];
+  const props=gs.dungeonObjects.filter(o=>kinds.includes(o.kind));
+  const wallSprites=gs.tileSprites.flat().filter(s=>gs.dungeon.tiles[Math.floor(s.y/32)]?.[Math.floor(s.x/32)]==='wall');
+  const wallsOK=wallSprites.every(s=>s.texture.key==='terrain_glacial_wall');
+  const pass=wallsOK&&gs.wallFacades.length===0&&new Set(props.map(p=>p.kind)).size===4&&props.every(p=>gs.textures.exists(p.sprite.texture.key));
+  output.textContent=(pass?'PASS':'FAIL')+`：${floor}階の氷岩と4種類のオブジェクト`;
+  report.textContent=JSON.stringify({floor,biome:gs.dungeon.biome,wallsOK,wallFacades:gs.wallFacades.length,props:props.map(p=>({kind:p.kind,x:p.x,y:p.y,texture:p.sprite.texture.key})),supplies:gs.dungeonObjects.filter(p=>p.breakable).length},null,2);
+  reported=true;
+},100);
+load(11);
+</script>
+</html>

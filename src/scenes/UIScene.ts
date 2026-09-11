@@ -514,7 +514,9 @@ export class UIScene extends Phaser.Scene {
   // ============ リフレッシュ ============
   refresh() {
     const p = this.gs.player;
-    const th = getTheme(this.gs.floor);
+    const th = this.gs.dungeon?.glacialArena
+      ? { ...getTheme(this.gs.floor), name: '氷晶の広間', accent: 0x8adfff }
+      : getTheme(this.gs.floor);
 
     const boost = this.gs.holdBoostTier === 2 ? '  最大加速' : this.gs.holdBoostTier === 1 ? '  加速' : '';
     const transformation = this.gs.transformation
