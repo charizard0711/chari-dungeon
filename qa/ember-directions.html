@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<title>1〜10階のボス・4方向</title>
+<style>
+body{margin:24px auto;max-width:850px;padding:0 16px;background:#0d1d22;color:#e5eee9;font:16px system-ui}h1{font-size:24px}p{line-height:1.7}a{color:#ffce91}.views{display:grid;grid-template-columns:1fr 1fr;gap:12px}figure{margin:0;background:#162a30;border:1px solid #355055;border-radius:10px;padding:12px}figcaption{font-weight:600}canvas{width:100%;image-rendering:pixelated}button{padding:10px;margin:12px 0}output{display:block;color:#ffce91}
+</style>
+<h1>1〜10階のボス・4方向</h1>
+<nav><a href="?floor=1">1階・炎</a> ／ <a href="?floor=2">2階・氷</a> ／ <a href="?floor=3">3階・雷</a> ／ <a href="?floor=4">4階・真鍮</a> ／ <a href="?floor=5">5階・封印王</a> ／ <a href="?floor=6">6階・骨</a> ／ <a href="?floor=7">7階・ヒュドラ</a></nav>
+<nav><a href="?floor=8">8階・黒い魔術師</a> ／ <a href="?floor=9&player=male">9階・男主人公の敵</a> ／ <a href="?floor=9&player=female">9階・女主人公の敵</a> ／ <a href="?floor=10">10階・グランドバイソン</a></nav>
+<p>上下左右の4枚を使い、ゆったりした揺れと傾きを重ねます。移動・攻撃から待機へ滑らかにつながり、体の大きさは変わりません。</p>
+<div class="views">
+<figure><figcaption>↓ 下向き</figcaption><canvas width="320" height="225" data-dir="down"></canvas></figure>
+<figure><figcaption>↑ 上向き・後ろ姿</figcaption><canvas width="320" height="225" data-dir="up"></canvas></figure>
+<figure><figcaption>← 左向き</figcaption><canvas width="320" height="225" data-dir="left"></canvas></figure>
+<figure><figcaption>→ 右向き</figcaption><canvas width="320" height="225" data-dir="right"></canvas></figure>
+</div>
+<button id="pause">揺れを止める</button> <a id="game" href="/?qa-game&qa-floor=1&qa-field-arena">ボス部屋へ</a>
+<output>画像を読み込み中</output>
+<script type="module">
+import {directionArtForFloor,MONSTER_DIRECTION_FRAME,monsterDirectionPose} from '/src/monsterDirections.ts';
+import {getSelectedGender} from '/src/playerAppearance.ts';
+const requested=Number(new URLSearchParams(location.search).get('floor'));
+const playerParam=new URLSearchParams(location.search).get('player');
+const playerGender=['male','female'].includes(playerParam)?playerParam:getSelectedGender();
+const floor=Number.isInteger(requested)&&requested>=1&&requested<=10?requested:1,art=directionArtForFloor(floor,playerGender);
+const bossSize=floor===5?68.8:floor===10?72.8:[8,9].includes(floor)?40:52.8;
+const names=['エンバードラゴン','フロストワイバーン','ストームドラゴン','ブラスドレイク','封印王アウレリウス','ボーンワイバーン','ジェイドヒュドラ','黒衣の魔術師',playerGender==='male'?'対の女剣士':'対の剣士','グランドバイソン'];
+document.title=document.querySelector('h1').textContent=`${floor}階・${names[floor-1]}の4方向`;
+document.querySelector('#game').href=`/?qa-game&qa-floor=${floor}&${[5,10].includes(floor)?'qa-boss&qa-field-arena':'qa-field-arena'}${floor===9?'&qa-gender='+playerGender:''}`;
+document.querySelector('#game').textContent=`${floor}階のボス部屋へ`;
+const img=new Image();img.src='/'+art.path;await img.decode();
+let paused=false;const pause=document.querySelector('#pause');
+pause.onclick=()=>{paused=!paused;pause.textContent=paused?'揺れを再開':'揺れを止める';};
+function draw(time){
+  for(const canvas of document.querySelectorAll('canvas')){
+    const ctx=canvas.getContext('2d'),frame=MONSTER_DIRECTION_FRAME[canvas.dataset.dir];
+    ctx.clearRect(0,0,320,225);ctx.imageSmoothingEnabled=true;
+    const pose=monsterDirectionPose(time,0,paused),sx=frame%2*128,sy=Math.floor(frame/2)*128;
+    function drawSprite(x,y,size){
+      const zoom=size/(bossSize/art.artSize*128);
+      ctx.save();ctx.translate(x+size*.5,y+size*.6);ctx.rotate(pose.angle*Math.PI/180);
+      ctx.drawImage(img,sx,sy,128,128,-size*.5+pose.x*zoom,-size*.6+pose.y*zoom,size,size);ctx.restore();
+    }
+    drawSprite(5,8,200);
+    const size=bossSize/art.artSize*128;
+    drawSprite(235,187-size,size);
+    ctx.fillStyle='#adbfbb';ctx.font='13px system-ui';ctx.fillText('ゲーム内サイズ',218,211);
+  }
+  requestAnimationFrame(draw);
+}
+document.querySelector('output').textContent='4方向・サイズ固定（右下はボスの表示サイズ）';
+requestAnimationFrame(draw);
+</script>
+</html>

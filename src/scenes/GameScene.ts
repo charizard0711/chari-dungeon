@@ -9,6 +9,10 @@ import {
   weaponFullName, shieldFullName, makeWeapon, makeShield
 } from '../player';
 import { Enemy } from '../enemy';
+import { customFloorBoss } from '../customFloorBosses';
+import { getMonsterAnimation, monsterAnimationFrame } from '../monsterAnimation';
+import type { MonsterAction } from '../monsterAnimation';
+import { DIRECTIONAL_MONSTERS, MONSTER_DIRECTION_FRAME, monsterDirectionPose } from '../monsterDirections';
 import { computePlayerAttack, computeEnemyAttack } from '../combat';
 import { Audio } from '../audio/manager';
 import { bgmForFloor, elementAttackSe, weaponAttackSe } from '../audio/config';
@@ -49,6 +53,7 @@ const WALL_FACADE_HEIGHT = 36;
 const HOLD_FIRST_REPEAT_MS = 145;
 const HOLD_BOOST_MS = 300;
 const HOLD_MAX_BOOST_MS = 820;
+const MOVE_KEY_DIRS: Record<string, Dir> = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
 
 // ボスはHPを倍にしつつ、攻撃と防御は控えめに上げる。
 // 全能力を2倍にすると体感難度が約4倍になるため、総合的に約2倍の強さへ寄せる。
@@ -211,11 +216,12 @@ interface TerrainVisual {
 
 type BossGimmickKind =
   | 'mid_fire' | 'mid_frost' | 'mid_storm' | 'mid_void' | 'mid_bone' | 'mid_poison'
+  | 'mid_magic' | 'mid_rival'
   | 'bull_charge' | 'furnace_titan' | 'azure_flight' | 'ancient_fire' | 'tri_head';
 
 type BossHazardKind = 'fire' | 'ice' | 'poison' | 'slow' | 'web' | 'lightning';
 type BossStrikeChannel = 'primary' | 'secondary' | 'tertiary';
-type BossImpactKind = 'fire' | 'ice' | 'lightning' | 'void' | 'bone' | 'poison' | 'impact';
+type BossImpactKind = 'fire' | 'ice' | 'lightning' | 'void' | 'bone' | 'poison' | 'impact' | 'magic';
 
 interface BossWarningMarker {
   x: number;
@@ -347,6 +353,7 @@ export class GameScene extends Phaser.Scene {
 
   // 長押し移動：押しっぱなしで歩き続ける
   heldDir: Dir | null = null;
+  queuedMove: Dir | null = null;
   holdRepeatAt = 0; // この時刻を過ぎたらリピート開始（初回の誤連打防止）
   holdStartedAt = 0;
   holdBoostTier = 0; // 0=通常 / 1=BOOST / 2=MAX BOOST
@@ -365,7 +372,7 @@ export class GameScene extends Phaser.Scene {
     this.playerGender = location.hostname === 'localhost' && isPlayerGender(qaGender)
       ? qaGender
       : getSelectedGender();
-    setSelectedGender(this.playerGender);
+    if (!(location.hostname === 'localhost' && isPlayerGender(qaGender))) setSelectedGender(this.playerGender);
     const qaArmor = qaParams.get('qa-armor');
     this.playerArmor = location.hostname === 'localhost' && isPlayerArmor(qaArmor)
       ? qaArmor
@@ -479,11 +486,23 @@ export class GameScene extends Phaser.Scene {
       right: kb.addKey('RIGHT'),
       enter: kb.addKey('ENTER')
     };
-    // 矢印はupdate()内でホールド検出（長押しで連続移動できる）
-    kb.on('keydown-ENTER', (event: KeyboardEvent) => { event.preventDefault(); this.tryDescend(); });
+    // 短押しはイベントで保持し、長押しリピートだけをupdateで処理する。
+    kb.on('keydown', this.handleMoveKeyDown, this);
+    kb.on('keyup', this.handleMoveKeyUp, this);
+    const descendKey = (event: KeyboardEvent) => { event.preventDefault(); this.tryDescend(); };
+    kb.on('keydown-ENTER', descendKey);
+    this.game.events.on(Phaser.Core.Events.BLUR, this.clearMoveInput, this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      kb.off('keydown', this.handleMoveKeyDown, this);
+      kb.off('keyup', this.handleMoveKeyUp, this);
+      kb.off('keydown-ENTER', descendKey);
+      this.game.events.off(Phaser.Core.Events.BLUR, this.clearMoveInput, this);
+      this.queuedMove = null;
+    });
     this.input.off('pointerdown', this.handleMapClick, this);
     this.input.on('pointerdown', this.handleMapClick, this);
     this.heldDir = null;
+    this.queuedMove = null;
     this.holdRepeatAt = 0;
     this.holdStartedAt = 0;
     this.holdBoostTier = 0;
@@ -622,10 +641,21 @@ export class GameScene extends Phaser.Scene {
     if (location.hostname === 'localhost' && qaParams.has('qa-field-arena') && this.dungeon.bossRoom) {
       const boss = this.enemies.find((enemy) => enemy.def.isFloorBoss);
       const room = this.dungeon.bossRoom;
-      const qaPos = [
+      const centerCandidates = [
         { x: room.cx - 1, y: room.cy }, { x: room.cx + 1, y: room.cy },
         { x: room.cx, y: room.cy - 1 }, { x: room.cx, y: room.cy + 1 }
-      ].find((pos) => !this.enemyAt(pos.x, pos.y));
+      ];
+      // Dedicated boss arenas are much wider; show the actual boss rather than the room center.
+      const candidates = this.inBossRoom && boss ? [
+        { x: boss.x - 2, y: boss.y }, { x: boss.x + 2, y: boss.y },
+        { x: boss.x, y: boss.y + 2 }, { x: boss.x, y: boss.y - 2 },
+        { x: boss.x - 1, y: boss.y }, { x: boss.x + 1, y: boss.y }, ...centerCandidates
+      ] : centerCandidates;
+      const qaPos = candidates.find((pos) => {
+        const tile = this.dungeon.tiles[pos.y]?.[pos.x];
+        return !!tile && isWalkable(tile) && this.isInsideBossCombatFrame(pos.x, pos.y)
+          && !this.enemyAt(pos.x, pos.y) && !this.chestAt(pos.x, pos.y) && !this.dungeonObjectAt(pos.x, pos.y);
+      });
       if (boss && qaPos) {
         this.player.x = qaPos.x;
         this.player.y = qaPos.y;
@@ -678,6 +708,7 @@ export class GameScene extends Phaser.Scene {
 
   // ============ フロア生成 ============
   buildFloor(floor: number, bossRoom = false) {
+    this.clearMoveInput();
     this.floor = floor;
     this.inBossRoom = bossRoom;
     this.enhancementScrollDrops = { stone: false, shieldstone: false };
@@ -806,7 +837,8 @@ export class GameScene extends Phaser.Scene {
     this.playerShadow?.setPosition(this.playerSprite.x, this.playerSprite.y + 13);
     this.updatePlayerAura();
     this.refreshTransformationVisual();
-    this.cameras.main.startFollow(this.playerSprite, true, 0.15, 0.15);
+    // Keep sub-pixel movement, matching the antialiased renderer in main.ts.
+    this.cameras.main.startFollow(this.playerSprite, false, 0.15, 0.15);
     this.cameras.main.setZoom(MAP_ZOOM);
 
     // 敵配置
@@ -1243,8 +1275,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   spawnMidBossDragon(floor: number, fieldPlacement: boolean) {
-    const spec = MID_DRAGONS[(floor - 1) % MID_DRAGONS.length];
-    const base = MONSTER_DEFS.find((m) => m.key === spec.key) ?? MONSTER_DEFS[0];
+    const custom = customFloorBoss(floor, this.playerGender);
+    const spec = custom ? { key: custom.key, name: custom.name, tint: custom.color }
+      : MID_DRAGONS[(floor - 1) % MID_DRAGONS.length];
+    const base = custom ?? MONSTER_DEFS.find((m) => m.key === spec.key) ?? MONSTER_DEFS[0];
     const def: MonsterDef = {
       ...base,
       name: spec.name,
@@ -1260,15 +1294,15 @@ export class GameScene extends Phaser.Scene {
       isElite: true,
       isBoss: false,
       isFloorBoss: true,
-      isDragonType: true,
-      bossTint: spec.tint
+      isDragonType: custom ? false : true,
+      bossTint: custom ? 0xffffff : spec.tint
     };
     const message = fieldPlacement
       ? `◆ ${floor}F 中ボス「${def.name}」が迷宮内のどこかに現れた！`
       : this.inBossRoom
         ? `◆ ${floor}.5F 中ボス「${def.name}」が現れた！`
         : `◆ ${floor}F 7×7の専用部屋から強い気配がする。入口を探せ。`;
-    this.placeFloorBoss(def, 1.32, spec.tint, message, this.midBossGimmick(base.key), fieldPlacement);
+    this.placeFloorBoss(def, custom ? 1 : 1.32, spec.tint, message, this.midBossGimmick(base.key), fieldPlacement);
   }
 
   spawnMilestoneBoss(floor: number) {
@@ -1324,6 +1358,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   midBossGimmick(key: string): BossGimmickKind {
+    if (key === 'm_black_mage') return 'mid_magic';
+    if (key.startsWith('m_rival_')) return 'mid_rival';
     if (/frost|wyrm/.test(key)) return 'mid_frost';
     if (/storm|wyvern/.test(key)) return 'mid_storm';
     if (/void/.test(key)) return 'mid_void';
@@ -1552,10 +1588,14 @@ export class GameScene extends Phaser.Scene {
       : def.isElite ? 34
       : def.isDragonType ? 30
       : 26;
+    const animation = getMonsterAnimation(def.key);
+    e.directionArt = DIRECTIONAL_MONSTERS.find(art => art.monsterKey === def.key && this.textures.exists(art.textureKey));
+    const drawnAnimation = animation && this.textures.exists(animation.motionKey)
+      && this.textures.exists(animation.attackKey) ? animation : undefined;
     const tex = this.textures.get(def.key).getSourceImage();
-    const sc = maxDim / Math.max(tex.width, tex.height);
+    const sc = maxDim / (e.directionArt?.artSize ?? drawnAnimation?.artSize ?? Math.max(tex.width, tex.height));
     e.sprite.setScale(sc);
-    if (def.bossTint) e.sprite.setTint(def.bossTint);
+    if (def.bossTint && def.bossTint !== drawnAnimation?.baseTint) e.sprite.setTint(def.bossTint);
     if (def.isDarkNinja) {
       e.sprite.setAlpha(0.08);
       e.shadow.setAlpha(0.12);
@@ -1574,6 +1614,11 @@ export class GameScene extends Phaser.Scene {
       e.sprite.setAlpha(def.gimmick === 'wraith_phase' ? 0.42 : 0.68);
     }
     e.baseScale = sc;
+    if (e.directionArt) this.updateEnemyDirection(e);
+    if (drawnAnimation) {
+      e.sprite.setOrigin(0.5, drawnAnimation.originY);
+      this.setEnemyAnimation(e, 'idle');
+    }
     e.bobPhase = Math.random() * Math.PI * 2;
     this.placeSprite(e.sprite, x, y);
     e.shadow.setPosition(e.sprite.x, e.sprite.y + 11);
@@ -1789,6 +1834,13 @@ export class GameScene extends Phaser.Scene {
     const p = this.player;
 
     switch (state.kind) {
+      case 'mid_magic':
+        tiles = this.bossCrossTiles(p.x, p.y, 1);
+        message = `${e.def.name}が魔力を集中している！ 銀色の予告マスから離れろ。`;
+        break;
+      case 'mid_rival':
+        // An armed adventurer fights with its sword, not a dragon spell.
+        return null;
       case 'mid_fire':
         tiles = this.bossCrossTiles(p.x, p.y, 1);
         message = `${e.def.name}が火炎弾を溜めている！ 赤いマスから離れろ。`;
@@ -1876,6 +1928,13 @@ export class GameScene extends Phaser.Scene {
       ...this.bossWarningMarkers(secondary, this.bossImpactColor(this.bossImpactKind(state.kind, 'secondary')), p, 'secondary'),
       ...this.bossWarningMarkers(tertiary, this.bossImpactColor(this.bossImpactKind(state.kind, 'tertiary')), p, 'tertiary')
     ];
+    if (e.directionArt) {
+      this.faceEnemyToward(e, p);
+      this.updateEnemyDirection(e);
+    } else if (e.frameAnimation) {
+      this.faceEnemyToward(e, p);
+      this.setEnemyAnimation(e, 'charge');
+    }
     this.log(message, 'dmg');
     Audio.playSe('seal');
     return { kind: state.kind, tiles, secondary, tertiary, destination, markers, triggered: false };
@@ -1946,63 +2005,75 @@ export class GameScene extends Phaser.Scene {
     intent.markers = remaining;
     intent.triggered = true;
 
-    const onTiles = (tiles: Vec2[]) => tiles.some((tile) => tile.x === this.player.x && tile.y === this.player.y);
-    this.bossImpactFx(primary, this.bossImpactKind(intent.kind, 'primary'));
-    this.bossImpactFx(secondary, this.bossImpactKind(intent.kind, 'secondary'));
-    this.bossImpactFx(tertiary, this.bossImpactKind(intent.kind, 'tertiary'));
+    const applyImpact = (): Promise<void> | undefined => {
+      const onTiles = (tiles: Vec2[]) => tiles.some((tile) => tile.x === this.player.x && tile.y === this.player.y);
+      this.bossImpactFx(primary, this.bossImpactKind(intent.kind, 'primary'));
+      this.bossImpactFx(secondary, this.bossImpactKind(intent.kind, 'secondary'));
+      this.bossImpactFx(tertiary, this.bossImpactKind(intent.kind, 'tertiary'));
 
-    switch (intent.kind) {
-      case 'bull_charge':
-        return { done: true, animation: this.resolveBullCharge(e, state, primary) };
-      case 'mid_void':
-        if (firstWave && intent.destination) this.teleportBoss(e, intent.destination);
-        if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.72, `${e.def.name}の転移衝撃！`);
-        break;
-      case 'furnace_titan':
-        if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.92, '炉心震撃！');
-        this.spawnBossWalls(e, primary, state.phaseTwo ? 2 : 1, 'iron');
-        break;
-      case 'azure_flight':
-        if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.86, '氷結ブレス！');
-        this.addBossHazards(primary, 'ice', 4);
-        break;
-      case 'ancient_fire':
-        if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.88, '古竜の炎！');
-        this.addBossHazards(primary, 'fire', 4);
-        break;
-      case 'tri_head': {
-        const hit = onTiles(primary) || onTiles(secondary) || onTiles(tertiary);
-        if (hit) this.damagePlayerFromBoss(e, state.phaseTwo ? 1.0 : 0.82, '三首連携ブレス！');
-        this.addBossHazards(primary, 'fire', 3);
-        this.addBossHazards(secondary, 'ice', 3);
-        this.addBossHazards(tertiary, 'poison', 4);
-        break;
+      switch (intent.kind) {
+        case 'mid_magic':
+          if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.7, '無属性の魔力衝撃！');
+          break;
+        case 'bull_charge':
+          return this.resolveBullCharge(e, state, primary);
+        case 'mid_void':
+          if (firstWave && intent.destination) this.teleportBoss(e, intent.destination);
+          if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.72, `${e.def.name}の転移衝撃！`);
+          break;
+        case 'furnace_titan':
+          if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.92, '炉心震撃！');
+          this.spawnBossWalls(e, primary, state.phaseTwo ? 2 : 1, 'iron');
+          break;
+        case 'azure_flight':
+          if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.86, '氷結ブレス！');
+          this.addBossHazards(primary, 'ice', 4);
+          break;
+        case 'ancient_fire':
+          if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.88, '古竜の炎！');
+          this.addBossHazards(primary, 'fire', 4);
+          break;
+        case 'tri_head': {
+          const hit = onTiles(primary) || onTiles(secondary) || onTiles(tertiary);
+          if (hit) this.damagePlayerFromBoss(e, state.phaseTwo ? 1.0 : 0.82, '三首連携ブレス！');
+          this.addBossHazards(primary, 'fire', 3);
+          this.addBossHazards(secondary, 'ice', 3);
+          this.addBossHazards(tertiary, 'poison', 4);
+          break;
+        }
+        case 'mid_fire':
+          if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.7, '火炎弾！');
+          this.addBossHazards(primary, 'fire', 2);
+          break;
+        case 'mid_frost':
+          if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.66, '冷気ブレス！');
+          this.addBossHazards(primary, 'ice', 2);
+          break;
+        case 'mid_storm':
+          if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.78, '十字雷撃！');
+          break;
+        case 'mid_bone':
+          if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.62, '骨片噴出！');
+          this.spawnBossWalls(e, primary, 1, 'bone');
+          break;
+        case 'mid_poison':
+          if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.64, '毒液散布！');
+          this.addBossHazards(primary, 'poison', 3);
+          break;
       }
-      case 'mid_fire':
-        if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.7, '火炎弾！');
-        this.addBossHazards(primary, 'fire', 2);
-        break;
-      case 'mid_frost':
-        if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.66, '冷気ブレス！');
-        this.addBossHazards(primary, 'ice', 2);
-        break;
-      case 'mid_storm':
-        if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.78, '十字雷撃！');
-        break;
-      case 'mid_bone':
-        if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.62, '骨片噴出！');
-        this.spawnBossWalls(e, primary, 1, 'bone');
-        break;
-      case 'mid_poison':
-        if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.64, '毒液散布！');
-        this.addBossHazards(primary, 'poison', 3);
-        break;
-    }
-    this.cameras.main.shake(finalWave ? 145 : 90, finalWave ? 0.009 : 0.005);
-    return { done: finalWave };
+      this.cameras.main.shake(finalWave ? 145 : 90, finalWave ? 0.009 : 0.005);
+      return undefined;
+    };
+    // Charges own their movement tween; a stationary attack recovery would pull them back.
+    // Await either the charge or the spell recovery before the next turn.
+    const animation = intent.kind === 'bull_charge' ? applyImpact() : e.frameAnimation || e.directionArt
+      ? this.playDrawnEnemyAttack(e, 'cast', () => applyImpact(), false)
+      : applyImpact();
+    return { done: finalWave, animation };
   }
 
   bossImpactKind(kind: BossGimmickKind, channel: BossStrikeChannel): BossImpactKind {
+    if (kind === 'mid_magic') return 'magic';
     if (kind === 'tri_head') {
       return channel === 'primary' ? 'fire' : channel === 'secondary' ? 'ice' : 'poison';
     }
@@ -2024,6 +2095,7 @@ export class GameScene extends Phaser.Scene {
       void: 0xb45cff,
       bone: 0xf0ddbd,
       poison: 0x8ee85a,
+      magic: 0xc7c5d0,
       impact: 0xff9d52
     }[kind];
   }
@@ -2053,9 +2125,9 @@ export class GameScene extends Phaser.Scene {
         art.lineStyle(5, 0xffffff, 0.96).beginPath().moveTo(-6, -22).lineTo(4, -7).lineTo(-2, -7).lineTo(8, 18).strokePath();
         art.lineStyle(2, 0xffde55, 1).beginPath().moveTo(-11, -17).lineTo(-2, -5).lineTo(-7, -4).lineTo(4, 13).strokePath();
         this.pickupBurst(x, y, 0xffef8a, 9);
-      } else if (kind === 'void') {
-        art.fillStyle(0x5d1a8c, 0.78).fillCircle(0, 0, 14);
-        art.lineStyle(3, 0xd491ff, 0.95).strokeCircle(0, 0, 13).strokeCircle(0, 0, 7);
+      } else if (kind === 'void' || kind === 'magic') {
+        art.fillStyle(kind === 'magic' ? 0x34313f : 0x5d1a8c, 0.78).fillCircle(0, 0, 14);
+        art.lineStyle(3, kind === 'magic' ? color : 0xd491ff, 0.95).strokeCircle(0, 0, 13).strokeCircle(0, 0, 7);
         art.fillStyle(0xffffff, 0.9).fillCircle(0, 0, 2);
         art.setAngle(Phaser.Math.Between(-35, 35));
       } else if (kind === 'bone') {
@@ -2106,6 +2178,12 @@ export class GameScene extends Phaser.Scene {
     const hitIndex = path.findIndex((tile) => tile.x === this.player.x && tile.y === this.player.y);
     const endIndex = hitIndex >= 0 ? Math.max(0, hitIndex - 1) : path.length - 1;
     const end = path[endIndex];
+    if (e.directionArt) {
+      this.faceEnemyToward(e, end);
+      this.updateEnemyDirection(e);
+      const [dx, dy] = this.dirVec(e.facing);
+      e.directionMotion = { kind: 'walk', startedAt: this.time.now, duration: 190, dx, dy };
+    }
     if (hitIndex >= 0) {
       this.damagePlayerFromBoss(e, 1.2, '猛烈な突進！');
     } else {
@@ -2118,6 +2196,7 @@ export class GameScene extends Phaser.Scene {
     e.animating = true;
     return this.tween(e.sprite, { x: end.x * TILE + TILE / 2, y: end.y * TILE + TILE / 2 }, 190, 'Cubic.easeIn').then(() => {
       e.animating = false;
+      e.directionMotion = undefined;
       this.effectFx(e.x, e.y, 'fx_hit', 1.8, 420, 0xffb060);
     });
   }
@@ -3249,7 +3328,8 @@ export class GameScene extends Phaser.Scene {
     for (const child of e.freezeFx.getAll()) this.tweens.killTweensOf(child);
     e.freezeFx.destroy(true);
     e.freezeFx = undefined;
-    if (e.def.bossTint !== undefined) e.sprite.setTint(e.def.bossTint);
+    const baseTint = e.frameAnimation ? getMonsterAnimation(e.def.key)?.baseTint : undefined;
+    if (e.def.bossTint !== undefined && e.def.bossTint !== baseTint) e.sprite.setTint(e.def.bossTint);
     else e.sprite.clearTint();
   }
 
@@ -4089,6 +4169,26 @@ export class GameScene extends Phaser.Scene {
     }
     const targetX = mv.x * TILE + TILE / 2;
     const targetY = mv.y * TILE + TILE / 2;
+    if (e.directionArt) {
+      this.updateEnemyDirection(e);
+      const duration = this.currentTurnAnimDuration(ANIM);
+      const [dx, dy] = this.dirVec(e.facing);
+      e.directionMotion = { kind: 'walk', startedAt: this.time.now, duration, dx, dy };
+      return this.tween(e.sprite, { x: targetX, y: targetY }, duration, 'Sine.easeInOut').then(() => {
+        e.animating = false;
+        e.directionMotion = undefined;
+      });
+    }
+    if (e.frameAnimation) {
+      // 4コマを保ちつつ、従来の移動速度と長押し加速に合わせる。
+      const duration = Math.max(80, this.currentTurnAnimDuration(ANIM));
+      this.setEnemyAnimation(e, 'walk', duration);
+      return this.tween(e.sprite, { x: targetX, y: targetY }, duration, 'Linear').then(() => {
+        if (!e.sprite.active) return;
+        e.animating = false;
+        this.setEnemyAnimation(e, 'idle');
+      });
+    }
     const flying = !!e.def.wallPass || /drake|dragon|wyrm|wyvern|moth|fiend|lich/.test(e.def.key);
     const rushing = /hound|cerberus|crawler/.test(e.def.key);
     const lean = Math.sign(targetX - e.sprite.x) * (flying ? -2 : -4);
@@ -4130,7 +4230,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  enemyAttackProfile(e: Enemy): { element: Element; factor: number; label: string } {
+  enemyAttackProfile(e: Enemy): { element: Element | undefined; factor: number; label: string } {
     let element = monsterElement(e.def);
     let factor = 1;
     let label = '';
@@ -4211,7 +4311,19 @@ export class GameScene extends Phaser.Scene {
     const res = computeEnemyAttack(this.player, e.def, profile.element);
     const damage = Math.max(1, Math.floor(res.damage * profile.factor));
     const enemyElement = profile.element;
-    const enemyElementInfo = ELEMENT_INFO[enemyElement];
+    const enemyElementInfo = enemyElement ? ELEMENT_INFO[enemyElement] : { name: '無', color: 0xc7c5d0 };
+    if (e.frameAnimation || e.directionArt) {
+      return this.playDrawnEnemyAttack(e, 'claw', () => {
+        Audio.playSe(elementAttackSe(enemyElement));
+        this.damagePlayer(damage, `${e.def.name}の${profile.label}${enemyElementInfo.name}属性攻撃！`, e);
+        this.afterEnemyHitGimmick(e, damage, false);
+        this.effectFx(this.player.x, this.player.y, 'fx_slash', 1.15, 250, enemyElementInfo.color);
+        this.hitFx(this.player.x, this.player.y);
+        this.cameras.main.shake(90, 0.004);
+        if (res.shieldBroke) this.handleShieldBreak();
+        this.flashSprite(this.playerSprite);
+      });
+    }
     e.animating = true;
     // 攻撃演出：少し前進
     const ox = e.sprite.x, oy = e.sprite.y;
@@ -4256,7 +4368,25 @@ export class GameScene extends Phaser.Scene {
     e.animating = true;
     const profile = this.enemyAttackProfile(e);
     const enemyElement = profile.element;
-    const enemyElementInfo = ELEMENT_INFO[enemyElement];
+    const enemyElementInfo = enemyElement ? ELEMENT_INFO[enemyElement] : { name: '無', color: 0xc7c5d0 };
+    if (e.frameAnimation || e.directionArt) {
+      return this.playDrawnEnemyAttack(e, 'cast', async () => {
+        Audio.playSe(elementAttackSe(enemyElement));
+        const [dx, dy] = this.dirVec(e.facing);
+        const bolt = this.add.image(e.sprite.x + dx * 17, e.sprite.y - 5 + dy * 17, 'fx_bolt')
+          .setDepth(20).setTint(enemyElementInfo.color);
+        bolt.setRotation(Phaser.Math.Angle.Between(bolt.x, bolt.y, this.playerSprite.x, this.playerSprite.y));
+        await this.tween(bolt, { x: this.playerSprite.x, y: this.playerSprite.y }, this.currentTurnAnimDuration(180));
+        bolt.destroy();
+        if (!e.alive || this.gameEnded) return;
+        const res = computeEnemyAttack(this.player, e.def, profile.element);
+        const damage = Math.max(1, Math.floor(res.damage * profile.factor));
+        this.damagePlayer(damage, `${e.def.name}の${profile.label}${enemyElementInfo.name}属性遠距離攻撃！`, e);
+        this.afterEnemyHitGimmick(e, damage, true);
+        if (res.shieldBroke) this.handleShieldBreak();
+        this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.45, 360, enemyElementInfo.color);
+      });
+    }
     Audio.playSe(elementAttackSe(enemyElement));
     this.effectFx(e.x, e.y, 'fx_magic', 2.0, 600, enemyElementInfo.color);
     this.tweens.add({
@@ -5697,7 +5827,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   enemyDefeatFx(e: Enemy) {
-    const echo = this.add.image(e.sprite.x, e.sprite.y, e.sprite.texture.key)
+    const echo = this.add.image(e.sprite.x, e.sprite.y, e.sprite.texture.key, e.sprite.frame.name)
       .setDepth(19).setOrigin(e.sprite.originX, e.sprite.originY)
       .setScale(e.sprite.scaleX, e.sprite.scaleY)
       .setFlipX(e.sprite.flipX)
@@ -5900,13 +6030,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   handleMoveKeys(time: number) {
-    if (this.busy || this.gameEnded) return;
     const ui = this.scene.get('UIScene') as { overlayMode?: string } | undefined;
-    if (ui?.overlayMode && ui.overlayMode !== 'none') {
-      this.heldDir = null;
-      this.holdStartedAt = 0;
-      this.touchDir = null;
-      this.setBoostTier(0);
+    if (this.gameEnded || (ui?.overlayMode && ui.overlayMode !== 'none')) {
+      this.clearMoveInput();
       return;
     }
     const entries: [Phaser.Input.Keyboard.Key, Dir][] = [
@@ -5922,9 +6048,21 @@ export class GameScene extends Phaser.Scene {
     if (!dir) {
       this.heldDir = null;
       this.holdStartedAt = 0;
+      if (!this.clickPathActive) this.setBoostTier(0);
+    }
+    // busy中もキーを離した事実は反映する。予約は行動可能になるまで保持。
+    if (this.busy) return;
+    if (this.queuedMove) {
+      const queued = this.queuedMove;
+      this.queuedMove = null;
+      this.heldDir = dir === queued ? queued : null;
+      this.holdStartedAt = time;
+      this.holdRepeatAt = time + HOLD_FIRST_REPEAT_MS;
       this.setBoostTier(0);
+      this.playerAct(queued);
       return;
     }
+    if (!dir) return;
     if (this.clickPathActive) {
       this.clickPathToken++;
       this.clickPathActive = false;
@@ -6055,7 +6193,13 @@ export class GameScene extends Phaser.Scene {
     // 敵：ゆらゆらした待機モーション＋影の追従
     for (const e of this.enemies) {
       if (!e.sprite || !e.sprite.visible) continue;
-      if (!e.animating) {
+      if (e.directionArt) {
+        // No animation state or frame cycling: swap only when the direction changes.
+        this.updateEnemyDirection(e);
+        this.updateDirectionalEnemyPose(e, time);
+      } else if (e.frameAnimation) {
+        this.updateEnemyAnimation(e, time);
+      } else if (!e.animating) {
         if (e.def.gimmick === 'mimic' && !e.awakened) {
           // 敵用baseScaleで宝箱が縮まないよう、擬態中は本物と同じ固定サイズにする。
           e.sprite.setDisplaySize(26, 26).setAngle(0);
@@ -6083,7 +6227,7 @@ export class GameScene extends Phaser.Scene {
       if (e.freezeFx) {
         e.freezeFx.setPosition(e.sprite.x, e.sprite.y - 3).setDepth(e.sprite.depth + 0.35);
       }
-      e.hpBar?.setDepth(e.sprite.depth + 0.45);
+      e.hpBar?.setPosition(e.sprite.x, e.sprite.y).setDepth(e.sprite.depth + 0.45);
     }
 
     for (const c of this.chests) {
@@ -6164,9 +6308,10 @@ export class GameScene extends Phaser.Scene {
     if (!e.hpBar) e.hpBar = this.add.graphics().setDepth(e.sprite.depth + 0.45);
     else e.hpBar.setDepth(e.sprite.depth + 0.45);
     e.hpBar.clear();
+    e.hpBar.setPosition(e.sprite.x, e.sprite.y);
     const w = 24;
-    const x = e.sprite.x - w / 2;
-    const y = e.sprite.y - 20;
+    const x = -w / 2;
+    const y = -20;
     e.hpBar.fillStyle(0x000000, 0.6); e.hpBar.fillRect(x - 1, y - 1, w + 2, 5);
     e.hpBar.fillStyle(0x40ff70, 1); e.hpBar.fillRect(x, y, w * Math.max(0, e.hp / e.hpMax), 3);
   }
@@ -6179,7 +6324,7 @@ export class GameScene extends Phaser.Scene {
       atk: `${e.def.atkMin}-${e.def.atkMax}`, def: e.def.def,
       behavior: this.behaviorLabel(e.def.behavior),
       description: e.def.description,
-      element: `${ELEMENT_INFO[element].name}属性（弱点: ${ELEMENT_INFO[ELEMENT_INFO[element].weakTo].name}属性）`
+      element: element ? `${ELEMENT_INFO[element].name}属性（弱点: ${ELEMENT_INFO[ELEMENT_INFO[element].weakTo].name}属性）` : '無属性（属性の弱点・耐性なし）'
     });
   }
   behaviorLabel(b: string): string {
@@ -6187,6 +6332,125 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ============ 描画ヘルパー ============
+  updateDirectionalEnemyPose(e: Enemy, time: number) {
+    const pose = monsterDirectionPose(time, e.bobPhase, e.freezeTurns > 0, e.directionMotion);
+    // Move the artwork relative to its anchor; never overwrite an in-flight tween.
+    e.sprite.setDisplayOrigin(e.sprite.width * 0.5 - pose.x / e.baseScale,
+      e.sprite.height * 0.6 - pose.y / e.baseScale).setAngle(pose.angle);
+  }
+
+  updateEnemyDirection(e: Enemy) {
+    if (!e.directionArt || !e.sprite.active) return;
+    const frame = MONSTER_DIRECTION_FRAME[e.facing];
+    if (e.sprite.texture.key !== e.directionArt.textureKey || Number(e.sprite.frame.name) !== frame) {
+      e.sprite.setTexture(e.directionArt.textureKey, frame).setFlip(false, false).setAngle(0);
+    }
+  }
+
+  async playDirectionalEnemyAttack(e: Enemy, impact: () => void | Promise<void>, facePlayer: boolean, immediate: boolean): Promise<void> {
+    if (facePlayer) this.faceEnemyToward(e, this.player);
+    this.updateEnemyDirection(e);
+    e.animating = true;
+    const x = e.x * TILE + TILE / 2, y = e.y * TILE + TILE / 2;
+    const [dx, dy] = this.dirVec(e.facing);
+    const half = this.currentTurnAnimDuration(ANIM) / 2;
+    e.directionMotion = { kind: 'attack', startedAt: this.time.now, duration: half * 2, dx, dy };
+    // Ranged attacks launch immediately, keeping their existing projectile timing.
+    const release = immediate && e.alive && !this.gameEnded ? impact() : undefined;
+    await this.tween(e.sprite, { x: x + dx * 3, y: y + dy * 3 }, half, 'Sine.easeInOut');
+    if (!e.sprite.active) return;
+    const recovery = this.tween(e.sprite, { x, y }, half, 'Sine.easeInOut');
+    await Promise.all([recovery, immediate ? release : e.alive && !this.gameEnded ? impact() : undefined]);
+    if (e.sprite.active) {
+      e.animating = false;
+      e.directionMotion = undefined;
+    }
+  }
+
+  faceEnemyToward(e: Enemy, target: Vec2) {
+    const dx = target.x - e.x;
+    const dy = target.y - e.y;
+    if (Math.abs(dx) > Math.abs(dy)) e.facing = dx > 0 ? 'right' : 'left';
+    else if (dy !== 0) e.facing = dy > 0 ? 'down' : 'up';
+  }
+
+  handleMoveKeyDown(event: KeyboardEvent) {
+    const dir = MOVE_KEY_DIRS[event.code || event.key];
+    if (!dir || event.repeat) return;
+    const ui = this.scene.get('UIScene') as { overlayMode?: string } | undefined;
+    if (this.gameEnded || (ui?.overlayMode && ui.overlayMode !== 'none')) return;
+    event.preventDefault();
+    // 最大1行動。連打で大量に予約せず、最後に押した方向へ更新する。
+    this.queuedMove = dir;
+    this.heldDir = null;
+    this.holdStartedAt = 0;
+    if (this.clickPathActive) this.stopClickPath();
+  }
+
+  handleMoveKeyUp(event: KeyboardEvent) {
+    const dir = MOVE_KEY_DIRS[event.code || event.key];
+    if (dir && this.heldDir === dir) {
+      this.heldDir = null;
+      this.holdStartedAt = 0;
+      this.setBoostTier(0);
+    }
+    // 離しても未処理の短押しは消さない。
+  }
+
+  clearMoveInput() {
+    this.queuedMove = null;
+    this.heldDir = null;
+    this.holdStartedAt = 0;
+    this.holdRepeatAt = 0;
+    this.touchDir = null;
+    this.input.keyboard?.resetKeys();
+    if (this.clickPathActive) this.stopClickPath();
+    else this.setBoostTier(0);
+  }
+
+  setEnemyAnimation(e: Enemy, action: MonsterAction, duration?: number) {
+    e.frameAnimation = {
+      action,
+      startedAt: this.time.now,
+      duration: duration ?? (action === 'charge' ? 800 : 1200)
+    };
+    this.updateEnemyAnimation(e, this.time.now);
+  }
+
+  updateEnemyAnimation(e: Enemy, time: number) {
+    if (!e.frameAnimation || !e.sprite.active) return;
+    const animation = getMonsterAnimation(e.def.key);
+    if (!animation) return;
+    const { texture, frame } = monsterAnimationFrame(e.facing, e.frameAnimation,
+      e.freezeTurns > 0 ? e.frameAnimation.startedAt : time, animation);
+    if (e.sprite.texture.key !== texture || String(e.sprite.frame.name) !== String(frame)) {
+      e.sprite.setTexture(texture, frame);
+    }
+    e.sprite.setFlip(false, false).setAngle(0).setScale(e.baseScale);
+  }
+
+  async playDrawnEnemyAttack(
+    e: Enemy, action: 'claw' | 'cast', impact: () => void | Promise<void>, facePlayer = true
+  ): Promise<void> {
+    if (e.directionArt) return this.playDirectionalEnemyAttack(e, impact, facePlayer, action === 'cast');
+    if (facePlayer) this.faceEnemyToward(e, this.player);
+    e.animating = true;
+    const duration = Math.max(action === 'cast' ? 240 : 160,
+      this.currentTurnAnimDuration(action === 'cast' ? 400 : 280));
+    this.setEnemyAnimation(e, action, duration);
+    const wait = (ms: number) => new Promise<void>((resolve) => this.time.delayedCall(ms, () => resolve()));
+    const recovery = wait(duration);
+    await wait(duration / 2);
+    if (e.alive && e.sprite.active && !this.gameEnded) {
+      this.updateEnemyAnimation(e, this.time.now);
+      await impact();
+    }
+    await recovery;
+    if (!e.sprite.active) return;
+    e.animating = false;
+    this.setEnemyAnimation(e, this.bossStates.get(e)?.intent ? 'charge' : 'idle');
+  }
+
   setPlayerVisual(dir: Dir, frame: PlayerVisualFrame) {
     this.player.dir = dir;
     this.transformationSprite?.setFlipX(dir === 'left');

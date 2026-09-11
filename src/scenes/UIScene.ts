@@ -1244,8 +1244,8 @@ export class UIScene extends Phaser.Scene {
         fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: found ? '#eef5ff' : '#596579', fontStyle: 'bold'
       }));
       const element = monsterElement(m);
-      const weakness = ELEMENT_INFO[element].weakTo;
-      this.overlay.add(this.add.text(px + 29, py + 15, found ? `${ELEMENT_INFO[element].name}/弱${ELEMENT_INFO[weakness].name} 体力${m.hp} 攻${m.atkMin}-${m.atkMax}` : `???  ${m.minFloor}-${m.maxFloor}階`, {
+      const affinity = element ? `${ELEMENT_INFO[element].name}/弱${ELEMENT_INFO[ELEMENT_INFO[element].weakTo].name}` : '無属性';
+      this.overlay.add(this.add.text(px + 29, py + 15, found ? `${affinity} 体力${m.hp} 攻${m.atkMin}-${m.atkMax}` : `???  ${m.minFloor}-${m.maxFloor}階`, {
         fontFamily: '"Yu Gothic UI"', fontSize: '8px', color: found ? '#8fc8d7' : '#465264'
       }));
       const trait = found ? (m.gimmickText ?? '固有効果なし') : '効果 ???';

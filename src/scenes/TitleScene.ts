@@ -25,7 +25,6 @@ export class TitleScene extends Phaser.Scene {
     const qaGender = qaParams.get('qa-gender');
     if (location.hostname === 'localhost' && isPlayerGender(qaGender)) {
       this.selectedGender = qaGender;
-      setSelectedGender(qaGender);
     } else {
       this.selectedGender = getSelectedGender();
     }
@@ -39,7 +38,7 @@ export class TitleScene extends Phaser.Scene {
     const startGame = () => {
       if (starting) return;
       starting = true;
-      setSelectedGender(this.selectedGender);
+      if (!(location.hostname === 'localhost' && isPlayerGender(qaGender))) setSelectedGender(this.selectedGender);
       this.cameras.main.fadeOut(180, 2, 7, 8);
       this.time.delayedCall(190, () => this.scene.start('GameScene'));
     };

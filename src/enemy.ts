@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import type { Dir, MonsterDef, Vec2 } from './types';
+import type { MonsterAnimationState } from './monsterAnimation';
+import type { MonsterDirectionArt, MonsterDirectionMotion } from './monsterDirections';
 
 export class Enemy {
   def: MonsterDef;
@@ -14,6 +16,9 @@ export class Enemy {
   baseScale = 1;      // 呼吸アニメ用の基準スケール
   bobPhase = 0;       // アイドル揺れの位相
   animating = false;
+  frameAnimation?: MonsterAnimationState;
+  directionArt?: MonsterDirectionArt;
+  directionMotion?: MonsterDirectionMotion;
   slowToggle = false;     // slow行動用
   freezeTurns = 0;        // 氷結
   freezeFx?: Phaser.GameObjects.Container;

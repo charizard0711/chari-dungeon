@@ -4,8 +4,11 @@ import { applyRealAssets } from '../assetLoader';
 import { BGM_DEFS, SE_DEFS, AudioDef } from '../audio/config';
 import { Audio } from '../audio/manager';
 import { PLAYER_SHEETS } from '../playerAppearance';
+import { MONSTER_ANIMATIONS } from '../monsterAnimation';
+import { DIRECTIONAL_MONSTERS } from '../monsterDirections';
 
 const EXPANSION_MONSTER_KEYS = [
+  'm_black_mage', 'm_rival_male', 'm_rival_female',
   'm_mush', 'm_mole', 'm_golem', 'm_spider', 'm_beetle', 'm_eye', 'm_wraith', 'm_reaper',
   'm_dark_ninja', 'm_obsidian_shogun', 'm_storm_minotaur', 'm_star_griffin', 'm_lucky_rabbit',
   'm_skel', 'm_archer', 'm_slime',
@@ -168,6 +171,19 @@ export class BootScene extends Phaser.Scene {
     }
     for (const key of EXPANSION_MONSTER_KEYS) {
       this.load.image(key, `assets/monsters/${key}.png`);
+    }
+    for (const art of DIRECTIONAL_MONSTERS) {
+      this.load.spritesheet(art.textureKey, art.path, { frameWidth: art.frameSize, frameHeight: art.frameSize });
+    }
+    for (const animation of MONSTER_ANIMATIONS) {
+      for (const [key, path] of [
+        [animation.motionKey, animation.motionPath],
+        [animation.attackKey, animation.attackPath]
+      ]) {
+        this.load.spritesheet(key, path, {
+          frameWidth: animation.frameSize, frameHeight: animation.frameSize
+        });
+      }
     }
     for (let era = 1; era <= 4; era++) {
       this.load.spritesheet(`terrain_floor_${era}`, `assets/terrain/floor-era${era}.png`, {

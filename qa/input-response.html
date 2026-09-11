@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<title>方向キーの応答確認</title>
+<style>
+body{background:#101d24;color:#e2f4ef;font:15px system-ui;margin:20px}button{padding:10px;margin:0 8px 10px 0}iframe{display:block;width:1000px;height:600px;border:1px solid #48616a}pre{white-space:pre-wrap;line-height:1.7}output{display:block;font-weight:bold;margin:10px 0}
+</style>
+<h1>方向キーの応答確認</h1>
+<p>1回目の移動中に次の方向を20msだけ押します。2入力で2行動になり、最後は停止することを確認します。</p>
+<button data-floor="1">1階</button><button data-floor="2">2階</button><button data-floor="3">3階</button><button data-floor="4">4階</button><button data-floor="5">5階ボス</button><button data-floor="6">6階</button><button data-floor="7">7階</button>
+<button data-floor="8">8階・魔術師</button><button data-floor="9" data-gender="male">9階・男主人公</button><button data-floor="9" data-gender="female">9階・女主人公</button><button data-floor="10">10階ボス</button>
+<button id="tap">短押し2回（下→左）</button><button id="same">同じ方向を2回（下→下）</button>
+<output id="result">読み込み中</output><pre id="stats"></pre>
+<iframe title="入力テスト用ゲーム"></iframe>
+<script type="module">
+import {monsterElement} from '/src/data.ts';
+import {getSelectedGender} from '/src/playerAppearance.ts';
+const frame=document.querySelector('iframe'),stats=document.querySelector('#stats'),result=document.querySelector('#result');
+let floor=1,running=false,busyPresses=0,received=0,lastReport='',readyAt=0,frameLoaded=false;
+const scene=()=>frame.contentWindow?.__game?.scene.getScene('GameScene');
+function load(n,gender){floor=n;readyAt=0;frameLoaded=false;received=0;busyPresses=0;lastReport='';stats.textContent='';frame.src=`/?qa-game&qa-floor=${n}&${[5,10].includes(n)?'qa-boss&qa-field-arena':'qa-field-arena'}${gender?'&qa-gender='+gender:''}`;result.textContent='読み込み中';}
+for(const button of document.querySelectorAll('[data-floor]'))button.onclick=()=>{if(!running)load(Number(button.dataset.floor),button.dataset.gender);};
+frame.onload=()=>{
+  readyAt=0;
+  frameLoaded=true;
+  frame.contentWindow.addEventListener('keydown',()=>{received++;if(scene()?.busy)busyPresses++;},true);
+};
+const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+function key(dir,down){
+  const code=dir==='down'?40:37,key=dir==='down'?'ArrowDown':'ArrowLeft';
+  frame.contentWindow.dispatchEvent(new KeyboardEvent(down?'keydown':'keyup',{key,code:key,keyCode:code,which:code,bubbles:true}));
+}
+async function run(second){
+  const gs=scene();if(running||!frameLoaded||!gs?.playerSprite||gs.floor!==floor||gs.busy||!readyAt)return;
+  running=true;lastReport='';received=0;busyPresses=0;result.textContent='確認中';
+  frame.contentWindow.focus();
+  const start={x:gs.player.x,y:gs.player.y,turn:gs.turn},started=performance.now();
+  key('down',true);await delay(20);key('down',false);
+  await delay(105);
+  const secondOrigin={x:gs.player.x,y:gs.player.y};
+  const secondTargetEnemy=gs.enemyAt(secondOrigin.x-(second==='left'?1:0),secondOrigin.y+(second==='down'?1:0))?.def.name??null;
+  key(second,true);await delay(20);key(second,false);
+  await delay(1000);
+  const end={x:gs.player.x,y:gs.player.y,turn:gs.turn,dir:gs.player.dir};
+  const expected=secondTargetEnemy?secondOrigin:{x:start.x-(second==='left'?1:0),y:start.y+(second==='down'?2:1)};
+  const pass=end.turn-start.turn===2&&end.dir===second&&end.x===expected.x&&end.y===expected.y&&!gs.busy;
+  lastReport=JSON.stringify({floor,pass,keyDowns:received,pressedWhileBusy:busyPresses,actions:end.turn-start.turn,secondTargetEnemy,start,end,expected,elapsed:Math.round(performance.now()-started)},null,2);
+  result.textContent=(pass?'PASS':'FAIL')+'：2回の短押し→'+(end.turn-start.turn)+'行動';running=false;
+}
+document.querySelector('#tap').onclick=()=>run('left');
+document.querySelector('#same').onclick=()=>run('down');
+function tick(){
+  const gs=scene(),game=frame.contentWindow?.__game;
+  if(frameLoaded&&gs?.playerSprite&&gs.floor===floor&&gs.sys.isActive()){
+    if(!readyAt){readyAt=performance.now();result.textContent='準備完了';}
+    const boss=gs.enemies.find(e=>e.def.isFloorBoss);
+    stats.textContent=`${floor}階 / FPS ${Math.round(game.loop.actualFps)} / ターン ${gs.turn} / 処理中 ${gs.busy} / 位置 ${gs.player.x},${gs.player.y} / 予約 ${gs.queuedMove??'なし'}\n座標の整数丸め: ${gs.cameras.main.roundPixels} / ボス画像: ${boss?.sprite.texture.key??'なし'} / 方向: ${boss?.facing??'なし'}\n${lastReport}`;
+    if(boss){
+      const gear=boss.def.rivalEquipment;
+      stats.textContent+=`\nボス: ${boss.def.name} / 属性: ${monsterElement(boss.def)??'無属性'} / プレイヤー: ${gs.playerGender} / 保存中の選択: ${getSelectedGender()}`;
+      if(gear)stats.textContent+=`\n敵: ${gear.gender} / 武器[${gear.weapon.grade}] ${gear.weapon.name} / 盾[${gear.shield.grade}] ${gear.shield.name} / 服[${gear.armor.grade}] ${gear.armor.name}`;
+    }
+  }
+  requestAnimationFrame(tick);
+}
+load(1);requestAnimationFrame(tick);
+</script>
+</html>

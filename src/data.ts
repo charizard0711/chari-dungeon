@@ -115,7 +115,8 @@ export function elementMultiplier(attack: Element | undefined, defend: Element |
   return ELEMENT_INFO[defend].weakTo === attack ? 1.5 : attack === defend ? 0.75 : 1;
 }
 
-export function monsterElement(def: MonsterDef): Element {
+export function monsterElement(def: MonsterDef): Element | undefined {
+  if (def.element === null) return undefined;
   if (def.element) return def.element;
   const values: Element[] = ['fire', 'thunder', 'water', 'ice'];
   let seed = 0;

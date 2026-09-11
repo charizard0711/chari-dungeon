@@ -70,7 +70,8 @@ export const SE_DEFS = {
 
 export type SeName = keyof typeof SE_DEFS;
 
-export function elementAttackSe(element: Element): SeName {
+export function elementAttackSe(element?: Element): SeName {
+  if (!element) return 'attack';
   return ({
     fire: 'elementFire', water: 'elementWater', thunder: 'elementThunder', ice: 'elementIce'
   } as const)[element];

@@ -134,7 +134,13 @@ export interface MonsterDef {
   gimmickText?: string;
   bossTint?: number;
   color: number;          // 代替ドット絵の基調色
-  element?: Element;
+  element?: Element | null; // null explicitly disables the legacy element fallback.
+  rivalEquipment?: {
+    gender: 'male' | 'female';
+    weapon: Weapon;
+    shield: Shield;
+    armor: Armor;
+  };
 }
 
 export type MonsterGimmick =
