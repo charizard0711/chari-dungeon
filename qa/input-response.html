@@ -9,6 +9,7 @@ body{background:#101d24;color:#e2f4ef;font:15px system-ui;margin:20px}button{pad
 <p>1回目の移動中に次の方向を20msだけ押します。2入力で2行動になり、最後は停止することを確認します。</p>
 <button data-floor="1">1階</button><button data-floor="2">2階</button><button data-floor="3">3階</button><button data-floor="4">4階</button><button data-floor="5">5階ボス</button><button data-floor="6">6階</button><button data-floor="7">7階</button>
 <button data-floor="8">8階・魔術師</button><button data-floor="9" data-gender="male">9階・男主人公</button><button data-floor="9" data-gender="female">9階・女主人公</button><button data-floor="10">10階ボス</button>
+<button data-floor="11">11階・白翼</button><button data-floor="12">12階・闇竜</button><button data-floor="13">13階・氷の騎士</button><button data-floor="14">14階・ゼウス</button><button data-floor="15">15階・タイタン</button>
 <button id="tap">短押し2回（下→左）</button><button id="same">同じ方向を2回（下→下）</button>
 <output id="result">読み込み中</output><pre id="stats"></pre>
 <iframe title="入力テスト用ゲーム"></iframe>
@@ -18,7 +19,7 @@ import {getSelectedGender} from '/src/playerAppearance.ts';
 const frame=document.querySelector('iframe'),stats=document.querySelector('#stats'),result=document.querySelector('#result');
 let floor=1,running=false,busyPresses=0,received=0,lastReport='',readyAt=0,frameLoaded=false;
 const scene=()=>frame.contentWindow?.__game?.scene.getScene('GameScene');
-function load(n,gender){floor=n;readyAt=0;frameLoaded=false;received=0;busyPresses=0;lastReport='';stats.textContent='';frame.src=`/?qa-game&qa-floor=${n}&${[5,10].includes(n)?'qa-boss&qa-field-arena':'qa-field-arena'}${gender?'&qa-gender='+gender:''}`;result.textContent='読み込み中';}
+function load(n,gender){floor=n;readyAt=0;frameLoaded=false;received=0;busyPresses=0;lastReport='';stats.textContent='';frame.src=`/?qa-game&qa-floor=${n}&${[5,10,15].includes(n)?'qa-boss&qa-field-arena':'qa-field-arena'}${gender?'&qa-gender='+gender:''}`;result.textContent='読み込み中';}
 for(const button of document.querySelectorAll('[data-floor]'))button.onclick=()=>{if(!running)load(Number(button.dataset.floor),button.dataset.gender);};
 frame.onload=()=>{
   readyAt=0;

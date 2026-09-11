@@ -1,4 +1,4 @@
-import type { Weapon, Shield, Item, ItemKind, MonsterDef, MagicCode, EquipmentGrade, Element, WeaponType, WeaponPassive, ShieldPassive } from './types';
+import type { Weapon, Shield, Item, ItemKind, MonsterDef, MagicCode, EquipmentGrade, Element, MonsterElement, WeaponType, WeaponPassive, ShieldPassive } from './types';
 
 // ===== 武器定義 =====
 export interface WeaponDef {
@@ -98,11 +98,12 @@ export const WEAPON_DEFS: WeaponDef[] = [
   }
 ];
 
-export const ELEMENT_INFO: Record<Element, { name: string; color: number; weakTo: Element }> = {
+export const ELEMENT_INFO: Record<MonsterElement, { name: string; color: number; weakTo?: Element }> = {
   fire: { name: '火', color: 0xff5a36, weakTo: 'water' },
   thunder: { name: '雷', color: 0xffe348, weakTo: 'ice' },
   water: { name: '水', color: 0x3fa9ff, weakTo: 'thunder' },
-  ice: { name: '氷', color: 0x82e9ff, weakTo: 'fire' }
+  ice: { name: '氷', color: 0x82e9ff, weakTo: 'fire' },
+  dark: { name: '闇', color: 0x9867db }
 };
 
 export function randomElement(): Element {
@@ -110,12 +111,12 @@ export function randomElement(): Element {
   return values[Math.floor(Math.random() * values.length)];
 }
 
-export function elementMultiplier(attack: Element | undefined, defend: Element | undefined): number {
+export function elementMultiplier(attack: MonsterElement | undefined, defend: MonsterElement | undefined): number {
   if (!attack || !defend) return 1;
   return ELEMENT_INFO[defend].weakTo === attack ? 1.5 : attack === defend ? 0.75 : 1;
 }
 
-export function monsterElement(def: MonsterDef): Element | undefined {
+export function monsterElement(def: MonsterDef): MonsterElement | undefined {
   if (def.element === null) return undefined;
   if (def.element) return def.element;
   const values: Element[] = ['fire', 'thunder', 'water', 'ice'];

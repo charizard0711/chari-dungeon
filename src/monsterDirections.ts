@@ -84,12 +84,36 @@ export const BISON_DIRECTIONS: MonsterDirectionArt = {
   path: 'assets/monsters/directional/bison-directions-v1.png', frameSize: 128, artSize: 120
 };
 
-export const DIRECTIONAL_MONSTERS: readonly MonsterDirectionArt[] = [EMBER_DIRECTIONS, FROST_DIRECTIONS, STORM_DIRECTIONS, BRASS_DIRECTIONS, AURELIUS_DIRECTIONS, BONE_DIRECTIONS, HYDRA_DIRECTIONS, BLACK_MAGE_DIRECTIONS, RIVAL_MALE_DIRECTIONS, RIVAL_FEMALE_DIRECTIONS, BISON_DIRECTIONS];
+export const SERAPH_DIRECTIONS: MonsterDirectionArt = {
+  monsterKey: 'm_silver_seraph', textureKey: 'seraph_directions_v1',
+  path: 'assets/monsters/directional/seraph-directions-v1.png', frameSize: 128, artSize: 120
+};
+export const ABYSS_DIRECTIONS: MonsterDirectionArt = {
+  monsterKey: 'm_abyss_dragon', textureKey: 'abyss_directions_v1',
+  path: 'assets/monsters/directional/abyss-directions-v1.png', frameSize: 128, artSize: 120
+};
+export const ICE_KNIGHT_DIRECTIONS: MonsterDirectionArt = {
+  monsterKey: 'm_ice_knight', textureKey: 'ice_knight_directions_v1',
+  path: 'assets/monsters/directional/ice-knight-directions-v1.png', frameSize: 128, artSize: 120
+};
+export const THUNDER_SOVEREIGN_DIRECTIONS: MonsterDirectionArt = {
+  monsterKey: 'm_thunder_sovereign', textureKey: 'thunder_sovereign_directions_v1',
+  path: 'assets/monsters/directional/thunder-sovereign-directions-v1.png', frameSize: 128, artSize: 120
+};
+export const TITAN_DIRECTIONS: MonsterDirectionArt = {
+  monsterKey: 'm_bone_colossus', textureKey: 'titan_directions_v1',
+  path: 'assets/monsters/directional/titan-directions-v1.png', frameSize: 128, artSize: 120
+};
+
+export const DIRECTIONAL_MONSTERS: readonly MonsterDirectionArt[] = [EMBER_DIRECTIONS, FROST_DIRECTIONS, STORM_DIRECTIONS, BRASS_DIRECTIONS, AURELIUS_DIRECTIONS, BONE_DIRECTIONS, HYDRA_DIRECTIONS, BLACK_MAGE_DIRECTIONS, RIVAL_MALE_DIRECTIONS, RIVAL_FEMALE_DIRECTIONS, BISON_DIRECTIONS, SERAPH_DIRECTIONS, ABYSS_DIRECTIONS, ICE_KNIGHT_DIRECTIONS, THUNDER_SOVEREIGN_DIRECTIONS, TITAN_DIRECTIONS];
+
+const FLOOR_DIRECTION_ART = [EMBER_DIRECTIONS, FROST_DIRECTIONS, STORM_DIRECTIONS, BRASS_DIRECTIONS,
+  AURELIUS_DIRECTIONS, BONE_DIRECTIONS, HYDRA_DIRECTIONS, BLACK_MAGE_DIRECTIONS, RIVAL_FEMALE_DIRECTIONS,
+  BISON_DIRECTIONS, SERAPH_DIRECTIONS, ABYSS_DIRECTIONS, ICE_KNIGHT_DIRECTIONS, THUNDER_SOVEREIGN_DIRECTIONS, TITAN_DIRECTIONS];
 
 export function directionArtForFloor(floor: number, playerGender: 'male' | 'female' = 'male'): MonsterDirectionArt {
   if (floor === 9) return playerGender === 'male' ? RIVAL_FEMALE_DIRECTIONS : RIVAL_MALE_DIRECTIONS;
-  if (floor === 10) return BISON_DIRECTIONS;
-  return DIRECTIONAL_MONSTERS[floor - 1] ?? EMBER_DIRECTIONS;
+  return FLOOR_DIRECTION_ART[floor - 1] ?? EMBER_DIRECTIONS;
 }
 export const MONSTER_DIRECTION_FRAME: Readonly<Record<Dir, number>> = { down: 0, left: 1, right: 2, up: 3 };
 

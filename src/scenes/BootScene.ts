@@ -9,6 +9,7 @@ import { DIRECTIONAL_MONSTERS } from '../monsterDirections';
 
 const EXPANSION_MONSTER_KEYS = [
   'm_black_mage', 'm_rival_male', 'm_rival_female',
+  'm_silver_seraph', 'm_abyss_dragon', 'm_ice_knight', 'm_thunder_sovereign',
   'm_mush', 'm_mole', 'm_golem', 'm_spider', 'm_beetle', 'm_eye', 'm_wraith', 'm_reaper',
   'm_dark_ninja', 'm_obsidian_shogun', 'm_storm_minotaur', 'm_star_griffin', 'm_lucky_rabbit',
   'm_skel', 'm_archer', 'm_slime',

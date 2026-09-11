@@ -3,7 +3,7 @@ import { TILE } from '../textures';
 import { generateDungeon, generateBossArena, DungeonData, randomFloor, isWalkable } from '../dungeon';
 import type { BossRoomZone, OptionalRoom, OptionalRoomKind, Room } from '../dungeon';
 import { getTheme, eraSuffix, MONSTER_DEFS, WEAPON_DEFS, makeItem, gradeColor, ITEM_DEFS, ELEMENT_INFO, monsterElement } from '../data';
-import type { Armor, Dir, Element, EquipmentGrade, ItemKind, MonsterDef, Shield, TileType, Vec2, Weapon } from '../types';
+import type { Armor, Dir, Element, MonsterElement, EquipmentGrade, ItemKind, MonsterDef, Shield, TileType, Vec2, Weapon } from '../types';
 import {
   Player, rollWeaponByGrade, rollShield, rollShieldByGrade,
   weaponFullName, shieldFullName, makeWeapon, makeShield
@@ -1294,7 +1294,7 @@ export class GameScene extends Phaser.Scene {
       isElite: true,
       isBoss: false,
       isFloorBoss: true,
-      isDragonType: custom ? false : true,
+      isDragonType: custom ? custom.isDragonType : true,
       bossTint: custom ? 0xffffff : spec.tint
     };
     const message = fieldPlacement
@@ -1302,7 +1302,7 @@ export class GameScene extends Phaser.Scene {
       : this.inBossRoom
         ? `◆ ${floor}.5F 中ボス「${def.name}」が現れた！`
         : `◆ ${floor}F 7×7の専用部屋から強い気配がする。入口を探せ。`;
-    this.placeFloorBoss(def, custom ? 1 : 1.32, spec.tint, message, this.midBossGimmick(base.key), fieldPlacement);
+    this.placeFloorBoss(def, custom && !custom.isDragonType ? 1 : 1.32, spec.tint, message, this.midBossGimmick(base.key), fieldPlacement);
   }
 
   spawnMilestoneBoss(floor: number) {
@@ -1325,7 +1325,7 @@ export class GameScene extends Phaser.Scene {
       isBoss: floor === 30,
       isFloorBoss: true,
       isDragonType: floor >= 20,
-      bossTint: spec.tint
+      bossTint: floor === 15 ? 0xffffff : spec.tint
     };
     const label = floor % 10 === 0
       ? `★★ ${floor}.5F 超ボス「${def.name}」が降臨した！`
@@ -1358,7 +1358,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   midBossGimmick(key: string): BossGimmickKind {
-    if (key === 'm_black_mage') return 'mid_magic';
+    if (key === 'm_black_mage' || key === 'm_silver_seraph') return 'mid_magic';
+    if (key === 'm_abyss_dragon') return 'mid_void';
+    if (key === 'm_ice_knight') return 'mid_frost';
+    if (key === 'm_thunder_sovereign') return 'mid_storm';
     if (key.startsWith('m_rival_')) return 'mid_rival';
     if (/frost|wyrm/.test(key)) return 'mid_frost';
     if (/storm|wyvern/.test(key)) return 'mid_storm';
@@ -2046,7 +2049,7 @@ export class GameScene extends Phaser.Scene {
           this.addBossHazards(primary, 'fire', 2);
           break;
         case 'mid_frost':
-          if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.66, '冷気ブレス！');
+          if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.66, e.def.key === 'm_ice_knight' ? '氷晶の剣撃！' : '冷気ブレス！');
           this.addBossHazards(primary, 'ice', 2);
           break;
         case 'mid_storm':
@@ -4230,7 +4233,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  enemyAttackProfile(e: Enemy): { element: Element | undefined; factor: number; label: string } {
+  enemyAttackProfile(e: Enemy): { element: MonsterElement | undefined; factor: number; label: string } {
     let element = monsterElement(e.def);
     let factor = 1;
     let label = '';
@@ -6319,12 +6322,13 @@ export class GameScene extends Phaser.Scene {
   showEnemyInfo(e: Enemy) {
     this.discovered.add(e.def.key);
     const element = monsterElement(e.def);
+    const weakTo = element ? ELEMENT_INFO[element].weakTo : undefined;
     this.events.emit('enemyinfo', {
       name: e.def.name, hp: e.hp, hpMax: e.hpMax,
       atk: `${e.def.atkMin}-${e.def.atkMax}`, def: e.def.def,
       behavior: this.behaviorLabel(e.def.behavior),
       description: e.def.description,
-      element: element ? `${ELEMENT_INFO[element].name}属性（弱点: ${ELEMENT_INFO[ELEMENT_INFO[element].weakTo].name}属性）` : '無属性（属性の弱点・耐性なし）'
+      element: element ? `${ELEMENT_INFO[element].name}属性（${weakTo ? `弱点: ${ELEMENT_INFO[weakTo].name}属性` : '属性の弱点なし'}）` : '無属性（属性の弱点・耐性なし）'
     });
   }
   behaviorLabel(b: string): string {

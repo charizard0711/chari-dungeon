@@ -1244,7 +1244,8 @@ export class UIScene extends Phaser.Scene {
         fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: found ? '#eef5ff' : '#596579', fontStyle: 'bold'
       }));
       const element = monsterElement(m);
-      const affinity = element ? `${ELEMENT_INFO[element].name}/弱${ELEMENT_INFO[ELEMENT_INFO[element].weakTo].name}` : '無属性';
+      const weakTo = element ? ELEMENT_INFO[element].weakTo : undefined;
+      const affinity = element ? `${ELEMENT_INFO[element].name}${weakTo ? `/弱${ELEMENT_INFO[weakTo].name}` : '/弱点なし'}` : '無属性';
       this.overlay.add(this.add.text(px + 29, py + 15, found ? `${affinity} 体力${m.hp} 攻${m.atkMin}-${m.atkMax}` : `???  ${m.minFloor}-${m.maxFloor}階`, {
         fontFamily: '"Yu Gothic UI"', fontSize: '8px', color: found ? '#8fc8d7' : '#465264'
       }));

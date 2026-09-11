@@ -1,4 +1,4 @@
-import type { Weapon, Shield, MonsterDef, Element } from './types';
+import type { Weapon, Shield, MonsterDef, MonsterElement } from './types';
 import { Player } from './player';
 import { elementMultiplier, monsterElement } from './data';
 
@@ -94,7 +94,7 @@ export interface DefendResult {
   shieldBroke: boolean;
 }
 
-export function computeEnemyAttack(p: Player, def: MonsterDef, attackElement?: Element): DefendResult {
+export function computeEnemyAttack(p: Player, def: MonsterDef, attackElement?: MonsterElement): DefendResult {
   let dmg = irand(def.atkMin, def.atkMax);
   dmg = Math.max(1, dmg - Math.floor(p.def * 0.7));
   dmg = Math.max(1, Math.floor(dmg * elementMultiplier(attackElement ?? monsterElement(def), p.shield?.element)));

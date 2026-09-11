@@ -30,6 +30,8 @@ export interface Magic {
 export type EquipmentGrade = 'D' | 'C' | 'B' | 'A' | 'S';
 
 export type Element = 'fire' | 'thunder' | 'water' | 'ice';
+// Dark is a monster affinity; equipment rolls retain the original four elements.
+export type MonsterElement = Element | 'dark';
 export type WeaponType = 'dagger' | 'longsword' | 'lance' | 'bow' | 'handgun' | 'greatsword' | 'dual_sword' | 'twin_daggers';
 
 export interface WeaponPassive {
@@ -134,7 +136,7 @@ export interface MonsterDef {
   gimmickText?: string;
   bossTint?: number;
   color: number;          // 代替ドット絵の基調色
-  element?: Element | null; // null explicitly disables the legacy element fallback.
+  element?: MonsterElement | null; // null explicitly disables the legacy element fallback.
   rivalEquipment?: {
     gender: 'male' | 'female';
     weapon: Weapon;

@@ -1,5 +1,5 @@
 // ========================================================================
-import type { Element, WeaponType } from '../types';
+import type { MonsterElement, WeaponType } from '../types';
 // 音源パス定数
 // 本物のmp3/oggに差し替える場合は public/assets/audio/ に
 // 下記ファイル名で置くだけでOK（自動で読み込まれ、仮BGMより優先される）。
@@ -70,10 +70,10 @@ export const SE_DEFS = {
 
 export type SeName = keyof typeof SE_DEFS;
 
-export function elementAttackSe(element?: Element): SeName {
+export function elementAttackSe(element?: MonsterElement): SeName {
   if (!element) return 'attack';
   return ({
-    fire: 'elementFire', water: 'elementWater', thunder: 'elementThunder', ice: 'elementIce'
+    fire: 'elementFire', water: 'elementWater', thunder: 'elementThunder', ice: 'elementIce', dark: 'warp'
   } as const)[element];
 }
 

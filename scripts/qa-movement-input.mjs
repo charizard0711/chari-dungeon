@@ -127,8 +127,8 @@ for (const boost of [0, 2]) {
     assert.equal(e.animating, false);
   }
 }
-assert.deepEqual(DIRECTIONAL_MONSTERS.map(art => art.monsterKey), ['m_ember_drake', 'm_frost_wyrm', 'm_storm_wyvern', 'm_brass_dragon', 'm_archdemon', 'm_bone_dragon', 'm_hydra', 'm_black_mage', 'm_rival_male', 'm_rival_female', 'm_horn_demon']);
-assert.equal(new Set(DIRECTIONAL_MONSTERS.map(art => art.textureKey)).size, 11, 'each species needs its own drawings');
+assert.deepEqual(DIRECTIONAL_MONSTERS.map(art => art.monsterKey), ['m_ember_drake', 'm_frost_wyrm', 'm_storm_wyvern', 'm_brass_dragon', 'm_archdemon', 'm_bone_dragon', 'm_hydra', 'm_black_mage', 'm_rival_male', 'm_rival_female', 'm_horn_demon', 'm_silver_seraph', 'm_abyss_dragon', 'm_ice_knight', 'm_thunder_sovereign', 'm_bone_colossus']);
+assert.equal(new Set(DIRECTIONAL_MONSTERS.map(art => art.textureKey)).size, DIRECTIONAL_MONSTERS.length, 'each species needs its own drawings');
 assert.equal(new Set(Object.values(MONSTER_DIRECTION_FRAME)).size, 4);
 for (const art of DIRECTIONAL_MONSTERS) {
 const atlas = await fs.readFile(new URL(`../public/${art.path}`, import.meta.url));
