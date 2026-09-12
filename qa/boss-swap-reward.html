@@ -1,0 +1,32 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><title>15階・20階と装備の確認</title>
+<style>body{margin:16px;background:#13242b;color:#e1f1ef;font:15px system-ui}button{padding:9px;margin:0 8px 10px 0}iframe{width:1000px;height:700px;border:1px solid #57727a;display:block}output{display:block;margin:8px 0}pre{white-space:pre-wrap}</style>
+<h1>15階の氷ボス・20階の熔獄竜</h1><button id="f15">15階の氷ボス</button><button id="f20">20階の熔獄竜</button><button id="overview">部屋全体</button><button id="defeat">ボス撃破とドロップ確認</button>
+<output>読み込み中</output><iframe title="ボスと装備の確認"></iframe><pre></pre>
+<script type="module">
+import {makeWeapon,makeShield} from '/src/player.ts';
+import {makePlayerArmor} from '/src/playerAppearance.ts';
+if(location.hostname!=='localhost')throw new Error('Local QA only');
+const frame=document.querySelector('iframe'),out=document.querySelector('output'),report=document.querySelector('pre');let floor=15,ready=false;
+const scene=()=>frame.contentWindow?.__game?.scene.getScene('GameScene');
+function load(n){floor=n;ready=false;out.textContent='読み込み中';report.textContent='';frame.src=`/?qa-game&qa-floor=${n}&qa-boss&qa-field-arena`;}
+document.querySelector('#f15').onclick=()=>load(15);document.querySelector('#f20').onclick=()=>load(20);
+document.querySelector('#overview').onclick=()=>{const gs=scene(),r=gs.dungeon.bossRoom,c=gs.cameras.main;c.stopFollow();c.setZoom(Math.min(c.width/((r.w+3)*32),c.height/((r.h+3)*32)));c.centerOn((r.cx+.5)*32,(r.cy+.5)*32);};
+document.querySelector('#defeat').onclick=()=>{
+ const gs=scene(),boss=gs.enemies.find(e=>e.def.isFloorBoss);if(!ready||!boss)return;
+ const before=new Set(gs.ground.filter(g=>g.kind==='weapon').map(g=>g.weapon));
+ gs.killEnemy(boss,0);
+ const weapons=gs.ground.filter(g=>g.kind==='weapon'&&!before.has(g.weapon));
+ gs.unlockFloorGate('重複通知の確認');
+ const pass=weapons.length===1&&weapons[0].weapon.element===(floor===15?'ice':'fire')&&gs.floorBossDefeated&&gs.dungeon.tiles[gs.dungeon.stairs.y][gs.dungeon.stairs.x]==='stairs';
+ out.textContent=(pass?'PASS':'FAIL')+`：${floor}階を撃破・武器1本・出口開放`;
+ report.textContent=JSON.stringify({floor,defeated:boss.def.name,weapons:weapons.map(g=>({key:g.weapon.key,name:g.weapon.name,element:g.weapon.element,grade:g.weapon.grade,dur:g.weapon.dur,x:g.x,y:g.y})),stairsOpen:gs.bossRewardClaimed},null,2);
+};
+setInterval(()=>{const gs=scene();if(ready||!gs?.playerSprite||!gs.sys.isActive()||gs.floor!==floor||!gs.inBossRoom)return;
+ const boss=gs.enemies.find(e=>e.def.isFloorBoss);if(!boss)return;
+ gs.player.weapon=makeWeapon('w_longsword_ice',[]);gs.player.shield=makeShield('s_frost_aegis');gs.player.armor=makePlayerArmor('plate');gs.playerArmor='plate';
+ gs.setPlayerVisual('down','idle');gs.updatePlayerAura();gs.emitRefresh();
+ const pass=boss.def.key===(floor===15?'m_ice_behemoth':'m_valgrado')&&Boolean(gs.dungeon.glacialArena)===(floor===15)&&gs.bossStates.get(boss)?.kind===(floor===15?'glacial_slam':'magma_breath');
+ out.textContent=(pass?'PASS':'FAIL')+`：${floor}階のボス・部屋・攻撃方式`;
+ report.textContent=JSON.stringify({floor,boss:boss.def.name,art:boss.sprite.texture.key,gimmick:gs.bossStates.get(boss)?.kind,biome:gs.dungeon.biome,weapon:gs.equipmentRenderer?.weapon.texture.key,shield:gs.equipmentRenderer?.offhand.texture.key},null,2);ready=true;
+},100);load(15);
+</script></html>

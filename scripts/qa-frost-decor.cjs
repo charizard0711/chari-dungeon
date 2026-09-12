@@ -17,11 +17,13 @@ function load(relative) {
 }
 const { generateDungeon, generateBossArena, isWalkable } = load('src/dungeon.ts');
 const { eraSuffix } = load('src/data.ts');
-const { hasRuinTerrain, ruinTerrainKey } = load('src/ruinTerrain.ts');
+const { hasRuinTerrain, ruinTerrainKey, ruinFloorKey, ruinFloorFrame } = load('src/ruinTerrain.ts');
+const volcano = load('src/volcanoTerrain.ts');
+const water = load('src/waterTerrain.ts');
 const source = fs.readFileSync(path.join(root, 'src/scenes/GameScene.ts'), 'utf8');
 const ast = ts.createSourceFile('GameScene.ts', source, ts.ScriptTarget.Latest, true);
 const scene = ast.statements.find(s => ts.isClassDeclaration(s) && s.name.text === 'GameScene');
-const names = new Set(['usesGlacialTerrain', 'tileVisual', 'createWallFacades', 'roomPropTexture', 'roomPropRenderTiles',
+const names = new Set(['usesGlacialTerrain', 'tileVisual', 'ruinFloorVisual', 'volcanoFloorVisual', 'waterFloorVisual', 'createWallFacades', 'roomPropTexture', 'roomPropRenderTiles',
   'roomPropChoices', 'roomPropCandidates', 'canPlaceRoomProp', 'canPlacePermanentDecor', 'isReservedOptionalRoomCell', 'spawnDungeonObjects', 'spawnRoomProps', 'spawnFieldBossRoomProps', 'dungeonObjectAt',
   'isInsideBossCombatFrame', 'validBossTile', 'validMonsterTile', 'bossArenaPosition']);
 const methods = scene.members.filter(m => names.has(m.name?.getText(ast)));
@@ -33,7 +35,7 @@ function shuffle(array) {
   for (let i = array.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [array[i], array[j]] = [array[j], array[i]]; }
   return array;
 }
-const Harness = vm.runInNewContext(js + '\nHarness', { isWalkable, eraSuffix, hasRuinTerrain, ruinTerrainKey, TILE: 32, Phaser: { Utils: { Array: { Shuffle: shuffle } } } });
+const Harness = vm.runInNewContext(js + '\nHarness', { ...water, ...volcano, isWalkable, eraSuffix, hasRuinTerrain, ruinTerrainKey, ruinFloorKey, ruinFloorFrame, TILE: 32, Phaser: { Utils: { Array: { Shuffle: shuffle } } } });
 function reachable(d, blocked) {
   const seen = new Set([`${d.start.x},${d.start.y}`]), queue = [d.start];
   for (let i = 0; i < queue.length; i++) {
@@ -77,7 +79,9 @@ try {
     if (room) {
       assert.equal(room.w, 10); assert.equal(room.h, 10);
       const inside = p => p.x >= room.x && p.x < room.x + room.w && p.y >= room.y && p.y < room.y + room.h;
-      assert.equal(h.dungeonObjects.filter(inside).length, 4, 'four corner props in every midboss room');
+      const roomProps = h.dungeonObjects.filter(inside);
+      assert.ok(roomProps.length >= 6 && roomProps.length <= 8, `${floor}F: six to eight props, found ${roomProps.length}`);
+      assert.ok(!roomProps.some(p => p.x >= room.x + 3 && p.x <= room.x + 6 && p.y >= room.y + 3 && p.y <= room.y + 6), 'open central four-by-four square');
       assert.ok(after.has(`${h.dungeon.bossEntry.x},${h.dungeon.bossEntry.y}`), 'entry is reachable');
       assert.ok(after.has(`${room.cx},${room.cy}`), 'central seal is reachable');
       assert.ok(!h.dungeonObjects.some(p => inside(p) && (p.x === room.cx || p.y === room.cy)), 'clear central cross');
@@ -92,6 +96,32 @@ try {
     if (hasRuinTerrain(floor)) {
       for (const kind of ['ruinRelic', 'ruinRubble']) assert.ok(h.dungeonObjects.some(p => p.kind === kind), `${floor}F missing ${kind}`);
       assert.equal(h.tileVisual('wall', 1, 0, 0).key, ruinTerrainKey(floor, 'wall-b'));
+      const frames = new Set();
+      for (let y = 0; y < h.dungeon.h; y++) for (let x = 0; x < h.dungeon.w; x++) {
+        if (h.dungeon.tiles[y][x] !== 'floor' || (h.dungeon.bossEntry?.x === x && h.dungeon.bossEntry?.y === y)) continue;
+        const visual = h.tileVisual('floor', 1, x, y);
+        assert.equal(visual.key, ruinFloorKey(floor));
+        assert.ok(visual.frame >= 0 && visual.frame < 6);
+        frames.add(visual.frame);
+      }
+      assert.equal(frames.size, 6, 'all painted floor variants are used');
+      assert.equal(h.tileVisual('stairs', 1, h.dungeon.stairs.x, h.dungeon.stairs.y).key, 'terrain_stairs');
+      assert.equal(h.tileVisual('poison', 1, 1, 1).key, 'terrain_hazard_poison');
+      h.createWallFacades(1);
+    }
+    if (water.hasWaterTerrain(floor)) {
+      for (const kind of water.WATER_PROP_KINDS) assert.ok(h.dungeonObjects.some(p => p.kind === kind), `${floor}F missing ${kind}`);
+      assert.equal(h.tileVisual('wall', 1, 0, 0).key, water.waterTerrainKey(floor, 'wall-b') + '_ground');
+      const frames = new Set();
+      for (let y = 0; y < h.dungeon.h; y++) for (let x = 0; x < h.dungeon.w; x++) {
+        if (h.dungeon.tiles[y][x] !== 'floor' || (h.dungeon.bossEntry?.x === x && h.dungeon.bossEntry?.y === y)) continue;
+        const visual = h.tileVisual('floor', 1, x, y);
+        assert.equal(visual.key, water.waterTerrainKey(floor, 'floor'));
+        assert.ok(visual.frame >= 0 && visual.frame < 4); frames.add(visual.frame);
+      }
+      assert.equal(frames.size, 4, 'all water floor variants are used');
+      assert.equal(h.tileVisual('poison', 1, 1, 1).key, 'terrain_hazard_poison');
+      assert.equal(h.tileVisual('ice', 1, 1, 1).key, 'terrain_hazard_ice');
       h.createWallFacades(1);
     }
     if (h.dungeon.biome === 'frost') {
@@ -107,9 +137,26 @@ try {
     maps++; props += h.dungeonObjects.length;
   }
   const h = new Harness();
+  for (const floor of water.WATER_FLOORS) {
+    h.floor = floor; h.dungeon = generateBossArena(floor); h.inBossRoom = true; h.dungeonObjects = [];
+    const d = h.dungeon, r = d.bossRoom, seen = reachable(d, new Set());
+    assert.equal(d.waterArena.props.length, 8);
+    for (const p of d.waterArena.props) {
+      assert.equal(d.tiles[p.y][p.x], 'wall', 'props block movement and projectiles');
+      assert.equal(h.tileVisual('wall', 1, p.x, p.y).key, water.waterTerrainKey(floor, 'floor'), 'no rock wall beneath props');
+      assert.equal(h.validBossTile(p.x, p.y), false, 'boss avoids props');
+    }
+    for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) {
+      if (d.tiles[y][x] !== 'wall') assert.ok(seen.has(`${x},${y}`), 'all arena floor reachable');
+      if (x === r.cx || y === r.cy) assert.notEqual(d.tiles[y][x], 'wall', 'both central axes clear');
+    }
+    assert.equal(h.tileVisual('wall', 1, 0, 0).key, 'terrain_water_surface');
+    assert.equal(h.tileVisual('wall', 1, r.x - 1, r.cy).key.endsWith('_water'), true);
+    assert.equal(h.tileVisual('door', 1, d.stairs.x, d.stairs.y).key, 'terrain_boss_chain_gate');
+  }
   for (const floor of [5, 10, 15, 20, 25, 30]) {
     h.floor = floor; h.dungeon = generateBossArena(floor); h.inBossRoom = true;
-    assert.equal(h.usesGlacialTerrain(), floor === 20, 'keep the furnace and other arenas intact');
+    assert.equal(h.usesGlacialTerrain(), floor === 15, 'ice arena moves to 15F, furnace to 20F');
   }
   for (const floor of [1, 6, 16, 21, 26]) {
     h.floor = floor; h.dungeon = generateDungeon(floor); h.inBossRoom = false;
@@ -117,4 +164,4 @@ try {
     assert.ok(!h.roomPropChoices().some(k => kinds.includes(k)));
   }
 } finally { Math.random = originalRandom; }
-console.log(`PASS: ${maps} maps across all 30 floors / ${props} props; 10x10 midboss rooms with four props, themed art, no severed routes, original hazards and supplies.`);
+console.log(`PASS: ${maps} maps across all 30 floors / ${props} props; 10x10 midboss rooms with 6–8 props, open centers, six painted floor variants, no severed routes, original hazards and supplies.`);

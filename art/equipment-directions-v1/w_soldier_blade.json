@@ -1,0 +1,7 @@
+{
+  "key": "w_soldier_blade",
+  "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-8d7ad09a-bb53-4590-ab7b-d987095bc897.png",
+  "prompt": "Use case: stylized-concept. Create a transparent PNG sprite atlas of this SAME equipment item, in four genuinely different directional views for a small top-down RPG character to hold. Reference is the existing item design: preserve its distinctive shape, colors, materials. 1024x1024 square, EXACT 2 by 2 grid; isolated object centered in each 512x512 quadrant, 48px clear margin, no overlap. Reading order TOP LEFT front/down, TOP RIGHT left-facing profile, BOTTOM LEFT right-facing profile, BOTTOM RIGHT back/up. One single straight steel longsword with crossguard and brown wrapped handle. Keep the blade pointing toward the TOP of each cell, handle and pommel at BOTTOM; same vertical orientation and scale in all four cells. Show the front broad face, narrow left edge, narrow right edge, and opposite back broad face. Carefully illustrated crisp chunky pixel-art with strong clean silhouette and simple metal shading, readable reduced to about 20 game pixels. No character, no hands, no arms, no environment, no floor shadows, no labels, no text, no grid lines. Transparent background.",
+  "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\soldier_blade.png",
+  "mode": "built-in ImageGen"
+}

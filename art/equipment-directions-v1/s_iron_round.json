@@ -1,0 +1,7 @@
+{
+  "key": "s_iron_round",
+  "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-0aab960f-0a65-415b-8c66-7a320fe2cce6.png",
+  "prompt": "Use case: stylized-concept. Create a transparent PNG sprite atlas of this SAME equipment item, in four genuinely different directional views for a small top-down RPG character to hold. Reference is the existing item design: preserve its distinctive shape, colors, materials. 1024x1024 square, EXACT 2 by 2 grid; isolated object centered in each 512x512 quadrant, 48px clear margin, no overlap. Reading order TOP LEFT front/down, TOP RIGHT left-facing profile, BOTTOM LEFT right-facing profile, BOTTOM RIGHT back/up. One single dark iron round shield with antique bronze rim and central iron boss. All four upright at same height: front face as seen with wearer facing camera, narrow left side/profile, narrow right side/profile, BACK with brown leather forearm straps as seen when wearer faces away. Back must have straps, not central front boss. Carefully illustrated crisp chunky pixel-art with strong clean silhouette and simple metal shading, readable reduced to about 20 game pixels. No character, no hands, no arms, no environment, no floor shadows, no labels, no text, no grid lines. Transparent background.",
+  "reference": "C:\\chari-dungeon-release-final\\public\\assets\\shields\\neutral\\iron_round.png",
+  "mode": "built-in ImageGen"
+}

@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { hasWaterTerrain, WATER_TITLES } from '../waterTerrain';
+import { EquipmentRenderer } from '../equipmentRenderer';
 import { GameScene } from './GameScene';
 import type { GachaResult } from './GameScene';
 import { GAME_W, GAME_H } from '../main';
@@ -25,6 +27,7 @@ export class UIScene extends Phaser.Scene {
   hpBar!: Phaser.GameObjects.Graphics;
   equipSlots: { kind: 'weapon' | 'armor' | 'shield'; tag: string; bg: Phaser.GameObjects.Graphics; icon: Phaser.GameObjects.Image; name: Phaser.GameObjects.Text; sub: Phaser.GameObjects.Text; rect: [number, number, number, number] }[] = [];
   paperDoll?: Phaser.GameObjects.Image;
+  paperDollEquipment?: EquipmentRenderer;
   codexText?: Phaser.GameObjects.Text; // モンスター図鑑サイドパネル（PCのみ）
   logTexts: Phaser.GameObjects.Text[] = []; // 固定8行（行ごとに色分け）
   itemContainer!: Phaser.GameObjects.Container;
@@ -57,6 +60,8 @@ export class UIScene extends Phaser.Scene {
   }
 
   create() {
+    this.paperDoll = undefined;
+    this.paperDollEquipment = undefined;
     this.gs = this.scene.get('GameScene') as GameScene;
     if (this.textures.exists('dungeon_chamber')) {
       this.add.image(GAME_W / 2, GAME_H / 2, 'dungeon_chamber')
@@ -249,7 +254,8 @@ export class UIScene extends Phaser.Scene {
     dollFrame.lineStyle(1.5, 0x9b793e, 0.9).strokeRoundedRect(x + 112, 260, 124, 180, 12);
     dollFrame.lineStyle(1, 0x58d9d1, 0.45).strokeRoundedRect(x + 118, 266, 112, 168, 9);
     this.paperDoll = this.add.image(x + 174, 343, playerSheetKey(this.gs.playerGender, this.gs.playerArmor ?? 'leather'), playerFrameIndex('down', 'idle'))
-      .setDisplaySize(116, 116);
+      .setDisplaySize(116, 116).setDepth(10);
+    this.paperDollEquipment = new EquipmentRenderer(this);
     this.add.text(x + 174, 416, '装備中の見た目', {
       fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: '#a9c9c7'
     }).setOrigin(0.5);
@@ -516,6 +522,10 @@ export class UIScene extends Phaser.Scene {
     const p = this.gs.player;
     const th = this.gs.dungeon?.glacialArena
       ? { ...getTheme(this.gs.floor), name: '氷晶の広間', accent: 0x8adfff }
+      : this.gs.dungeon?.volcanoArena
+        ? { ...getTheme(this.gs.floor), name: '熔獄竜の火口', accent: 0xff783d }
+      : hasWaterTerrain(this.gs.floor)
+        ? { ...getTheme(this.gs.floor), name: WATER_TITLES[this.gs.floor - 6], accent: 0x75c7c4 }
       : getTheme(this.gs.floor);
 
     const boost = this.gs.holdBoostTier === 2 ? '  最大加速' : this.gs.holdBoostTier === 1 ? '  加速' : '';
@@ -575,6 +585,7 @@ export class UIScene extends Phaser.Scene {
     });
     if (this.paperDoll && this.gs.playerArmor) {
       this.paperDoll.setTexture(playerSheetKey(this.gs.playerGender, this.gs.playerArmor), playerFrameIndex('down', 'idle'));
+      this.paperDollEquipment?.update(this.paperDoll,p.weapon,p.shield,'down','idle',this.gs.playerGender);
     }
 
     // 図鑑（サイドパネルはPCのみ。詳細は図鑑オーバーレイで）

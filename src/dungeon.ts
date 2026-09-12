@@ -40,6 +40,8 @@ export interface DungeonData {
   teleportPads: TeleportPad[];
   biome: DungeonBiome;
   optionalRooms: OptionalRoom[];
+  volcanoArena?: { props: (Vec2 & { part: 'prop-1' | 'prop-2' | 'prop-3' | 'prop-4'; blocking: boolean })[] };
+  waterArena?: { props: (Vec2 & { part: 'prop-1' | 'prop-2' | 'prop-3' | 'prop-4'; blocking: boolean })[] };
   glacialArena?: { props: (Vec2 & { kind: 'crystal' | 'obelisk' | 'boulder' | 'altar'; blocking: boolean })[] };
 }
 
@@ -968,21 +970,33 @@ export function generateBossArena(floor: number): DungeonData {
   const w = isSuper ? 35 : isStrong ? 31 : 25;
   const h = isSuper ? 25 : isStrong ? 23 : 19;
   const tiles: TileType[][] = Array.from({ length: h }, () => Array<TileType>(w).fill('wall'));
-  const roomW = floor === 20 ? 21 : isSuper ? 25 : isStrong ? 21 : 17;
-  const roomH = floor === 20 ? 15 : isSuper ? 17 : isStrong ? 15 : 13;
+  const roomW = floor === 15 || floor === 20 ? 21 : isSuper ? 25 : isStrong ? 21 : 17;
+  const roomH = floor === 15 || floor === 20 ? 15 : isSuper ? 17 : isStrong ? 15 : 13;
   const bossRoom = roomAt(Math.floor((w - roomW) / 2), Math.floor((h - roomH) / 2), roomW, roomH);
   carveRoom(tiles, bossRoom);
 
   // 中央を広く保ち、四隅の柱だけでボス攻撃を避ける駆け引きを作る。
-  const pillarInset = isSuper ? 4 : 3;
+  const pillarInset = floor === 20 ? 3 : isSuper ? 4 : 3;
   const pillars: Vec2[] = [
     { x: bossRoom.x + pillarInset, y: bossRoom.y + pillarInset },
     { x: bossRoom.x + bossRoom.w - 1 - pillarInset, y: bossRoom.y + pillarInset },
     { x: bossRoom.x + pillarInset, y: bossRoom.y + bossRoom.h - 1 - pillarInset },
     { x: bossRoom.x + bossRoom.w - 1 - pillarInset, y: bossRoom.y + bossRoom.h - 1 - pillarInset }
   ];
+  let volcanoArena: DungeonData['volcanoArena'];
+  let waterArena: DungeonData['waterArena'];
   let glacialArena: DungeonData['glacialArena'];
-  if (floor === 20) {
+  if (floor >= 6 && floor <= 10) {
+    // Reuse the four cover pillars, adding low props near the edges; keep both central axes open.
+    waterArena = { props: [
+      ...pillars.map((p, i) => ({ ...p, part: (i < 2 ? 'prop-2' : 'prop-1') as 'prop-1' | 'prop-2', blocking: true })),
+      { x: bossRoom.cx - 3, y: bossRoom.y + 1, part: 'prop-3', blocking: true },
+      { x: bossRoom.cx + 3, y: bossRoom.y + 1, part: 'prop-3', blocking: true },
+      { x: bossRoom.cx - 3, y: bossRoom.y + bossRoom.h - 2, part: 'prop-4', blocking: true },
+      { x: bossRoom.cx + 3, y: bossRoom.y + bossRoom.h - 2, part: 'prop-4', blocking: true }
+    ] };
+    for (const prop of waterArena.props) tiles[prop.y][prop.x] = 'wall';
+  } else if (floor === 15) {
     // Clip the four corners into an octagonal hall. The middle stays open for dodging.
     for (let y = 0; y < roomH; y++) {
       for (let x = 0; x < roomW; x++) {
@@ -1005,6 +1019,23 @@ export function generateBossArena(floor: number): DungeonData {
     ] };
     // Real wall cells give the large props collision for movement, sight and projectiles.
     for (const prop of glacialArena.props) if (prop.blocking) tiles[prop.y][prop.x] = 'wall';
+  } else if (floor === 20) {
+    // A broad basalt island; the ring outside remains impassable lava scenery.
+    for (let y = 0; y < roomH; y++) for (let x = 0; x < roomW; x++) {
+      if (Math.min(x, roomW - 1 - x) + Math.min(y, roomH - 1 - y) < 4) tiles[bossRoom.y + y][bossRoom.x + x] = 'wall';
+    }
+    const { cx, cy } = bossRoom;
+    volcanoArena = { props: [
+      { x: cx - 6, y: cy - 3, part: 'prop-1', blocking: true },
+      { x: cx + 6, y: cy - 3, part: 'prop-1', blocking: true },
+      { x: cx - 6, y: cy + 3, part: 'prop-2', blocking: true },
+      { x: cx + 6, y: cy + 3, part: 'prop-2', blocking: true },
+      { x: cx - 9, y: cy, part: 'prop-3', blocking: true },
+      { x: cx + 9, y: cy, part: 'prop-3', blocking: true },
+      { x: cx - 3, y: cy - 6, part: 'prop-4', blocking: true },
+      { x: cx + 3, y: cy - 6, part: 'prop-4', blocking: true }
+    ] };
+    for (const prop of volcanoArena.props) if (prop.blocking) tiles[prop.y][prop.x] = 'wall';
   } else {
     for (const pillar of pillars) tiles[pillar.y][pillar.x] = 'wall';
   }
@@ -1016,8 +1047,10 @@ export function generateBossArena(floor: number): DungeonData {
   tiles[stairs.y][stairs.x] = 'door';
   return {
     w, h, tiles, rooms: [bossRoom], start, stairs, hazards: [], bossRoom,
-    bossRoomZone: 'center', teleportPads: [], biome: floor === 20 ? 'frost' : biomeForFloor(floor), optionalRooms: [],
-    ...(glacialArena ? { glacialArena } : {})
+    bossRoomZone: 'center', teleportPads: [], biome: floor === 15 ? 'frost' : biomeForFloor(floor), optionalRooms: [],
+    ...(glacialArena ? { glacialArena } : {}),
+    ...(waterArena ? { waterArena } : {}),
+    ...(volcanoArena ? { volcanoArena } : {})
   };
 }
 

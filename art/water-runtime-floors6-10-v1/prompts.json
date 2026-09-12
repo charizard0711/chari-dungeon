@@ -1,0 +1,164 @@
+[
+  {
+    "id": "floors-6",
+    "kind": "floor",
+    "floor": 6,
+    "title": "苔むす地下水路",
+    "references": [
+      "C:/chari-dungeon-release-final/art/floor-concepts-floors1-5-v1/runtime-2.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production game terrain asset for a top-down pixel-art dungeon. Reference is ONLY for chunky painted pixel texture style, not its tan color or six-cell layout. Draw one opaque SQUARE sprite sheet with exactly 2 columns and 2 rows of equal square tile cells, no gutter or separating border. All FOUR cells are edge-to-edge floor textures viewed directly overhead. Theme: Worn irregular rounded flagstones, cool slate blue-grey with muted desaturated green in narrow joints. Mostly dry walkable stone, damp in places, readable medium-dark value. Top-left: calm plain paving. Top-right: an alternate calm paving arrangement. Bottom-left: same paving with sparse moss/silt around the edge. Bottom-right: same paving with a small shallow blue-green puddle covering at most 20 percent, most is visibly solid stone. Match brightness and palette across all cells. Fine chunky pixel painting with restrained highlights; no harsh black outlines around every tiny brick. Seam-friendly similar edges; no wall, no objects, no UI, no text, no border, no creature. Water is a small quiet surface detail, not ice, not a hazard. No perspective, no glow.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-f472f0f3-9481-4536-b8ce-4a75f981b90b.png",
+    "file": "floors-6.png",
+    "mode": "built-in imagegen"
+  },
+  {
+    "id": "props-6",
+    "kind": "props",
+    "floor": 6,
+    "title": "苔むす地下水路",
+    "references": [
+      "C:/chari-dungeon-release-final/art/wall-concepts-floors1-5-v1/runtime-1.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production transparent PNG game asset atlas. The reference shows ONLY the desired rich chunky pixel-art brushwork and low broad rock wall block perspective. Draw SIX separate complete game props arranged in exactly 3 COLUMNS x 2 ROWS of equal cells, reading left-to-right then top-to-bottom. True transparent background; no black or checkerboard background, no glow or shadow mist. Each item centered wholly inside its own cell with 12% transparent padding. All objects are for 苔むす地下水路, use wet blue-grey stone, quiet teal water touches and aged natural materials. TOP LEFT: one broad low wall block, Rounded wet blue-grey river boulders with short faces, restrained moss tucked into joints, visible broad top faces. Distinct low broad wall blocks, not a long fence. TOP MIDDLE: alternative of that same low wall block with different chips. TOP RIGHT, BOTTOM LEFT, BOTTOM MIDDLE, BOTTOM RIGHT in that exact order: a broken clay water jar; a short old stone drain outlet; a broken low stone column; a low cluster of wet mossy rocks. Wall blocks should have broad near-square footprints as in reference, with height about half their width, like a waist-high barrier, not skinny fence strips. Props use a consistent slightly overhead top-down game view, visible top surfaces, no horizon or isometric diamond bases. All relatively low so they won't hide characters. Crisp pixel-art painterly textures, no labels, no text, no UI, no ground tile beneath individual objects, no characters, no new weapons lying separately, no ice, no fire.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-d9e1397c-8e09-42e7-a47b-6a1e7e29cf72.png",
+    "file": "props-6.png",
+    "mode": "built-in imagegen"
+  },
+  {
+    "id": "floors-7",
+    "kind": "floor",
+    "floor": 7,
+    "title": "根絡みの水路",
+    "references": [
+      "C:/chari-dungeon-release-final/art/floor-concepts-floors1-5-v1/runtime-2.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production game terrain asset for a top-down pixel-art dungeon. Reference is ONLY for chunky painted pixel texture style, not its tan color or six-cell layout. Draw one opaque SQUARE sprite sheet with exactly 2 columns and 2 rows of equal square tile cells, no gutter or separating border. All FOUR cells are edge-to-edge floor textures viewed directly overhead. Theme: Dark damp fractured slate paving with restrained silt and little root tips along occasional edges, cool grey-green. Roots should not cover most tiles; clear walkable stone. Top-left: calm plain paving. Top-right: an alternate calm paving arrangement. Bottom-left: same paving with sparse moss/silt around the edge. Bottom-right: same paving with a small shallow blue-green puddle covering at most 20 percent, most is visibly solid stone. Match brightness and palette across all cells. Fine chunky pixel painting with restrained highlights; no harsh black outlines around every tiny brick. Seam-friendly similar edges; no wall, no objects, no UI, no text, no border, no creature. Water is a small quiet surface detail, not ice, not a hazard. No perspective, no glow.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-a1c2ec7b-47a1-4b85-b758-27d09832a295.png",
+    "file": "floors-7.png",
+    "mode": "built-in imagegen"
+  },
+  {
+    "id": "props-7",
+    "kind": "props",
+    "floor": 7,
+    "title": "根絡みの水路",
+    "prompt": "Pixel art game sprites on a transparent background. Six isolated objects in a 3 by 2 grid: two low square blue-grey stone walls wrapped with brown roots, a stump, a knot of roots on a rock, a fallen short stone column, a little round stone water basin with reeds. Top-down RPG view with visible tops and short front faces. Rich chunky pixel art, restrained moss and teal water. Equal square cells, isolated complete objects with clear empty margins. Transparent background.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-876ab573-412a-46f3-8ccc-48d5d721cf26.png",
+    "file": "props-7.png",
+    "mode": "built-in imagegen",
+    "initialDraft": {
+      "prompt": "Use case: stylized-concept. Production transparent PNG game asset atlas. The reference shows ONLY the desired rich chunky pixel-art brushwork and low broad rock wall block perspective. Draw SIX separate complete game props arranged in exactly 3 COLUMNS x 2 ROWS of equal cells, reading left-to-right then top-to-bottom. True transparent background; no black or checkerboard background, no glow or shadow mist. Each item centered wholly inside its own cell with 12% transparent padding. All objects are for 根絡みの水路, use wet blue-grey stone, quiet teal water touches and aged natural materials. TOP LEFT: one broad low wall block, Old uneven blue-grey stone blocks wrapped in thick weathered brown roots and sparse dark moss; broad top plane, short face. Low blocks not a tall hedge. TOP MIDDLE: alternative of that same low wall block with different chips. TOP RIGHT, BOTTOM LEFT, BOTTOM MIDDLE, BOTTOM RIGHT in that exact order: a weathered low tree stump; a low tangled root cluster gripping stone; a fallen short stone column; a small ancient water basin with reeds. Wall blocks should have broad near-square footprints as in reference, with height about half their width, like a waist-high barrier, not skinny fence strips. Props use a consistent slightly overhead top-down game view, visible top surfaces, no horizon or isometric diamond bases. All relatively low so they won't hide characters. Crisp pixel-art painterly textures, no labels, no text, no UI, no ground tile beneath individual objects, no characters, no new weapons lying separately, no ice, no fire.",
+      "references": [
+        "C:/chari-dungeon-release-final/art/wall-concepts-floors1-5-v1/runtime-1.png"
+      ],
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-b216d771-0a4a-4b57-a72a-c0d7ee7d9320.png",
+      "accepted": false,
+      "reason": "Opaque background; replaced with a newly generated transparent sheet."
+    }
+  },
+  {
+    "id": "floors-8",
+    "kind": "floor",
+    "floor": 8,
+    "title": "水鏡の魔術神殿",
+    "references": [
+      "C:/chari-dungeon-release-final/art/floor-concepts-floors1-5-v1/runtime-2.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production game terrain asset for a top-down pixel-art dungeon. Reference is ONLY for chunky painted pixel texture style, not its tan color or six-cell layout. Draw one opaque SQUARE sprite sheet with exactly 2 columns and 2 rows of equal square tile cells, no gutter or separating border. All FOUR cells are edge-to-edge floor textures viewed directly overhead. Theme: Worn broad square blue-grey temple tiles, subtle geometric inset lines on a few slabs, very restrained pale reflections, dark quiet stone. Top-left: calm plain paving. Top-right: an alternate calm paving arrangement. Bottom-left: same paving with sparse moss/silt around the edge. Bottom-right: same paving with a small shallow blue-green puddle covering at most 20 percent, most is visibly solid stone. Match brightness and palette across all cells. Fine chunky pixel painting with restrained highlights; no harsh black outlines around every tiny brick. Seam-friendly similar edges; no wall, no objects, no UI, no text, no border, no creature. Water is a small quiet surface detail, not ice, not a hazard. No perspective, no glow.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-6d750abb-edcb-4755-acd2-e9f1fc095d4d.png",
+    "file": "floors-8.png",
+    "mode": "built-in imagegen"
+  },
+  {
+    "id": "props-8",
+    "kind": "props",
+    "floor": 8,
+    "title": "水鏡の魔術神殿",
+    "prompt": "Pixel art game sprites on a transparent background. Six isolated objects in a 3 by 2 grid in reading order: two low broad square dark blue slate wall blocks with subtle carved geometric symbols, a short carved stone tablet, a broken kneeling hooded statue, a low round stone pool altar, a pile of fallen carved fragments. Top-down RPG view with visible broad top faces and short front faces. Rich chunky pixel art, restrained moss and teal water, weathered wet stone. Walls have low height and broad square footprints; props are short and compact. Equal square cells, isolated complete objects with clear empty margins. Transparent background.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-19204d55-00fb-4c27-b6e2-9251aa9a7075.png",
+    "file": "props-8.png",
+    "mode": "built-in imagegen",
+    "initialDraft": {
+      "prompt": "Use case: stylized-concept. Production transparent PNG game asset atlas. The reference shows ONLY the desired rich chunky pixel-art brushwork and low broad rock wall block perspective. Draw SIX separate complete game props arranged in exactly 3 COLUMNS x 2 ROWS of equal cells, reading left-to-right then top-to-bottom. True transparent background; no black or checkerboard background, no glow or shadow mist. Each item centered wholly inside its own cell with 12% transparent padding. All objects are for 水鏡の魔術神殿, use wet blue-grey stone, quiet teal water touches and aged natural materials. TOP LEFT: one broad low wall block, Dark teal blue slate temple blocks with a few faint carved geometric symbols and eroded edges. Broad flat top faces, short walls, no glowing lights. TOP MIDDLE: alternative of that same low wall block with different chips. TOP RIGHT, BOTTOM LEFT, BOTTOM MIDDLE, BOTTOM RIGHT in that exact order: a short carved stone tablet; a broken kneeling robed stone statue; a low circular carved altar with a small pool; a cluster of fallen carved stone fragments. Wall blocks should have broad near-square footprints as in reference, with height about half their width, like a waist-high barrier, not skinny fence strips. Props use a consistent slightly overhead top-down game view, visible top surfaces, no horizon or isometric diamond bases. All relatively low so they won't hide characters. Crisp pixel-art painterly textures, no labels, no text, no UI, no ground tile beneath individual objects, no characters, no new weapons lying separately, no ice, no fire.",
+      "references": [
+        "C:/chari-dungeon-release-final/art/wall-concepts-floors1-5-v1/runtime-1.png"
+      ],
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-462fbcf5-7154-485e-8122-9d21f6fc8366.png",
+      "accepted": false,
+      "reason": "Opaque background; replaced with a newly generated transparent sheet."
+    }
+  },
+  {
+    "id": "floors-9",
+    "kind": "floor",
+    "floor": 9,
+    "title": "沈んだ砦",
+    "references": [
+      "C:/chari-dungeon-release-final/art/floor-concepts-floors1-5-v1/runtime-2.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production game terrain asset for a top-down pixel-art dungeon. Reference is ONLY for chunky painted pixel texture style, not its tan color or six-cell layout. Draw one opaque SQUARE sprite sheet with exactly 2 columns and 2 rows of equal square tile cells, no gutter or separating border. All FOUR cells are edge-to-edge floor textures viewed directly overhead. Theme: Large rectangular blue-grey fortress paving blocks in staggered rows, darkened water stains and worn joints, quiet and clear. Top-left: calm plain paving. Top-right: an alternate calm paving arrangement. Bottom-left: same paving with sparse moss/silt around the edge. Bottom-right: same paving with a small shallow blue-green puddle covering at most 20 percent, most is visibly solid stone. Match brightness and palette across all cells. Fine chunky pixel painting with restrained highlights; no harsh black outlines around every tiny brick. Seam-friendly similar edges; no wall, no objects, no UI, no text, no border, no creature. Water is a small quiet surface detail, not ice, not a hazard. No perspective, no glow.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-1c9130ed-f2e5-4bf4-9e44-23ae40c9091c.png",
+    "file": "floors-9.png",
+    "mode": "built-in imagegen"
+  },
+  {
+    "id": "props-9",
+    "kind": "props",
+    "floor": 9,
+    "title": "沈んだ砦",
+    "prompt": "Pixel art game sprites on a transparent background. Six isolated objects in a 3 by 2 grid in reading order: two low broad square rectangular-ashlar blue-grey wall blocks with rusty brackets, a broken shield leaning on a stone, a collapsed short wooden weapon rack, a squat broken stone pillar, a short stone mooring bollard wrapped with rope. Top-down RPG view with visible broad top faces and short front faces. Rich chunky pixel art, restrained moss and teal water, weathered wet stone. Walls have low height and broad square footprints; props are short and compact. Equal square cells, isolated complete objects with clear empty margins. Transparent background.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-ee528d02-150c-4143-a8d2-5215cb094b43.png",
+    "file": "props-9.png",
+    "mode": "built-in imagegen",
+    "initialDraft": {
+      "prompt": "Use case: stylized-concept. Production transparent PNG game asset atlas. The reference shows ONLY the desired rich chunky pixel-art brushwork and low broad rock wall block perspective. Draw SIX separate complete game props arranged in exactly 3 COLUMNS x 2 ROWS of equal cells, reading left-to-right then top-to-bottom. True transparent background; no black or checkerboard background, no glow or shadow mist. Each item centered wholly inside its own cell with 12% transparent padding. All objects are for 沈んだ砦, use wet blue-grey stone, quiet teal water touches and aged natural materials. TOP LEFT: one broad low wall block, Low rectangular blue-grey fortress ashlar masonry with rusty narrow iron brackets, restrained moss and old water stains. Broad top, short front. TOP MIDDLE: alternative of that same low wall block with different chips. TOP RIGHT, BOTTOM LEFT, BOTTOM MIDDLE, BOTTOM RIGHT in that exact order: a broken shield leaning on a low stone; a short collapsed weapon rack; a squat broken pillar; a weathered mooring bollard with a short coil of rope. Wall blocks should have broad near-square footprints as in reference, with height about half their width, like a waist-high barrier, not skinny fence strips. Props use a consistent slightly overhead top-down game view, visible top surfaces, no horizon or isometric diamond bases. All relatively low so they won't hide characters. Crisp pixel-art painterly textures, no labels, no text, no UI, no ground tile beneath individual objects, no characters, no new weapons lying separately, no ice, no fire.",
+      "references": [
+        "C:/chari-dungeon-release-final/art/wall-concepts-floors1-5-v1/runtime-1.png"
+      ],
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-c869d227-8ab2-4dfa-9b96-7c281ffa5b41.png",
+      "accepted": false,
+      "reason": "Opaque background; replaced with a newly generated transparent sheet."
+    }
+  },
+  {
+    "id": "floors-10",
+    "kind": "floor",
+    "floor": 10,
+    "title": "蒼潮の大水門",
+    "references": [
+      "C:/chari-dungeon-release-final/art/floor-concepts-floors1-5-v1/runtime-2.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production game terrain asset for a top-down pixel-art dungeon. Reference is ONLY for chunky painted pixel texture style, not its tan color or six-cell layout. Draw one opaque SQUARE sprite sheet with exactly 2 columns and 2 rows of equal square tile cells, no gutter or separating border. All FOUR cells are edge-to-edge floor textures viewed directly overhead. Theme: Broad blue-grey stone arena slabs in orderly courses, extremely subtle worn bronze-colored inlay on a few slabs. Clear calm dark arena stone, strong contrast to characters. Top-left: calm plain paving. Top-right: an alternate calm paving arrangement. Bottom-left: same paving with sparse moss/silt around the edge. Bottom-right: same paving with a small shallow blue-green puddle covering at most 20 percent, most is visibly solid stone. Match brightness and palette across all cells. Fine chunky pixel painting with restrained highlights; no harsh black outlines around every tiny brick. Seam-friendly similar edges; no wall, no objects, no UI, no text, no border, no creature. Water is a small quiet surface detail, not ice, not a hazard. No perspective, no glow.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-92de4dba-b9f4-4685-bbae-94dc22dd38b9.png",
+    "file": "floors-10.png",
+    "mode": "built-in imagegen"
+  },
+  {
+    "id": "props-10",
+    "kind": "props",
+    "floor": 10,
+    "title": "蒼潮の大水門",
+    "prompt": "Pixel art game sprites on a transparent background. Six isolated objects in a 3 by 2 grid in reading order: two low broad square sluice-gate wall blocks of blue-grey stone reinforced with verdigris bronze and bull-horn emblems, a squat bull-horn stone monument, a thick broken sluice gate pillar, a half buried bronze waterwheel gear, a low stone sluice basin full of teal water. Top-down RPG view with visible broad top faces and short front faces. Rich chunky pixel art, restrained moss and teal water, weathered wet stone. Walls have low height and broad square footprints; props are short and compact. Equal square cells, isolated complete objects with clear empty margins. Transparent background.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-adb0b829-192f-4d60-b846-1479b9499277.png",
+    "file": "props-10.png",
+    "mode": "built-in imagegen",
+    "initialDraft": {
+      "prompt": "Use case: stylized-concept. Production transparent PNG game asset atlas. The reference shows ONLY the desired rich chunky pixel-art brushwork and low broad rock wall block perspective. Draw SIX separate complete game props arranged in exactly 3 COLUMNS x 2 ROWS of equal cells, reading left-to-right then top-to-bottom. True transparent background; no black or checkerboard background, no glow or shadow mist. Each item centered wholly inside its own cell with 12% transparent padding. All objects are for 蒼潮の大水門, use wet blue-grey stone, quiet teal water touches and aged natural materials. TOP LEFT: one broad low wall block, Very thick but low blue-grey sluice gate stone blocks, occasional aged verdigris bronze bands or a small bull-horn carved motif, massive broad top plane and short face, not tall barriers. TOP MIDDLE: alternative of that same low wall block with different chips. TOP RIGHT, BOTTOM LEFT, BOTTOM MIDDLE, BOTTOM RIGHT in that exact order: a squat bull-horn carved stone monument; a thick broken gate pillar of low height; a half-buried bronze waterwheel gear; a low old stone sluice basin. Wall blocks should have broad near-square footprints as in reference, with height about half their width, like a waist-high barrier, not skinny fence strips. Props use a consistent slightly overhead top-down game view, visible top surfaces, no horizon or isometric diamond bases. All relatively low so they won't hide characters. Crisp pixel-art painterly textures, no labels, no text, no UI, no ground tile beneath individual objects, no characters, no new weapons lying separately, no ice, no fire.",
+      "references": [
+        "C:/chari-dungeon-release-final/art/wall-concepts-floors1-5-v1/runtime-1.png"
+      ],
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-5148fbce-25db-4abc-8634-b9d14ecdc7df.png",
+      "accepted": false,
+      "reason": "Opaque background; replaced with a newly generated transparent sheet."
+    }
+  },
+  {
+    "id": "water",
+    "kind": "water",
+    "prompt": "Use case: stylized-concept. A single opaque square seamless top-down water tile for the background moat of a pixel-art dungeon. Deep muted blue teal water, subtle broad ripples, a few soft desaturated aqua reflections, quiet medium-dark value, hand-painted chunky pixels matching classic detailed dungeon sprites. Uniform seamless repeat at edges, no shoreline, no rocks, no objects, no foam, no waves, no text, no border, no grid, no glow. This will repeat outside a stone arena, it should be restful and much darker than bright cyan.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-93a74843-2b06-44aa-ba61-cecae61871c8.png",
+    "file": "water.png",
+    "mode": "built-in imagegen"
+  }
+]

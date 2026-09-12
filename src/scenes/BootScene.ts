@@ -1,3 +1,5 @@
+import { VOLCANO_FLOORS, VOLCANO_PARTS, volcanoTerrainKey } from '../volcanoTerrain';
+import { WATER_FLOORS, WATER_PARTS, waterTerrainKey } from '../waterTerrain';
 import Phaser from 'phaser';
 import { buildAllTextures } from '../textures';
 import { applyRealAssets } from '../assetLoader';
@@ -6,12 +8,13 @@ import { Audio } from '../audio/manager';
 import { PLAYER_SHEETS } from '../playerAppearance';
 import { MONSTER_ANIMATIONS } from '../monsterAnimation';
 import { DIRECTIONAL_MONSTERS } from '../monsterDirections';
-import { RUIN_TERRAIN_FLOORS, RUIN_TERRAIN_PARTS, ruinTerrainKey } from '../ruinTerrain';
+import { HELD_EQUIPMENT, HELD_FRAME_SIZE } from '../equipmentAppearance';
+import { RUIN_TERRAIN_FLOORS, RUIN_TERRAIN_PARTS, RUIN_FLOOR_FRAME_SIZE, ruinTerrainKey, ruinFloorKey } from '../ruinTerrain';
 
 const EXPANSION_MONSTER_KEYS = [
   'm_black_mage', 'm_rival_male', 'm_rival_female',
   'm_silver_seraph', 'm_abyss_dragon', 'm_ice_knight', 'm_thunder_sovereign',
-  'm_fallen_angel', 'm_phoenix', 'm_unicorn', 'm_bone_reaper', 'm_ice_behemoth',
+  'm_valgrado', 'm_fallen_angel', 'm_phoenix', 'm_unicorn', 'm_bone_reaper', 'm_ice_behemoth',
   'm_mush', 'm_mole', 'm_golem', 'm_spider', 'm_beetle', 'm_eye', 'm_wraith', 'm_reaper',
   'm_dark_ninja', 'm_obsidian_shogun', 'm_storm_minotaur', 'm_star_griffin', 'm_lucky_rabbit',
   'm_skel', 'm_archer', 'm_slime',
@@ -156,6 +159,14 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload() {
+    for (const art of HELD_EQUIPMENT) {
+      this.load.spritesheet(art.textureKey, art.path, {frameWidth:HELD_FRAME_SIZE,frameHeight:HELD_FRAME_SIZE});
+    }
+    for (const floor of RUIN_TERRAIN_FLOORS) {
+      this.load.spritesheet(ruinFloorKey(floor), `assets/terrain/ruins-floor-v1/${floor}.png`, {
+        frameWidth: RUIN_FLOOR_FRAME_SIZE, frameHeight: RUIN_FLOOR_FRAME_SIZE
+      });
+    }
     for (const floor of RUIN_TERRAIN_FLOORS) for (const part of RUIN_TERRAIN_PARTS) {
       this.load.image(ruinTerrainKey(floor, part), `assets/terrain/ruins-low-v1/${floor}/${part}.png`);
     }
@@ -184,6 +195,18 @@ export class BootScene extends Phaser.Scene {
     for (const key of EXPANSION_MONSTER_KEYS) {
       this.load.image(key, `assets/monsters/${key}.png`);
     }
+    for (const floor of VOLCANO_FLOORS) {
+      const root = `assets/terrain/volcano-v1/${floor}`;
+      this.load.spritesheet(volcanoTerrainKey(floor, 'floor'), `${root}/floor.png`, { frameWidth: 64, frameHeight: 64 });
+      for (const part of VOLCANO_PARTS) this.load.image(volcanoTerrainKey(floor, part), `${root}/${part}.png`);
+    }
+    this.load.image('terrain_volcano_lava', 'assets/terrain/volcano-v1/lava.png');
+    for (const floor of WATER_FLOORS) {
+      const root = `assets/terrain/water-v1/${floor}`;
+      this.load.spritesheet(waterTerrainKey(floor, 'floor'), `${root}/floor.png`, { frameWidth: 64, frameHeight: 64 });
+      for (const part of WATER_PARTS) this.load.image(waterTerrainKey(floor, part), `${root}/${part}.png`);
+    }
+    this.load.image('terrain_water_surface', 'assets/terrain/water-v1/water.png');
     for (const art of DIRECTIONAL_MONSTERS) {
       this.load.spritesheet(art.textureKey, art.path, { frameWidth: art.frameSize, frameHeight: art.frameSize });
     }
@@ -227,6 +250,35 @@ export class BootScene extends Phaser.Scene {
   }
 
   async create() {
+    // Precompose the transparent low walls once; no extra sprites or animation per cell.
+    for (const floor of WATER_FLOORS) for (const part of ['wall-a', 'wall-b'] as const) {
+      const key = waterTerrainKey(floor, part);
+      for (const ground of ['ground', 'water'] as const) {
+        const texture = this.textures.createCanvas(`${key}_${ground}`, 64, 64);
+        if (!texture) continue;
+        const context = texture.context;
+        context.imageSmoothingEnabled = false;
+        const base = this.textures.get(ground === 'water' ? 'terrain_water_surface' : waterTerrainKey(floor, 'floor')).getSourceImage() as HTMLImageElement;
+        context.drawImage(base, 0, 0, 64, 64, 0, 0, 64, 64);
+        context.drawImage(this.textures.get(key).getSourceImage() as HTMLImageElement, 0, 0);
+        texture.refresh();
+      }
+    }
+    // Compose each painted low wall with its ground once, keeping one sprite per map cell.
+    // Transparent space above the rock shows stone or lava, rather than a black gap.
+    for (const floor of VOLCANO_FLOORS) for (const part of ['wall-a', 'wall-b'] as const) {
+      const key = volcanoTerrainKey(floor, part);
+      for (const ground of ['ground', 'lava'] as const) {
+        const texture = this.textures.createCanvas(`${key}_${ground}`, 64, 64);
+        if (!texture) continue;
+        const context = texture.context;
+        context.imageSmoothingEnabled = false;
+        const base = this.textures.get(ground === 'lava' ? 'terrain_volcano_lava' : volcanoTerrainKey(floor, 'floor')).getSourceImage() as HTMLImageElement;
+        context.drawImage(base, 0, 0, 64, 64, 0, 0, 64, 64);
+        context.drawImage(this.textures.get(key).getSourceImage() as HTMLImageElement, 0, 0);
+        texture.refresh();
+      }
+    }
     // 1) 代替ドット絵テクスチャを手続き生成（フォールバック）
     buildAllTextures(this);
     // 2) アセットシートから実画像を切り抜いて上書き

@@ -1,0 +1,10 @@
+{
+  "key": "w_drill_lance",
+  "name": "穿城槍ドリルギア",
+  "weaponType": "lance",
+  "kind": "weapon",
+  "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\drill_lance.png",
+  "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-45518f72-de18-4739-bd5f-08672a44530d.png",
+  "prompt": "Use case: stylized-concept. Production transparent PNG sprite atlas of the SAME equipment item in four directional views for a small top-down RPG character to hold. Input image is a DESIGN REFERENCE: preserve this item's distinctive silhouette, colors, ornament, materials and identity (穿城槍ドリルギア). Exactly 2 by 2 grid, square canvas. Isolated item centered in each equal quadrant with generous clear padding, no overlaps. Reading order top-left FRONT/down, top-right LEFT, bottom-left RIGHT, bottom-right BACK/up. One single lance. Blade/head always pointing TOP of each cell, handle/pommel at BOTTOM, SAME vertical orientation and scale. Front/down broad face, left-facing narrow oblique view, right-facing narrow oblique view, back/up opposite broad face. Do not rotate the blade horizontally in profile. Preserve original blade, guard and grip. Crisp chunky pixel-art shading, clearly readable reduced to 20 game pixels, simple metal highlights. No character, hands, arms, ground, floor shadow, scene, labels, lettering, grid, border or extra objects. Transparent background.",
+  "mode": "built-in ImageGen"
+}

@@ -1,0 +1,10 @@
+{
+  "key": "w_bow_thunder",
+  "name": "雷鳴弓テンペスト",
+  "weaponType": "bow",
+  "kind": "weapon",
+  "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\affinities\\bow_thunder.png",
+  "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-4c446bc5-ac60-4efc-a553-75e598d9b44b.png",
+  "prompt": "Use case: stylized-concept. Production transparent PNG sprite atlas of the SAME equipment item in four directional views for a small top-down RPG character to hold. Input image is a DESIGN REFERENCE: preserve this item's distinctive silhouette, colors, ornament, materials and identity (雷鳴弓テンペスト). Exactly 2 by 2 grid, square canvas. Isolated item centered in each equal quadrant with generous clear padding, no overlaps. Reading order top-left FRONT/down, top-right LEFT, bottom-left RIGHT, bottom-right BACK/up. One bow held vertically. Front/down shows front of curved bow and string, left-facing profile, right-facing profile, back/up shows opposite side. Grip at vertical midpoint in every cell. Preserve this bow's ornate silhouette. Crisp chunky pixel-art shading, clearly readable reduced to 20 game pixels, simple metal highlights. No character, hands, arms, ground, floor shadow, scene, labels, lettering, grid, border or extra objects. Transparent background.",
+  "mode": "built-in ImageGen"
+}

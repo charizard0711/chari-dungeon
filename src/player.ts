@@ -209,6 +209,19 @@ export function rollWeaponByGrade(grade: EquipmentGrade): Weapon {
   return addRandomLootTraits(makeWeapon(picked.key, rollMagics(magicCount)));
 }
 
+/** The 15F ice boss replaces its ordinary weapon reward with one unlocked ice weapon. */
+export function rollGlacialBossWeapon(): Weapon {
+  const pool = WEAPON_DEFS.filter(def => def.element === 'ice' && def.minFloor <= 15);
+  const picked = pool[Math.floor(Math.random() * pool.length)];
+  return makeWeapon(picked.key, []);
+}
+
+/** The 20F dragon guarantees one fire weapon available by this floor. */
+export function rollVolcanicBossWeapon(): Weapon {
+  const pool = WEAPON_DEFS.filter(def => def.element === 'fire' && def.minFloor <= 20);
+  return makeWeapon(pool[Math.floor(Math.random() * pool.length)].key, []);
+}
+
 export function weaponFullName(w: Weapon): string {
   const plus = (w.plus ?? 0) > 0 ? `+${w.plus} ` : '';
   const magic = w.magics.length ? ` [${w.magics.map((m) => m.label).join('')}]` : '';

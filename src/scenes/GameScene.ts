@@ -1,12 +1,15 @@
+import { hasVolcanoTerrain, volcanoTerrainKey, volcanoFloorFrame, VOLCANO_PROP_KINDS, type VolcanoPropKind, type VolcanoPart } from '../volcanoTerrain';
+import { hasWaterTerrain, waterTerrainKey, waterFloorFrame, WATER_PROP_KINDS, type WaterPropKind, type WaterPart } from '../waterTerrain';
 import Phaser from 'phaser';
+import { EquipmentRenderer } from '../equipmentRenderer';
 import { TILE } from '../textures';
-import { hasRuinTerrain, ruinTerrainKey } from '../ruinTerrain';
+import { hasRuinTerrain, ruinTerrainKey, ruinFloorKey, ruinFloorFrame } from '../ruinTerrain';
 import { generateDungeon, generateBossArena, DungeonData, randomFloor, isWalkable } from '../dungeon';
 import type { BossRoomZone, OptionalRoom, OptionalRoomKind, Room } from '../dungeon';
 import { getTheme, eraSuffix, MONSTER_DEFS, WEAPON_DEFS, makeItem, gradeColor, ITEM_DEFS, ELEMENT_INFO, monsterElement } from '../data';
 import type { Armor, Dir, Element, MonsterElement, EquipmentGrade, ItemKind, MonsterDef, Shield, TileType, Vec2, Weapon } from '../types';
 import {
-  Player, rollWeaponByGrade, rollShield, rollShieldByGrade,
+  Player, rollWeaponByGrade, rollGlacialBossWeapon, rollVolcanicBossWeapon, rollShield, rollShieldByGrade,
   weaponFullName, shieldFullName, makeWeapon, makeShield
 } from '../player';
 import { Enemy } from '../enemy';
@@ -87,8 +90,8 @@ const MID_DRAGONS: { key: string; name: string; tint: number }[] = [
 const MILESTONE_BOSSES: Record<number, { key: string; name: string; tint: number; scale: number; hp: number; atkMin: number; atkMax: number; def: number }> = {
   5: { key: 'm_archdemon', name: '封印王アウレリウス', tint: 0xffc96b, scale: 1.72, hp: 96, atkMin: 6, atkMax: 11, def: 4 },
   10: { key: 'm_horn_demon', name: 'グランドバイソン', tint: 0xc98b52, scale: 1.82, hp: 150, atkMin: 9, atkMax: 16, def: 7 },
-  15: { key: 'm_bone_colossus', name: '炉心王タイタン', tint: 0xff9a45, scale: 1.9, hp: 220, atkMin: 11, atkMax: 19, def: 10 },
-  20: { key: 'm_ice_behemoth', name: '氷晶王ベヒーモス', tint: 0x8adfff, scale: 1.85, hp: 310, atkMin: 14, atkMax: 23, def: 12 },
+  15: { key: 'm_ice_behemoth', name: '氷晶王ベヒーモス', tint: 0x8adfff, scale: 1.85, hp: 220, atkMin: 11, atkMax: 19, def: 10 },
+  20: { key: 'm_valgrado', name: '熔獄竜ヴァルグラド', tint: 0xff783d, scale: 2.7, hp: 310, atkMin: 14, atkMax: 23, def: 12 },
   25: { key: 'm_brass_dragon', name: 'エンシェントドラゴン', tint: 0xff8c42, scale: 1.92, hp: 410, atkMin: 17, atkMax: 28, def: 15 },
   30: { key: 'm_hydra', name: 'トライヘッド・ドラゴン', tint: 0xb072ff, scale: 2.05, hp: 580, atkMin: 20, atkMax: 34, def: 18 }
 };
@@ -168,13 +171,14 @@ interface TerrainDetailVisual {
   x: number;
   y: number;
   wall: boolean;
+  underlay?: boolean;
   alpha: number;
   sprite: Phaser.GameObjects.Image;
 }
 
 type HealingDungeonObjectKind = 'fountain';
 type RoomPropKind = 'barrel' | 'jar' | 'crates' | 'weaponRack' | 'mapTable' | 'cookingPot' | 'minecart' | 'bonePile'
-  | 'iceCrystal' | 'iceObelisk' | 'snowBoulder' | 'iceAltar' | 'ruinRelic' | 'ruinRubble';
+  | 'iceCrystal' | 'iceObelisk' | 'snowBoulder' | 'iceAltar' | 'ruinRelic' | 'ruinRubble' | VolcanoPropKind | WaterPropKind;
 type DungeonObjectKind = HealingDungeonObjectKind | RoomPropKind;
 
 interface DungeonObject {
@@ -218,7 +222,7 @@ interface TerrainVisual {
 
 type BossGimmickKind =
   | 'mid_fire' | 'mid_frost' | 'mid_storm' | 'mid_void' | 'mid_bone' | 'mid_poison'
-  | 'mid_magic' | 'mid_rival'
+  | 'mid_magic' | 'mid_rival' | 'mid_ember_shift' | 'mid_magma_lance' | 'mid_ember_bone' | 'magma_breath'
   | 'bull_charge' | 'furnace_titan' | 'glacial_slam' | 'ancient_fire' | 'tri_head';
 
 type BossHazardKind = 'fire' | 'ice' | 'poison' | 'slow' | 'web' | 'lightning';
@@ -324,6 +328,9 @@ export class GameScene extends Phaser.Scene {
   playerShadow?: Phaser.GameObjects.Image; // 足元の影（接地感）
   playerAura?: Phaser.GameObjects.Image; // 武器強化のオーラ（剣が光る演出）
   weaponSprite?: Phaser.GameObjects.Image; // キャラが手に持つ武器（装備で変化）
+  equipmentRenderer?: EquipmentRenderer;
+  playerVisualFrame: PlayerVisualFrame = 'idle';
+  playerVisualSince = 0;
   stepToggle = false; // 歩行アニメの左右足切り替え
   stepFrame = 0;
   playerAttacking = false;
@@ -448,6 +455,9 @@ export class GameScene extends Phaser.Scene {
     this.playerShadow = undefined;
     this.playerAura = undefined;
     this.weaponSprite = undefined;
+    this.equipmentRenderer = undefined;
+    this.playerVisualFrame = 'idle';
+    this.playerVisualSince = 0;
     this.transformationSprite = undefined;
     this.tileSprites = [];
     this.enemies = [];
@@ -799,6 +809,13 @@ export class GameScene extends Phaser.Scene {
       for (let x = 0; x < d.w; x++) {
         const t = d.tiles[y][x];
         const visual = this.tileVisual(t, theme.era, x, y);
+        if ((hasRuinTerrain(floor) || hasVolcanoTerrain(floor) || hasWaterTerrain(floor)) && (t === 'stairs' || t === 'door' || t === 'roomDoor'
+          || visual.key.startsWith('terrain_boss_gate'))) {
+          const base = hasWaterTerrain(floor) ? this.waterFloorVisual(x, y) : hasVolcanoTerrain(floor) ? this.volcanoFloorVisual(x, y) : this.ruinFloorVisual(x, y);
+          const sprite = this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, base.key, base.frame)
+            .setDisplaySize(TERRAIN_RENDER_SIZE, TERRAIN_RENDER_SIZE).setDepth(-0.1).setVisible(false);
+          this.terrainDetails.push({ x, y, wall: false, underlay: true, alpha: 1, sprite });
+        }
         const spr = this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, visual.key, visual.frame)
           .setFlipX(visual.flipX ?? false)
           .setAngle(visual.angle ?? 0)
@@ -833,7 +850,8 @@ export class GameScene extends Phaser.Scene {
       this.playerSprite = this.add.image(0, 0, playerSheet, playerFrameIndex('down', 'idle'))
         .setDepth(12).setScale(0.85).setOrigin(0.5, 0.6);
       // キャラが手に持つ武器（装備中の武器で絵が変わる）
-      this.weaponSprite = this.add.image(0, 0, 'w_screw').setDepth(13).setDisplaySize(18, 18).setVisible(false);
+      this.equipmentRenderer = new EquipmentRenderer(this);
+      this.weaponSprite = this.equipmentRenderer.weapon;
     }
     this.setPlayerVisual('down', 'idle');
     this.placeSprite(this.playerSprite, d.start.x, d.start.y);
@@ -955,7 +973,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   createWallFacades(era: number) {
-    if (this.usesGlacialTerrain() || hasRuinTerrain(this.floor)) return;
+    if (this.usesGlacialTerrain() || hasRuinTerrain(this.floor) || hasVolcanoTerrain(this.floor) || hasWaterTerrain(this.floor)) return;
     const d = this.dungeon;
     const texture = `terrain_wall_facade_${era}`;
     for (let y = 0; y < d.h; y++) {
@@ -999,6 +1017,28 @@ export class GameScene extends Phaser.Scene {
   }
 
   tileVisual(t: TileType, era: number, x: number, y: number): TerrainVisual {
+    if (hasWaterTerrain(this.floor) && t === 'wall') {
+      const arena = this.dungeon.waterArena;
+      if (arena?.props.some(p => p.blocking && p.x === x && p.y === y)) return this.waterFloorVisual(x, y);
+      const touchesFloor = [-1, 0, 1].some(dy => [-1, 0, 1].some(dx => {
+        const tile = this.dungeon.tiles[y + dy]?.[x + dx];
+        return tile && tile !== 'wall';
+      }));
+      if (arena && !touchesFloor) return { key: 'terrain_water_surface' };
+      const wallKey = waterTerrainKey(this.floor, (x * 13 + y * 7) % 3 === 0 ? 'wall-b' : 'wall-a');
+      return { key: `${wallKey}_${arena ? 'water' : 'ground'}` };
+    }
+    if (hasVolcanoTerrain(this.floor) && t === 'wall') {
+      const arena = this.dungeon.volcanoArena;
+      if (arena?.props.some(p => p.blocking && p.x === x && p.y === y)) return this.volcanoFloorVisual(x, y);
+      const touchesFloor = [-1, 0, 1].some(dy => [-1, 0, 1].some(dx => {
+        const tile = this.dungeon.tiles[y + dy]?.[x + dx];
+        return tile && tile !== 'wall';
+      }));
+      if (arena && !touchesFloor) return { key: 'terrain_volcano_lava' };
+      const wallKey = volcanoTerrainKey(this.floor, (x * 13 + y * 7) % 3 === 0 ? 'wall-b' : 'wall-a');
+      return { key: `${wallKey}_${arena ? 'lava' : 'ground'}` };
+    }
     if (this.dungeon.glacialArena) {
       const propCell = this.dungeon.glacialArena.props.some(p => p.blocking && p.x === x && p.y === y);
       if (t === 'floor' || (t === 'wall' && propCell)) return { key: 'terrain_glacial_floor' };
@@ -1040,7 +1080,7 @@ export class GameScene extends Phaser.Scene {
         const vertical = open(x, y - 1) && open(x, y + 1) && !open(x - 1, y) && !open(x + 1, y);
         return { key: 'terrain_hazard_ice', angle: vertical ? 90 : 0 };
       }
-      case 'lava': return { key: 'terrain_hazard_lava' };
+      case 'lava': return { key: hasVolcanoTerrain(this.floor) ? 'terrain_volcano_lava' : 'terrain_hazard_lava' };
       case 'lightning': return { key: 'terrain_hazard_lightning' };
       case 'voidRift': return { key: 'terrain_hazard_void' };
       case 'poison': return { key: 'terrain_hazard_poison' };
@@ -1049,10 +1089,28 @@ export class GameScene extends Phaser.Scene {
       case 'cracked': return { key: 'terrain_hazard_cracked' };
       case 'floor':
       default:
+        if (hasWaterTerrain(this.floor)) return this.waterFloorVisual(x, y);
+        if (hasVolcanoTerrain(this.floor)) return this.volcanoFloorVisual(x, y);
+        if (hasRuinTerrain(this.floor)) return this.ruinFloorVisual(x, y);
         return this.inBossRoom
           ? { key: `terrain_floor_${era}`, frame: (x * 7 + y * 11) % 3 }
           : { key: `terrain_biome_floor_${this.dungeon.biome}` };
     }
+  }
+
+  waterFloorVisual(x: number, y: number): TerrainVisual {
+    const edge = [[0, -1], [0, 1], [-1, 0], [1, 0]].some(([dx, dy]) => this.dungeon.tiles[y + dy]?.[x + dx] === 'wall');
+    return { key: waterTerrainKey(this.floor, 'floor'), frame: waterFloorFrame(this.floor, x, y, edge) };
+  }
+
+  volcanoFloorVisual(x: number, y: number): TerrainVisual {
+    const edge = [[0, -1], [0, 1], [-1, 0], [1, 0]].some(([dx, dy]) => this.dungeon.tiles[y + dy]?.[x + dx] === 'wall');
+    return { key: volcanoTerrainKey(this.floor, 'floor'), frame: volcanoFloorFrame(this.floor, x, y, edge) };
+  }
+
+  ruinFloorVisual(x: number, y: number): TerrainVisual {
+    const edge = [[0, -1], [0, 1], [-1, 0], [1, 0]].some(([dx, dy]) => this.dungeon.tiles[y + dy]?.[x + dx] === 'wall');
+    return { key: ruinFloorKey(this.floor), frame: ruinFloorFrame(this.floor, x, y, edge) };
   }
 
   bossGateVisual(): TerrainVisual {
@@ -1086,6 +1144,18 @@ export class GameScene extends Phaser.Scene {
   createBossRoomVisuals(era: number, accent: number) {
     const room = this.dungeon.bossRoom;
     if (!room) return;
+    if (this.dungeon.waterArena) {
+      for (const prop of this.dungeon.waterArena.props) {
+        const size = this.floor === 10 ? 1.65 : 1.4;
+        const sprite = this.add.image(prop.x * TILE + TILE / 2, prop.y * TILE + TILE / 2,
+          waterTerrainKey(this.floor, prop.part)).setOrigin(.5, .78)
+          .setDisplaySize(TILE * size, TILE * size).setVisible(false)
+          .setDepth(this.worldDepth(prop.y * TILE + TILE, -.2));
+        this.bossRoomDecorSprites.push(sprite);
+      }
+      this.createBossFloorDecor(0x78b6b1);
+      return;
+    }
     if (this.dungeon.glacialArena) {
       // Supply the floor beneath the sealed stair, whose own tile is an object.
       const stairs = this.dungeon.stairs;
@@ -1101,6 +1171,18 @@ export class GameScene extends Phaser.Scene {
       }
       return;
     }
+    if (this.dungeon.volcanoArena) {
+      for (const prop of this.dungeon.volcanoArena.props) {
+        const size = prop.part === 'prop-1' ? 1.8 : 1.5;
+        const sprite = this.add.image(prop.x * TILE + TILE / 2, prop.y * TILE + TILE / 2,
+          volcanoTerrainKey(this.floor, prop.part)).setOrigin(.5, .78)
+          .setDisplaySize(TILE * size, TILE * size).setVisible(false)
+          .setDepth(this.worldDepth(prop.y * TILE + TILE, -.2));
+        this.bossRoomDecorSprites.push(sprite);
+      }
+      this.createBossFloorDecor(0xff783d);
+      return;
+    }
     // 埋め込み型の中ボス部屋は、通常タイルの床だけで描く。
     // 大きな背景絵に含まれていた内壁と、外周の実壁が二重に見えるのを防ぐ。
     if (!this.inBossRoom) return;
@@ -1110,6 +1192,45 @@ export class GameScene extends Phaser.Scene {
   createBossFloorDecor(accent: number) {
     const room = this.dungeon.bossRoom;
     if (!room) return;
+    if (this.dungeon.waterArena) {
+      if (this.floor === 10) {
+        const g = this.add.graphics().setDepth(.35).setVisible(false);
+        g.lineStyle(1, 0x87aaa0, .22);
+        g.strokeCircle((room.cx + .5) * TILE, (room.cy + .5) * TILE, TILE * 2.6);
+        this.bossFloorDecor = g;
+      }
+      return;
+    }
+    if (this.dungeon.volcanoArena) {
+      const g = this.add.graphics().setDepth(.35).setVisible(false);
+      const cx = (room.cx + .5) * TILE, cy = (room.cy + .5) * TILE;
+      g.lineStyle(1.5, 0xb2754b, .26);
+      g.strokeCircle(cx, cy, TILE * 2.4);
+      g.lineStyle(1, 0xb2754b, .16);
+      g.strokeCircle(cx, cy, TILE * 1.9);
+      this.bossFloorDecor = g;
+      return;
+    }
+    if (this.floor === 5) {
+      // Static, worn engraving in the stone, below actors and attack warnings.
+      const inset = TILE;
+      const left = room.x * TILE + inset, top = room.y * TILE + inset;
+      const width = room.w * TILE - inset * 2, height = room.h * TILE - inset * 2;
+      const cx = (room.x + room.w / 2) * TILE, cy = (room.y + room.h / 2) * TILE;
+      const radius = Math.min(width, height) * .28;
+      const g = this.add.graphics().setDepth(.35).setVisible(false);
+      g.lineStyle(1.5, 0xb69b59, .38);
+      g.strokeRect(left, top, width, height);
+      g.lineStyle(1, 0xb69b59, .20);
+      g.strokeCircle(cx, cy, radius);
+      g.strokeCircle(cx, cy, radius * .72);
+      g.beginPath();
+      g.moveTo(cx, cy - radius * .48); g.lineTo(cx + radius * .48, cy);
+      g.lineTo(cx, cy + radius * .48); g.lineTo(cx - radius * .48, cy); g.closePath();
+      g.strokePath();
+      this.bossFloorDecor = g;
+      return;
+    }
     const left = room.x * TILE + 10;
     const top = room.y * TILE + 10;
     const width = room.w * TILE - 20;
@@ -1142,7 +1263,7 @@ export class GameScene extends Phaser.Scene {
     }
     Phaser.Utils.Array.Shuffle(floorCells);
     const count = Math.min(18, floorCells.length);
-    const color = floor >= 21 ? 0xb47aff : floor >= 11 ? 0x6ce8d8 : 0x65d8ff;
+    const color = hasWaterTerrain(floor) ? 0x71b8b9 : hasVolcanoTerrain(floor) ? 0xff853f : floor >= 21 ? 0xb47aff : floor >= 11 ? 0x6ce8d8 : 0x65d8ff;
     for (let i = 0; i < count; i++) {
       const pos = floorCells[i];
       const baseY = pos.y * TILE + TILE / 2 - 2 - Math.random() * 10;
@@ -1361,7 +1482,7 @@ export class GameScene extends Phaser.Scene {
       isBoss: floor === 30,
       isFloorBoss: true,
       isDragonType: custom ? custom.isDragonType : floor >= 20,
-      bossTint: custom || floor === 15 ? 0xffffff : spec.tint
+      bossTint: custom ? 0xffffff : spec.tint
     };
     const label = floor % 10 === 0
       ? `★★ ${floor}.5F 超ボス「${def.name}」が降臨した！`
@@ -1394,10 +1515,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   midBossGimmick(key: string): BossGimmickKind {
-    if (key === 'm_unicorn') return 'mid_magic';
+    if (key === 'm_unicorn') return 'mid_magma_lance';
+    if (key === 'm_bone_reaper') return 'mid_ember_bone';
+    if (key === 'm_valgrado') return 'magma_breath';
     if (key === 'm_ice_behemoth') return 'glacial_slam';
+    if (key === 'm_bone_colossus') return 'furnace_titan';
     if (key === 'm_black_mage' || key === 'm_silver_seraph') return 'mid_magic';
-    if (key === 'm_abyss_dragon' || key === 'm_fallen_angel') return 'mid_void';
+    if (key === 'm_fallen_angel') return 'mid_ember_shift';
+    if (key === 'm_abyss_dragon') return 'mid_void';
     if (key === 'm_ice_knight') return 'mid_frost';
     if (key === 'm_thunder_sovereign') return 'mid_storm';
     if (key.startsWith('m_rival_')) return 'mid_rival';
@@ -1411,8 +1536,8 @@ export class GameScene extends Phaser.Scene {
 
   milestoneGimmick(floor: number): BossGimmickKind {
     return ({
-      5: 'mid_fire', 10: 'bull_charge', 15: 'furnace_titan',
-      20: 'glacial_slam', 25: 'ancient_fire', 30: 'tri_head'
+      5: 'mid_fire', 10: 'bull_charge', 15: 'glacial_slam',
+      20: 'magma_breath', 25: 'ancient_fire', 30: 'tri_head'
     } as Record<number, BossGimmickKind>)[floor] ?? 'mid_fire';
   }
 
@@ -1785,6 +1910,24 @@ export class GameScene extends Phaser.Scene {
     return this.uniqueBossTiles(tiles);
   }
 
+  bossBreathTiles(e: Enemy, phaseTwo: boolean): Vec2[] {
+    const horizontal = Math.abs(this.player.x - e.x) >= Math.abs(this.player.y - e.y);
+    const dx = horizontal ? Math.sign(this.player.x - e.x) || 1 : 0;
+    const dy = horizontal ? 0 : Math.sign(this.player.y - e.y) || 1;
+    const tiles: Vec2[] = [];
+    const reach = phaseTwo ? 9 : 7;
+    for (let side = -1; side <= 1; side++) {
+      for (let step = 1; step <= reach; step++) {
+        const x = e.x + dx * step + (horizontal ? 0 : side);
+        const y = e.y + dy * step + (horizontal ? side : 0);
+        const tile = this.dungeon.tiles[y]?.[x];
+        if (!tile || !isWalkable(tile)) break;
+        tiles.push({ x, y });
+      }
+    }
+    return this.uniqueBossTiles(tiles);
+  }
+
   bossChargePath(e: Enemy): Vec2[] {
     const dx = this.player.x === e.x ? 0 : Math.sign(this.player.x - e.x);
     const dy = this.player.y === e.y ? 0 : Math.sign(this.player.y - e.y);
@@ -1817,6 +1960,16 @@ export class GameScene extends Phaser.Scene {
     if (!edge) {
       const offset = this.bossStates.get(e)?.phase ?? 0;
       for (let i = 0; i < offset % candidates.length; i++) candidates.push(candidates.shift()!);
+    }
+    if (e.def.key === 'm_fallen_angel') {
+      // Props can occupy all four preferred corners and the central gate.
+      // Scan other room cells after those preferred positions, without moving through props.
+      for (let y = room.y + 1; y < room.y + room.h - 1; y++) {
+        for (let x = room.x + 1; x < room.x + room.w - 1; x++) {
+          if (Math.abs(x - this.player.x) + Math.abs(y - this.player.y) < 2 || (x === e.x && y === e.y)) continue;
+          candidates.push({ x, y });
+        }
+      }
     }
     for (const pos of candidates) {
       if (!this.validBossTile(pos.x, pos.y)) continue;
@@ -1880,6 +2033,26 @@ export class GameScene extends Phaser.Scene {
       case 'mid_magic':
         tiles = this.bossCrossTiles(p.x, p.y, 1);
         message = `${e.def.name}が魔力を集中している！ 銀色の予告マスから離れろ。`;
+        break;
+      case 'mid_ember_shift':
+        destination = this.findBossDestination(e) ?? undefined;
+        if (!destination) return null;
+        tiles = this.bossAreaTiles(destination.x, destination.y, 1);
+        message = `${e.def.name}が炎の中に消えた！ 赤いマスへの転移斬りに注意。`;
+        break;
+      case 'mid_magma_lance': {
+        const horizontal = Math.abs(p.x - e.x) >= Math.abs(p.y - e.y);
+        tiles = this.bossRoomLine(horizontal, horizontal ? p.y : p.x);
+        message = `${e.def.name}の角から熔熱が一直線に走る！`;
+        break;
+      }
+      case 'mid_ember_bone':
+        tiles = this.bossCrossTiles(p.x, p.y, 1);
+        message = `${e.def.name}が灼けた大鎌を振り上げた！ 十字の火柱から離れろ。`;
+        break;
+      case 'magma_breath':
+        tiles = this.bossBreathTiles(e, state.phaseTwo);
+        message = '熔獄竜ヴァルグラドが息を吸い込んだ！ 赤い予告マスへ熔岩の息吹が来る。';
         break;
       case 'mid_rival':
         // An armed adventurer fights with its sword, not a dragon spell.
@@ -2056,6 +2229,20 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'bull_charge':
           return this.resolveBullCharge(e, state, primary);
+        case 'mid_ember_shift':
+          if (firstWave && intent.destination) this.teleportBoss(e, intent.destination);
+          if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.72, '熔翼の転移斬り！');
+          this.addBossHazards(primary, 'fire', 2);
+          break;
+        case 'mid_magma_lance':
+        case 'mid_ember_bone':
+          if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.66, '灼熱の一撃！');
+          this.addBossHazards(primary, 'fire', 2);
+          break;
+        case 'magma_breath':
+          if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.88, '熔獄の息吹！');
+          this.addBossHazards(primary, 'fire', 3);
+          break;
         case 'mid_void':
           if (firstWave && intent.destination) this.teleportBoss(e, intent.destination);
           if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.72, `${e.def.name}の転移衝撃！`);
@@ -2112,6 +2299,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   bossImpactKind(kind: BossGimmickKind, channel: BossStrikeChannel): BossImpactKind {
+    if (kind === 'mid_ember_shift' || kind === 'mid_magma_lance' || kind === 'mid_ember_bone' || kind === 'magma_breath') return 'fire';
     if (kind === 'mid_magic') return 'magic';
     if (kind === 'tri_head') {
       return channel === 'primary' ? 'fire' : channel === 'secondary' ? 'ice' : 'poison';
@@ -2392,6 +2580,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   roomPropTexture(kind: RoomPropKind) {
+    if (kind.startsWith('waterProp')) return waterTerrainKey(this.floor, `prop-${kind.slice(-1)}` as WaterPart);
+    if (kind.startsWith('volcanoProp')) return volcanoTerrainKey(this.floor, `prop-${kind.slice(-1)}` as VolcanoPart);
     if (kind === 'ruinRelic' || kind === 'ruinRubble') {
       return ruinTerrainKey(this.floor, kind === 'ruinRelic' ? 'relic' : 'rubble');
     }
@@ -2404,6 +2594,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   roomPropRenderTiles(kind: RoomPropKind) {
+    if (kind.startsWith('waterProp')) return kind === 'waterProp2' ? 1.4 : 1.2;
+    if (kind.startsWith('volcanoProp')) return kind === 'volcanoProp2' ? 1.4 : 1.2;
     if (kind === 'ruinRelic' || kind === 'ruinRubble') return 1.05;
     if (kind === 'iceCrystal') return 1.45;
     if (kind === 'iceObelisk') return 1.65;
@@ -2417,6 +2609,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   roomPropChoices(kind?: OptionalRoomKind): RoomPropKind[] {
+    if (hasWaterTerrain(this.floor)) return [...WATER_PROP_KINDS];
+    if (hasVolcanoTerrain(this.floor)) return [...VOLCANO_PROP_KINDS];
     if (hasRuinTerrain(this.floor)) return ['ruinRubble', 'ruinRelic', 'crates', 'jar'];
     if (this.dungeon.biome === 'frost') {
       return kind === 'shrine' ? ['iceAltar', 'iceObelisk', 'iceCrystal']
@@ -2535,7 +2729,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     // 各テーマの装飾を一通り置く。氷マップには20階の氷オブジェクトを小さく配置する。
-    const requiredDecor: RoomPropKind[] = hasRuinTerrain(this.floor) ? ['ruinRelic', 'ruinRubble'] : this.dungeon.biome === 'frost'
+    const requiredDecor: RoomPropKind[] = hasWaterTerrain(this.floor) ? [...WATER_PROP_KINDS] : hasVolcanoTerrain(this.floor) ? [...VOLCANO_PROP_KINDS] : hasRuinTerrain(this.floor) ? ['ruinRelic', 'ruinRubble'] : this.dungeon.biome === 'frost'
       ? ['iceCrystal', 'iceObelisk', 'snowBoulder', 'iceAltar']
       : ['crates', 'weaponRack', 'mapTable', 'cookingPot', 'minecart', 'bonePile'];
     requiredDecor.forEach((kind, index) => {
@@ -2559,16 +2753,25 @@ export class GameScene extends Phaser.Scene {
     const room = this.dungeon.bossRoom;
     if (this.inBossRoom || !room) return;
     const choices = this.roomPropChoices().filter(kind => kind !== 'barrel' && kind !== 'jar');
-    const kinds: RoomPropKind[] = [choices[0], 'barrel', 'jar', choices[1] ?? choices[0]];
-    const corners = [
+    const kinds: RoomPropKind[] = [choices[0], choices[1] ?? choices[0], 'jar', choices[0],
+      choices[2] ?? choices[0], 'barrel', choices[1] ?? choices[0], choices[3] ?? choices[0]];
+    const candidates = [
       { x: room.x + 1, y: room.y + 1 }, { x: room.x + room.w - 2, y: room.y + 1 },
-      { x: room.x + 1, y: room.y + room.h - 2 }, { x: room.x + room.w - 2, y: room.y + room.h - 2 }
+      { x: room.x + 1, y: room.y + room.h - 2 }, { x: room.x + room.w - 2, y: room.y + room.h - 2 },
+      // Extra wall-side accents; the central four-by-four square stays open.
+      { x: room.x + 3, y: room.y + 1 }, { x: room.x + room.w - 2, y: room.y + 3 },
+      { x: room.x + room.w - 4, y: room.y + room.h - 2 }, { x: room.x + 1, y: room.y + room.h - 4 },
+      { x: room.x + room.w - 4, y: room.y + 1 }, { x: room.x + room.w - 2, y: room.y + room.h - 4 },
+      { x: room.x + 3, y: room.y + room.h - 2 }, { x: room.x + 1, y: room.y + 3 }
     ];
-    corners.forEach((position, index) => {
-      if (!this.canPlaceRoomProp(position) || !this.canPlacePermanentDecor(position)) return;
-      const kind = kinds[index];
+    let placed = 0;
+    for (const position of candidates) {
+      if (placed >= 8) break;
+      if (position.x === room.cx || position.y === room.cy
+        || !this.canPlaceRoomProp(position) || !this.canPlacePermanentDecor(position)) continue;
+      const kind = kinds[placed++];
       this.addDungeonObject(kind, position.x, position.y, 1, 1, kind === 'barrel' || kind === 'jar');
-    });
+    }
   }
 
   addDungeonObject(kind: DungeonObjectKind, centerX: number, centerY: number, w: number, h: number, breakable = false) {
@@ -3222,15 +3425,6 @@ export class GameScene extends Phaser.Scene {
     } else {
       this.slashFx(e.x, e.y, elementColor);
     }
-    if (this.weaponSprite?.visible) {
-      this.tweens.add({
-        targets: this.weaponSprite,
-        angle: this.weaponSprite.angle + (dir === 'left' || dir === 'up' ? -115 : 115),
-        duration: ANIM * 0.45,
-        yoyo: true,
-        ease: 'Cubic.easeOut'
-      });
-    }
     if (!ranged) {
       await new Promise<void>((resolve) => {
         this.tweens.add({
@@ -3542,10 +3736,12 @@ export class GameScene extends Phaser.Scene {
 
     // 5階刻みの強ボス／超ボスは、武器と服を必ず直接落とす。
     if (isMilestoneBoss) {
-      const weapon = rollWeaponByGrade(bossEquipmentGrade);
+      const weapon = this.floor === 15 ? rollGlacialBossWeapon() : this.floor === 20 ? rollVolcanicBossWeapon() : rollWeaponByGrade(bossEquipmentGrade);
       weapon.plus = Math.max(weapon.plus, Math.min(3, Math.floor(this.floor / 10)));
       this.dropEquipment(origin.x, origin.y, 'weapon', weapon);
       this.weaponWonThisFloor = true;
+      if (this.floor === 20) this.log(`熔獄竜の討伐報酬！ 火属性の武器「${weapon.name}」が確定ドロップした。`, 'special');
+      if (this.floor === 15) this.log(`氷晶王の討伐報酬！ 氷属性の武器「${weapon.name}」が確定ドロップした。`, 'special');
     }
 
     // 5階刻みの強ボスは服を確定、中ボスは5%で服を落とす。
@@ -4683,7 +4879,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   createTerrainDetails(floor: number) {
-    if (this.inBossRoom) return;
+    // Painted floors already contain wear; keep their broad quiet surfaces readable.
+    if (this.inBossRoom || hasRuinTerrain(floor) || hasVolcanoTerrain(floor) || hasWaterTerrain(floor)) return;
     const d = this.dungeon;
     const layout = getFloorLayoutProfile(floor);
     const reserved = new Set<string>([
@@ -4793,7 +4990,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Painted low walls have their own faces; tall stone buttresses would cover them.
-    if (this.usesGlacialTerrain() || hasRuinTerrain(this.floor)) return;
+    if (this.usesGlacialTerrain() || hasRuinTerrain(this.floor) || hasVolcanoTerrain(this.floor) || hasWaterTerrain(this.floor)) return;
 
     for (let y = 1; y < d.h - 1; y++) {
       for (let x = 1; x < d.w - 1; x++) {
@@ -4909,8 +5106,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     // 視界内の床に接する最初の壁面は表示する。壁の先の床へは視界を伝播させない。
-    // 中ボス部屋へ入った後は、松明なしでも部屋全体を見せる。
-    if (playerInsideBossRoom && d.bossRoom && (d.glacialArena || !this.inBossRoom)) {
+    // 中ボス部屋と描き直した専用部屋では、入室後に床の縁と封印も見せる。
+    if (playerInsideBossRoom && d.bossRoom && (d.glacialArena || d.volcanoArena || d.waterArena || !this.inBossRoom || this.floor === 5)) {
       for (let y = d.bossRoom.y; y < d.bossRoom.y + d.bossRoom.h; y++) {
         for (let x = d.bossRoom.x; x < d.bossRoom.x + d.bossRoom.w; x++) {
           visible[y][x] = true;
@@ -4940,6 +5137,14 @@ export class GameScene extends Phaser.Scene {
         }
       }
     }
+    if (playerInsideBossRoom && (d.volcanoArena || d.waterArena) && d.bossRoom) {
+      const r = d.bossRoom;
+      for (let y = Math.max(0, r.y - 3); y < Math.min(d.h, r.y + r.h + 3); y++) {
+        for (let x = Math.max(0, r.x - 3); x < Math.min(d.w, r.x + r.w + 3); x++) {
+          if (d.tiles[y][x] === 'wall') { visible[y][x] = true; this.explored[y][x] = true; }
+        }
+      }
+    }
     this.visibleTiles = visible;
 
     // 現在の視界外は、探索済みであっても完全に隠す。
@@ -4957,7 +5162,7 @@ export class GameScene extends Phaser.Scene {
         }
         if (visible[y][x]) {
           spr.setVisible(true);
-          spr.setTint(this.usesGlacialTerrain() ? 0xffffff : isWall ? WALL_VISIBLE_TINT : isBossRoomFloor ? BOSS_ROOM_FLOOR_TINT : this.themeTileTint);
+          spr.setTint(this.usesGlacialTerrain() || hasRuinTerrain(this.floor) || hasVolcanoTerrain(this.floor) || hasWaterTerrain(this.floor) ? 0xffffff : isWall ? WALL_VISIBLE_TINT : isBossRoomFloor ? BOSS_ROOM_FLOOR_TINT : this.themeTileTint);
           if (previousState !== 'visible') {
             spr.setAlpha(.16);
             this.tweens.add({ targets: spr, alpha: 1, duration: 260, ease: 'Quad.easeOut' });
@@ -4975,7 +5180,7 @@ export class GameScene extends Phaser.Scene {
     for (const detail of this.terrainDetails) {
       const tile = d.tiles[detail.y]?.[detail.x];
       const active = !!visible[detail.y]?.[detail.x]
-        && (detail.wall ? tile === 'wall' : tile === 'floor');
+        && (detail.underlay ? tile !== 'wall' && tile !== 'pit' : detail.wall ? tile === 'wall' : tile === 'floor');
       detail.sprite.setVisible(active).setAlpha(active ? detail.alpha : 0);
     }
     if (d.bossRoom) {
@@ -5990,19 +6195,14 @@ export class GameScene extends Phaser.Scene {
         this.playerAura.setVisible(false);
       }
     }
-    // 手持ち武器：装備中の武器の絵に変える（強化色でtint）
-    if (this.weaponSprite) {
-      const w = this.player.weapon;
-      if (this.transformation) {
-        this.weaponSprite.setVisible(false);
-      } else if (w && this.textures.exists(w.key)) {
-        const size = w.grade === 'S' ? 22 : w.grade === 'A' ? 20 : 18;
-        this.weaponSprite.setVisible(true).setTexture(w.key).setDisplaySize(size, size);
-        this.weaponSprite.clearTint();
-      } else {
-        this.weaponSprite.setVisible(false);
-      }
-    }
+    this.updateHeldEquipment();
+  }
+
+  updateHeldEquipment() {
+    if (!this.playerSprite) return;
+    this.equipmentRenderer?.update(this.playerSprite,this.player.weapon,this.player.shield,this.player.dir,
+      this.playerVisualFrame,this.playerGender,this.time.now-this.playerVisualSince,
+      !this.transformation && !(this.gameEnded && this.player.hp <= 0));
   }
 
   // 矢印キーのホールド処理：押した瞬間に1歩、押しっぱなしで歩き続ける
@@ -6278,22 +6478,7 @@ export class GameScene extends Phaser.Scene {
       this.playerAura.setScale(pulse);
       this.playerAura.setDepth(ps.depth - 0.16);
     }
-    // 手持ち武器を「握って構えている」ように向きごとに位置・角度・反転を調整
-    if (this.weaponSprite && this.weaponSprite.visible && !this.playerAttacking) {
-      const dir = this.player.dir;
-      // ox,oy=手元オフセット / rot=傾き(ラジアン) / flip=左右反転 / behind=キャラの後ろ
-      let ox = 8, oy = 6, rot = 0.5, flip = false, behind = false;
-      // 正面向きは柄を右手へ寄せ、刃先を斜め下へ流して腰から真横に生えないようにする。
-      if (dir === 'down') { ox = 6; oy = 9; rot = 1.25; flip = false; }
-      else if (dir === 'up') { ox = -8; oy = -3; rot = 0.5; flip = true; behind = true; }
-      else if (dir === 'left') { ox = -10; oy = 6; rot = -0.5; flip = true; }
-      else { ox = 10; oy = 6; rot = 0.5; flip = false; } // right
-      this.weaponSprite.x = ps.x + ox;
-      this.weaponSprite.y = ps.y + oy;
-      this.weaponSprite.setRotation(rot);
-      this.weaponSprite.setFlipX(flip);
-      this.weaponSprite.setDepth(ps.depth + (behind ? -0.08 : 0.18));
-    }
+    this.updateHeldEquipment();
 
     // 敵：ゆらゆらした待機モーション＋影の追従
     for (const e of this.enemies) {
@@ -6559,12 +6744,16 @@ export class GameScene extends Phaser.Scene {
   }
 
   setPlayerVisual(dir: Dir, frame: PlayerVisualFrame) {
+    this.playerVisualFrame = frame;
+    this.playerVisualSince = this.time.now;
     this.player.dir = dir;
     this.transformationSprite?.setFlipX(dir === 'left');
     const sheetKey = playerSheetKey(this.playerGender, this.playerArmor ?? DEFAULT_PLAYER_ARMOR);
     if (this.textures.exists(sheetKey)) {
-      this.playerSprite.setTexture(sheetKey, playerFrameIndex(dir, frame));
-      this.playerSprite.setFlipX(false);
+      const mirrorAttack = dir === 'left' && (frame === 'atk' || frame === 'atkWindup');
+      this.playerSprite.setTexture(sheetKey, playerFrameIndex(mirrorAttack ? 'right' : dir, frame));
+      this.playerSprite.setFlipX(mirrorAttack);
+      this.updateHeldEquipment();
       return;
     }
 

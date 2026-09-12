@@ -1,0 +1,205 @@
+[
+  {
+    "id": "boss-16",
+    "kind": "boss",
+    "floor": 16,
+    "name": "熔翼の堕天使",
+    "references": [
+      "C:/chari-dungeon-release-final/art/volcano-concepts-floors16-20-v1/16-obsidian-fall.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production transparent PNG FOUR-DIRECTION MONSTER SPRITE SHEET for Chari Dungeon top-down RPG. Reference is design identity/style, NOT a backdrop. Create only the monster described, precisely FOUR entire drawings in equal 2x2 SQUARE grid. Reading order upper-left DOWN/front, upper-right LEFT profile, lower-left RIGHT profile, lower-right UP/true back. SAME creature size, SAME feet baseline and same calm standing pose in all cells; unique correct views, no sideways mirroring of front. Detailed hand-painted chunky pixel art with crisp stepped silhouettes matching the reference game, readable when reduced to 120 pixels. Generous transparent 12% margin within each cell, separate cells, no overlap. No room, floor, ground shadow, UI, text, label, frame, grid, particles or aura. Real transparent background. A silver-haired male fallen angel in black obsidian armor, black FEATHERED wings with lava orange tips and glowing sparse cracks, holding a molten red sword. Preserve this winged humanoid from the reference. Four directional standing poses; back view shows hair back and wings, no face.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-804d2fb7-030a-4e3a-ba2d-0f3307a2f659.png",
+    "mode": "built-in image_gen",
+    "file": "boss-16.png"
+  },
+  {
+    "id": "floors-16",
+    "kind": "floor",
+    "floor": 16,
+    "references": [
+      "C:/chari-dungeon-release-final/art/volcano-concepts-floors16-20-v1/16-obsidian-fall.png"
+    ],
+    "prompt": "Use case: stylized-concept. Create a production square PNG texture atlas of FOUR seamless floor tiles, 2 columns and 2 rows, exactly equal square cells, edge-to-edge full opaque painted pixels in every cell, no gutter, no border or gaps, no text. Reference for volcanic rock palette and painted pixel style only. TOP-DOWN orthographic flat surface, no perspective bevel, no cube or objects, no room or walls. Each cell is a full floor surface continuing naturally at edges. Broad subtle readable hand-painted pixel clusters, not high-contrast noisy gravel. Gray-black porous basalt paving, ash in crevices, sparse tiny orange embers. Four floor variants in reading order: plain dark quiet rock, alternate plain worn stone, one fine dim orange hairline fissure, ash and tiny loose chips along one edge.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-e0b56103-a9dc-462a-a3a7-894c12f89f5c.png",
+    "mode": "built-in image_gen",
+    "file": "floors-16.png"
+  },
+  {
+    "id": "props-16",
+    "kind": "props",
+    "floor": 16,
+    "references": [
+      "C:/chari-dungeon-release-final/art/volcano-concepts-floors16-20-v1/16-obsidian-fall.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production RPG transparent PNG sprite atlas, SIX independent environmental sprites, strict 3 columns by 2 rows of equal square cells, landscape 3:2 canvas. Reference for the exact approved volcanic material, palette and object designs only. Top-down RPG camera showing top and low front faces, not isometric diamond. Each sprite entirely inside its cell with 14% transparent padding. Walls are ONE tile-wide cluster, squat low boulders, wider than tall, no huge cliff face. Consistent light from upper-left, crisp rich painted pixel clusters matching reference. Do not draw a room, background, floor, title, letters, border, grid, labels, extra objects, strong shadows or large fire effects. Real transparent background. The SIX sprites in READING ORDER are: Top row: 1 short connected low boulder wall of charcoal basalt, 2 alternate low boulder wall with a narrow red glowing fissure, 3 low cluster of black obsidian shards. Bottom row: 4 small volcanic gas vent with only a wisp of gray smoke, 5 broken scorched wing statue squat and low, 6 squat ember brazier of volcanic stone.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-aacf5103-caeb-4312-8f69-c2cdb3f62429.png",
+    "mode": "built-in image_gen",
+    "file": "props-16.png"
+  },
+  {
+    "id": "boss-17",
+    "kind": "boss",
+    "floor": 17,
+    "name": "火口のフェニックス",
+    "references": [
+      "C:/chari-dungeon-release-final/art/volcano-concepts-floors16-20-v1/17-phoenix-crater.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production transparent PNG FOUR-DIRECTION MONSTER SPRITE SHEET for Chari Dungeon top-down RPG. Reference is design identity/style, NOT a backdrop. Create only the monster described, precisely FOUR entire drawings in equal 2x2 SQUARE grid. Reading order upper-left DOWN/front, upper-right LEFT profile, lower-left RIGHT profile, lower-right UP/true back. SAME creature size, SAME feet baseline and same calm standing pose in all cells; unique correct views, no sideways mirroring of front. Detailed hand-painted chunky pixel art with crisp stepped silhouettes matching the reference game, readable when reduced to 120 pixels. Generous transparent 12% margin within each cell, separate cells, no overlap. No room, floor, ground shadow, UI, text, label, frame, grid, particles or aura. Real transparent background. A graceful phoenix, broad red-orange wings, gold breast, crown feathers, blackened wing tips, long flowing ember tail. Preserve bird anatomy and distinct beak, two legs, not a dragon. Front, left side, right side, true rear view. Same posed wingspan across views as far as perspective permits.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-7d192745-d82a-4d67-9dad-21dd9ce0def0.png",
+    "mode": "built-in image_gen",
+    "file": "boss-17.png"
+  },
+  {
+    "id": "floors-17",
+    "kind": "floor",
+    "floor": 17,
+    "references": [
+      "C:/chari-dungeon-release-final/art/volcano-concepts-floors16-20-v1/17-phoenix-crater.png"
+    ],
+    "prompt": "Use case: stylized-concept. Create a production square PNG texture atlas of FOUR seamless floor tiles, 2 columns and 2 rows, exactly equal square cells, edge-to-edge full opaque painted pixels in every cell, no gutter, no border or gaps, no text. Reference for volcanic rock palette and painted pixel style only. TOP-DOWN orthographic flat surface, no perspective bevel, no cube or objects, no room or walls. Each cell is a full floor surface continuing naturally at edges. Broad subtle readable hand-painted pixel clusters, not high-contrast noisy gravel. Cooled dark maroon-black lava with quiet rope-like flowing stone texture, broad shaded clusters. Four variants: quiet solid cooled lava, alternate curved lava folds, very sparse fine dim red cracks, ash and stone chips along edge. Matte and mostly dark, not glowing orange throughout.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-95cd3a71-c116-4505-bf1b-27b611812a46.png",
+    "mode": "built-in image_gen",
+    "file": "floors-17.png"
+  },
+  {
+    "id": "props-17",
+    "kind": "props",
+    "floor": 17,
+    "references": [
+      "C:/chari-dungeon-release-final/art/volcano-concepts-floors16-20-v1/17-phoenix-crater.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production RPG transparent PNG sprite atlas, SIX independent environmental sprites, strict 3 columns by 2 rows of equal square cells, landscape 3:2 canvas. Reference for the exact approved volcanic material, palette and object designs only. Top-down RPG camera showing top and low front faces, not isometric diamond. Each sprite entirely inside its cell with 14% transparent padding. Walls are ONE tile-wide cluster, squat low boulders, wider than tall, no huge cliff face. Consistent light from upper-left, crisp rich painted pixel clusters matching reference. Do not draw a room, background, floor, title, letters, border, grid, labels, extra objects, strong shadows or large fire effects. Real transparent background. The SIX sprites in READING ORDER are: Top row: 1 low rough dark basalt boulder wall, 2 low basalt wall with sparse glowing seams, 3 shallow black volcanic-rock phoenix nest with one ember egg. Bottom row: 4 short cluster of columnar volcanic rock, 5 small low glowing volcanic vent, 6 group of tiny charred rock stumps.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-519de44c-80cb-4bd7-b677-0eb04e1ea444.png",
+    "mode": "built-in image_gen",
+    "file": "props-17.png"
+  },
+  {
+    "id": "boss-18",
+    "kind": "boss",
+    "floor": 18,
+    "name": "熔角獣イグニコーン",
+    "references": [
+      "C:/chari-dungeon-release-final/art/volcano-concepts-floors16-20-v1/18-cinder-horn.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production transparent PNG FOUR-DIRECTION MONSTER SPRITE SHEET for Chari Dungeon top-down RPG. Reference is design identity/style, NOT a backdrop. Create only the monster described, precisely FOUR entire drawings in equal 2x2 SQUARE grid. Reading order upper-left DOWN/front, upper-right LEFT profile, lower-left RIGHT profile, lower-right UP/true back. SAME creature size, SAME feet baseline and same calm standing pose in all cells; unique correct views, no sideways mirroring of front. Detailed hand-painted chunky pixel art with crisp stepped silhouettes matching the reference game, readable when reduced to 120 pixels. Generous transparent 12% margin within each cell, separate cells, no overlap. No room, floor, ground shadow, UI, text, label, frame, grid, particles or aura. Real transparent background. A proud single-horned unicorn made of charcoal basalt with subtle molten seams around knees, flowing orange-red lava mane and tail, glowing gold-orange horn, red hooves. Four clearly readable legs, beautiful equine silhouette. Front, left profile facing left, right profile facing right, actual rear with tail and rear of mane, no face.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-a4fe3296-5721-45d8-9151-82b95ca99d51.png",
+    "mode": "built-in image_gen",
+    "file": "boss-18.png",
+    "repairs": [
+      {
+        "prompt": "Keep this same lava unicorn design and its four directional poses. Fix the composition only: reduce the unicorns so every horn, mane and entire tail is fully visible, with generous 15% transparent padding on every side INSIDE EACH of the four equal 2x2 cells. Top left front, top right left-facing, bottom left right-facing, bottom right back. Match body scale in all four views. Transparent background. No glow haze, no floor, no shadows. Complete tails, nothing cropped, each creature wholly inside its own quadrant.",
+        "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-a4fe3296-5721-45d8-9151-82b95ca99d51.png"
+      }
+    ]
+  },
+  {
+    "id": "floors-18",
+    "kind": "floor",
+    "floor": 18,
+    "references": [
+      "C:/chari-dungeon-release-final/art/volcano-concepts-floors16-20-v1/18-cinder-horn.png"
+    ],
+    "prompt": "Use case: stylized-concept. Create a production square PNG texture atlas of FOUR seamless floor tiles, 2 columns and 2 rows, exactly equal square cells, edge-to-edge full opaque painted pixels in every cell, no gutter, no border or gaps, no text. Reference for volcanic rock palette and painted pixel style only. TOP-DOWN orthographic flat surface, no perspective bevel, no cube or objects, no room or walls. Each cell is a full floor surface continuing naturally at edges. Broad subtle readable hand-painted pixel clusters, not high-contrast noisy gravel. Big plates of cooled brown-black lava basalt, muted gray highlights, restrained orange seams. Four variants: unbroken quiet irregular broad rock, alternate plain broad plates, one narrow dim molten crack, pale ash dust at one border. Avoid regular checkerboards.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-b250e1ce-46ff-46bc-9beb-4e1dfc61dfa8.png",
+    "mode": "built-in image_gen",
+    "file": "floors-18.png"
+  },
+  {
+    "id": "props-18",
+    "kind": "props",
+    "floor": 18,
+    "references": [
+      "C:/chari-dungeon-release-final/art/volcano-concepts-floors16-20-v1/18-cinder-horn.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production RPG transparent PNG sprite atlas, SIX independent environmental sprites, strict 3 columns by 2 rows of equal square cells, landscape 3:2 canvas. Reference for the exact approved volcanic material, palette and object designs only. Top-down RPG camera showing top and low front faces, not isometric diamond. Each sprite entirely inside its cell with 14% transparent padding. Walls are ONE tile-wide cluster, squat low boulders, wider than tall, no huge cliff face. Consistent light from upper-left, crisp rich painted pixel clusters matching reference. Do not draw a room, background, floor, title, letters, border, grid, labels, extra objects, strong shadows or large fire effects. Real transparent background. The SIX sprites in READING ORDER are: Top row: 1 low horizontal layered black basalt boulder wall with gray upper facets, 2 alternate low wall with fine orange seams, 3 low black obsidian shard cluster. Bottom row: 4 shallow glowing lava bowl of black rock, 5 squat charred lava tree stump, 6 low horn-shaped volcanic stone altar.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-a4c398d0-39f3-405f-a889-0532c4bdb6ea.png",
+    "mode": "built-in image_gen",
+    "file": "props-18.png"
+  },
+  {
+    "id": "boss-19",
+    "kind": "boss",
+    "floor": 19,
+    "name": "灰燼の大鎌使い",
+    "references": [
+      "C:/chari-dungeon-release-final/art/volcano-concepts-floors16-20-v1/19-ash-reaper.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production transparent PNG FOUR-DIRECTION MONSTER SPRITE SHEET for Chari Dungeon top-down RPG. Reference is design identity/style, NOT a backdrop. Create only the monster described, precisely FOUR entire drawings in equal 2x2 SQUARE grid. Reading order upper-left DOWN/front, upper-right LEFT profile, lower-left RIGHT profile, lower-right UP/true back. SAME creature size, SAME feet baseline and same calm standing pose in all cells; unique correct views, no sideways mirroring of front. Detailed hand-painted chunky pixel art with crisp stepped silhouettes matching the reference game, readable when reduced to 120 pixels. Generous transparent 12% margin within each cell, separate cells, no overlap. No room, floor, ground shadow, UI, text, label, frame, grid, particles or aura. Real transparent background. A humanoid skeleton with charcoal black burnt bones, warm ash highlights, glowing orange joints and eye sockets, visible ribcage containing a small furnace ember core, large black iron scythe with thin molten red-orange cutting edge, short sparse ragged ash-gray cloth. Front, left profile, right profile, true rear. Clearly skeleton not a knight.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-8d8f7436-f61f-4984-aed4-e536a6feaeb0.png",
+    "mode": "built-in image_gen",
+    "file": "boss-19.png"
+  },
+  {
+    "id": "floors-19",
+    "kind": "floor",
+    "floor": 19,
+    "references": [
+      "C:/chari-dungeon-release-final/art/volcano-concepts-floors16-20-v1/19-ash-reaper.png"
+    ],
+    "prompt": "Use case: stylized-concept. Create a production square PNG texture atlas of FOUR seamless floor tiles, 2 columns and 2 rows, exactly equal square cells, edge-to-edge full opaque painted pixels in every cell, no gutter, no border or gaps, no text. Reference for volcanic rock palette and painted pixel style only. TOP-DOWN orthographic flat surface, no perspective bevel, no cube or objects, no room or walls. Each cell is a full floor surface continuing naturally at edges. Broad subtle readable hand-painted pixel clusters, not high-contrast noisy gravel. Dark basalt plates with cool-neutral gray volcanic ash powder, quiet broad shading. Four floor variants: plain ashy basalt, alternate plain worn slabs, one very fine dim ember fissure, sparse small scattered charred bone fragments near one edge. No central magic circle.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-f12961d1-b4a3-4d5f-a1d3-93fadc736416.png",
+    "mode": "built-in image_gen",
+    "file": "floors-19.png"
+  },
+  {
+    "id": "props-19",
+    "kind": "props",
+    "floor": 19,
+    "references": [
+      "C:/chari-dungeon-release-final/art/volcano-concepts-floors16-20-v1/19-ash-reaper.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production RPG transparent PNG sprite atlas, SIX independent environmental sprites, strict 3 columns by 2 rows of equal square cells, landscape 3:2 canvas. Reference for the exact approved volcanic material, palette and object designs only. Top-down RPG camera showing top and low front faces, not isometric diamond. Each sprite entirely inside its cell with 14% transparent padding. Walls are ONE tile-wide cluster, squat low boulders, wider than tall, no huge cliff face. Consistent light from upper-left, crisp rich painted pixel clusters matching reference. Do not draw a room, background, floor, title, letters, border, grid, labels, extra objects, strong shadows or large fire effects. Real transparent background. The SIX sprites in READING ORDER are: Top row: 1 low eroded black volcanic boulder wall with ashy warm-gray upper facets, 2 alternate low boulder wall with tiny red embers between stones, 3 low burnt ribcage remnant. Bottom row: 4 squat ember funerary urn, 5 short broken obsidian gravestone, 6 low round volcanic-stone bowl altar filled with molten embers.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-cc9b1374-0647-400b-886e-537f869eee3d.png",
+    "mode": "built-in image_gen",
+    "file": "props-19.png"
+  },
+  {
+    "id": "boss-20",
+    "kind": "boss",
+    "floor": 20,
+    "name": "熔獄竜ヴァルグラド",
+    "references": [
+      "C:/Users/masam/AppData/Local/Temp/codex-clipboard-dd776ff3-14f2-4a11-b6ea-60aed6f94c82.png",
+      "C:/chari-dungeon-release-final/public/assets/monsters/directional/ice-behemoth-directions-v1.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production transparent PNG FOUR-DIRECTION MONSTER SPRITE SHEET for Chari Dungeon top-down RPG. Reference is design identity/style, NOT a backdrop. Create only the monster described, precisely FOUR entire drawings in equal 2x2 SQUARE grid. Reading order upper-left DOWN/front, upper-right LEFT profile, lower-left RIGHT profile, lower-right UP/true back. SAME creature size, SAME feet baseline and same calm standing pose in all cells; unique correct views, no sideways mirroring of front. Detailed hand-painted chunky pixel art with crisp stepped silhouettes matching the reference game, readable when reduced to 120 pixels. Generous transparent 12% margin within each cell, separate cells, no overlap. No room, floor, ground shadow, UI, text, label, frame, grid, particles or aura. Real transparent background. Create an ORIGINAL enormous ancient VOLCANIC RED DRAGON inspired by the attached screenshot's anatomy: four powerful clawed legs, two vast BAT-MEMBRANE WINGS, long muscular neck, long heavy tail, elongated snarling dragon head, swept-back golden horns and back spines, dark crimson scale armor with black volcanic ridges and sparse orange heat through chest and mouth. Menacing mature quadrupedal dragon, not cute, not bipedal Godzilla, not mechanical, no humanoid armor. Wings half-spread, standing grounded. Front/down, exact left-facing side, exact right-facing side, true rear/up showing back skull, back plates, wings and tail, no front face. ALL complete wings, tail and horns fit each cell. Low top-down RPG viewing angle matches existing game.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-9a169120-a8bc-46c8-a203-ee8995226568.png",
+    "mode": "built-in image_gen",
+    "file": "boss-20.png"
+  },
+  {
+    "id": "floors-20",
+    "kind": "floor",
+    "floor": 20,
+    "references": [
+      "C:/chari-dungeon-release-final/art/volcano-concepts-floors16-20-v1/20-magma-titan.png"
+    ],
+    "prompt": "Use case: stylized-concept. Create a production square PNG texture atlas of FOUR seamless floor tiles, 2 columns and 2 rows, exactly equal square cells, edge-to-edge full opaque painted pixels in every cell, no gutter, no border or gaps, no text. Reference for volcanic rock palette and painted pixel style only. TOP-DOWN orthographic flat surface, no perspective bevel, no cube or objects, no room or walls. Each cell is a full floor surface continuing naturally at edges. Broad subtle readable hand-painted pixel clusters, not high-contrast noisy gravel. Wide dark charcoal basalt rock plates in a final volcano boss arena, subtle old worn stone cuts with muted iron-gray highlights. Four variants: plain quiet basalt, alternate plain slabs, sparse dim lava crack, worn dark ash border. No emblem, no glowing circle, no scene.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-fc3650b4-5a43-46a9-8637-0357a45c8b32.png",
+    "mode": "built-in image_gen",
+    "file": "floors-20.png"
+  },
+  {
+    "id": "props-20",
+    "kind": "props",
+    "floor": 20,
+    "references": [
+      "C:/chari-dungeon-release-final/art/volcano-concepts-floors16-20-v1/20-magma-titan.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production RPG transparent PNG sprite atlas, SIX independent environmental sprites, strict 3 columns by 2 rows of equal square cells, landscape 3:2 canvas. Reference for the exact approved volcanic material, palette and object designs only. Top-down RPG camera showing top and low front faces, not isometric diamond. Each sprite entirely inside its cell with 14% transparent padding. Walls are ONE tile-wide cluster, squat low boulders, wider than tall, no huge cliff face. Consistent light from upper-left, crisp rich painted pixel clusters matching reference. Do not draw a room, background, floor, title, letters, border, grid, labels, extra objects, strong shadows or large fire effects. Real transparent background. The SIX sprites in READING ORDER are: Top row: 1 low dark volcanic boulder wall with one scorched iron band, 2 alternate low iron-braced volcanic boulder wall with thin molten seam, 3 squat obsidian furnace pillar with tiny orange core, keep only waist-high. Bottom row: 4 black volcanic stone anvil, 5 half-buried giant broken bronze gear low in rocks, 6 low jagged obsidian lava shrine.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-e45ed5db-8f4b-4b8a-a058-1ccf5c578ccf.png",
+    "mode": "built-in image_gen",
+    "file": "props-20.png"
+  },
+  {
+    "id": "lava",
+    "kind": "lava",
+    "references": [
+      "C:/chari-dungeon-release-final/art/volcano-concepts-floors16-20-v1/20-magma-titan.png"
+    ],
+    "prompt": "Use case: stylized-concept. One seamless square top-down lava surface tile texture for a pixel-art volcanic RPG. Edge-to-edge opaque lava surface only. Slow-looking deep orange-red molten lava with some dark red cooled crust islands and thin bright orange channels, yellow highlights very sparse. Hand-painted chunky pixel shading, subdued enough for background outside low basalt walls, similar palette to reference. No perspective, frame, border, text, objects, room, rock walls or ground shadow. Flat square seamless texture.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-431f48be-27b8-4875-b32c-2b43d1ddd5a9.png",
+    "mode": "built-in image_gen",
+    "file": "lava.png"
+  }
+]

@@ -1,0 +1,9 @@
+{
+  "key": "s_thorn_guard",
+  "name": "反撃盾ヴァイン",
+  "kind": "shield",
+  "reference": "C:\\chari-dungeon-release-final\\public\\assets\\shields\\neutral\\thorn_guard.png",
+  "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-d1ddd827-aa0f-41b9-9ea8-6f72b366ef06.png",
+  "prompt": "Use case: stylized-concept. Production transparent PNG sprite atlas of the SAME equipment item in four directional views for a small top-down RPG character to hold. Input image is a DESIGN REFERENCE: preserve this item's distinctive silhouette, colors, ornament, materials and identity (反撃盾ヴァイン). Exactly 2 by 2 grid, square canvas. Isolated item centered in each equal quadrant with generous clear padding, no overlaps. Reading order top-left FRONT/down, top-right LEFT, bottom-left RIGHT, bottom-right BACK/up. One shield. Upright in all cells: front decorated face, narrow left side/profile, narrow right side/profile, back face with leather forearm straps. Show the thickness of the rim in profiles. The back is a functional reverse of this same shield, NOT its front design. Crisp chunky pixel-art shading, clearly readable reduced to 20 game pixels, simple metal highlights. No character, hands, arms, ground, floor shadow, scene, labels, lettering, grid, border or extra objects. Transparent background.",
+  "mode": "built-in ImageGen"
+}

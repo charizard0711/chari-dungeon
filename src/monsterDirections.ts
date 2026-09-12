@@ -106,32 +106,37 @@ export const TITAN_DIRECTIONS: MonsterDirectionArt = {
 };
 
 export const FALLEN_ANGEL_DIRECTIONS: MonsterDirectionArt = {
-  monsterKey: 'm_fallen_angel', textureKey: 'fallen_angel_directions_v1',
-  path: 'assets/monsters/directional/fallen-angel-directions-v1.png', frameSize: 128, artSize: 120
+  monsterKey: 'm_fallen_angel', textureKey: 'fallen_angel_volcano_v1',
+  path: 'assets/monsters/directional/fallen-angel-volcano-v1.png', frameSize: 128, artSize: 120
 };
 
 export const PHOENIX_DIRECTIONS: MonsterDirectionArt = {
-  monsterKey: 'm_phoenix', textureKey: 'phoenix_directions_v1',
-  path: 'assets/monsters/directional/phoenix-directions-v1.png', frameSize: 128, artSize: 120
+  monsterKey: 'm_phoenix', textureKey: 'phoenix_volcano_v1',
+  path: 'assets/monsters/directional/phoenix-volcano-v1.png', frameSize: 128, artSize: 120
 };
 export const UNICORN_DIRECTIONS: MonsterDirectionArt = {
-  monsterKey: 'm_unicorn', textureKey: 'unicorn_directions_v1',
-  path: 'assets/monsters/directional/unicorn-directions-v1.png', frameSize: 128, artSize: 120
+  monsterKey: 'm_unicorn', textureKey: 'unicorn_volcano_v1',
+  path: 'assets/monsters/directional/unicorn-volcano-v1.png', frameSize: 128, artSize: 120
 };
 export const BONE_REAPER_DIRECTIONS: MonsterDirectionArt = {
-  monsterKey: 'm_bone_reaper', textureKey: 'bone_reaper_directions_v1',
-  path: 'assets/monsters/directional/bone-reaper-directions-v1.png', frameSize: 128, artSize: 120
+  monsterKey: 'm_bone_reaper', textureKey: 'bone_reaper_volcano_v1',
+  path: 'assets/monsters/directional/bone-reaper-volcano-v1.png', frameSize: 128, artSize: 120
 };
 export const ICE_BEHEMOTH_DIRECTIONS: MonsterDirectionArt = {
   monsterKey: 'm_ice_behemoth', textureKey: 'ice_behemoth_directions_v1',
   path: 'assets/monsters/directional/ice-behemoth-directions-v1.png', frameSize: 128, artSize: 120
 };
 
-export const DIRECTIONAL_MONSTERS: readonly MonsterDirectionArt[] = [EMBER_DIRECTIONS, FROST_DIRECTIONS, STORM_DIRECTIONS, BRASS_DIRECTIONS, AURELIUS_DIRECTIONS, BONE_DIRECTIONS, HYDRA_DIRECTIONS, BLACK_MAGE_DIRECTIONS, RIVAL_MALE_DIRECTIONS, RIVAL_FEMALE_DIRECTIONS, BISON_DIRECTIONS, SERAPH_DIRECTIONS, ABYSS_DIRECTIONS, ICE_KNIGHT_DIRECTIONS, THUNDER_SOVEREIGN_DIRECTIONS, TITAN_DIRECTIONS, FALLEN_ANGEL_DIRECTIONS, PHOENIX_DIRECTIONS, UNICORN_DIRECTIONS, BONE_REAPER_DIRECTIONS, ICE_BEHEMOTH_DIRECTIONS];
+export const VALGRADO_DIRECTIONS: MonsterDirectionArt = {
+  monsterKey: 'm_valgrado', textureKey: 'valgrado_directions_v1',
+  path: 'assets/monsters/directional/valgrado-directions-v1.png', frameSize: 128, artSize: 120
+};
+
+export const DIRECTIONAL_MONSTERS: readonly MonsterDirectionArt[] = [EMBER_DIRECTIONS, FROST_DIRECTIONS, STORM_DIRECTIONS, BRASS_DIRECTIONS, AURELIUS_DIRECTIONS, BONE_DIRECTIONS, HYDRA_DIRECTIONS, BLACK_MAGE_DIRECTIONS, RIVAL_MALE_DIRECTIONS, RIVAL_FEMALE_DIRECTIONS, BISON_DIRECTIONS, SERAPH_DIRECTIONS, ABYSS_DIRECTIONS, ICE_KNIGHT_DIRECTIONS, THUNDER_SOVEREIGN_DIRECTIONS, TITAN_DIRECTIONS, FALLEN_ANGEL_DIRECTIONS, PHOENIX_DIRECTIONS, UNICORN_DIRECTIONS, BONE_REAPER_DIRECTIONS, ICE_BEHEMOTH_DIRECTIONS, VALGRADO_DIRECTIONS];
 
 const FLOOR_DIRECTION_ART = [EMBER_DIRECTIONS, FROST_DIRECTIONS, STORM_DIRECTIONS, BRASS_DIRECTIONS,
   AURELIUS_DIRECTIONS, BONE_DIRECTIONS, HYDRA_DIRECTIONS, BLACK_MAGE_DIRECTIONS, RIVAL_FEMALE_DIRECTIONS,
-  BISON_DIRECTIONS, SERAPH_DIRECTIONS, ABYSS_DIRECTIONS, ICE_KNIGHT_DIRECTIONS, THUNDER_SOVEREIGN_DIRECTIONS, TITAN_DIRECTIONS, FALLEN_ANGEL_DIRECTIONS, PHOENIX_DIRECTIONS, UNICORN_DIRECTIONS, BONE_REAPER_DIRECTIONS, ICE_BEHEMOTH_DIRECTIONS];
+  BISON_DIRECTIONS, SERAPH_DIRECTIONS, ABYSS_DIRECTIONS, ICE_KNIGHT_DIRECTIONS, THUNDER_SOVEREIGN_DIRECTIONS, ICE_BEHEMOTH_DIRECTIONS, FALLEN_ANGEL_DIRECTIONS, PHOENIX_DIRECTIONS, UNICORN_DIRECTIONS, BONE_REAPER_DIRECTIONS, VALGRADO_DIRECTIONS];
 
 export function directionArtForFloor(floor: number, playerGender: 'male' | 'female' = 'male'): MonsterDirectionArt {
   if (floor === 9) return playerGender === 'male' ? RIVAL_FEMALE_DIRECTIONS : RIVAL_MALE_DIRECTIONS;

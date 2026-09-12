@@ -1,0 +1,34 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><title>16〜20階 火山の確認</title>
+<style>body{margin:16px;background:#241813;color:#f5e7d5;font:15px system-ui}button{padding:9px;margin:0 6px 8px 0}iframe{width:1000px;height:650px;border:1px solid #855b42;display:block}output{display:block;margin:8px 0}pre{white-space:pre-wrap}img{width:256px;image-rendering:pixelated}</style>
+<h1>火山のボスと部屋</h1><nav><button data-floor="16">16階・熔翼</button><button data-floor="17">17階・不死鳥</button><button data-floor="18">18階・熔角獣</button><button data-floor="19">19階・灰燼</button><button data-floor="20">20階・熔獄竜</button></nav>
+<button id="overview">部屋全体</button><button id="attack">予告と攻撃を確認</button><button id="directions">上下左右の向き</button><output>読み込み中</output><iframe title="火山の確認用ゲーム"></iframe><pre></pre>
+<script type="module">
+import {customFloorBoss} from '/src/customFloorBosses.ts';
+import {directionArtForFloor} from '/src/monsterDirections.ts';
+import {hasVolcanoTerrain} from '/src/volcanoTerrain.ts';
+if(location.hostname!=='localhost')throw Error('Local QA only');
+const iframe=document.querySelector('iframe'),out=document.querySelector('output'),report=document.querySelector('pre');let floor=20,ready=false,working=false;
+const scene=()=>iframe.contentWindow?.__game?.scene.getScene('GameScene');
+function load(n){floor=n;ready=false;out.textContent='読み込み中';report.textContent='';iframe.src=`/?qa-game&qa-floor=${n}&qa-field-arena${n===20?'&qa-boss':''}`;}
+for(const b of document.querySelectorAll('[data-floor]'))b.onclick=()=>{if(!working)load(Number(b.dataset.floor));};
+document.querySelector('#overview').onclick=()=>{if(!ready)return;const g=scene(),r=g.dungeon.bossRoom,c=g.cameras.main;c.stopFollow();c.setZoom(Math.min(c.width/((r.w+6)*32),c.height/((r.h+6)*32)));c.centerOn((r.cx+.5)*32,(r.cy+.5)*32);};
+document.querySelector('#directions').onclick=async()=>{if(!ready||working)return;working=true;const g=scene(),b=g.enemies.find(e=>e.def.isFloorBoss);const frames=[];for(const dir of ['up','down','left','right']){b.facing=dir;g.updateEnemyDirection(b);frames.push({dir,frame:b.sprite.frame.name});await new Promise(r=>setTimeout(r,700));}out.textContent=new Set(frames.map(f=>f.frame)).size===4?'PASS：4方向の絵':'FAIL：方向';report.textContent=JSON.stringify(frames,null,2);working=false;};
+document.querySelector('#attack').onclick=async()=>{
+ if(!ready||working)return;working=true;const g=scene(),b=g.enemies.find(e=>e.def.isFloorBoss),s=g.bossStates.get(b),startScale=b.sprite.scaleX;
+ const intent=g.prepareBossIntent(b,s);if(!intent){out.textContent='FAIL：攻撃の予告なし';working=false;return;}
+ const tiles=intent.tiles.map(t=>({...t})),warningCount=intent.markers.length;out.textContent='予告マスを表示中';
+ await new Promise(r=>setTimeout(r,900));
+ for(let i=0;i<4&&intent.markers.length;i++){const result=g.resolveBossIntent(b,s,intent);if(result.animation)await result.animation;}
+ g.updateVisibility();
+ const fire=g.bossHazards.filter(h=>h.kind==='fire').length;
+ const pass=warningCount>0&&fire>0&&b.sprite.scaleX===startScale&&tiles.every(t=>g.dungeon.tiles[t.y]?.[t.x]!=='wall');
+ out.textContent=(pass?'PASS':'FAIL')+'：予告・火属性攻撃・固定サイズ';report.textContent=JSON.stringify({floor,kind:s.kind,warningCount,fire,scale:startScale,afterScale:b.sprite.scaleX},null,2);working=false;
+};
+setInterval(()=>{const g=scene();if(ready||!g?.playerSprite||!g.sys.isActive()||g.floor!==floor)return;const b=g.enemies.find(e=>e.def.isFloorBoss);if(!b)return;
+ g.input.enabled=false;g.scene.get('UIScene').input.enabled=false;g.scene.get('UIScene').setOverlay('none');
+ const def=customFloorBoss(floor,g.playerGender),art=directionArtForFloor(floor);
+ const pass=b.def.key===def.key&&b.def.element==='fire'&&b.sprite.texture.key===art.textureKey&&hasVolcanoTerrain(floor)&&!g.dungeon.glacialArena;
+ out.textContent=(pass?'PASS':'FAIL')+`：${floor}階・火属性・新しい絵と地形`;
+ report.textContent=JSON.stringify({floor,name:b.def.name,art:b.sprite.texture.key,kind:g.bossStates.get(b)?.kind,props:g.dungeon.volcanoArena?.props.length??g.dungeonObjects.filter(p=>p.kind.startsWith('volcano')).length,room:g.dungeon.bossRoom},null,2);ready=true;
+},100);load(20);
+</script></html>

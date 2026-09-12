@@ -1,0 +1,378 @@
+[
+  {
+    "key": "s_iron_round",
+    "name": "黒鉄の円盾",
+    "kind": "shield",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\shields\\neutral\\iron_round.png"
+  },
+  {
+    "key": "s_mirror_silver",
+    "name": "鏡銀の盾",
+    "kind": "shield",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\shields\\neutral\\mirror_silver.png"
+  },
+  {
+    "key": "s_thorn_guard",
+    "name": "反撃盾ヴァイン",
+    "kind": "shield",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\shields\\neutral\\thorn_guard.png"
+  },
+  {
+    "key": "s_chrono_guard",
+    "name": "時守りの盾クロノス",
+    "kind": "shield",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\shields\\neutral\\chrono_guard.png"
+  },
+  {
+    "key": "s_seraph_guard",
+    "name": "聖域盾セラフィム",
+    "kind": "shield",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\shields\\neutral\\seraph_guard.png"
+  },
+  {
+    "key": "s_flame_aegis",
+    "name": "炎獄盾イグナード",
+    "kind": "shield",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\shields\\elemental\\flame_aegis.png"
+  },
+  {
+    "key": "s_tidal_aegis",
+    "name": "海淵盾ネレイア",
+    "kind": "shield",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\shields\\elemental\\tidal_aegis.png"
+  },
+  {
+    "key": "s_storm_aegis",
+    "name": "雷皇盾ヴォルテクス",
+    "kind": "shield",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\shields\\elemental\\storm_aegis.png"
+  },
+  {
+    "key": "s_frost_aegis",
+    "name": "氷城盾グレイシア",
+    "kind": "shield",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\shields\\elemental\\frost_aegis.png"
+  },
+  {
+    "key": "w_dagger_fire",
+    "name": "焔牙カグツチ",
+    "weaponType": "dagger",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\affinities\\dagger_fire.png"
+  },
+  {
+    "key": "w_dagger_water",
+    "name": "潮刃ミナヅキ",
+    "weaponType": "dagger",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\affinities\\dagger_water.png"
+  },
+  {
+    "key": "w_dagger_thunder",
+    "name": "雷針イカヅチ",
+    "weaponType": "dagger",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\affinities\\dagger_thunder.png"
+  },
+  {
+    "key": "w_dagger_ice",
+    "name": "氷晶シラユキ",
+    "weaponType": "dagger",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\affinities\\dagger_ice.png"
+  },
+  {
+    "key": "w_longsword_fire",
+    "name": "獄炎剣ヴォルガ",
+    "weaponType": "longsword",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\affinities\\longsword_fire.png"
+  },
+  {
+    "key": "w_longsword_water",
+    "name": "海淵剣ネレイス",
+    "weaponType": "longsword",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\affinities\\longsword_water.png"
+  },
+  {
+    "key": "w_longsword_thunder",
+    "name": "迅雷剣ヴァジュラ",
+    "weaponType": "longsword",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\affinities\\longsword_thunder.png"
+  },
+  {
+    "key": "w_longsword_ice",
+    "name": "凍界剣グレイシア",
+    "weaponType": "longsword",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\affinities\\longsword_ice.png"
+  },
+  {
+    "key": "w_bow_fire",
+    "name": "炎翼弓フェニクス",
+    "weaponType": "bow",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\affinities\\bow_fire.png"
+  },
+  {
+    "key": "w_bow_water",
+    "name": "蒼流弓アクエリア",
+    "weaponType": "bow",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\affinities\\bow_water.png"
+  },
+  {
+    "key": "w_bow_thunder",
+    "name": "雷鳴弓テンペスト",
+    "weaponType": "bow",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\affinities\\bow_thunder.png"
+  },
+  {
+    "key": "w_bow_ice",
+    "name": "氷月弓ルナフロスト",
+    "weaponType": "bow",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\affinities\\bow_ice.png"
+  },
+  {
+    "key": "w_dual_sword_fire",
+    "name": "双炎刃イグニス",
+    "weaponType": "dual_sword",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\affinities\\dual_sword_fire.png"
+  },
+  {
+    "key": "w_dual_sword_water",
+    "name": "双潮刃リヴァイア",
+    "weaponType": "dual_sword",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\affinities\\dual_sword_water.png"
+  },
+  {
+    "key": "w_dual_sword_thunder",
+    "name": "双雷刃ライキリ",
+    "weaponType": "dual_sword",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\affinities\\dual_sword_thunder.png"
+  },
+  {
+    "key": "w_dual_sword_ice",
+    "name": "双氷刃フロストバイト",
+    "weaponType": "dual_sword",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\affinities\\dual_sword_ice.png"
+  },
+  {
+    "key": "w_handgun_fire",
+    "name": "焔銃イグナイト",
+    "weaponType": "handgun",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\affinities\\handgun_fire.png"
+  },
+  {
+    "key": "w_handgun_water",
+    "name": "蒼銃アクアリウム",
+    "weaponType": "handgun",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\affinities\\handgun_water.png"
+  },
+  {
+    "key": "w_handgun_thunder",
+    "name": "雷銃ヴォルト",
+    "weaponType": "handgun",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\affinities\\handgun_thunder.png"
+  },
+  {
+    "key": "w_handgun_ice",
+    "name": "氷銃フロストロック",
+    "weaponType": "handgun",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\affinities\\handgun_ice.png"
+  },
+  {
+    "key": "w_iron_dagger",
+    "name": "黒鉄の短剣",
+    "weaponType": "dagger",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\iron_dagger.png"
+  },
+  {
+    "key": "w_shadow_stiletto",
+    "name": "影縫いのスティレット",
+    "weaponType": "dagger",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\shadow_stiletto.png"
+  },
+  {
+    "key": "w_sawtooth_dirk",
+    "name": "鋸刃のダーク",
+    "weaponType": "dagger",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\sawtooth_dirk.png"
+  },
+  {
+    "key": "w_moon_fang",
+    "name": "月牙の短剣",
+    "weaponType": "dagger",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\moon_fang.png"
+  },
+  {
+    "key": "w_assassin_requiem",
+    "name": "暗殺刃レクイエム",
+    "weaponType": "dagger",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\assassin_requiem.png"
+  },
+  {
+    "key": "w_soldier_blade",
+    "name": "兵士の直剣",
+    "weaponType": "longsword",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\soldier_blade.png"
+  },
+  {
+    "key": "w_knight_sword",
+    "name": "騎士剣アルディオン",
+    "weaponType": "longsword",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\knight_sword.png"
+  },
+  {
+    "key": "w_rune_saber",
+    "name": "ルーン鋼剣",
+    "weaponType": "longsword",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\rune_saber.png"
+  },
+  {
+    "key": "w_paladin_edge",
+    "name": "聖騎士剣ルミナス",
+    "weaponType": "longsword",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\paladin_edge.png"
+  },
+  {
+    "key": "w_black_oath",
+    "name": "黒誓剣モルドレッド",
+    "weaponType": "longsword",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\black_oath.png"
+  },
+  {
+    "key": "w_iron_pike",
+    "name": "鉄兵のパイク",
+    "weaponType": "lance",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\iron_pike.png"
+  },
+  {
+    "key": "w_royal_spear",
+    "name": "王衛槍レオニス",
+    "weaponType": "lance",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\royal_spear.png"
+  },
+  {
+    "key": "w_bone_lance",
+    "name": "白骨槍グレイヴ",
+    "weaponType": "lance",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\bone_lance.png"
+  },
+  {
+    "key": "w_drill_lance",
+    "name": "穿城槍ドリルギア",
+    "weaponType": "lance",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\drill_lance.png"
+  },
+  {
+    "key": "w_dragon_lance",
+    "name": "竜穿槍バハムート",
+    "weaponType": "lance",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\dragon_lance.png"
+  },
+  {
+    "key": "w_hunter_bow",
+    "name": "狩人の長弓",
+    "weaponType": "bow",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\hunter_bow.png"
+  },
+  {
+    "key": "w_composite_bow",
+    "name": "複合弓ファルコン",
+    "weaponType": "bow",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\composite_bow.png"
+  },
+  {
+    "key": "w_blackwood_bow",
+    "name": "黒檀弓ナイトレイ",
+    "weaponType": "bow",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\blackwood_bow.png"
+  },
+  {
+    "key": "w_royal_bow",
+    "name": "王弓レガリア",
+    "weaponType": "bow",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\royal_bow.png"
+  },
+  {
+    "key": "w_siege_arbalest",
+    "name": "攻城弩バリスタ",
+    "weaponType": "bow",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\siege_arbalest.png"
+  },
+  {
+    "key": "w_blackpowder_handgun",
+    "name": "黒鉄のハンドガン",
+    "weaponType": "handgun",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\blackpowder_handgun.png"
+  },
+  {
+    "key": "w_rusted_greatsword",
+    "name": "錆びた大剣",
+    "weaponType": "greatsword",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\rusted_greatsword.png"
+  },
+  {
+    "key": "w_executioner_blade",
+    "name": "断罪の処刑剣",
+    "weaponType": "greatsword",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\executioner_blade.png"
+  },
+  {
+    "key": "w_titan_cleaver",
+    "name": "巨人断ちタイタンクリーバー",
+    "weaponType": "greatsword",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\titan_cleaver.png"
+  },
+  {
+    "key": "w_holy_greatsword",
+    "name": "聖堂大剣カテドラル",
+    "weaponType": "greatsword",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\holy_greatsword.png"
+  },
+  {
+    "key": "w_grand_breaker",
+    "name": "破城大剣グランバスター",
+    "weaponType": "greatsword",
+    "kind": "weapon",
+    "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\neutral\\grand_breaker.png"
+  }
+]

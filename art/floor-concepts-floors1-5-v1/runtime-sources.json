@@ -1,0 +1,52 @@
+[
+  {
+    "floor": 1,
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-64cbdf08-f7b5-4f85-b6bd-fb80be6c8dff.png",
+    "prompt": "Generate ONE production pixel-art FLOOR atlas: exactly SIX individual square floor tiles arranged 3 columns x 2 rows. 1536x1024, every tile exactly 512 square. Reference image gives only the material and pixel style of 1F. In EACH cell draw ONE HUGE flat irregular weathered gray flagstone covering about 85% of the cell, tiny flat corner chips and a thin muted taupe grout edge, so six BIG stones total, NOT tiny brick paving. The first four cells are clean worn gray stone variations; last two have a few tiny olive moss flecks at outer edges. Strict straight overhead flat 2D, all six tiles connect on all sides with matching dark gray mortar. Flat floor surfaces, soft low contrast chunky pixel art. No walls, raised blocks, borders, gutters, labels, text or props. Opaque texture fills whole canvas. All six cells have the SAME neutral warm-gray palette, material, and brightness. No grid of small bricks within cells.",
+    "cropRows": [
+      0,
+      512,
+      1024
+    ]
+  },
+  {
+    "floor": 2,
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-b92ff97f-2add-420e-aa31-03cc53ffae14.png",
+    "prompt": "Use case: stylized-concept. Production game asset: ONE opaque floor TILESET atlas, landscape 1536x1024, exactly 3 columns by 2 rows of equal square 512x512 cells, edge to edge, zero margins and zero gutters. Input image is only a STYLE/MATERIAL REFERENCE, do not reproduce the comparison board, walls, or room. Strict flat overhead 2D camera, aligned horizontal/vertical movement grid. Carefully drawn chunky pixel-art stone shading in the same touch as the supplied dungeon concept, designed to reduce to 64x64 pixels per cell. Every cell is a different variation of the SAME floor material, not a different theme. The first four cells are quiet clean broad slabs, last two have restrained wear. Each cell has thin identical dark stone mortar at its outermost edge, so ANY of the six cells connects convincingly to ANY other cell in any direction. Stone surfaces fill the whole cell; shallow flat floor with no vertical sides, no lifted blocks, no drop shadows, no bevel that looks like a wall. Keep low contrast and calm broad shapes, sparse texture, never noisy tiny pebbles. Uniform ambient illumination, no vignette. No labels, no lettering, no border around the atlas, no walls, props, characters, holes, hazards, glow, seals or watermarks. Material for all six cells: 2F warm sandy desaturated beige limestone paving. Each cell has two broad horizontal rectangular dressed slabs with staggered middle joins, thin sandy mortar and occasional chipped corners, quiet ochre dust in two variants.",
+    "cropRows": [
+      0,
+      474,
+      980
+    ]
+  },
+  {
+    "floor": 3,
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-e5d3fd96-e97a-4053-a858-8d62303f7d5e.png",
+    "prompt": "Use case: stylized-concept. Production game asset: ONE opaque floor TILESET atlas, landscape 1536x1024, exactly 3 columns by 2 rows of equal square 512x512 cells, edge to edge, zero margins and zero gutters. Input image is only a STYLE/MATERIAL REFERENCE, do not reproduce the comparison board, walls, or room. Strict flat overhead 2D camera, aligned horizontal/vertical movement grid. Carefully drawn chunky pixel-art stone shading in the same touch as the supplied dungeon concept, designed to reduce to 64x64 pixels per cell. Every cell is a different variation of the SAME floor material, not a different theme. The first four cells are quiet clean broad slabs, last two have restrained wear. Each cell has thin identical dark stone mortar at its outermost edge, so ANY of the six cells connects convincingly to ANY other cell in any direction. Stone surfaces fill the whole cell; shallow flat floor with no vertical sides, no lifted blocks, no drop shadows, no bevel that looks like a wall. Keep low contrast and calm broad shapes, sparse texture, never noisy tiny pebbles. Uniform ambient illumination, no vignette. No labels, no lettering, no border around the atlas, no walls, props, characters, holes, hazards, glow, seals or watermarks. Material for all six cells: 3F shaded green-gray slate paving. Each cell has one broad irregular flat slab and small corner pieces. Deep muted green stone, restrained olive moss and a fine brown root in two variants only.",
+    "cropRows": [
+      0,
+      512,
+      1024
+    ]
+  },
+  {
+    "floor": 4,
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-82a7a7d0-fc57-4bda-abe5-cda61ce81fdc.png",
+    "prompt": "Use case: stylized-concept. Production game asset: ONE opaque floor TILESET atlas, landscape 1536x1024, exactly 3 columns by 2 rows of equal square 512x512 cells, edge to edge, zero margins and zero gutters. Input image is only a STYLE/MATERIAL REFERENCE, do not reproduce the comparison board, walls, or room. Strict flat overhead 2D camera, aligned horizontal/vertical movement grid. Carefully drawn chunky pixel-art stone shading in the same touch as the supplied dungeon concept, designed to reduce to 64x64 pixels per cell. Every cell is a different variation of the SAME floor material, not a different theme. The first four cells are quiet clean broad slabs, last two have restrained wear. Each cell has thin identical dark stone mortar at its outermost edge, so ANY of the six cells connects convincingly to ANY other cell in any direction. Stone surfaces fill the whole cell; shallow flat floor with no vertical sides, no lifted blocks, no drop shadows, no bevel that looks like a wall. Keep low contrast and calm broad shapes, sparse texture, never noisy tiny pebbles. Uniform ambient illumination, no vignette. No labels, no lettering, no border around the atlas, no walls, props, characters, holes, hazards, glow, seals or watermarks. Material for all six cells: 4F charcoal cool violet-gray basalt paving. Each cell has one broad angular geological slab and small corner pieces. Subtle facets, sparse shallow hairline cracks; two variants have slightly chipped edges. No lava, no glowing cracks.",
+    "cropRows": [
+      0,
+      512,
+      1024
+    ]
+  },
+  {
+    "floor": 5,
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-0c5c11d1-9753-4972-b0d9-af1ac3ab820c.png",
+    "prompt": "Generate ONE production pixel-art FLOOR atlas: exactly SIX individual square floor tiles arranged 3 columns x 2 rows. 1536x1024, every tile exactly 512 square. Reference image gives only material and pixel style of 5F. In EACH cell draw ONE HUGE smooth dressed midnight blue-gray square paving slab covering 97% of cell, with subtle broad stone facets, and thin straight dark mortar around the perimeter. Six BIG slab tiles total, no smaller bricks or subdivisions within each cell. Four cells nearly plain with faint stone wear; last two have a few short hairline shallow scratches. Quiet desaturated soft low-contrast flat stone, crisp chunky pixel shading. Strict straight overhead flat 2D floor surface, all tiles seamlessly connect on all four sides. No vertical sides, raised blocks, walls, perspective, props, margins, gutters, labels, text, gold, symbols, glow or watermarks. Opaque texture fills entire canvas.",
+    "cropRows": [
+      0,
+      512,
+      1024
+    ]
+  }
+]

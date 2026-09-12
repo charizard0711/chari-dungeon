@@ -1,0 +1,9 @@
+{
+  "key": "s_chrono_guard",
+  "name": "時守りの盾クロノス",
+  "kind": "shield",
+  "reference": "C:\\chari-dungeon-release-final\\public\\assets\\shields\\neutral\\chrono_guard.png",
+  "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-8c369e41-b271-4e48-ad94-230d02809a2e.png",
+  "prompt": "Use case: stylized-concept. Production transparent PNG sprite atlas of the SAME equipment item in four directional views for a small top-down RPG character to hold. Input image is a DESIGN REFERENCE: preserve this item's distinctive silhouette, colors, ornament, materials and identity (時守りの盾クロノス). Exactly 2 by 2 grid, square canvas. Isolated item centered in each equal quadrant with generous clear padding, no overlaps. Reading order top-left FRONT/down, top-right LEFT, bottom-left RIGHT, bottom-right BACK/up. One shield. Upright in all cells: front decorated face, narrow left side/profile, narrow right side/profile, back face with leather forearm straps. Show the thickness of the rim in profiles. The back is a functional reverse of this same shield, NOT its front design. Crisp chunky pixel-art shading, clearly readable reduced to 20 game pixels, simple metal highlights. No character, hands, arms, ground, floor shadow, scene, labels, lettering, grid, border or extra objects. Transparent background.",
+  "mode": "built-in ImageGen"
+}

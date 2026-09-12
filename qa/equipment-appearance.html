@@ -1,0 +1,64 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><title>装備の4方向チェック</title>
+<style>body{margin:20px;background:#11212a;color:#e3edef;font:15px system-ui}label{display:inline-block;margin:0 14px 12px 0}select,button{padding:8px;background:#243944;color:inherit;border:1px solid #67848e}canvas{display:block}pre{white-space:pre-wrap}a{color:#9edfe8}</style>
+<h1>武器・服・盾の組み合わせ</h1>
+<label>キャラ <select id="gender"><option value="female">女</option><option value="male">男</option></select></label>
+<label>服 <select id="armor"></select></label><label>武器 <select id="weapon"></select></label><label>盾 <select id="shield"></select></label>
+<button id="walk">歩行を切り替え</button><button id="check">全装備の描画を確認</button>
+<p>上段：待機・歩行　下段：攻撃　／　正面・左・右・後ろ</p><output>読み込み中</output><div id="preview"></div><pre></pre>
+<script type="module">
+import Phaser from 'phaser';
+import {EquipmentRenderer} from '/src/equipmentRenderer.ts';
+import {HELD_EQUIPMENT,HELD_DIRECTION_FRAME} from '/src/equipmentAppearance.ts';
+import {PLAYER_SHEETS,PLAYER_ARMOR_DEFS,playerSheetKey,playerFrameIndex} from '/src/playerAppearance.ts';
+import {WEAPON_DEFS,SHIELD_DEFS} from '/src/data.ts';
+import {makeWeapon,makeShield} from '/src/player.ts';
+import jobs from '/art/equipment-directions-v1/jobs.json';
+if(location.hostname!=='localhost')throw new Error('Local QA only');
+const available=import.meta.glob('/public/assets/equipment/directional/*.png',{eager:true,query:'?url',import:'default'});
+const els=Object.fromEntries(['gender','armor','weapon','shield'].map(id=>[id,document.querySelector('#'+id)]));
+function options(el,defs){for(const d of defs){const o=document.createElement('option');o.value=d.key;o.textContent=d.name;el.append(o);}}
+options(els.armor,Object.values(PLAYER_ARMOR_DEFS));options(els.weapon,WEAPON_DEFS);options(els.shield,[{key:'none',name:'なし'},...SHIELD_DEFS]);
+els.weapon.value='w_soldier_blade';els.shield.value='s_iron_round';
+const out=document.querySelector('output'),report=document.querySelector('pre');let walking=false;
+class Preview extends Phaser.Scene {
+  preload(){
+    for(const s of PLAYER_SHEETS)this.load.spritesheet(s.key,'/'+s.path,{frameWidth:40,frameHeight:40});
+    for(const job of jobs)this.load.image(job.key,'/'+job.reference.split('public\\')[1].replaceAll('\\','/'));
+    for(const a of HELD_EQUIPMENT)if(available['/public/'+a.path])this.load.spritesheet(a.textureKey,'/'+a.path,{frameWidth:64,frameHeight:64});
+  }
+  create(){
+    this.actors=[];
+    for(let row=0;row<2;row++)for(const [col,dir]of['down','left','right','up'].entries()){
+      const x=120+col*225,y=115+row*210;
+      this.add.rectangle(x,y,200,190,0x24343c).setStrokeStyle(1,0x405c68);
+      this.add.text(x,y-88,['正面','左','右','後ろ'][col],{fontSize:14,color:'#a3c7ce'}).setOrigin(.5);
+      const body=this.add.image(x,y+5,playerSheetKey('female','leather'),0).setScale(3.5).setOrigin(.5,.6).setDepth(10);
+      this.actors.push({body,gear:new EquipmentRenderer(this),dir,attack:row===1});
+    }
+    for(const el of Object.values(els))el.onchange=()=>this.refresh();
+    document.querySelector('#walk').onclick=()=>walking=!walking;
+    document.querySelector('#check').onclick=()=>this.checkAll();
+    this.refresh();
+  }
+  refresh(){this.weapon=makeWeapon(els.weapon.value,[]);this.shield=els.shield.value==='none'?null:makeShield(els.shield.value);this.gender=els.gender.value;this.armor=els.armor.value;
+    out.textContent=[this.weapon,this.shield].filter(Boolean).every(i=>this.textures.exists('held_'+i.key))?'準備完了：4方向の装備絵を表示':'絵を作成中の装備があります';}
+  update(time){if(!this.actors)return;for(const a of this.actors){
+    const cycle=time%1100,frame=a.attack?(cycle<350?'idle':cycle<500?'atkWindup':cycle<850?'atk':'idle'):(walking?['walk1','walk2','walk3'][Math.floor(time/170)%3]:'idle');
+    const mirror=a.dir==='left'&&(frame==='atk'||frame==='atkWindup');
+    a.body.setTexture(playerSheetKey(this.gender,this.armor),playerFrameIndex(mirror?'right':a.dir,frame)).setFlipX(mirror);
+    a.gear.update(a.body,this.weapon,this.shield,a.dir,frame,this.gender,frame==='atk'?cycle-500:cycle-350);
+  }}
+  checkAll(){const missing=HELD_EQUIPMENT.filter(a=>!this.textures.exists(a.textureKey)).map(a=>a.itemKey);let checks=0;const a=this.actors[0];
+    for(const gender of ['male','female'])for(const armor of Object.keys(PLAYER_ARMOR_DEFS))for(const w of WEAPON_DEFS)for(const s of [null,...SHIELD_DEFS])for(const dir of ['down','left','right','up']){
+      const weapon=makeWeapon(w.key,[]),shield=s?makeShield(s.key):null;
+      a.body.setTexture(playerSheetKey(gender,armor),playerFrameIndex(dir,'idle'));
+      a.gear.update(a.body,weapon,shield,dir,'idle',gender);
+      if(!a.gear.weapon.visible||a.gear.offhand.visible!==Boolean(w.dual||s))throw new Error('Equipment visibility mismatch');
+      if(this.textures.exists('held_'+w.key)&&Number(a.gear.weapon.frame.name)!==HELD_DIRECTION_FRAME[dir])throw new Error('Wrong direction');
+      checks++;
+    }
+    out.textContent=missing.length?'未完成の絵あり':'PASS：全装備・服・性別・4方向を描画';report.textContent=JSON.stringify({checks,missing,spritesPerActor:2},null,2);
+  }
+}
+new Phaser.Game({type:Phaser.AUTO,width:915,height:440,parent:'preview',backgroundColor:'#11212a',pixelArt:true,scene:Preview,audio:{noAudio:true}});
+</script></html>

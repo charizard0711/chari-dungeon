@@ -1,0 +1,10 @@
+{
+  "key": "w_handgun_water",
+  "name": "蒼銃アクアリウム",
+  "weaponType": "handgun",
+  "kind": "weapon",
+  "reference": "C:\\chari-dungeon-release-final\\public\\assets\\weapons\\affinities\\handgun_water.png",
+  "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-03be9ecc-3f04-4f8b-90cf-0d12b1d17c79.png",
+  "prompt": "Use case: stylized-concept. Production transparent PNG sprite atlas of the SAME equipment item in four directional views for a small top-down RPG character to hold. Input image is a DESIGN REFERENCE: preserve this item's distinctive silhouette, colors, ornament, materials and identity (蒼銃アクアリウム). Exactly 2 by 2 grid, square canvas. Isolated item centered in each equal quadrant with generous clear padding, no overlaps. Reading order top-left FRONT/down, top-right LEFT, bottom-left RIGHT, bottom-right BACK/up. One fantasy handgun. Front/down view with muzzle foreshortened toward camera, full left-pointing side profile, full right-pointing side profile, back/up view with barrel pointing away. Trigger grip sits toward lower center, at consistent height. Preserve barrel and grip shapes. Crisp chunky pixel-art shading, clearly readable reduced to 20 game pixels, simple metal highlights. No character, hands, arms, ground, floor shadow, scene, labels, lettering, grid, border or extra objects. Transparent background.",
+  "mode": "built-in ImageGen"
+}
