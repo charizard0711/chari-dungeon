@@ -1,0 +1,35 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs'), path = require('node:path'), ts = require('typescript'), vm = require('node:vm');
+const root = path.resolve(__dirname, '..'), cache = new Map();
+function load(file) {
+  file = path.resolve(root, file);
+  if (cache.has(file)) return cache.get(file).exports;
+  const m = {exports:{}}; cache.set(file,m);
+  const js = ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
+  vm.runInThisContext(`(function(require,module,exports){${js}\n})`,{filename:file})(name=>name.startsWith('.')?load(path.resolve(path.dirname(file),name+'.ts')):require(name),m,m.exports);
+  return m.exports;
+}
+const {PlayerAnimation}=load('src/playerAnimation.ts');
+const {PLAYER_VISUAL_FRAMES,PLAYER_SHEETS,playerFrameIndex}=load('src/playerAppearance.ts');
+const frames=[];
+for(const dir of ['down','left','right','up'])for(const frame of PLAYER_VISUAL_FRAMES)frames.push(playerFrameIndex(dir,frame));
+assert.deepEqual(frames,Array.from({length:64},(_,i)=>i));
+assert.equal(new Set(PLAYER_SHEETS.map(s=>s.path)).size,10);
+const a=new PlayerAnimation();
+assert.equal(a.sample(0),'idle'); assert.equal(a.sample(1100),'idle2');assert.equal(a.sample(1800),'idle');
+a.walkFrameMs=40;a.play('walk1',2000);
+assert.deepEqual([0,40,80,120,160,200,240].map(t=>a.sample(2000+t)),['walk1','walk2','walk3','walk4','walk5','walk6','walk1']);
+a.play('idle',2100);a.play('walk1',2140);
+assert.equal(a.sample(2160),'walk4','a quick next tile must continue the gait, not restart the same leg');
+a.play('idle',2200);a.play('walk1',3000);assert.equal(a.sample(3000),'walk1','a fresh step starts with a contact pose');
+a.play('atkWindup',3100);assert.equal(a.sample(3100),'atkWindup');assert.equal(a.sample(3129),'atkWindup2');
+a.play('atk',3158);
+assert.deepEqual([0,26,52,78,1000].map(t=>a.sample(3158+t)),['atk','atk2','atkFollow','atkRecover','atkRecover']);
+a.play('hurt',3300);assert.equal(a.sample(3400),'hurt','an interrupted attack cannot reappear');
+a.play('down',3400);assert.equal(a.sample(8000),'down');
+a.play('idle',9000);assert.equal(a.sample(9000),'idle','revival and scene restart must restore neutral pose');
+const source=fs.readFileSync(path.join(root,'src/scenes/GameScene.ts'),'utf8');
+assert.ok(!source.includes('mirrorAttack'),'all attacks must use their own directional cells');
+assert.ok(!source.includes('walkFrames[(this.stepFrame'),'no delayed gait callback may overwrite a newer action');
+assert.ok(!source.includes('ps.scaleX = 0.85'),'idle must use drawings instead of body scaling');
+console.log('PASS: 64 unique directional poses, ten costume atlases, six-step continuous gait, idle/attack/hurt/death transitions, no stale animation callbacks or mirrored attacks.');

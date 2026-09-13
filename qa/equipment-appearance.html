@@ -9,7 +9,8 @@
 import Phaser from 'phaser';
 import {EquipmentRenderer} from '/src/equipmentRenderer.ts';
 import {HELD_EQUIPMENT,HELD_DIRECTION_FRAME} from '/src/equipmentAppearance.ts';
-import {PLAYER_SHEETS,PLAYER_ARMOR_DEFS,playerSheetKey,playerFrameIndex} from '/src/playerAppearance.ts';
+import {PLAYER_SHEETS,PLAYER_ARMOR_DEFS,PLAYER_FRAME_SIZE,playerSheetKey,playerFrameIndex} from '/src/playerAppearance.ts';
+import {PlayerAnimation} from '/src/playerAnimation.ts';
 import {WEAPON_DEFS,SHIELD_DEFS} from '/src/data.ts';
 import {makeWeapon,makeShield} from '/src/player.ts';
 import jobs from '/art/equipment-directions-v1/jobs.json';
@@ -22,7 +23,7 @@ els.weapon.value='w_soldier_blade';els.shield.value='s_iron_round';
 const out=document.querySelector('output'),report=document.querySelector('pre');let walking=false;
 class Preview extends Phaser.Scene {
   preload(){
-    for(const s of PLAYER_SHEETS)this.load.spritesheet(s.key,'/'+s.path,{frameWidth:40,frameHeight:40});
+    for(const s of PLAYER_SHEETS)this.load.spritesheet(s.key,'/'+s.path,{frameWidth:PLAYER_FRAME_SIZE,frameHeight:PLAYER_FRAME_SIZE});
     for(const job of jobs)this.load.image(job.key,'/'+job.reference.split('public\\')[1].replaceAll('\\','/'));
     for(const a of HELD_EQUIPMENT)if(available['/public/'+a.path])this.load.spritesheet(a.textureKey,'/'+a.path,{frameWidth:64,frameHeight:64});
   }
@@ -32,8 +33,8 @@ class Preview extends Phaser.Scene {
       const x=120+col*225,y=115+row*210;
       this.add.rectangle(x,y,200,190,0x24343c).setStrokeStyle(1,0x405c68);
       this.add.text(x,y-88,['正面','左','右','後ろ'][col],{fontSize:14,color:'#a3c7ce'}).setOrigin(.5);
-      const body=this.add.image(x,y+5,playerSheetKey('female','leather'),0).setScale(3.5).setOrigin(.5,.6).setDepth(10);
-      this.actors.push({body,gear:new EquipmentRenderer(this),dir,attack:row===1});
+      const body=this.add.image(x,y+5,playerSheetKey('female','leather'),0).setDisplaySize(172.8,172.8).setOrigin(.5,.6).setDepth(10);
+      this.actors.push({body,gear:new EquipmentRenderer(this),dir,attack:row===1,animation:new PlayerAnimation(),phase:-1});
     }
     for(const el of Object.values(els))el.onchange=()=>this.refresh();
     document.querySelector('#walk').onclick=()=>walking=!walking;
@@ -43,10 +44,11 @@ class Preview extends Phaser.Scene {
   refresh(){this.weapon=makeWeapon(els.weapon.value,[]);this.shield=els.shield.value==='none'?null:makeShield(els.shield.value);this.gender=els.gender.value;this.armor=els.armor.value;
     out.textContent=[this.weapon,this.shield].filter(Boolean).every(i=>this.textures.exists('held_'+i.key))?'準備完了：4方向の装備絵を表示':'絵を作成中の装備があります';}
   update(time){if(!this.actors)return;for(const a of this.actors){
-    const cycle=time%1100,frame=a.attack?(cycle<350?'idle':cycle<500?'atkWindup':cycle<850?'atk':'idle'):(walking?['walk1','walk2','walk3'][Math.floor(time/170)%3]:'idle');
-    const mirror=a.dir==='left'&&(frame==='atk'||frame==='atkWindup');
-    a.body.setTexture(playerSheetKey(this.gender,this.armor),playerFrameIndex(mirror?'right':a.dir,frame)).setFlipX(mirror);
-    a.gear.update(a.body,this.weapon,this.shield,a.dir,frame,this.gender,frame==='atk'?cycle-500:cycle-350);
+    const cycle=time%1100,phase=a.attack?(cycle<350?0:cycle<408?1:cycle<590?2:3):(walking?4:0);
+    if(phase!==a.phase){a.animation.play(phase===1?'atkWindup':phase===2?'atk':phase===4?'walk1':'idle',time);a.phase=phase;}
+    const frame=a.animation.sample(time);
+    a.body.setTexture(playerSheetKey(this.gender,this.armor),playerFrameIndex(a.dir,frame)).setFlipX(false);
+    a.gear.update(a.body,this.weapon,this.shield,a.dir,frame,this.gender,time-a.animation.since);
   }}
   checkAll(){const missing=HELD_EQUIPMENT.filter(a=>!this.textures.exists(a.textureKey)).map(a=>a.itemKey);let checks=0;const a=this.actors[0];
     for(const gender of ['male','female'])for(const armor of Object.keys(PLAYER_ARMOR_DEFS))for(const w of WEAPON_DEFS)for(const s of [null,...SHIELD_DEFS])for(const dir of ['down','left','right','up']){
@@ -60,5 +62,5 @@ class Preview extends Phaser.Scene {
     out.textContent=missing.length?'未完成の絵あり':'PASS：全装備・服・性別・4方向を描画';report.textContent=JSON.stringify({checks,missing,spritesPerActor:2},null,2);
   }
 }
-new Phaser.Game({type:Phaser.AUTO,width:915,height:440,parent:'preview',backgroundColor:'#11212a',pixelArt:true,scene:Preview,audio:{noAudio:true}});
+new Phaser.Game({type:Phaser.AUTO,width:915,height:440,parent:'preview',backgroundColor:'#11212a',pixelArt:false,antialias:true,scene:Preview,audio:{noAudio:true}});
 </script></html>

@@ -1,0 +1,49 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>新しい冒険者の動き</title>
+<style>body{margin:0;padding:24px;background:#13202a;color:#ecede4;font:15px system-ui}main{max-width:980px;margin:auto}h1{font-size:26px;margin:0 0 8px}p{color:#b7c6cc;line-height:1.6}label{display:inline-flex;gap:7px;align-items:center;margin:0 12px 12px 0}select,button,input{font:inherit;background:#233643;color:#fff;border:1px solid #4b6877;border-radius:7px;padding:8px}button{cursor:pointer}canvas{width:100%;height:auto;display:block}output{display:block;padding:12px 0;color:#a4e3c8}a{color:#a3d6eb}pre{white-space:pre-wrap}</style>
+<main><h1>新しい冒険者の動き</h1><p>手描きの輪郭と控えめな陰影。歩く・攻撃する・振り向く動きを、男女それぞれ4方向で確認できます。</p>
+<label>服<select id="armor"></select></label><label>動き<select id="action"><option value="walk">歩く</option><option value="idle">待機</option><option value="attack">攻撃</option><option value="hurt">被弾</option><option value="down">倒れる</option><option value="all">全コマ</option></select></label>
+<label>武器<select id="weapon"></select></label><label>盾<select id="shield"></select></label><label>速さ<select id="speed"><option value="1">通常</option><option value="0.5">ゆっくり</option><option value="1.5">速い</option></select></label>
+<button id="pause">一時停止</button> <button id="next">次のコマ</button> <button id="check">全コマを検査</button>
+<output id="status">読み込み中…</output><div id="preview"></div><p>上段：男性　下段：女性　｜　左から 正面・左向き・右向き・後ろ向き</p>
+<a href="/?qa-game&qa-floor=1&qa-field-arena&qa-gender=male">男性で1階を開く</a>　<a href="/?qa-game&qa-floor=1&qa-field-arena&qa-gender=female">女性で1階を開く</a><pre id="report"></pre></main>
+<script type="module">
+import Phaser from 'phaser';
+import {PLAYER_SHEETS,PLAYER_ARMOR_DEFS,PLAYER_FRAME_SIZE,PLAYER_VISUAL_FRAMES,playerSheetKey,playerFrameIndex} from '/src/playerAppearance.ts';
+import {PlayerAnimation} from '/src/playerAnimation.ts';
+import {EquipmentRenderer} from '/src/equipmentRenderer.ts';
+import {HELD_EQUIPMENT} from '/src/equipmentAppearance.ts';
+import {WEAPON_DEFS,SHIELD_DEFS} from '/src/data.ts';
+import {makeWeapon,makeShield} from '/src/player.ts';
+const els=Object.fromEntries(['armor','action','weapon','shield','speed','status','pause','next','check','report'].map(id=>[id,document.getElementById(id)]));
+function options(el,defs){for(const d of defs){const o=document.createElement('option');o.value=d.key;o.textContent=d.name;el.append(o);}}
+options(els.armor,Object.values(PLAYER_ARMOR_DEFS));options(els.weapon,[{key:'none',name:'なし'},...WEAPON_DEFS]);options(els.shield,[{key:'none',name:'なし'},...SHIELD_DEFS]);
+els.weapon.value='w_soldier_blade';els.shield.value='s_iron_round';
+const available=import.meta.glob('/public/assets/characters/player-painted-v1/*.png',{eager:true,query:'?url',import:'default'});
+let paused=false,clock=0,manual=0,lastPhase=-1;
+class Preview extends Phaser.Scene{
+ preload(){for(const s of PLAYER_SHEETS)if(available['/public/'+s.path])this.load.spritesheet(s.key,'/'+s.path,{frameWidth:PLAYER_FRAME_SIZE,frameHeight:PLAYER_FRAME_SIZE});for(const s of HELD_EQUIPMENT)this.load.spritesheet(s.textureKey,'/'+s.path,{frameWidth:64,frameHeight:64});}
+ create(){this.actors=[];this.animation=new PlayerAnimation();this.animation.walkFrameMs=65;this.animation.play('walk1',0);
+  for(let row=0;row<2;row++)for(const [col,dir] of ['down','left','right','up'].entries()){
+   const x=110+col*235,y=230+row*260;
+   this.add.rectangle(x,y-30,216,225,0x25363e).setStrokeStyle(1,0x405760);
+   this.add.ellipse(x,y+67,90,20,0x07151d,.45);
+   this.add.text(x,y-128,['正面','左','右','後ろ'][col],{fontFamily:'sans-serif',fontSize:14,color:'#a6c5c9'}).setOrigin(.5);
+   const gender=row?'female':'male',body=this.add.image(x,y,playerSheetKey('male'),0).setOrigin(.5,.6).setDisplaySize(230.4,230.4).setDepth(10);
+   this.actors.push({gender,dir,body,gear:new EquipmentRenderer(this)});
+  }
+  for(const id of ['armor','action','weapon','shield','speed'])els[id].onchange=()=>this.refresh();
+  els.pause.onclick=()=>{paused=!paused;els.pause.textContent=paused?'再生':'一時停止';};
+  els.next.onclick=()=>{paused=true;els.pause.textContent='再生';els.action.value='all';manual=(manual+1)%16;this.render(PLAYER_VISUAL_FRAMES[manual]);};
+  els.check.onclick=()=>this.check();this.refresh();
+ }
+ refresh(){this.weapon=els.weapon.value==='none'?null:makeWeapon(els.weapon.value,[]);this.shield=els.shield.value==='none'?null:makeShield(els.shield.value);clock=0;lastPhase=-1;this.animation=new PlayerAnimation();this.animation.walkFrameMs=65;this.animation.play(els.action.value==='walk'?'walk1':els.action.value==='attack'?'idle':els.action.value==='all'?'idle':els.action.value,0);}
+ render(frame){for(const a of this.actors){const key=playerSheetKey(a.gender,els.armor.value),ready=this.textures.exists(key);a.body.setVisible(ready);if(ready)a.body.setTexture(key,playerFrameIndex(a.dir,frame)).setFlipX(false);a.gear.update(a.body,this.weapon,this.shield,a.dir,frame,a.gender,Math.max(0,clock-this.animation.since),ready);}this.currentFrame=frame;}
+ update(_time,delta){if(!this.actors)return;if(!paused){clock+=Math.min(delta,100)*Number(els.speed.value);const action=els.action.value;if(action==='attack'){const cycle=clock%1000,phase=cycle<300?0:cycle<358?1:cycle<540?2:3;if(phase!==lastPhase){this.animation.play(phase===1?'atkWindup':phase===2?'atk':'idle',clock);lastPhase=phase;}}this.render(action==='all'?PLAYER_VISUAL_FRAMES[Math.floor(clock/180)%16]:this.animation.sample(clock));}
+  els.status.textContent=`${this.currentFrame||'idle'} ／ ${Math.round(this.game.loop.actualFps)} fps ／ 読み込み ${PLAYER_SHEETS.filter(s=>this.textures.exists(s.key)).length}/10 着`;
+ }
+ check(){const missing=PLAYER_SHEETS.filter(s=>!this.textures.exists(s.key)).map(s=>s.key);let checks=0;for(const s of PLAYER_SHEETS){if(missing.includes(s.key))continue;const texture=this.textures.get(s.key);for(let n=0;n<64;n++){if(!texture.has(n))throw new Error('Missing frame '+s.key+'/'+n);checks++;}}
+  els.report.textContent=JSON.stringify({result:missing.length?'未完成の絵があります':'PASS',checkedFrames:checks,missing,cellSize:PLAYER_FRAME_SIZE,drawingsPerDirection:16,equipmentSpritesPerActor:2},null,2);
+ }
+}
+new Phaser.Game({type:Phaser.AUTO,width:925,height:610,parent:'preview',backgroundColor:'#13202a',pixelArt:false,antialias:true,roundPixels:false,audio:{noAudio:true},scene:Preview});
+</script></html>

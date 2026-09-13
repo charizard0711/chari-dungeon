@@ -7,9 +7,12 @@ export const PLAYER_ARMORS = ['leather', 'chain', 'plate', 'arcane', 'dragon'] a
 export type PlayerArmor = typeof PLAYER_ARMORS[number];
 
 export const PLAYER_VISUAL_FRAMES = [
-  'idle', 'walk1', 'walk2', 'walk3', 'atkWindup', 'atk', 'hurt', 'down'
+  'idle', 'idle2', 'walk1', 'walk2', 'walk3', 'walk4', 'walk5', 'walk6',
+  'atkWindup', 'atkWindup2', 'atk', 'atk2', 'atkFollow', 'atkRecover', 'hurt', 'down'
 ] as const;
 export type PlayerVisualFrame = typeof PLAYER_VISUAL_FRAMES[number];
+export const PLAYER_FRAME_SIZE = 96;
+export const PLAYER_WORLD_SCALE = 43.52 / PLAYER_FRAME_SIZE;
 
 export const DEFAULT_PLAYER_GENDER: PlayerGender = 'male';
 export const DEFAULT_PLAYER_ARMOR: PlayerArmor = 'leather';
@@ -38,7 +41,7 @@ export const PLAYER_SHEETS = PLAYER_GENDERS.flatMap((gender) =>
     gender,
     armor,
     key: playerSheetKey(gender, armor),
-    path: `assets/characters/player/${gender}-${armor}.png`
+    path: `assets/characters/player-painted-v1/${gender}-${armor}.png`
   }))
 );
 

@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { HELD_DIRECTION_FRAME, HELD_EQUIPMENT_KEYS, heldArtSize, heldGrip, heldHandPose } from './equipmentAppearance';
 import type { Dir, Shield, Weapon } from './types';
-import type { PlayerGender, PlayerVisualFrame } from './playerAppearance';
+import { PLAYER_FRAME_SIZE, type PlayerGender, type PlayerVisualFrame } from './playerAppearance';
 
 /** Two persistent sprites; no combined textures or animation-frame generation at runtime. */
 export class EquipmentRenderer {
@@ -22,11 +22,15 @@ export class EquipmentRenderer {
       const hasArt = this.scene.textures.exists(key), texture = hasArt ? key : item.key;
       const artFrame = hasArt ? HELD_DIRECTION_FRAME[dir] : undefined;
       if (sprite.texture.key !== texture || (hasArt && String(sprite.frame.name) !== String(artFrame))) sprite.setTexture(texture,artFrame);
-      const pose = heldHandPose(dir,frame,gender,offhand,elapsed,type);
-      const dx = (pose.x - body.originX * 40) * body.scaleX, dy = (pose.y - body.originY * 40) * body.scaleY;
+      const pose = heldHandPose(dir,frame,gender,offhand,elapsed,type,body.texture.key);
+      // Hand anchors use a 40-unit art space, independent of atlas resolution.
+      const frameSize = body.frame.realWidth || PLAYER_FRAME_SIZE;
+      const artScale = frameSize / 40;
+      const dx = (pose.x - body.originX * 40) * body.scaleX * artScale;
+      const dy = (pose.y - body.originY * 40) * body.scaleY * artScale;
       const cosine = Math.cos(body.rotation), sine = Math.sin(body.rotation);
       const [ox,oy] = hasArt ? heldGrip(type,dir) : [.5,.65];
-      const size = heldArtSize(type) * Math.abs(body.scaleY) / .85;
+      const size = heldArtSize(type) * Math.abs(body.scaleY) * artScale / .85;
       sprite.setVisible(true).setOrigin(ox,oy).setPosition(body.x + dx*cosine - dy*sine,body.y + dx*sine + dy*cosine)
         .setDisplaySize(size,size).setRotation(body.rotation + pose.angle).setFlipX(!!weapon?.dual && offhand && (dir === 'down' || dir === 'up'))
         .setDepth(body.depth + pose.depth).setAlpha(body.alpha).clearTint();

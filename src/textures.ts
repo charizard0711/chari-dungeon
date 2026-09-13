@@ -562,17 +562,13 @@ function buildItemTextures(scene: Phaser.Scene) {
       // 消えかけのきらめき
       px(g, 15, 10, 1, 3, 0xffffff, 0.8); px(g, 14, 11, 3, 1, 0xffffff, 0.8);
     },
-    // 疾風の羽：水色の羽＋風のライン
-    dash: (g) => {
-      g.fillStyle(0x6fd0ff);
-      g.fillTriangle(5, 19, 19, 3, 15, 19);
-      g.fillStyle(0xbfe8ff);
-      g.fillTriangle(8, 18, 18, 5, 15, 18);
-      g.fillStyle(0xffffff, 0.9);
-      g.fillTriangle(11, 17, 17, 8, 15, 17);
-      g.lineStyle(1.5, 0x9fe8ff, 0.8);
-      g.beginPath(); g.moveTo(3, 8); g.lineTo(9, 8); g.strokePath();
-      g.beginPath(); g.moveTo(2, 12); g.lineTo(7, 12); g.strokePath();
+    // 原画を読み込めない場合の修復石アイコン。
+    repair: (g) => {
+      g.fillStyle(0x348cae); g.fillTriangle(3, 15, 10, 2, 21, 16);
+      g.fillStyle(0x72e8e2); g.fillTriangle(10, 2, 10, 21, 21, 16);
+      g.fillStyle(0xd3ae63); g.fillRect(5, 17, 15, 3);
+      g.fillStyle(0xd9faff); g.fillRect(9, 8, 7, 2);
+      g.fillRect(11, 10, 3, 4);
     }
   };
   for (const [k, fn] of Object.entries(items)) {

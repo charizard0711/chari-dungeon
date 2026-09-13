@@ -14,7 +14,7 @@ import { getTheme, MAGIC_DESC, MONSTER_DEFS, ITEM_DEFS, gradeColor, isRareItem, 
 import type { Armor, MagicCode, ItemKind, Item, Dir, Weapon, Shield, Element } from '../types';
 import { shieldFullName } from '../player';
 import { Audio } from '../audio/manager';
-import { EQUIPMENT_LIMIT } from '../balance';
+import { EQUIPMENT_LIMIT, SHOP_PRICES, type ShopItemKind } from '../balance';
 import { armorFullName, armorTextureKey, isPlayerArmor, PLAYER_ARMOR_DEFS, playerFrameIndex, playerSheetKey } from '../playerAppearance';
 
 const COLORS: Record<string, string> = {
@@ -35,7 +35,8 @@ export class UIScene extends Phaser.Scene {
   logTexts: Phaser.GameObjects.Text[] = []; // 固定8行（行ごとに色分け）
   itemContainer!: Phaser.GameObjects.Container;
   overlay!: Phaser.GameObjects.Container;
-  overlayMode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' | 'itemcatalog' = 'none';
+  overlayMode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' | 'itemcatalog' | 'repair' = 'none';
+  repairKind: 'weapon' | 'shield' = 'weapon';
   pickSlot = 0; // 'pick'モードで開いている装備スロット（0武器/1服/2盾）
   gachaAnimating = false; // ガチャ演出中は再描画をブロック
   codeDigits = '';
@@ -753,7 +754,7 @@ export class UIScene extends Phaser.Scene {
     this.rebuildOverlay();
   }
 
-  setOverlay(mode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' | 'itemcatalog') {
+  setOverlay(mode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' | 'itemcatalog' | 'repair') {
     if (this.gachaAnimating) return; // 演出中は切替禁止
     if (this.gs.pendingEquipment && mode !== 'equip') mode = 'equip';
     if (mode === 'equip' && this.overlayMode !== 'equip') this.equipScrollIndex = 0;
@@ -827,7 +828,7 @@ export class UIScene extends Phaser.Scene {
     this.overlay.removeAll(true);
     const { x, y, w, h } = this.overlayMode === 'itemcatalog' && !IS_MOBILE
       ? { x: 180, y: 40, w: 920, h: 660 }
-      : this.overlayMode === 'settings' && !IS_MOBILE
+      : ['settings', 'shop', 'repair'].includes(this.overlayMode) && !IS_MOBILE
         ? { x: 200, y: 60, w: 680, h: 620 } : this.L.ov;
     const g = this.add.graphics();
     g.fillStyle(0x061316, 0.985).fillRoundedRect(x, y, w, h, 14);
@@ -842,6 +843,7 @@ export class UIScene extends Phaser.Scene {
       this.overlayMode === 'settings' ? '設定' :
       this.overlayMode === 'itemcatalog' ? '全アイテム一覧' :
       this.overlayMode === 'shop' ? 'フロアショップ' :
+      this.overlayMode === 'repair' ? '修復する装備を選ぶ' :
       this.overlayMode === 'gacha' ? 'ダンジョンガチャ' :
       this.overlayMode === 'pick' ? pickTitles[this.pickSlot] :
       'モンスター図鑑';
@@ -865,6 +867,7 @@ export class UIScene extends Phaser.Scene {
     else if (this.overlayMode === 'settings') this.buildSettingsOverlay(x, y, w, h);
     else if (this.overlayMode === 'itemcatalog') this.buildItemCatalogOverlay(x, y, w, h);
     else if (this.overlayMode === 'shop') this.buildShopOverlay(x, y, w);
+    else if (this.overlayMode === 'repair') this.buildRepairOverlay(x, y, w);
     else if (this.overlayMode === 'gacha') this.buildGachaOverlay(x, y, w, h);
     else if (this.overlayMode === 'pick') this.buildPickOverlay(x, y, w);
     else this.buildCodexOverlay(x, y, w, h);
@@ -1192,7 +1195,7 @@ export class UIScene extends Phaser.Scene {
         const group = entry.group;
         const count = ` ×${group.count}`;
         const icon = this.framedIcon(x + 33, cy + 14, group.item.textureKey, isRareItem(group.kind) ? 0xff5f67 : 0x2f6f6a, 32);
-        const use = () => { this.gs.useItem(group.firstIndex); this.setOverlay('inv'); };
+        const use = () => { this.gs.useItem(group.firstIndex); if (this.overlayMode !== 'repair') this.setOverlay('inv'); };
         const sellW = 112;
         const useW = 64;
         const actionY = IS_MOBILE ? cy + 30 : cy;
@@ -1227,7 +1230,7 @@ export class UIScene extends Phaser.Scene {
     groups.forEach((grp) => {
       const cntLabel = grp.count > 1 ? ` ×${grp.count}` : '';
       const icon = this.add.image(x + 30, cy + 14, grp.item.textureKey).setDisplaySize(26, 26);
-      const row = this.rowButton(x + 48, cy, w - 64, `${grp.item.name}${cntLabel} — ${grp.item.desc}`, false, () => { this.gs.useItem(grp.firstIndex); this.setOverlay('inv'); });
+      const row = this.rowButton(x + 48, cy, w - 64, `${grp.item.name}${cntLabel} — ${grp.item.desc}`, false, () => { this.gs.useItem(grp.firstIndex); if (this.overlayMode !== 'repair') this.setOverlay('inv'); });
       this.overlay.add([icon, row]);
       cy += 34;
     });
@@ -1320,21 +1323,54 @@ export class UIScene extends Phaser.Scene {
     }
   }
 
+  buildRepairOverlay(x: number, y: number, w: number) {
+    const p = this.gs.player;
+    const count = p.inventory.filter(item => item.kind === 'repair').length;
+    this.overlay.add(this.add.text(x + 20, y + 54, `修復石：${count}個　1個で耐久を100回復（最大まで）\n服には耐久がありません。選ばずに閉じると消費しません。`, {
+      fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '11px' : '13px', color: '#a9d4d5',
+      wordWrap: { width: w - 40 }, lineSpacing: 5
+    }));
+    for (const [i, kind] of (['weapon', 'shield'] as const).entries()) {
+      this.overlay.add(this.rowButton(x + 20 + i * (w - 32) / 2, y + 106, (w - 48) / 2,
+        kind === 'weapon' ? '武器' : '盾', this.repairKind === kind,
+        () => { this.repairKind = kind; this.rebuildOverlay(); }));
+    }
+    const owned: (Weapon | Shield)[] = this.repairKind === 'weapon' ? p.weapons : p.shields;
+    if (!owned.length) this.overlay.add(this.add.text(x + 24, y + 164, '修復できる装備を持っていません。', { fontSize: '14px', color: '#bccbce' }));
+    owned.forEach((equipment, index) => {
+      const cy = y + 154 + index * 72;
+      const restored = Math.max(0, Math.min(100, equipment.durMax - equipment.dur));
+      const equipped = equipment === p.weapon || equipment === p.shield;
+      const bg = this.add.graphics().fillStyle(0x112a31).fillRoundedRect(x + 16, cy, w - 32, 64, 8);
+      const icon = this.framedIcon(x + 42, cy + 32, equipment.key, gradeColor(equipment.grade), 36);
+      const name = this.add.text(x + 68, cy + 6, `${equipped ? '装備中 ' : ''}${equipment.name} +${equipment.plus}`, {
+        fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#e1f2ec', wordWrap: { width: w - 172, useAdvancedWrap: true }
+      });
+      const dur = this.add.text(x + 68, cy + 44, `耐久 ${equipment.dur}/${equipment.durMax}${restored ? ` → ${equipment.dur + restored}` : '（最大）'}`, {
+        fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#82dfcb'
+      });
+      const button = this.rowButton(x + w - 94, cy + 17, 74, restored ? '修復する' : '修復不要', restored > 0 && count > 0,
+        () => { if (this.gs.repairEquipment(this.repairKind, equipment)) this.setOverlay('inv'); });
+      this.overlay.add([bg, ...icon, name, dur, button]);
+    });
+  }
+
   // ============ フロアショップ ============
   buildShopOverlay(x: number, y: number, w: number) {
     const p = this.gs.player;
     this.overlay.add(this.add.text(x + w - 58, y + 16, `所持 ${p.gold} G`, {
       fontFamily: '"Yu Gothic UI"', fontSize: '16px', color: '#f5c542', fontStyle: 'bold'
     }).setOrigin(1, 0));
-    this.overlay.add(this.add.text(x + 24, y + 58, '強化スクロールの販売は終了しました。変身スクロールはショップ限定・各階1枚、効果は30ターンです。', {
+    this.overlay.add(this.add.text(x + 24, y + 58, '装備修復石は各階1個。変身スクロールも各階1枚まで購入できます。', {
       fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '11px' : '13px', color: '#9db8b9',
       wordWrap: { width: w - 48 }
     }));
 
-    const rows: { kind: 'potion' | 'slime_scroll' | 'boss5_scroll'; price: number; label: string }[] = [
-      { kind: 'potion', price: 25, label: '回復ポーション　体力を40回復' },
-      { kind: 'slime_scroll', price: 500, label: 'スライム変身　30ターン／攻撃+5%・防御+1' },
-      { kind: 'boss5_scroll', price: 500, label: '封印王アウレリウス変身　30ターン／攻撃+10%・防御+3' }
+    const rows: { kind: ShopItemKind; label: string }[] = [
+      { kind: 'potion', label: '回復ポーション　体力を40回復' },
+      { kind: 'repair', label: '装備修復石　武器か盾の耐久を100回復' },
+      { kind: 'slime_scroll', label: 'スライム変身　30ターン／攻撃+5%・防御+1' },
+      { kind: 'boss5_scroll', label: '封印王アウレリウス変身　30ターン／攻撃+10%・防御+3' }
     ];
     let cy = y + (IS_MOBILE ? 112 : 102);
     for (const row of rows) {
@@ -1349,9 +1385,9 @@ export class UIScene extends Phaser.Scene {
       const textX = x + (IS_MOBILE ? 86 : 104);
       const title = this.add.text(textX, cy + (IS_MOBILE ? 11 : 16), row.label, {
         fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '12px' : '14px', color: '#eef5ff', fontStyle: 'bold',
-        wordWrap: { width: IS_MOBILE ? w - 118 : w - 210 }
+        wordWrap: { width: IS_MOBILE ? w - 118 : w - 210, useAdvancedWrap: true }
       });
-      const stock = this.add.text(textX, cy + (IS_MOBILE ? 49 : 48), `価格 ${row.price}G　残り ${remaining}`, {
+      const stock = this.add.text(textX, cy + (IS_MOBILE ? 49 : 48), `価格 ${SHOP_PRICES[row.kind]}G　残り ${remaining}`, {
         fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '11px' : '13px', color: remaining > 0 ? '#b8d8d6' : '#ff7b82'
       });
       const button = this.rowButton(

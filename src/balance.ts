@@ -15,8 +15,11 @@ export const ITEM_SELL_PRICES: Record<ItemKind, number> = {
   slime_scroll: 200,
   boss5_scroll: 200,
   invis: 25,
-  dash: 20
+  repair: 25
 };
+
+export const SHOP_PRICES = { potion: 25, repair: 100, slime_scroll: 500, boss5_scroll: 500 } as const;
+export type ShopItemKind = keyof typeof SHOP_PRICES;
 
 export function enhancementChance(plus: number): number {
   return Math.max(0.3, 0.9 - Math.max(0, plus) * 0.1);

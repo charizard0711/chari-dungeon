@@ -219,7 +219,7 @@ export const ITEM_DEFS: Record<ItemKind, Omit<Item, 'kind'>> = {
   shroom:  { name: '光るキノコ', desc: '周囲をしばらく明るくする', textureKey: 'i_shroom' },
   torch:   { name: '松明', desc: '10ターンの間、壁を越えて上下左右10マスまで明るくする', textureKey: 'i_torch' },
   bomb:    { name: 'ボムナッツ', desc: '周囲の敵に範囲ダメージ', textureKey: 'i_bomb' },
-  warp:    { name: 'ワープベル', desc: '同じ階のランダム地点へ移動', textureKey: 'i_warp' },
+  warp:    { name: 'リコールベル', desc: '今いる階のスタート位置へ戻る', textureKey: 'i_warp' },
   revive:  { name: '復活のタネ', desc: '倒れた時に一度だけ復活', textureKey: 'i_revive' },
   floorkey:{ name: 'フロアキー', desc: '特殊な扉を開ける', textureKey: 'i_floorkey' },
   seal:    { name: '封印の魔導書', desc: '周囲の敵を数ターン止める', textureKey: 'i_seal' },
@@ -228,7 +228,7 @@ export const ITEM_DEFS: Record<ItemKind, Omit<Item, 'kind'>> = {
   slime_scroll: { name: 'スライム変身スクロール', desc: '30ターンの間スライムへ変身。装備効果を引き継ぎ、攻撃力+5%・防御力+1', textureKey: 'i_slime_scroll' },
   boss5_scroll: { name: '封印王アウレリウス変身スクロール', desc: '30ターンの間「封印王アウレリウス」へ変身。装備効果を引き継ぎ、攻撃力+10%・防御力+3', textureKey: 'i_boss5_scroll' },
   invis:   { name: '透明ポーション', desc: '20ターンの間、敵から完全に見えなくなる', textureKey: 'i_invis' },
-  dash:    { name: '疾風の羽', desc: '20歩の間、1歩で2マス進めるようになる', textureKey: 'i_dash' }
+  repair:  { name: '装備修復石', desc: '選んだ武器か盾1つの耐久を100回復（最大耐久まで）', textureKey: 'i_repair' }
 };
 
 // レアアイテム（所持欄で赤枠になる）

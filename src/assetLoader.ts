@@ -90,7 +90,7 @@ const FRAME_DEFS: FrameDef[] = [
 
   // ---- お宝・キーアイテム ----
   { key: 'i_floorkey', sheet: 'items', r: [583, 715, 693, 848], mode: 'sprite', size: 48},
-  // i_stone / i_shieldstone / i_invis / i_dash は専用のオリジナル画像を使用する。
+  // i_stone / i_shieldstone / i_invis / i_repair は専用のオリジナル画像を使用する。
   { key: 'i_seal', sheet: 'items', r: [1085, 715, 1196, 848], mode: 'sprite', size: 48},
 
   // ---- エフェクト（効果シートから切り抜き）----

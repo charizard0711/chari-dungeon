@@ -7,7 +7,7 @@ import { buildAllTextures } from '../textures';
 import { applyRealAssets } from '../assetLoader';
 import { BGM_DEFS, SE_DEFS, AudioDef } from '../audio/config';
 import { Audio } from '../audio/manager';
-import { PLAYER_SHEETS } from '../playerAppearance';
+import { PLAYER_FRAME_SIZE, PLAYER_SHEETS } from '../playerAppearance';
 import { MONSTER_ANIMATIONS } from '../monsterAnimation';
 import { DIRECTIONAL_MONSTERS } from '../monsterDirections';
 import { HELD_EQUIPMENT, HELD_FRAME_SIZE } from '../equipmentAppearance';
@@ -118,7 +118,7 @@ const ORIGINAL_ITEM_ART = {
   i_slime_scroll: 'assets/items/slime-transformation-scroll.png',
   i_boss5_scroll: 'assets/items/aurelius-transformation-scroll.png',
   i_invis: 'assets/items/invisibility-potion.png',
-  i_dash: 'assets/items/gale-feather.png'
+  i_repair: 'assets/items/equipment-repair-stone.png'
 } as const;
 
 const TERRAIN_PROP_ART = {
@@ -182,7 +182,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image('dungeon_chamber', 'assets/dungeon-chamber.png');
     this.load.image('title_screen_v2', 'assets/title-screen-v2.png');
     for (const sheet of PLAYER_SHEETS) {
-      this.load.spritesheet(sheet.key, sheet.path, { frameWidth: 40, frameHeight: 40 });
+      this.load.spritesheet(sheet.key, sheet.path, { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
     }
     for (const [key, path] of Object.entries(ORIGINAL_ITEM_ART)) {
       this.load.image(key, path);

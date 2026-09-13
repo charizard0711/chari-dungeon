@@ -92,7 +92,7 @@ export type ItemKind =
   | 'shroom'      // 光るキノコ
   | 'torch'       // 松明（10ターン、壁を越えて上下左右10マスを照らす）
   | 'bomb'        // ボムナッツ
-  | 'warp'        // ワープベル
+  | 'warp'        // リコールベル（現在の階の開始地点へ戻る）
   | 'revive'      // 復活のタネ
   | 'floorkey'    // フロアキー
   | 'seal'        // 封印の魔導書
@@ -101,7 +101,7 @@ export type ItemKind =
   | 'slime_scroll' // スライムへ30ターン変身（ショップ限定）
   | 'boss5_scroll' // 封印王アウレリウスへ30ターン変身（ショップ限定）
   | 'invis'       // 透明ポーション（20ターン敵から見えなくなる）
-  | 'dash';       // 疾風の羽（20歩の間、1歩で2マス進める）
+  | 'repair';     // 装備修復石（武器または盾1つの耐久を100回復）
 
 export interface Item {
   kind: ItemKind;

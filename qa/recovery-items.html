@@ -1,0 +1,33 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><title>リコールベル・装備修復石の確認</title>
+<style>body{margin:12px;background:#112329;color:#dcedea;font:14px system-ui}button{padding:8px;margin:0 5px 6px 0}iframe{display:block;width:100%;height:600px;border:1px solid #47737b}pre{white-space:pre-wrap}output{display:block;margin:8px 0}h1{font-size:20px}</style>
+<h1>リコールベル・装備修復石</h1>
+<button id="repair">修復石を使う</button><button id="shop">ショップ</button><button id="recall">離れた場所から帰還</button><button id="regression">ボス報酬・在庫の確認</button><button id="mobile">スマホ表示</button><button id="desktop">PC表示</button>
+<output>読み込み中</output><iframe title="アイテム確認用ゲーム"></iframe><pre></pre>
+<script type="module">
+import {makeItem, WEAPON_DEFS, SHIELD_DEFS} from '/src/data.ts';
+import {makeWeapon,makeShield} from '/src/player.ts';
+if(location.hostname!=='localhost')throw Error('Local QA only');
+const frame=document.querySelector('iframe'),out=document.querySelector('output'),report=document.querySelector('pre');
+const gs=()=>frame.contentWindow?.__game?.scene.getScene('GameScene'), ui=()=>frame.contentWindow?.__game?.scene.getScene('UIScene');
+let ready=false,loaded=false,extra='';
+frame.onload=()=>{loaded=true;ready=false;};
+function load(mobile){ready=false;loaded=false;extra='';out.textContent='読み込み中';frame.style.height=mobile?'844px':'760px';frame.style.width=mobile?'390px':'100%';frame.style.margin='auto';frame.src=`/?qa-game&qa-floor=1&qa-field-arena&mobile=${mobile?1:0}`;}
+function prepare(){const g=gs();g.player.inventory=[makeItem('repair'),makeItem('repair'),makeItem('repair'),makeItem('warp')];g.player.gold=3000;
+g.player.weapons=WEAPON_DEFS.slice(0,6).map(d=>makeWeapon(d.key,[]));g.player.shields=SHIELD_DEFS.slice(0,6).map(d=>makeShield(d.key));g.player.weapon=g.player.weapons[0];g.player.shield=g.player.shields[0];
+for(const e of [...g.player.weapons,...g.player.shields])e.dur=Math.max(1,e.durMax-150);g.player.shields[0].dur=g.player.shields[0].durMax-20;
+g.setPlayerVisual('down','idle');g.updatePlayerAura();g.emitRefresh();}
+document.querySelector('#repair').onclick=()=>{const g=gs();g.useItem(g.player.inventory.findIndex(i=>i.kind==='repair'));};
+document.querySelector('#shop').onclick=()=>ui().setOverlay('shop');
+document.querySelector('#recall').onclick=()=>{const g=gs(),start={...g.dungeon.start},floor=g.floor,turn=g.turn,dungeon=g.dungeon;g.player.x=start.x+1;g.player.y=start.y;g.placeSprite(g.playerSprite,g.player.x,g.player.y);ui().setOverlay('none');
+g.useItem(g.player.inventory.findIndex(i=>i.kind==='warp'));const pass=g.player.x===start.x&&g.player.y===start.y&&g.turn===turn&&g.floor===floor&&g.dungeon===dungeon;
+extra=`${pass?'PASS':'FAIL'} 帰還先=${g.player.x},${g.player.y} 開始=${start.x},${start.y} 同じマップ・ターン維持`;out.textContent=extra;};
+document.querySelector('#regression').onclick=async()=>{const g=gs(),results=[];ui().setOverlay('none');
+function check(pass,message){results.push(`${pass?'PASS':'FAIL'} ${message}`);}
+g.buildFloor(5);g.buyItem('repair');check(g.shopRemaining('repair')===0,'5階で修復石を1個購入');g.buildFloor(5,true);check(g.shopRemaining('repair')===0,'同じ階の専用ボス部屋へ入っても売り切れ');
+for(const [floor,bossRoom] of [[5,true],[6,false],[15,true],[20,true],[30,true]]){g.buildFloor(floor,bossRoom);const before=g.player.inventory.filter(i=>i.kind==='repair').length;const boss=g.enemies.find(e=>e.def.isFloorBoss);if(!boss){check(false,`${floor}階ボス不在`);continue;}g.killEnemy(boss,0);g.unlockFloorGate('重複確認');const count=g.ground.filter(i=>i.kind==='repair').length+g.player.inventory.filter(i=>i.kind==='repair').length-before;check(count===1,`${floor}階 ボス撃破→修復石${count}個、重複なし`);await new Promise(resolve=>setTimeout(resolve,1200));}
+g.buildFloor(7);check(g.shopRemaining('repair')===1,'次の階では1個補充');check(g.buyItem('repair')&&!g.buyItem('repair'),'1個のみ買える');
+extra=results.join('\n');out.textContent=results.every(r=>r.startsWith('PASS'))?'PASS：ボス報酬・各階の在庫':'FAIL';g.buildFloor(1);prepare();ui().setOverlay('shop');};
+document.querySelector('#mobile').onclick=()=>load(true);document.querySelector('#desktop').onclick=()=>load(false);
+setInterval(()=>{const g=gs(),u=ui();if(!loaded||!g?.playerSprite||!g.sys.isActive()||!u?.overlay)return;if(!ready){ready=true;prepare();out.textContent='準備完了';u.setOverlay('shop');}
+report.textContent=extra+'\n'+JSON.stringify({floor:g.floor,overlay:u.overlayMode,stones:g.player.inventory.filter(i=>i.kind==='repair').length,stock:g.shopRemaining('repair'),gold:g.player.gold,weaponDur:g.player.weapons.map(w=>`${w.dur}/${w.durMax}`),shieldDur:g.player.shields.map(s=>`${s.dur}/${s.durMax}`)},null,2);},150);load(false);
+</script></html>

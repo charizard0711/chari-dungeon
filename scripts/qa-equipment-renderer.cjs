@@ -25,14 +25,14 @@ function image(x,y,key) {
     setDepth(v){this.depth=v;return this;},setAlpha(v){this.alpha=v;return this;},clearTint(){return this;}};
 }
 const gear=new EquipmentRenderer({add:{image},textures:{exists:k=>textures.has(k)}});
-const body={x:100,y:200,originX:.5,originY:.6,scaleX:.85,scaleY:.85,rotation:0,depth:10,alpha:1,visible:true,active:true};
+const body={x:100,y:200,texture:{key:'player_female_leather'},frame:{realWidth:128},originX:.5,originY:.6,scaleX:.34,scaleY:.34,rotation:0,depth:10,alpha:1,visible:true,active:true};
 const sword=makeWeapon('w_longsword_ice',[]),shield=makeShield('s_frost_aegis');
 const render=(dir='down',frame='idle',weapon=sword,offhand=shield,enabled=true,elapsed=0)=>gear.update(body,weapon,offhand,dir,frame,'female',elapsed,enabled);
 render();const offset={x:gear.weapon.x-body.x,y:gear.weapon.y-body.y};
 body.x+=37;body.y-=23;render();assert.ok(Math.abs(gear.weapon.x-body.x-offset.x)<1e-8);assert.ok(Math.abs(gear.weapon.y-body.y-offset.y)<1e-8);
 body.rotation=Math.PI/2;render();assert.ok(Math.abs(gear.weapon.x-body.x+offset.y)<1e-8);assert.ok(Math.abs(gear.weapon.y-body.y-offset.x)<1e-8);
-body.rotation=0;body.scaleX=body.scaleY=1.7;render();assert.ok(Math.abs(gear.weapon.x-body.x-offset.x*2)<1e-8);
-body.scaleX=body.scaleY=.85;
+body.rotation=0;body.scaleX=body.scaleY=.68;render();assert.ok(Math.abs(gear.weapon.x-body.x-offset.x*2)<1e-8);
+body.scaleX=body.scaleY=.34;
 for(const [frame,dir] of ['down','left','right','up'].entries()) {
   render(dir);assert.equal(gear.weapon.frame.name,frame);assert.equal(gear.offhand.frame.name,frame);
   assert.equal(gear.weapon.depth<body.depth,dir==='left'||dir==='up');
