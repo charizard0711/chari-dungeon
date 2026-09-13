@@ -75,7 +75,7 @@ for (const gender of ['male', 'female']) {
 const rivalA = customFloorBoss(9, 'male'), rivalB = customFloorBoss(9, 'male');
 rivalA.rivalEquipment.weapon.dur = 0;
 assert.ok(rivalB.rivalEquipment.weapon.dur > 0, 'encounters must not share mutable equipment');
-for (const floor of [1, 7, 10, 23, 24, 26, 27, 28, 29, 30]) assert.equal(customFloorBoss(floor, 'male'), undefined);
+for (const floor of [1, 7, 10]) assert.equal(customFloorBoss(floor, 'male'), undefined);
 const newBosses = [
   [11, 'm_silver_seraph', undefined, false, 'mid_magic'],
   [12, 'm_abyss_dragon', 'dark', true, 'mid_void'],
@@ -86,7 +86,12 @@ const newBosses = [
   [17, 'm_phoenix', 'fire', false, 'mid_fire'],
   [18, 'm_unicorn', 'fire', false, 'mid_magma_lance'],
   [19, 'm_bone_reaper', 'fire', false, 'mid_ember_bone'],
-  [20, 'm_valgrado', 'fire', true, 'magma_breath']
+  [20, 'm_valgrado', 'fire', true, 'magma_breath'],
+  [21, 'm_voltyrex', 'thunder', false, 'mid_thunder_jaw'],
+  [22, 'm_spark_beetle', 'thunder', false, 'mid_thunder_shell'],
+  [23, 'm_galvan', 'thunder', false, 'mid_thunder_engine'],
+  [24, 'm_amatsuchi', 'thunder', false, 'mid_thunder_ring'],
+  [25, 'm_raiga', 'thunder', false, 'thunder_king']
 ];
 for (const [floor, key, element, dragon] of newBosses) {
   const def = customFloorBoss(floor, 'female');
@@ -132,13 +137,14 @@ const sceneSource = fs.readFileSync(path.join(root, 'src/scenes/GameScene.ts'), 
 const ast = ts.createSourceFile('GameScene.ts', sceneSource, ts.ScriptTarget.Latest, true);
 const scene = ast.statements.find(s => ts.isClassDeclaration(s) && s.name.text === 'GameScene');
 const methodNames = new Set(['spawnMidBossDragon', 'spawnMilestoneBoss', 'midBossGimmick', 'milestoneGimmick', 'showEnemyInfo', 'resolveBossIntent', 'resolveBullCharge', 'prepareBossIntent', 'bossCrossTiles', 'bossBreathTiles', 'findBossDestination', 'uniqueBossTiles', 'bossImpactKind']);
+methodNames.add('bossThunderCone'); methodNames.add('bossChargePath');
 const methods = scene.members.filter(m => methodNames.has(m.name?.getText(ast)));
 assert.equal(methods.length, methodNames.size);
 const constantNames = new Set(['MID_DRAGONS', 'MILESTONE_BOSSES', 'BOSS_HP_MULTIPLIER', 'BOSS_ATTACK_MULTIPLIER', 'BOSS_DEFENSE_MULTIPLIER', 'FLOOR_BOSS_HP_BOOST', 'FLOOR_BOSS_ATTACK_BOOST', 'FLOOR_BOSS_DEFENSE_BOOST']);
 const declarations = ast.statements.filter(s => ts.isVariableStatement(s) && s.declarationList.declarations.some(d => constantNames.has(d.name.getText(ast))));
 const harnessCode = ts.transpileModule(declarations.map(d => d.getText(ast)).join('\n')
   + `\nclass Harness {${methods.map(m => m.getText(ast)).join('\n')}}`, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
-const Harness = vm.runInNewContext(harnessCode + '\nHarness', { isWalkable, MONSTER_DEFS, customFloorBoss, monsterElement, ELEMENT_INFO, TILE: 32, Audio: { playSe() {} } });
+const Harness = vm.runInNewContext(harnessCode + '\nHarness', { ...load('src/finalDepthBosses.ts'), isWalkable, MONSTER_DEFS, customFloorBoss, monsterElement, ELEMENT_INFO, TILE: 32, Audio: { playSe() {} } });
 for (const phaseTwo of [false, true]) {
   const h = new Harness(), p = { x: iceArena.bossRoom.cx, y: iceArena.bossRoom.cy + 2 };
   const e = { x: p.x + 3, y: p.y - 2, def: customFloorBoss(15, 'male') };
@@ -177,7 +183,7 @@ for (const gender of ['male', 'female']) {
   assert.equal(h.spawn.gimmick, 'mid_rival');
   assert.equal(h.spawn.def.isDragonType, false);
   h.spawnMidBossDragon(24, false);
-  assert.equal(h.spawn.def.key, 'm_frost_wyrm');
+  assert.equal(h.spawn.def.key, 'm_amatsuchi');
   for (const [floor, key, element, dragon, gimmick] of newBosses) {
     h.spawnMidBossDragon(floor, false);
     assert.equal(h.spawn.def.key, key);
@@ -187,7 +193,7 @@ for (const gender of ['male', 'female']) {
     assert.equal(h.spawn.gimmick, gimmick);
     assert.equal(h.spawn.scale, dragon ? 1.32 : 1);
   }
-  for (const [floor, key] of [[1, 'm_ember_drake'], [26, 'm_brass_dragon'], [27, 'm_void_drake'], [28, 'm_bone_dragon'], [29, 'm_hydra']]) {
+  for (const [floor, key] of [[1, 'm_ember_drake'], [26, 'm_deep_kraken'], [27, 'm_valzeon'], [28, 'm_selene'], [29, 'm_abyss_lord']]) {
     h.spawnMidBossDragon(floor, false);
     assert.equal(h.spawn.def.key, key);
   }
@@ -197,6 +203,13 @@ for (const gender of ['male', 'female']) {
   assert.equal(h.spawn.def.bossTint, 0xffffff);
   assert.equal(h.spawn.gimmick, 'magma_breath');
   assert.equal(h.spawn.scale, 2.7);
+  h.spawnMilestoneBoss(25);
+  assert.equal(h.spawn.def.key, 'm_raiga');
+  assert.equal(h.spawn.def.name, '轟雷王ライガ');
+  assert.equal(monsterElement(h.spawn.def), 'thunder');
+  assert.equal(h.spawn.gimmick, 'thunder_king');
+  assert.equal(h.spawn.def.bossTint, 0xffffff);
+  assert.equal(h.spawn.scale, 2.35);
   h.spawnMilestoneBoss(15);
   assert.equal(h.spawn.def.key, 'm_ice_behemoth');
   assert.equal(h.spawn.def.name, '氷晶王ベヒーモス');
@@ -250,10 +263,62 @@ for(const phaseTwo of [false,true]) {
  assert.ok(destination,'fallen angel must find a free position when all preferred corners are occupied');
  assert.ok(h.validBossTile(destination.x,destination.y));
 }
+// Exercise real storm attack geometry, telegraph timing, damage and openings.
+{
+  const h = new Harness(), blocked = new Set();
+  const e = { x: 5, y: 5, def: customFloorBoss(21, 'male') };
+  Object.assign(h, {
+    player: { x: 8, y: 5 }, log() {}, enemyAt: () => false, bossObstacleAt: () => false,
+    validBossTile: (x, y) => x >= 0 && x < 16 && y >= 0 && y < 14 && !blocked.has(x + ',' + y),
+    bossImpactColor: () => 0xffe875, cameras: { main: { shake() {} } },
+    bossWarningMarkers: (tiles, color, anchor, channel, simultaneous) => tiles.map(t => ({ ...t, channel, turns: simultaneous ? 1 : 3, label: { setText() {} } })),
+    destroyBossWarningMarker() {}, bossImpactFx() {}, damagePlayerFromBoss: () => { h.hits++; },
+    addBossHazards: () => assert.fail('storm attacks do not leave fire or ice'),
+    teleportBoss: () => assert.fail('storm bosses remain grounded')
+  });
+  for (const [floor, kind] of [[21, 'mid_thunder_jaw'], [22, 'mid_thunder_shell'], [23, 'mid_thunder_engine'], [24, 'mid_thunder_ring'], [25, 'thunder_king']]) {
+    e.def = customFloorBoss(floor, 'male'); h.player = { x: 8, y: 6 }; h.hits = 0;
+    const state = { kind, phase: 0, phaseTwo: false, stunned: 0 };
+    const intent = h.prepareBossIntent(e, state);
+    assert.ok(intent && intent.markers.length > 0);
+    assert.equal(intent.destination, undefined);
+    assert.ok(intent.markers.every(t => h.validBossTile(t.x, t.y)));
+    assert.equal(h.bossImpactKind(intent.kind, 'primary'), 'lightning');
+    if (floor === 24) {
+      assert.ok(intent.markers.filter(m => m.channel === 'primary').every(m => m.turns === 2));
+      assert.ok(intent.markers.filter(m => m.channel === 'secondary').every(m => m.turns === 1));
+      assert.equal(h.resolveBossIntent(e, state, intent).done, false);
+      assert.equal(h.hits, 0, 'center remains safe during outer wave');
+      assert.equal(h.resolveBossIntent(e, state, intent).done, true);
+      assert.equal(h.hits, 1, 'inner wave hits only on the second turn');
+    } else {
+      assert.ok(intent.markers.every(m => m.turns === 1));
+      assert.equal(h.resolveBossIntent(e, state, intent).done, true);
+      assert.equal(h.hits, 1);
+    }
+    if (floor === 25) assert.equal(state.stunned, 1, 'king has a recovery opening');
+  }
+  h.player = { x: 9, y: 5 };
+  blocked.add('7,5');
+  const cone = h.bossThunderCone(e, 4);
+  assert.ok(!cone.some(t => t.y === 5 && t.x >= 7), 'cover blocks the discharge lane');
+  blocked.clear();
+  const charge = h.prepareBossIntent(e, { kind: 'thunder_king', phase: 0, phaseTwo: true, stunned: 0 });
+  assert.equal(charge.kind, 'thunder_charge');
+  assert.ok(charge.markers.every(t => t.y === 5 && t.x > 5 && t.turns === 1));
+  // The moving attack must own its tween, with no stationary recovery pulling it back.
+  const awaited = Promise.resolve(); let chargeCalls = 0;
+  h.resolveBullCharge = () => { chargeCalls++; return awaited; };
+  h.playDrawnEnemyAttack = () => assert.fail('a charge must not run a competing attack tween');
+  e.directionArt = {};
+  const resolution = h.resolveBossIntent(e, { kind: 'thunder_king' }, charge);
+  assert.equal(resolution.animation, awaited); assert.equal(chargeCalls, 1);
+}
+
 async function checkCharge() {
   const h = new Harness();
   let completeTween;
-  const e = { x: 1, y: 1, sprite: { x: 48, y: 48 }, directionArt: {}, facing: 'right' };
+  const e = { x: 1, y: 1, def: { name: 'グランドバイソン' }, sprite: { x: 48, y: 48 }, directionArt: {}, facing: 'right' };
   Object.assign(h, {
     player: { x: 8, y: 1 }, time: { now: 0 }, cameras: { main: { shake() {} } },
     log() {}, effectFx() {}, faceEnemyToward() {}, updateEnemyDirection() {}, dirVec: () => [1, 0],
@@ -278,4 +343,4 @@ async function checkCharge() {
   assert.equal(e.directionMotion, undefined);
   assert.equal(state.stunned, 2);
 }
-checkCharge().then(() => console.log('PASS: floors 8–20 spawning/art, affinities, equipment, glacial arena collision/reachability, volcano arena and warned fire breath, unchanged other arenas and awaited charge.')).catch(error => { console.error(error); process.exitCode = 1; });
+checkCharge().then(() => console.log('PASS: floors 8–25 spawning/art and affinities, thunder attack timing/cover/openings, glacial and volcano behavior, new final-depth species and awaited charges.')).catch(error => { console.error(error); process.exitCode = 1; });

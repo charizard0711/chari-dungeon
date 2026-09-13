@@ -20,12 +20,15 @@ const { eraSuffix } = load('src/data.ts');
 const { hasRuinTerrain, ruinTerrainKey, ruinFloorKey, ruinFloorFrame } = load('src/ruinTerrain.ts');
 const volcano = load('src/volcanoTerrain.ts');
 const water = load('src/waterTerrain.ts');
+const thunder = load('src/thunderTerrain.ts');
+const finalDepth = load('src/finalDepthTerrain.ts');
 const source = fs.readFileSync(path.join(root, 'src/scenes/GameScene.ts'), 'utf8');
 const ast = ts.createSourceFile('GameScene.ts', source, ts.ScriptTarget.Latest, true);
 const scene = ast.statements.find(s => ts.isClassDeclaration(s) && s.name.text === 'GameScene');
-const names = new Set(['usesGlacialTerrain', 'tileVisual', 'ruinFloorVisual', 'volcanoFloorVisual', 'waterFloorVisual', 'createWallFacades', 'roomPropTexture', 'roomPropRenderTiles',
+const names = new Set(['usesGlacialTerrain', 'tileVisual', 'ruinFloorVisual', 'volcanoFloorVisual', 'waterFloorVisual', 'thunderFloorVisual', 'createWallFacades', 'roomPropTexture', 'roomPropRenderTiles',
   'roomPropChoices', 'roomPropCandidates', 'canPlaceRoomProp', 'canPlacePermanentDecor', 'isReservedOptionalRoomCell', 'spawnDungeonObjects', 'spawnRoomProps', 'spawnFieldBossRoomProps', 'dungeonObjectAt',
   'isInsideBossCombatFrame', 'validBossTile', 'validMonsterTile', 'bossArenaPosition']);
+names.add('finalDepthFloorVisual');
 const methods = scene.members.filter(m => names.has(m.name?.getText(ast)));
 assert.equal(methods.length, names.size);
 const js = ts.transpileModule(`class Harness {${methods.map(m => m.getText(ast)).join('\n')}}`, {
@@ -35,7 +38,7 @@ function shuffle(array) {
   for (let i = array.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [array[i], array[j]] = [array[j], array[i]]; }
   return array;
 }
-const Harness = vm.runInNewContext(js + '\nHarness', { ...water, ...volcano, isWalkable, eraSuffix, hasRuinTerrain, ruinTerrainKey, ruinFloorKey, ruinFloorFrame, TILE: 32, Phaser: { Utils: { Array: { Shuffle: shuffle } } } });
+const Harness = vm.runInNewContext(js + '\nHarness', { ...finalDepth, ...thunder, ...water, ...volcano, isWalkable, eraSuffix, hasRuinTerrain, ruinTerrainKey, ruinFloorKey, ruinFloorFrame, TILE: 32, Phaser: { Utils: { Array: { Shuffle: shuffle } } } });
 function reachable(d, blocked) {
   const seen = new Set([`${d.start.x},${d.start.y}`]), queue = [d.start];
   for (let i = 0; i < queue.length; i++) {
@@ -124,7 +127,20 @@ try {
       assert.equal(h.tileVisual('ice', 1, 1, 1).key, 'terrain_hazard_ice');
       h.createWallFacades(1);
     }
-    if (h.dungeon.biome === 'frost') {
+    if (thunder.hasThunderTerrain(floor)) {
+      for (const kind of thunder.THUNDER_PROP_KINDS) assert.ok(h.dungeonObjects.some(p => p.kind === kind), `${floor}F missing ${kind}`);
+      assert.equal(h.tileVisual('wall', 1, 0, 0).key, thunder.thunderTerrainKey(floor, 'wall-b') + '_ground');
+      const frames = new Set();
+      for (let y = 0; y < h.dungeon.h; y++) for (let x = 0; x < h.dungeon.w; x++) {
+        if (h.dungeon.tiles[y][x] !== 'floor' || (h.dungeon.bossEntry?.x === x && h.dungeon.bossEntry?.y === y)) continue;
+        const visual = h.tileVisual('floor', 1, x, y);
+        assert.equal(visual.key, thunder.thunderTerrainKey(floor, 'floor'));
+        assert.ok(visual.frame >= 0 && visual.frame < 4); frames.add(visual.frame);
+      }
+      assert.equal(frames.size, 4);
+      h.createWallFacades(1);
+    }
+    if (h.dungeon.biome === 'frost' && !finalDepth.hasFinalDepthTerrain(floor)) {
     for (const [i, kind] of kinds.entries()) {
       assert.ok(h.dungeonObjects.some(p => p.kind === kind), `${floor}F missing ${kind}`);
       assert.equal(h.roomPropTexture(kind), textures[i]);
@@ -137,6 +153,26 @@ try {
     maps++; props += h.dungeonObjects.length;
   }
   const h = new Harness();
+  for (const floor of thunder.THUNDER_FLOORS) {
+    h.floor = floor; h.dungeon = generateBossArena(floor); h.inBossRoom = true; h.dungeonObjects = [];
+    const d = h.dungeon, r = d.bossRoom, seen = reachable(d, new Set());
+    assert.equal(d.thunderArena.props.length, 8);
+    if (floor === 25) {
+      assert.equal(r.w, 16); assert.equal(r.h, 14);
+      assert.equal(d.tiles[r.y][r.x], 'wall');
+    }
+    for (const p of d.thunderArena.props) {
+      assert.equal(d.tiles[p.y][p.x], 'wall');
+      assert.equal(h.tileVisual('wall', 1, p.x, p.y).key, thunder.thunderTerrainKey(floor, 'floor'));
+      assert.equal(h.validBossTile(p.x, p.y), false);
+    }
+    for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) {
+      if (d.tiles[y][x] !== 'wall') assert.ok(seen.has(`${x},${y}`), 'storm arena reachable');
+      if (x === r.cx || y === r.cy) assert.notEqual(d.tiles[y][x], 'wall', 'storm axes clear');
+    }
+    assert.equal(h.tileVisual('wall', 1, 0, 0).key, 'terrain_thunder_clouds');
+    assert.equal(h.tileVisual('door', 1, d.stairs.x, d.stairs.y).key, 'terrain_boss_chain_gate');
+  }
   for (const floor of water.WATER_FLOORS) {
     h.floor = floor; h.dungeon = generateBossArena(floor); h.inBossRoom = true; h.dungeonObjects = [];
     const d = h.dungeon, r = d.bossRoom, seen = reachable(d, new Set());

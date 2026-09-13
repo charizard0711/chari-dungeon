@@ -42,6 +42,8 @@ export interface DungeonData {
   optionalRooms: OptionalRoom[];
   volcanoArena?: { props: (Vec2 & { part: 'prop-1' | 'prop-2' | 'prop-3' | 'prop-4'; blocking: boolean })[] };
   waterArena?: { props: (Vec2 & { part: 'prop-1' | 'prop-2' | 'prop-3' | 'prop-4'; blocking: boolean })[] };
+  thunderArena?: { props: (Vec2 & { part: 'prop-1' | 'prop-2' | 'prop-3' | 'prop-4'; blocking: boolean })[] };
+  finalDepthArena?: { props: (Vec2 & { part: import('./finalDepthTerrain').FinalDepthPart; blocking: boolean })[] };
   glacialArena?: { props: (Vec2 & { kind: 'crystal' | 'obelisk' | 'boulder' | 'altar'; blocking: boolean })[] };
 }
 
@@ -334,6 +336,9 @@ export function biomeForFloor(floor: number): DungeonBiome {
   if (floor <= 15) return 'frost';
   if (floor <= 20) return 'magma';
   if (floor <= 25) return 'storm';
+  if (floor === 26) return 'aqueduct';
+  if (floor === 27) return 'magma';
+  if (floor === 28) return 'frost';
   return 'void';
 }
 
@@ -840,6 +845,16 @@ function removeUnreachableFloors(tiles: TileType[][], start: Vec2) {
 }
 
 export function generateDungeon(floor: number, _forcedBossRoomZone?: BossRoomZone): DungeonData {
+  if (floor === 30) {
+    const w = 25, h = 31;
+    const tiles: TileType[][] = Array.from({ length: h }, () => Array<TileType>(w).fill('wall'));
+    const entry = roomAt(8, 20, 9, 8), exitRoom = roomAt(7, 3, 11, 10);
+    carveRoom(tiles, entry); carveRoom(tiles, exitRoom);
+    for (let y = exitRoom.cy; y <= entry.cy; y++) for (let x = 11; x <= 13; x++) tiles[y][x] = 'floor';
+    const start = { x: entry.cx, y: entry.cy + 2 }, stairs = { x: exitRoom.cx, y: exitRoom.y + 1 };
+    tiles[stairs.y][stairs.x] = 'door';
+    return { w, h, tiles, rooms: [entry, exitRoom], start, stairs, exitRoom, hazards: [], teleportPads: [], biome: 'void', optionalRooms: [] };
+  }
   return buildSpaciousDungeon(floor, _forcedBossRoomZone);
   /* Legacy maze generator kept below temporarily as a reference while the spacious generator settles.
   // 縦横を約√2倍にし、従来比でおよそ2倍の探索面積を確保する。
@@ -970,8 +985,8 @@ export function generateBossArena(floor: number): DungeonData {
   const w = isSuper ? 35 : isStrong ? 31 : 25;
   const h = isSuper ? 25 : isStrong ? 23 : 19;
   const tiles: TileType[][] = Array.from({ length: h }, () => Array<TileType>(w).fill('wall'));
-  const roomW = floor === 15 || floor === 20 ? 21 : isSuper ? 25 : isStrong ? 21 : 17;
-  const roomH = floor === 15 || floor === 20 ? 15 : isSuper ? 17 : isStrong ? 15 : 13;
+  const roomW = floor === 30 ? 24 : floor === 25 ? 16 : floor === 15 || floor === 20 ? 21 : isSuper ? 25 : isStrong ? 21 : 17;
+  const roomH = floor === 30 ? 18 : floor === 25 ? 14 : floor === 15 || floor === 20 ? 15 : isSuper ? 17 : isStrong ? 15 : 13;
   const bossRoom = roomAt(Math.floor((w - roomW) / 2), Math.floor((h - roomH) / 2), roomW, roomH);
   carveRoom(tiles, bossRoom);
 
@@ -985,6 +1000,8 @@ export function generateBossArena(floor: number): DungeonData {
   ];
   let volcanoArena: DungeonData['volcanoArena'];
   let waterArena: DungeonData['waterArena'];
+  let thunderArena: DungeonData['thunderArena'];
+  let finalDepthArena: DungeonData['finalDepthArena'];
   let glacialArena: DungeonData['glacialArena'];
   if (floor >= 6 && floor <= 10) {
     // Reuse the four cover pillars, adding low props near the edges; keep both central axes open.
@@ -996,6 +1013,42 @@ export function generateBossArena(floor: number): DungeonData {
       { x: bossRoom.cx + 3, y: bossRoom.y + bossRoom.h - 2, part: 'prop-4', blocking: true }
     ] };
     for (const prop of waterArena.props) tiles[prop.y][prop.x] = 'wall';
+  } else if (floor >= 26 && floor <= 30) {
+    if (floor === 30) for (let y = 0; y < roomH; y++) for (let x = 0; x < roomW; x++) {
+      if (Math.min(x, roomW - 1 - x) + Math.min(y, roomH - 1 - y) < 4) tiles[bossRoom.y + y][bossRoom.x + x] = 'wall';
+    }
+    const { cx, cy, x, y } = bossRoom;
+    finalDepthArena = { props: floor === 30 ? [
+      { x: cx - 7, y: y + 2, part: 'prop-1', blocking: true },
+      { x: cx + 7, y: y + 2, part: 'prop-2', blocking: true },
+      { x: x + 2, y: cy, part: 'prop-3', blocking: true },
+      { x: x + roomW - 3, y: cy, part: 'prop-4', blocking: true },
+      { x: cx + 6, y: y + roomH - 3, part: 'prop-5', blocking: true },
+      { x: cx - 6, y: y + roomH - 3, part: 'prop-6', blocking: true },
+      { x: cx + 2, y: y + 1, part: 'prop-7', blocking: true }
+    ] : [
+      { x: x + 2, y: y + 2, part: 'prop-1', blocking: true },
+      { x: x + roomW - 3, y: y + 2, part: 'prop-2', blocking: true },
+      { x: x + 2, y: y + roomH - 3, part: 'prop-3', blocking: true },
+      { x: x + roomW - 3, y: y + roomH - 3, part: 'prop-4', blocking: true }
+    ] };
+    for (const prop of finalDepthArena.props) if (prop.blocking) tiles[prop.y][prop.x] = 'wall';
+  } else if (floor >= 21 && floor <= 25) {
+    // A low-walled storm court, with clipped corners for the king's arena.
+    if (floor === 25) for (let y = 0; y < roomH; y++) for (let x = 0; x < roomW; x++) {
+      if (Math.min(x, roomW - 1 - x) + Math.min(y, roomH - 1 - y) < 3) tiles[bossRoom.y + y][bossRoom.x + x] = 'wall';
+    }
+    thunderArena = { props: [
+      { x: bossRoom.x + 2, y: bossRoom.y + 2, part: 'prop-1', blocking: true },
+      { x: bossRoom.x + roomW - 3, y: bossRoom.y + 2, part: 'prop-1', blocking: true },
+      { x: bossRoom.x + 2, y: bossRoom.y + roomH - 3, part: 'prop-2', blocking: true },
+      { x: bossRoom.x + roomW - 3, y: bossRoom.y + roomH - 3, part: 'prop-2', blocking: true },
+      { x: bossRoom.cx - 3, y: bossRoom.y + 1, part: 'prop-3', blocking: true },
+      { x: bossRoom.cx + 3, y: bossRoom.y + 1, part: 'prop-3', blocking: true },
+      { x: bossRoom.cx - 3, y: bossRoom.y + roomH - 2, part: 'prop-4', blocking: true },
+      { x: bossRoom.cx + 3, y: bossRoom.y + roomH - 2, part: 'prop-4', blocking: true }
+    ] };
+    for (const prop of thunderArena.props) if (prop.blocking) tiles[prop.y][prop.x] = 'wall';
   } else if (floor === 15) {
     // Clip the four corners into an octagonal hall. The middle stays open for dodging.
     for (let y = 0; y < roomH; y++) {
@@ -1050,6 +1103,8 @@ export function generateBossArena(floor: number): DungeonData {
     bossRoomZone: 'center', teleportPads: [], biome: floor === 15 ? 'frost' : biomeForFloor(floor), optionalRooms: [],
     ...(glacialArena ? { glacialArena } : {}),
     ...(waterArena ? { waterArena } : {}),
+    ...(thunderArena ? { thunderArena } : {}),
+    ...(finalDepthArena ? { finalDepthArena } : {}),
     ...(volcanoArena ? { volcanoArena } : {})
   };
 }

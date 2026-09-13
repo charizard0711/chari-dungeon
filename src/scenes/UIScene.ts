@@ -1,5 +1,8 @@
 import Phaser from 'phaser';
+import { CATALOG_TABS, ITEM_CATALOG, catalogPage, type CatalogCategory, type CatalogEntry } from '../itemCatalog';
 import { hasWaterTerrain, WATER_TITLES } from '../waterTerrain';
+import { hasFinalDepthTerrain, FINAL_DEPTH_TITLES, FINAL_DEPTH_COLORS } from '../finalDepthTerrain';
+import { hasThunderTerrain, THUNDER_TITLES } from '../thunderTerrain';
 import { EquipmentRenderer } from '../equipmentRenderer';
 import { GameScene } from './GameScene';
 import type { GachaResult } from './GameScene';
@@ -32,11 +35,16 @@ export class UIScene extends Phaser.Scene {
   logTexts: Phaser.GameObjects.Text[] = []; // 固定8行（行ごとに色分け）
   itemContainer!: Phaser.GameObjects.Container;
   overlay!: Phaser.GameObjects.Container;
-  overlayMode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' = 'none';
+  overlayMode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' | 'itemcatalog' = 'none';
   pickSlot = 0; // 'pick'モードで開いている装備スロット（0武器/1服/2盾）
   gachaAnimating = false; // ガチャ演出中は再描画をブロック
   codeDigits = '';
   codeMessage = '';
+  catalogCategory: CatalogCategory = 'all';
+  catalogPageIndex = 0;
+  catalogPageCount = 1;
+  catalogDetail: CatalogEntry | null = null;
+  catalogClaimMessage = '';
   enemyInfoText!: Phaser.GameObjects.Text;
   // レイアウト依存の座標（PC / スマホ縦で切り替え）
   L!: {
@@ -122,6 +130,7 @@ export class UIScene extends Phaser.Scene {
       if (this.overlayMode === 'equip' && dy !== 0) this.scrollEquipment(dy > 0 ? 1 : -1);
       if (this.overlayMode === 'inv' && dy !== 0) this.scrollInventory(dy > 0 ? 1 : -1);
       if (this.overlayMode === 'codex' && dy !== 0) this.scrollCodex(dy > 0 ? 1 : -1);
+      if (this.overlayMode === 'itemcatalog' && dy !== 0) this.turnCatalogPage(dy > 0 ? 1 : -1);
     };
     const onSecretKey = (event: KeyboardEvent) => this.handleEquipmentSecret(event);
     this.input.on('wheel', onWheel);
@@ -524,6 +533,10 @@ export class UIScene extends Phaser.Scene {
       ? { ...getTheme(this.gs.floor), name: '氷晶の広間', accent: 0x8adfff }
       : this.gs.dungeon?.volcanoArena
         ? { ...getTheme(this.gs.floor), name: '熔獄竜の火口', accent: 0xff783d }
+      : hasFinalDepthTerrain(this.gs.floor)
+        ? { ...getTheme(this.gs.floor), name: FINAL_DEPTH_TITLES[this.gs.floor - 26], accent: FINAL_DEPTH_COLORS[this.gs.floor - 26] }
+      : hasThunderTerrain(this.gs.floor)
+        ? { ...getTheme(this.gs.floor), name: THUNDER_TITLES[this.gs.floor - 21], accent: 0xa7d7ff }
       : hasWaterTerrain(this.gs.floor)
         ? { ...getTheme(this.gs.floor), name: WATER_TITLES[this.gs.floor - 6], accent: 0x75c7c4 }
       : getTheme(this.gs.floor);
@@ -740,7 +753,7 @@ export class UIScene extends Phaser.Scene {
     this.rebuildOverlay();
   }
 
-  setOverlay(mode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick') {
+  setOverlay(mode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' | 'itemcatalog') {
     if (this.gachaAnimating) return; // 演出中は切替禁止
     if (this.gs.pendingEquipment && mode !== 'equip') mode = 'equip';
     if (mode === 'equip' && this.overlayMode !== 'equip') this.equipScrollIndex = 0;
@@ -763,6 +776,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   handleEquipmentSecret(event: KeyboardEvent) {
+    if (this.handleCodeAndCatalogKey(event)) return;
     if (this.overlayMode === 'codex' && (event.code === 'ArrowUp' || event.code === 'ArrowDown')) {
       event.preventDefault();
       this.scrollCodex(event.code === 'ArrowDown' ? 1 : -1);
@@ -811,7 +825,10 @@ export class UIScene extends Phaser.Scene {
   rebuildOverlay() {
     if (this.gachaAnimating) return; // 演出中に消さない
     this.overlay.removeAll(true);
-    const { x, y, w, h } = this.L.ov;
+    const { x, y, w, h } = this.overlayMode === 'itemcatalog' && !IS_MOBILE
+      ? { x: 180, y: 40, w: 920, h: 660 }
+      : this.overlayMode === 'settings' && !IS_MOBILE
+        ? { x: 200, y: 60, w: 680, h: 620 } : this.L.ov;
     const g = this.add.graphics();
     g.fillStyle(0x061316, 0.985).fillRoundedRect(x, y, w, h, 14);
     g.fillStyle(0x143034, .26).fillRoundedRect(x + 5, y + 5, w - 10, h - 10, 10);
@@ -823,6 +840,7 @@ export class UIScene extends Phaser.Scene {
       this.overlayMode === 'equip' ? (this.gs.pendingEquipment ? '装備上限：売却が必要' : '装備・売却') :
       this.overlayMode === 'inv' ? '所持品・装備' :
       this.overlayMode === 'settings' ? '設定' :
+      this.overlayMode === 'itemcatalog' ? '全アイテム一覧' :
       this.overlayMode === 'shop' ? 'フロアショップ' :
       this.overlayMode === 'gacha' ? 'ダンジョンガチャ' :
       this.overlayMode === 'pick' ? pickTitles[this.pickSlot] :
@@ -845,6 +863,7 @@ export class UIScene extends Phaser.Scene {
     if (this.overlayMode === 'equip') this.buildEquipOverlay(x, y, w, h);
     else if (this.overlayMode === 'inv') this.buildUnifiedInventoryOverlay(x, y, w, h);
     else if (this.overlayMode === 'settings') this.buildSettingsOverlay(x, y, w, h);
+    else if (this.overlayMode === 'itemcatalog') this.buildItemCatalogOverlay(x, y, w, h);
     else if (this.overlayMode === 'shop') this.buildShopOverlay(x, y, w);
     else if (this.overlayMode === 'gacha') this.buildGachaOverlay(x, y, w, h);
     else if (this.overlayMode === 'pick') this.buildPickOverlay(x, y, w);
@@ -1788,6 +1807,154 @@ export class UIScene extends Phaser.Scene {
     this.setOverlay('settings');
   }
 
+  editCode(value: string) {
+    this.codeDigits = value.slice(0, 10);
+    this.codeMessage = '';
+    this.rebuildOverlay();
+  }
+
+  submitCode() {
+    const accepted = this.gs.redeemCode(this.codeDigits);
+    this.codeDigits = '';
+    this.codeMessage = accepted ? '' : 'コードが違います';
+    if (accepted) {
+      this.catalogCategory = 'all';
+      this.catalogPageIndex = 0;
+      this.catalogDetail = null;
+      this.catalogClaimMessage = '';
+      this.setOverlay('itemcatalog');
+    } else {
+      this.rebuildOverlay();
+    }
+  }
+
+  handleCodeAndCatalogKey(event: KeyboardEvent): boolean {
+    if (this.overlayMode === 'settings') {
+      const key = event.key.normalize('NFKC');
+      if (/^[0-9]$/.test(key)) {
+        event.preventDefault();
+        if (!event.repeat) this.editCode(this.codeDigits + key);
+      } else if (key === 'Backspace' || key === 'Delete') {
+        event.preventDefault();
+        this.editCode(key === 'Delete' ? '' : this.codeDigits.slice(0, -1));
+      } else if (key === 'Enter') {
+        event.preventDefault();
+        if (!event.repeat) this.submitCode();
+      }
+      return true;
+    }
+    if (this.overlayMode !== 'itemcatalog') return false;
+    const key = event.key;
+    if (key === 'Escape') {
+      event.preventDefault();
+      if (this.catalogDetail) { this.catalogDetail = null; this.rebuildOverlay(); }
+      else this.setOverlay('settings');
+    } else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'ArrowRight', 'ArrowDown', 'PageDown'].includes(key)) {
+      event.preventDefault();
+      if (!event.repeat) this.turnCatalogPage(['ArrowLeft', 'ArrowUp', 'PageUp'].includes(key) ? -1 : 1);
+    }
+    return true;
+  }
+
+  turnCatalogPage(delta: number) {
+    if (this.overlayMode !== 'itemcatalog' || this.catalogDetail) return;
+    const next = Phaser.Math.Clamp(this.catalogPageIndex + delta, 0, this.catalogPageCount - 1);
+    if (next === this.catalogPageIndex) return;
+    this.catalogPageIndex = next;
+    this.rebuildOverlay();
+  }
+
+  selectCatalogItem(entry: CatalogEntry) {
+    const result = this.gs.claimCatalogItem(entry.key);
+    this.catalogClaimMessage = result.message;
+    if (result.status === 'pending') {
+      this.setOverlay('equip');
+      return;
+    }
+    this.catalogDetail = entry;
+    this.rebuildOverlay();
+  }
+
+  buildItemCatalogOverlay(x: number, y: number, w: number, h: number) {
+    const addText = (tx: number, ty: number, text: string, size = 14, color = '#dfe7f0', width = w - 40) => {
+      const label = this.add.text(tx, ty, text, {
+        fontFamily: '"Yu Gothic UI"', fontSize: `${size}px`, color,
+        wordWrap: { width, useAdvancedWrap: true }, lineSpacing: 3
+      });
+      this.overlay.add(label);
+      return label;
+    };
+    const addArt = (entry: CatalogEntry, cx: number, cy: number, size: number) => {
+      const icon = this.add.image(cx, cy, entry.textureKey);
+      icon.setScale(size / Math.max(icon.width, icon.height));
+      this.overlay.add(icon);
+    };
+    if (this.catalogDetail) {
+      const entry = this.catalogDetail;
+      this.overlay.add(this.rowButton(x + 16, y + 50, 132, '‹ 一覧に戻る', false, () => {
+        this.catalogDetail = null;
+        this.rebuildOverlay();
+      }));
+      addArt(entry, x + w / 2, y + 196, IS_MOBILE ? 172 : 200);
+      addText(x + 24, y + 320, entry.name, IS_MOBILE ? 21 : 26, '#fff2cb', w - 48);
+      addText(x + 24, y + 396, entry.summary, 16, '#58d9d1', w - 48);
+      addText(x + 24, y + 432, entry.description, 16, '#dfe7f0', w - 48);
+      addText(x + 24, y + h - 112, this.catalogClaimMessage, 14, '#fff2cb', w - 48);
+      const ownedArmor = entry.category === 'armor' && this.gs.ownsArmor(entry.key.slice('armor_'.length));
+      this.overlay.add(this.rowButton(x + 24, y + h - 74, 168, ownedArmor ? '所持済み' : 'もう1つ取得', true,
+        () => this.selectCatalogItem(entry), !ownedArmor));
+      addText(x + 24, y + h - 38, '装備の数値は未強化の基本性能です。', 12, '#86a9ad', w - 48);
+      return;
+    }
+
+    const tabGap = 6;
+    const tabW = (w - 32 - tabGap * 4) / 5;
+    CATALOG_TABS.forEach((tab, i) => {
+      this.overlay.add(this.rowButton(x + 16 + i * (tabW + tabGap), y + 49, tabW, tab.label,
+        this.catalogCategory === tab.key, () => {
+          this.catalogCategory = tab.key;
+          this.catalogPageIndex = 0;
+          this.rebuildOverlay();
+        }));
+    });
+    const columns = IS_MOBILE ? 2 : 3;
+    const rows = Math.max(1, Math.floor((h - 164) / 140));
+    const page = catalogPage(this.catalogCategory, this.catalogPageIndex, columns * rows);
+    this.catalogPageIndex = page.page;
+    this.catalogPageCount = page.pageCount;
+    addText(x + 16, y + 87, `${page.total}種類 / 全${ITEM_CATALOG.length}種類　絵を押すと1個取得`, IS_MOBILE ? 12 : 14, '#86a9ad');
+    const gap = 10;
+    const cardW = (w - 32 - gap * (columns - 1)) / columns;
+    const cardH = (h - 164 - gap * (rows - 1)) / rows;
+    page.entries.forEach((entry, index) => {
+      const px = x + 16 + (index % columns) * (cardW + gap);
+      const py = y + 114 + Math.floor(index / columns) * (cardH + gap);
+      const color = entry.element ? ELEMENT_INFO[entry.element].color : entry.grade ? gradeColor(entry.grade) : 0x58d9d1;
+      const card = this.add.graphics();
+      card.fillStyle(0x142630).fillRoundedRect(px, py, cardW, cardH, 8);
+      card.lineStyle(1, color, .65).strokeRoundedRect(px, py, cardW, cardH, 8);
+      this.overlay.add(card);
+      addArt(entry, px + cardW / 2, py + 43, 72);
+      const name = addText(px + 10, py + 85, entry.name, IS_MOBILE ? 12 : 15, '#f5ead1', cardW - 20);
+      // 長い道具名も省略せず、カード内に収める。
+      while (name.height > cardH - 115 && parseInt(name.style.fontSize as string) > 10) {
+        name.setFontSize(parseInt(name.style.fontSize as string) - 1);
+      }
+      addText(px + 10, py + cardH - 22, entry.summary, IS_MOBILE ? 10 : 12,
+        `#${color.toString(16).padStart(6, '0')}`, cardW - 20);
+      const zone = this.add.zone(px, py, cardW, cardH).setOrigin(0).setInteractive({ useHandCursor: true });
+      zone.on('pointerdown', () => {
+        this.selectCatalogItem(entry);
+      });
+      this.overlay.add(zone);
+    });
+    const footerY = y + h - 36;
+    this.overlay.add(this.rowButton(x + 16, footerY, IS_MOBILE ? 66 : 100, '設定へ', false, () => this.setOverlay('settings')));
+    this.overlay.add(this.rowButton(x + w / 2 - 76, footerY, 44, '‹', false, () => this.turnCatalogPage(-1), page.page > 0));
+    addText(x + w / 2, footerY + 14, `${page.page + 1} / ${page.pageCount}`, 13).setOrigin(.5);
+    this.overlay.add(this.rowButton(x + w / 2 + 32, footerY, 44, '›', false, () => this.turnCatalogPage(1), page.page < page.pageCount - 1));
+  }
+
   // ---- 設定オーバーレイ：BGMと効果音（システム音）を別々に調整 ----
   buildSettingsOverlay(x: number, y: number, w: number, h: number) {
     const rows: {
@@ -1857,13 +2024,8 @@ export class UIScene extends Phaser.Scene {
       }
     }
 
-    this.overlay.add(this.add.text(x + (IS_MOBILE ? 20 : 30), cy + 14, [
-      '※ 音楽と効果音は別々に調整できます。',
-      IS_MOBILE
-        ? '※ 音源がない場合は内蔵チップチューンを再生します。'
-        : '※ 音源ファイル(public/assets/audio/*.mp3)を置くと自動でそちらが使われます。',
-      IS_MOBILE ? '' : '   無い場合は内蔵のレトロ風チップチューンが鳴ります。'
-    ].join('\n'), {
+    this.overlay.add(this.add.text(x + (IS_MOBILE ? 20 : 30), cy + 14,
+      '音楽と効果音は別々に調整できます。\nコードは下の数字ボタン、またはキーボードから入力できます。', {
       fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '11px' : '13px', color: '#8a97ab', lineSpacing: 6,
       wordWrap: { width: w - (IS_MOBILE ? 40 : 60) }
     }));
@@ -1893,10 +2055,6 @@ export class UIScene extends Phaser.Scene {
     const gridW = buttonW * 5 + gap * 4;
     const gridX = centerX - gridW / 2;
     const gridY = displayY + 48;
-    const updateDisplay = () => {
-      displayText.setText(this.codeDigits || 'コードを入力');
-      displayText.setColor(this.codeDigits ? '#ffffff' : '#63787b');
-    };
     const codeButton = (bx: number, by: number, bw: number, label: string, onClick: () => void, accent = false) => {
       const g = this.add.graphics();
       const draw = (hover: boolean) => {
@@ -1919,30 +2077,15 @@ export class UIScene extends Phaser.Scene {
       const row = Math.floor(index / 5);
       const col = index % 5;
       codeButton(gridX + col * (buttonW + gap), gridY + row * (buttonH + gap), buttonW, String(digit), () => {
-        if (this.codeDigits.length < 10) this.codeDigits += String(digit);
-        this.codeMessage = '';
-        messageText.setText('');
-        updateDisplay();
+        this.editCode(this.codeDigits + String(digit));
       });
     });
 
     const actionY = gridY + (buttonH + gap) * 2 + 4;
-    codeButton(centerX - 136, actionY, 126, '消去', () => {
-      this.codeDigits = '';
-      this.codeMessage = '';
-      messageText.setText('');
-      updateDisplay();
-    });
-    codeButton(centerX + 10, actionY, 126, '入力', () => {
-      const accepted = this.gs.redeemCode(this.codeDigits);
-      this.codeMessage = accepted ? 'コードを適用しました' : 'コードが違います';
-      this.codeDigits = '';
-      updateDisplay();
-      messageText.setText(this.codeMessage).setColor(accepted ? '#f5c542' : '#ff7777');
-      this.refresh();
-    }, true);
+    codeButton(centerX - 136, actionY, 126, '消去', () => this.editCode(''));
+    codeButton(centerX + 10, actionY, 126, '入力', () => this.submitCode(), true);
     const messageText = this.add.text(centerX, actionY + 43, this.codeMessage, {
-      fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: '#f5c542', fontStyle: 'bold'
+      fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: '#ff7777', fontStyle: 'bold'
     }).setOrigin(0.5);
     this.overlay.add(messageText);
   }

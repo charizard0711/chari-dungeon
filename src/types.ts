@@ -137,6 +137,7 @@ export interface MonsterDef {
   bossTint?: number;
   color: number;          // 代替ドット絵の基調色
   element?: MonsterElement | null; // null explicitly disables the legacy element fallback.
+  elements?: readonly MonsterElement[]; // Multi-element bosses announce their current attack separately.
   rivalEquipment?: {
     gender: 'male' | 'female';
     weapon: Weapon;

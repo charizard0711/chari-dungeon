@@ -1,5 +1,7 @@
 import { VOLCANO_FLOORS, VOLCANO_PARTS, volcanoTerrainKey } from '../volcanoTerrain';
 import { WATER_FLOORS, WATER_PARTS, waterTerrainKey } from '../waterTerrain';
+import { THUNDER_FLOORS, THUNDER_PARTS, thunderTerrainKey } from '../thunderTerrain';
+import { FINAL_DEPTH_FLOORS, finalDepthParts, finalDepthTerrainKey } from '../finalDepthTerrain';
 import Phaser from 'phaser';
 import { buildAllTextures } from '../textures';
 import { applyRealAssets } from '../assetLoader';
@@ -12,8 +14,10 @@ import { HELD_EQUIPMENT, HELD_FRAME_SIZE } from '../equipmentAppearance';
 import { RUIN_TERRAIN_FLOORS, RUIN_TERRAIN_PARTS, RUIN_FLOOR_FRAME_SIZE, ruinTerrainKey, ruinFloorKey } from '../ruinTerrain';
 
 const EXPANSION_MONSTER_KEYS = [
+  'm_deep_kraken', 'm_valzeon', 'm_selene', 'm_abyss_lord', 'm_astravein',
   'm_black_mage', 'm_rival_male', 'm_rival_female',
   'm_silver_seraph', 'm_abyss_dragon', 'm_ice_knight', 'm_thunder_sovereign',
+  'm_voltyrex', 'm_spark_beetle', 'm_galvan', 'm_amatsuchi', 'm_raiga',
   'm_valgrado', 'm_fallen_angel', 'm_phoenix', 'm_unicorn', 'm_bone_reaper', 'm_ice_behemoth',
   'm_mush', 'm_mole', 'm_golem', 'm_spider', 'm_beetle', 'm_eye', 'm_wraith', 'm_reaper',
   'm_dark_ninja', 'm_obsidian_shogun', 'm_storm_minotaur', 'm_star_griffin', 'm_lucky_rabbit',
@@ -207,6 +211,17 @@ export class BootScene extends Phaser.Scene {
       for (const part of WATER_PARTS) this.load.image(waterTerrainKey(floor, part), `${root}/${part}.png`);
     }
     this.load.image('terrain_water_surface', 'assets/terrain/water-v1/water.png');
+    for (const floor of THUNDER_FLOORS) {
+      const root = `assets/terrain/thunder-v1/${floor}`;
+      this.load.spritesheet(thunderTerrainKey(floor, 'floor'), `${root}/floor.png`, { frameWidth: 64, frameHeight: 64 });
+      for (const part of THUNDER_PARTS) this.load.image(thunderTerrainKey(floor, part), `${root}/${part}.png`);
+    }
+    for (const floor of FINAL_DEPTH_FLOORS) {
+      const root = `assets/terrain/final-depths-v1/${floor}`;
+      this.load.spritesheet(finalDepthTerrainKey(floor, 'floor'), `${root}/floor.png`, { frameWidth: 64, frameHeight: 64 });
+      for (const part of finalDepthParts(floor)) this.load.image(finalDepthTerrainKey(floor, part), `${root}/${part}.png`);
+    }
+    this.load.image('terrain_thunder_clouds', 'assets/terrain/thunder-v1/storm-clouds.png');
     for (const art of DIRECTIONAL_MONSTERS) {
       this.load.spritesheet(art.textureKey, art.path, { frameWidth: art.frameSize, frameHeight: art.frameSize });
     }
@@ -250,6 +265,20 @@ export class BootScene extends Phaser.Scene {
   }
 
   async create() {
+    // One cached texture per low wall/background combination, with no per-frame compositing.
+    for (const floor of THUNDER_FLOORS) for (const part of ['wall-a', 'wall-b'] as const) {
+      const key = thunderTerrainKey(floor, part);
+      for (const ground of ['ground', 'clouds'] as const) {
+        const texture = this.textures.createCanvas(`${key}_${ground}`, 64, 64);
+        if (!texture) continue;
+        const context = texture.context;
+        context.imageSmoothingEnabled = false;
+        const base = this.textures.get(ground === 'clouds' ? 'terrain_thunder_clouds' : thunderTerrainKey(floor, 'floor')).getSourceImage() as HTMLImageElement;
+        context.drawImage(base, 0, 0, 64, 64, 0, 0, 64, 64);
+        context.drawImage(this.textures.get(key).getSourceImage() as HTMLImageElement, 0, 0);
+        texture.refresh();
+      }
+    }
     // Precompose the transparent low walls once; no extra sprites or animation per cell.
     for (const floor of WATER_FLOORS) for (const part of ['wall-a', 'wall-b'] as const) {
       const key = waterTerrainKey(floor, part);

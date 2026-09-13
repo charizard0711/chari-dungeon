@@ -127,15 +127,15 @@ for (const boost of [0, 2]) {
     assert.equal(e.animating, false);
   }
 }
-assert.deepEqual(DIRECTIONAL_MONSTERS.map(art => art.monsterKey), ['m_ember_drake', 'm_frost_wyrm', 'm_storm_wyvern', 'm_brass_dragon', 'm_archdemon', 'm_bone_dragon', 'm_hydra', 'm_black_mage', 'm_rival_male', 'm_rival_female', 'm_horn_demon', 'm_silver_seraph', 'm_abyss_dragon', 'm_ice_knight', 'm_thunder_sovereign', 'm_bone_colossus', 'm_fallen_angel', 'm_phoenix', 'm_unicorn', 'm_bone_reaper', 'm_ice_behemoth', 'm_valgrado']);
+assert.deepEqual(DIRECTIONAL_MONSTERS.map(art => art.monsterKey), ['m_ember_drake', 'm_frost_wyrm', 'm_storm_wyvern', 'm_brass_dragon', 'm_archdemon', 'm_bone_dragon', 'm_hydra', 'm_black_mage', 'm_rival_male', 'm_rival_female', 'm_horn_demon', 'm_silver_seraph', 'm_abyss_dragon', 'm_ice_knight', 'm_thunder_sovereign', 'm_bone_colossus', 'm_fallen_angel', 'm_phoenix', 'm_unicorn', 'm_bone_reaper', 'm_ice_behemoth', 'm_valgrado', 'm_voltyrex', 'm_spark_beetle', 'm_galvan', 'm_amatsuchi', 'm_raiga', 'm_deep_kraken', 'm_valzeon', 'm_selene', 'm_abyss_lord', 'm_astravein']);
 assert.equal(new Set(DIRECTIONAL_MONSTERS.map(art => art.textureKey)).size, DIRECTIONAL_MONSTERS.length, 'each species needs its own drawings');
 assert.equal(new Set(Object.values(MONSTER_DIRECTION_FRAME)).size, 4);
 for (const art of DIRECTIONAL_MONSTERS) {
 const atlas = await fs.readFile(new URL(`../public/${art.path}`, import.meta.url));
-assert.equal(atlas.readUInt32BE(16), 256);
-assert.equal(atlas.readUInt32BE(20), 256);
+assert.equal(atlas.readUInt32BE(16), art.frameSize * 2);
+assert.equal(atlas.readUInt32BE(20), art.frameSize * 2);
 assert.equal(atlas[25], 6, 'direction artwork must retain RGBA alpha');
-assert.ok(atlas.length < 128 * 1024, 'four directions must stay small');
+assert.ok(atlas.length < (art.frameSize === 256 ? 512 : 128) * 1024, 'four directions must stay small');
 }
 for (let time = 0; time < 10000; time += 16) {
   const pose = monsterDirectionPose(time, 1, false);
@@ -161,7 +161,7 @@ for (const art of DIRECTIONAL_MONSTERS) for (const facing of ['down', 'left', 'r
   const sprite = { active: true, texture: { key: '' }, frame: { name: -1 }, scaleX: 0.44, scaleY: 0.44,
     x: 90.125, y: 40.875, width: 128, height: 128,
     setTexture(key, frame) { swaps.push(frame); this.texture.key = key; this.frame.name = String(frame); return this; },
-    setFlip() { return this; }, setAngle(value) { this.angle = value; return this; },
+    setOrigin() { return this; }, setFlip() { return this; }, setAngle(value) { this.angle = value; return this; },
     setDisplayOrigin(x, y) { this.displayOriginX = x; this.displayOriginY = y; return this; } };
   const e = { x: 3, y: 4, facing, directionArt: art, sprite, def: {}, alive: true, baseScale: 0.44, bobPhase: 1 };
   for (let i = 0; i < 300; i++) { h.updateEnemyDirection(e); h.updateDirectionalEnemyPose(e, i * 16); }

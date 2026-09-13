@@ -1,9 +1,13 @@
 import type { MonsterDef } from './types';
+import { THUNDER_BOSSES } from './thunderBosses';
+import { FINAL_DEPTH_BOSSES } from './finalDepthBosses';
 import { makeShield, makeWeapon } from './player';
 import { makePlayerArmor, type PlayerGender } from './playerAppearance';
 
 // These replacements are floor-specific; later dragon variants stay intact.
 export function customFloorBoss(floor: number, playerGender: PlayerGender): MonsterDef | undefined {
+  if (FINAL_DEPTH_BOSSES[floor]) return { ...FINAL_DEPTH_BOSSES[floor] };
+  if (THUNDER_BOSSES[floor]) return { ...THUNDER_BOSSES[floor] };
   if (floor === 17) return {
     key: 'm_phoenix', name: '火口のフェニックス',
     description: '金色の冠羽と長い尾羽を持つ不死鳥。炎の翼を広げ、予告マスへ紅蓮の火を降らせる。',

@@ -1,0 +1,265 @@
+[
+  {
+    "id": "boss-21",
+    "kind": "boss",
+    "floor": 21,
+    "key": "m_voltyrex",
+    "name": "雷竜ヴォルティレックス",
+    "file": "boss-21.png",
+    "references": [
+      "C:/chari-dungeon-release-final/art/thunder-concepts-floors21-25-v1/25-voltyrex-detail.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production transparent PNG FOUR-DIRECTION MONSTER SPRITE SHEET for Chari Dungeon top-down RPG. Input image is approved creature design reference only, not edit target or backdrop. Draw exactly FOUR separate complete full-body standing drawings in an equal 2x2 SQUARE grid: TOP LEFT faces DOWN toward viewer, TOP RIGHT faces LEFT, BOTTOM LEFT faces RIGHT, BOTTOM RIGHT faces UP with true back visible. Same consistent creature, body size, feet baseline and calm standing pose in all cells. Correct anatomical rotation, especially real rear view. Detailed hand-painted chunky pixel art, crisp stepped silhouettes readable at 120 pixels, matching reference. Each creature entirely within its cell with at least 12% transparent margins, no overlap. Real transparent alpha background. No ground, shadow, floor, room, UI, text, labels, grid, detached lightning particles, aura or motion trails. Subject: The reference lightning TYRANNOSAURUS REX, massive head and jaws, two tiny two-finger forearms, two muscular hind legs and thick long horizontal tail. Dark navy scales, gold lightning-shaped natural markings, tiny amber dorsal scutes. Preserve realistic T. rex anatomy, no wings, horns, armor or dragon limbs. Midboss-sized but complete full body.",
+    "mode": "built-in image_gen",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-cf50718e-68e9-4f25-8f41-8e5ddbd17cc7.png"
+  },
+  {
+    "id": "boss-22",
+    "kind": "boss",
+    "floor": 22,
+    "key": "m_spark_beetle",
+    "name": "電甲蟲スパルク",
+    "file": "boss-22.png",
+    "references": [
+      "C:/chari-dungeon-release-final/art/thunder-concepts-floors21-25-v1/22-magnetite-mine.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production transparent PNG FOUR-DIRECTION MONSTER SPRITE SHEET for Chari Dungeon top-down RPG. Input image is approved creature design reference only, not edit target or backdrop. Draw exactly FOUR separate complete full-body standing drawings in an equal 2x2 SQUARE grid: TOP LEFT faces DOWN toward viewer, TOP RIGHT faces LEFT, BOTTOM LEFT faces RIGHT, BOTTOM RIGHT faces UP with true back visible. Same consistent creature, body size, feet baseline and calm standing pose in all cells. Correct anatomical rotation, especially real rear view. Detailed hand-painted chunky pixel art, crisp stepped silhouettes readable at 120 pixels, matching reference. Each creature entirely within its cell with at least 12% transparent margins, no overlap. Real transparent alpha background. No ground, shadow, floor, room, UI, text, labels, grid, detached lightning particles, aura or motion trails. Subject: Broad round black-iron stag beetle from the reference, six short articulated legs, huge forked stag-beetle mandibles, dark domed carapace with aged copper/bronze edging and thin blue glowing gaps. No humanoid parts. Thick readable oval silhouette.",
+    "mode": "built-in image_gen",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-6d5dcbce-2d15-40fe-bef3-ff60bf30a17e.png"
+  },
+  {
+    "id": "boss-23",
+    "kind": "boss",
+    "floor": 23,
+    "key": "m_galvan",
+    "name": "雷機兵ガルヴァン",
+    "file": "boss-23.png",
+    "references": [
+      "C:/chari-dungeon-release-final/art/thunder-concepts-floors21-25-v1/23-thunder-engine.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production transparent PNG FOUR-DIRECTION MONSTER SPRITE SHEET for Chari Dungeon top-down RPG. Input image is approved creature design reference only, not edit target or backdrop. Draw exactly FOUR separate complete full-body standing drawings in an equal 2x2 SQUARE grid: TOP LEFT faces DOWN toward viewer, TOP RIGHT faces LEFT, BOTTOM LEFT faces RIGHT, BOTTOM RIGHT faces UP with true back visible. Same consistent creature, body size, feet baseline and calm standing pose in all cells. Correct anatomical rotation, especially real rear view. Detailed hand-painted chunky pixel art, crisp stepped silhouettes readable at 120 pixels, matching reference. Each creature entirely within its cell with at least 12% transparent margins, no overlap. Real transparent alpha background. No ground, shadow, floor, room, UI, text, labels, grid, detached lightning particles, aura or motion trails. Subject: Stout ancient blue-gray stone and aged copper mechanical humanoid from the reference, round shoulder spheres, very large blunt fists, short thick legs, compact head and small pale blue round chest core. Match reference proportions.",
+    "mode": "built-in image_gen",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-9ecf9900-732c-40c0-83d1-89c3a2e64293.png"
+  },
+  {
+    "id": "boss-24",
+    "kind": "boss",
+    "floor": 24,
+    "key": "m_amatsuchi",
+    "name": "嵐蛇アマツチ",
+    "file": "boss-24.png",
+    "references": [
+      "C:/chari-dungeon-release-final/art/thunder-concepts-floors21-25-v1/24-storm-serpent.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production transparent PNG FOUR-DIRECTION MONSTER SPRITE SHEET for Chari Dungeon top-down RPG. Input image is approved creature design reference only, not edit target or backdrop. Draw exactly FOUR separate complete full-body standing drawings in an equal 2x2 SQUARE grid: TOP LEFT faces DOWN toward viewer, TOP RIGHT faces LEFT, BOTTOM LEFT faces RIGHT, BOTTOM RIGHT faces UP with true back visible. Same consistent creature, body size, feet baseline and calm standing pose in all cells. Correct anatomical rotation, especially real rear view. Detailed hand-painted chunky pixel art, crisp stepped silhouettes readable at 120 pixels, matching reference. Each creature entirely within its cell with at least 12% transparent margins, no overlap. Real transparent alpha background. No ground, shadow, floor, room, UI, text, labels, grid, detached lightning particles, aura or motion trails. Subject: The large thick coiled cobra from the reference, indigo blue scales, pale-blue belly, gold lightning pattern on flared hood, blunt reptile head. Coiled supporting tail and raised hood, no wings or legs. Back view shows rear hood and coil, no face.",
+    "mode": "built-in image_gen",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-871f2845-b1e2-4d99-bbcd-4c863a330763.png"
+  },
+  {
+    "id": "boss-25",
+    "kind": "boss",
+    "floor": 25,
+    "key": "m_raiga",
+    "name": "轟雷王ライガ",
+    "file": "boss-25.png",
+    "references": [
+      "C:/chari-dungeon-release-final/art/thunder-concepts-floors21-25-v1/21-storm-courtyard.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production transparent PNG FOUR-DIRECTION MONSTER SPRITE SHEET for Chari Dungeon top-down RPG. Input image is approved creature design reference only, not edit target or backdrop. Draw exactly FOUR separate complete full-body standing drawings in an equal 2x2 SQUARE grid: TOP LEFT faces DOWN toward viewer, TOP RIGHT faces LEFT, BOTTOM LEFT faces RIGHT, BOTTOM RIGHT faces UP with true back visible. Same consistent creature, body size, feet baseline and calm standing pose in all cells. Correct anatomical rotation, especially real rear view. Detailed hand-painted chunky pixel art, crisp stepped silhouettes readable at 120 pixels, matching reference. Each creature entirely within its cell with at least 12% transparent margins, no overlap. Real transparent alpha background. No ground, shadow, floor, room, UI, text, labels, grid, detached lightning particles, aura or motion trails. Subject: The regal four-legged lightning wolf-beast in the reference, dark indigo muscular body, huge silver-white spiky mane and neck ruff, sharp tall ears, thick flowing silver/navy tail, gold fangs, yellow eyes, broad strong paws. This is the majestic final boss of the storm region. Preserve precisely the wolf-beast identity in the reference, no horns/wings/humanoid body. Larger mane but no new accessories.",
+    "mode": "built-in image_gen",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-29b0ce77-cce6-45a1-8011-ba778bc8acd5.png",
+    "editPrompt": "Use case: background-extraction. Edit the supplied four-direction lightning wolf sprite atlas. Keep all four monsters, their exact pose, placement, scale, outlines, colors and details unchanged. Remove ALL checkerboard pixels and all background from the ENTIRE image, including every gap between legs, tail and mane. The gray checkerboard is unwanted painted background, not actual transparency. Output a real RGBA PNG with alpha=0 everywhere outside the four wolf silhouettes. No checkerboard or matte of any color, no drop shadow, halo, floor or additional drawing. Preserve the four existing drawings faithfully. This is production game sprite extraction, not a preview mockup.",
+    "originalSource": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-bad97b3b-ef94-42f9-8c52-69ad877581e7.png"
+  },
+  {
+    "id": "floor-21",
+    "kind": "floor",
+    "floor": 21,
+    "file": "floor-21.png",
+    "references": [
+      "C:/chari-dungeon-release-final/art/thunder-concepts-floors21-25-v1/21-storm-courtyard.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production square PNG atlas of FOUR seamless floor tiles, equal 2x2 square cells, full opaque edge-to-edge painted pixels with no gutters, frames or gaps. Reference only for floor material and painted pixel art. Flat top-down orthographic floor texture, no objects, walls, room, shadows, bevelled cubes or perspective. Broad quiet readable hand-painted pixel clusters, consistent top-left light. Rain-darkened blue-gray rounded stone paving with shallow quiet wet patches and minimal moss at edges. Reading order: 1 plain subtle worn paving, 2 alternate plain paving, 3 small fine cracks and worn faint carved line, 4 few chips near one edge. Similar base value and material in all four. No bright lightning, glow, neon circuit, sparks or obvious dangerous hazards. No text.",
+    "mode": "built-in image_gen",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-28a0d5b0-f8a1-4770-abf9-d1b90e62f389.png"
+  },
+  {
+    "id": "props-21",
+    "kind": "props",
+    "floor": 21,
+    "file": "props-21.png",
+    "references": [
+      "C:/chari-dungeon-release-final/art/thunder-concepts-floors21-25-v1/21-storm-courtyard.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production RPG transparent PNG sprite atlas of SIX independent environmental sprites, strict 3 columns by 2 rows of equal square cells, landscape 3:2 canvas. Input reference for approved material, palette and pixel illustration style only. Top-down game camera, visible top and low front faces, not isometric diamond. Each full sprite contained within its cell with 14% real transparent padding. Walls are one tile-wide squat wall segments, wider than tall, waist-high. Consistent upper-left light, crisp detailed painted pixel clusters. SIX sprites reading order: 1 squat low blue-gray rounded-stone wall, 2 alternate squat moss-jointed wet stone wall, 3 short broken copper column lying down, 4 low round stone rainwater basin, 5 lightning-split old stump with tiny blue crack, 6 squat square stone lightning conductor with short copper point. Real transparent alpha background, no scene, floor plane, grid, labels, text, shadow mats, UI, large lightning auras or floating particles. Clear separate silhouettes.",
+    "mode": "built-in image_gen",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-e1572080-0b70-469a-b751-f2a5eaa3f1f6.png"
+  },
+  {
+    "id": "floor-22",
+    "kind": "floor",
+    "floor": 22,
+    "file": "floor-22.png",
+    "references": [
+      "C:/chari-dungeon-release-final/art/thunder-concepts-floors21-25-v1/22-magnetite-mine.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production square PNG atlas of FOUR seamless floor tiles, equal 2x2 square cells, full opaque edge-to-edge painted pixels with no gutters, frames or gaps. Reference only for floor material and painted pixel art. Flat top-down orthographic floor texture, no objects, walls, room, shadows, bevelled cubes or perspective. Broad quiet readable hand-painted pixel clusters, consistent top-left light. Black magnetite rock slabs, dull silver ore veins, subtle slate grit, muted charcoal gray. Reading order: 1 plain subtle worn paving, 2 alternate plain paving, 3 small fine cracks and worn faint carved line, 4 few chips near one edge. Similar base value and material in all four. No bright lightning, glow, neon circuit, sparks or obvious dangerous hazards. No text.",
+    "mode": "built-in image_gen",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-9a99e404-630f-49ba-a07d-3f49c47a70dc.png"
+  },
+  {
+    "id": "props-22",
+    "kind": "props",
+    "floor": 22,
+    "file": "props-22.png",
+    "references": [
+      "C:/chari-dungeon-release-final/art/thunder-concepts-floors21-25-v1/22-magnetite-mine.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production RPG transparent PNG sprite atlas of SIX independent environmental sprites, strict 3 columns by 2 rows of equal square cells, landscape 3:2 canvas. Input reference for approved material, palette and pixel illustration style only. Top-down game camera, visible top and low front faces, not isometric diamond. Each full sprite contained within its cell with 14% real transparent padding. Walls are one tile-wide squat wall segments, wider than tall, waist-high. Consistent upper-left light, crisp detailed painted pixel clusters. SIX sprites reading order: 1 squat low black magnetite boulder wall with dull silver veins, 2 alternate low broken iron-ore wall, 3 low iron ore outcrop, 4 small ruined ore minecart, 5 squat copper wire coil, 6 fallen short wooden mine support beam. Real transparent alpha background, no scene, floor plane, grid, labels, text, shadow mats, UI, large lightning auras or floating particles. Clear separate silhouettes.",
+    "mode": "built-in image_gen",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-75baa352-af8b-4058-b314-ef1eaf692c89.png"
+  },
+  {
+    "id": "floor-23",
+    "kind": "floor",
+    "floor": 23,
+    "file": "floor-23.png",
+    "references": [
+      "C:/chari-dungeon-release-final/art/thunder-concepts-floors21-25-v1/23-thunder-engine.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production square PNG atlas of FOUR seamless floor tiles, equal 2x2 square cells, full opaque edge-to-edge painted pixels with no gutters, frames or gaps. Reference only for floor material and painted pixel art. Flat top-down orthographic floor texture, no objects, walls, room, shadows, bevelled cubes or perspective. Broad quiet readable hand-painted pixel clusters, consistent top-left light. Large blue-gray dressed stone slabs with sparse unlit narrow aged copper joints, desaturated navy-gray ancient machine temple. Reading order: 1 plain subtle worn paving, 2 alternate plain paving, 3 small fine cracks and worn faint carved line, 4 few chips near one edge. Similar base value and material in all four. No bright lightning, glow, neon circuit, sparks or obvious dangerous hazards. No text.",
+    "mode": "built-in image_gen",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-06a74735-ec92-40e2-8221-239b932e8d28.png"
+  },
+  {
+    "id": "props-23",
+    "kind": "props",
+    "floor": 23,
+    "file": "props-23.png",
+    "references": [
+      "C:/chari-dungeon-release-final/art/thunder-concepts-floors21-25-v1/23-thunder-engine.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production RPG transparent PNG sprite atlas of SIX independent environmental sprites, strict 3 columns by 2 rows of equal square cells, landscape 3:2 canvas. Input reference for approved material, palette and pixel illustration style only. Top-down game camera, visible top and low front faces, not isometric diamond. Each full sprite contained within its cell with 14% real transparent padding. Walls are one tile-wide squat wall segments, wider than tall, waist-high. Consistent upper-left light, crisp detailed painted pixel clusters. SIX sprites reading order: 1 low blue-gray dressed-stone wall bound with copper bands, 2 alternate low broken stone-copper wall, 3 squat copper capacitor with tiny blue core, 4 broken pale porcelain insulator, 5 half-buried low copper gear, 6 low inactive ancient thunder furnace. Real transparent alpha background, no scene, floor plane, grid, labels, text, shadow mats, UI, large lightning auras or floating particles. Clear separate silhouettes.",
+    "mode": "built-in image_gen",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-beb5fd75-f8e6-457a-8081-89c4253226b4.png"
+  },
+  {
+    "id": "floor-24",
+    "kind": "floor",
+    "floor": 24,
+    "file": "floor-24.png",
+    "references": [
+      "C:/chari-dungeon-release-final/art/thunder-concepts-floors21-25-v1/24-storm-serpent.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production square PNG atlas of FOUR seamless floor tiles, equal 2x2 square cells, full opaque edge-to-edge painted pixels with no gutters, frames or gaps. Reference only for floor material and painted pixel art. Flat top-down orthographic floor texture, no objects, walls, room, shadows, bevelled cubes or perspective. Broad quiet readable hand-painted pixel clusters, consistent top-left light. Weathered pale gray stone slabs, delicate worn curved wind carvings, neutral cool-gray with subdued contrast. Reading order: 1 plain subtle worn paving, 2 alternate plain paving, 3 small fine cracks and worn faint carved line, 4 few chips near one edge. Similar base value and material in all four. No bright lightning, glow, neon circuit, sparks or obvious dangerous hazards. No text.",
+    "mode": "built-in image_gen",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-43df7359-5ca1-4f27-8729-670f732e2b82.png"
+  },
+  {
+    "id": "props-24",
+    "kind": "props",
+    "floor": 24,
+    "file": "props-24.png",
+    "references": [
+      "C:/chari-dungeon-release-final/art/thunder-concepts-floors21-25-v1/24-storm-serpent.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production RPG transparent PNG sprite atlas of SIX independent environmental sprites, strict 3 columns by 2 rows of equal square cells, landscape 3:2 canvas. Input reference for approved material, palette and pixel illustration style only. Top-down game camera, visible top and low front faces, not isometric diamond. Each full sprite contained within its cell with 14% real transparent padding. Walls are one tile-wide squat wall segments, wider than tall, waist-high. Consistent upper-left light, crisp detailed painted pixel clusters. SIX sprites reading order: 1 low pale-gray shrine-stone wall with faint carved wind lines, 2 alternate short broken pale-gray carved shrine wall, 3 low thunder-symbol stone tablet, 4 collapsed copper weathervane, 5 ancient copper ring half embedded in a stone base, 6 short broken stone altar. Real transparent alpha background, no scene, floor plane, grid, labels, text, shadow mats, UI, large lightning auras or floating particles. Clear separate silhouettes.",
+    "mode": "built-in image_gen",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-e124deff-304c-4a02-b987-8e5fb9ce6855.png"
+  },
+  {
+    "id": "floor-25",
+    "kind": "floor",
+    "floor": 25,
+    "file": "floor-25.png",
+    "references": [
+      "C:/chari-dungeon-release-final/art/thunder-concepts-floors21-25-v1/25-thunder-tyrant.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production square PNG atlas of FOUR seamless floor tiles, equal 2x2 square cells, full opaque edge-to-edge painted pixels with no gutters, frames or gaps. Reference only for floor material and painted pixel art. Flat top-down orthographic floor texture, no objects, walls, room, shadows, bevelled cubes or perspective. Broad quiet readable hand-painted pixel clusters, consistent top-left light. Broad dark blue-gray megalith paving in a storm throne court, fine muted gold mineral veins and chipped stone seams. Very quiet walking surface. Reading order: 1 plain subtle worn paving, 2 alternate plain paving, 3 small fine cracks and worn faint carved line, 4 few chips near one edge. Similar base value and material in all four. No bright lightning, glow, neon circuit, sparks or obvious dangerous hazards. No text.",
+    "mode": "built-in image_gen",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-c6d87d9d-9ca4-44bf-8e76-5fb299b7084a.png"
+  },
+  {
+    "id": "props-25",
+    "kind": "props",
+    "floor": 25,
+    "file": "props-25.png",
+    "references": [
+      "C:/chari-dungeon-release-final/art/thunder-concepts-floors21-25-v1/25-thunder-tyrant.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production RPG transparent PNG sprite atlas of SIX independent environmental sprites, strict 3 columns by 2 rows of equal square cells, landscape 3:2 canvas. Input reference for approved material, palette and pixel illustration style only. Top-down game camera, visible top and low front faces, not isometric diamond. Each full sprite contained within its cell with 14% real transparent padding. Walls are one tile-wide squat wall segments, wider than tall, waist-high. Consistent upper-left light, crisp detailed painted pixel clusters. SIX sprites reading order: 1 low blue-black boulder wall with copper bands, 2 alternate chipped low blue-black wall, 3 damaged copper lightning mast on compact rock base, 4 low charged slate boulder with tiny blue seam, 5 heavy copper chain coiled on dark rocks, 6 squat stone thunder-beast crest marker. No dinosaur prints. Real transparent alpha background, no scene, floor plane, grid, labels, text, shadow mats, UI, large lightning auras or floating particles. Clear separate silhouettes.",
+    "mode": "built-in image_gen",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-2746e9c2-0a4c-4000-b06d-9da3a88ee162.png"
+  },
+  {
+    "id": "clouds",
+    "kind": "clouds",
+    "file": "storm-clouds.png",
+    "references": [
+      "C:/chari-dungeon-release-final/art/thunder-concepts-floors21-25-v1/25-thunder-tyrant.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production square seamless opaque tile texture of dark navy storm cloud tops, soft broad hand-painted chunky pixel clusters matching the dark clouds outside the reference courtyard. Subdued low contrast and dark value, no white cloud edges. Top-down texture filling entire image edge to edge, tileable. Only distant cloud volume, no lightning, stars, objects, text, border, walls or land. Designed for inaccessible scenery outside a lightning boss arena, not walkable floor.",
+    "mode": "built-in image_gen",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-2952f8d0-d4fc-4dd0-991d-acd1ebc86fd8.png"
+  },
+  {
+    "id": "walls-21",
+    "kind": "walls",
+    "floor": 21,
+    "file": "walls-21.png",
+    "references": [
+      "C:/chari-dungeon-release-final/art/thunder-concepts-floors21-25-v1/21-storm-courtyard.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production RPG WALL TILE atlas, TWO square tiles side-by-side in a strict 2-column 1-row landscape canvas. Both cells are fully opaque edge to edge: no transparent margin, no gutter, no border. Each tile shows a compact SQUARE FOOTPRINT of tightly packed LOW boulders viewed from above at a steep top-down RPG camera. The broad visible stone TOP SURFACES must occupy at least 80% of each cell and reach ALL FOUR edges to connect in both horizontal and vertical map runs. Only a short dark FRONT rock face along the lower 15% of the tile, giving a low waist-high wall. NOT a thin horizontal fence or row of stones floating within a square. No tall cliff, deep front face, background, floor around the rocks, objects, columns, text or aura. Dense big hand-painted crisp pixel clusters, not granular noise. Reference for material palette only. Material: rain-darkened blue-gray rounded moss-jointed rock. Two subtly different variants. Low relief, readable light top faces, no glow.",
+    "mode": "generate",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-3e742129-b8cc-4807-aae4-c071f40a6715.png"
+  },
+  {
+    "id": "walls-22",
+    "kind": "walls",
+    "floor": 22,
+    "file": "walls-22.png",
+    "references": [
+      "C:/chari-dungeon-release-final/art/thunder-concepts-floors21-25-v1/22-magnetite-mine.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production RPG WALL TILE atlas, TWO square tiles side-by-side in a strict 2-column 1-row landscape canvas. Both cells are fully opaque edge to edge: no transparent margin, no gutter, no border. Each tile shows a compact SQUARE FOOTPRINT of tightly packed LOW boulders viewed from above at a steep top-down RPG camera. The broad visible stone TOP SURFACES must occupy at least 80% of each cell and reach ALL FOUR edges to connect in both horizontal and vertical map runs. Only a short dark FRONT rock face along the lower 15% of the tile, giving a low waist-high wall. NOT a thin horizontal fence or row of stones floating within a square. No tall cliff, deep front face, background, floor around the rocks, objects, columns, text or aura. Dense big hand-painted crisp pixel clusters, not granular noise. Reference for material palette only. Material: black magnetite with sparse dull silver ore veins. Two subtly different variants. Low relief, readable light top faces, no glow.",
+    "mode": "generate",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-6ebbcb37-62b6-4434-ae34-f4618b67b6e7.png"
+  },
+  {
+    "id": "walls-23",
+    "kind": "walls",
+    "floor": 23,
+    "file": "walls-23.png",
+    "references": [
+      "C:/chari-dungeon-release-final/art/thunder-concepts-floors21-25-v1/23-thunder-engine.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production RPG WALL TILE atlas, TWO square tiles side-by-side in a strict 2-column 1-row landscape canvas. Both cells are fully opaque edge to edge: no transparent margin, no gutter, no border. Each tile shows a compact SQUARE FOOTPRINT of tightly packed LOW boulders viewed from above at a steep top-down RPG camera. The broad visible stone TOP SURFACES must occupy at least 80% of each cell and reach ALL FOUR edges to connect in both horizontal and vertical map runs. Only a short dark FRONT rock face along the lower 15% of the tile, giving a low waist-high wall. NOT a thin horizontal fence or row of stones floating within a square. No tall cliff, deep front face, background, floor around the rocks, objects, columns, text or aura. Dense big hand-painted crisp pixel clusters, not granular noise. Reference for material palette only. Material: blue-gray dressed stone with a few aged copper bands. Two subtly different variants. Low relief, readable light top faces, no glow.",
+    "mode": "generate",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-98ece79e-a451-4bcb-aebf-33462f5bc1f2.png"
+  },
+  {
+    "id": "walls-24",
+    "kind": "walls",
+    "floor": 24,
+    "file": "walls-24.png",
+    "references": [
+      "C:/chari-dungeon-release-final/art/thunder-concepts-floors21-25-v1/24-storm-serpent.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production RPG WALL TILE atlas, TWO square tiles side-by-side in a strict 2-column 1-row landscape canvas. Both cells are fully opaque edge to edge: no transparent margin, no gutter, no border. Each tile shows a compact SQUARE FOOTPRINT of tightly packed LOW boulders viewed from above at a steep top-down RPG camera. The broad visible stone TOP SURFACES must occupy at least 80% of each cell and reach ALL FOUR edges to connect in both horizontal and vertical map runs. Only a short dark FRONT rock face along the lower 15% of the tile, giving a low waist-high wall. NOT a thin horizontal fence or row of stones floating within a square. No tall cliff, deep front face, background, floor around the rocks, objects, columns, text or aura. Dense big hand-painted crisp pixel clusters, not granular noise. Reference for material palette only. Material: pale gray shrine rock with worn subtle wind engravings. Two subtly different variants. Low relief, readable light top faces, no glow.",
+    "mode": "generate",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-4eafaf00-f73b-4177-b436-3df256ce3c7f.png"
+  },
+  {
+    "id": "walls-25",
+    "kind": "walls",
+    "floor": 25,
+    "file": "walls-25.png",
+    "references": [
+      "C:/chari-dungeon-release-final/art/thunder-concepts-floors21-25-v1/25-thunder-tyrant.png"
+    ],
+    "prompt": "Use case: stylized-concept. Production RPG WALL TILE atlas, TWO square tiles side-by-side in a strict 2-column 1-row landscape canvas. Both cells are fully opaque edge to edge: no transparent margin, no gutter, no border. Each tile shows a compact SQUARE FOOTPRINT of tightly packed LOW boulders viewed from above at a steep top-down RPG camera. The broad visible stone TOP SURFACES must occupy at least 80% of each cell and reach ALL FOUR edges to connect in both horizontal and vertical map runs. Only a short dark FRONT rock face along the lower 15% of the tile, giving a low waist-high wall. NOT a thin horizontal fence or row of stones floating within a square. No tall cliff, deep front face, background, floor around the rocks, objects, columns, text or aura. Dense big hand-painted crisp pixel clusters, not granular noise. Reference for material palette only. Material: dark blue-black boulders with narrow aged copper bands and faint muted gold mineral veins. Two subtly different variants. Low relief, readable light top faces, no glow.",
+    "mode": "generate",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a08ed5-5e3c-77a0-8ea5-a1e27ef7525c\\exec-518256bc-d496-4a70-a655-b16ec4864adb.png"
+  }
+]
