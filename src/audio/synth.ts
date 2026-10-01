@@ -254,7 +254,7 @@ export async function renderBgm(name: BgmName): Promise<AudioBuffer> {
 
 interface SeSeg { type: Osc; f0: number; f1?: number; t: number; d: number; vol: number }
 
-const SE_SPECS: Record<SeName, { len: number; segs: SeSeg[] }> = {
+const SE_SPECS: Partial<Record<SeName, { len: number; segs: SeSeg[] }>> = {
   click: { len: 0.08, segs: [{ type: 'square', f0: 900, t: 0, d: 0.05, vol: 0.3 }] },
   step: { len: 0.08, segs: [{ type: 'noise', f0: 220, t: 0, d: 0.05, vol: 0.25 }] },
   attack: {
@@ -422,7 +422,12 @@ const SE_SPECS: Record<SeName, { len: number; segs: SeSeg[] }> = {
 
 // 仮効果音を合成して AudioBuffer を返す
 export async function renderSe(name: SeName): Promise<AudioBuffer> {
-  const spec = SE_SPECS[name];
+  // Skill WAVs are shipped with the game; fall back to the corresponding weapon sound if unavailable.
+  const skillFallback: Partial<Record<SeName, SeName>> = {
+    skillDagger: 'weaponDagger', skillLongsword: 'weaponLongsword', skillLance: 'weaponLance',
+    skillBow: 'weaponBow', skillHandgun: 'weaponHandgun', skillGreatsword: 'weaponGreatsword', skillDual: 'weaponDual'
+  };
+  const spec = SE_SPECS[skillFallback[name] ?? name]!;
   const sr = 44100;
   const ctx = new OfflineAudioContext(1, Math.ceil(sr * (spec.len + 0.15)), sr);
   const noise = makeNoise(ctx, 0.8);

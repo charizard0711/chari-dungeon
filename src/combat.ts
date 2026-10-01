@@ -20,13 +20,14 @@ function irand(min: number, max: number): number {
 }
 
 // プレイヤー→敵 の攻撃計算
-export function computePlayerAttack(p: Player, def: MonsterDef, backstab = false): AttackResult {
+export function computePlayerAttack(p: Player, def: MonsterDef, backstab = false,
+  options: { hits?: number; multiplier?: number; defenseIgnore?: number; consumeDurability?: boolean } = {}): AttackResult {
   const w = p.weapon;
   // 二刀流は2回斬る（1振りごとにダメージを算出して合算）
-  const hits = w?.dual ? 2 : 1;
+  const hits = options.hits ?? (w?.dual ? 2 : 1);
   let dmg = 0;
   for (let i = 0; i < hits; i++) {
-    const armorPierce = w?.passive?.key === 'pierce' ? 0.08 : 0;
+    const armorPierce = Math.max(options.defenseIgnore ?? 0, w?.passive?.key === 'pierce' ? 0.08 : 0);
     let hitDamage = Math.max(1, irand(p.atkMin, p.atkMax) - Math.floor(def.def * (1 - armorPierce) * 0.6));
     if (i === 1 && w?.passive?.key === 'twin_edge') hitDamage = Math.floor(hitDamage * 1.08);
     dmg += hitDamage;
@@ -54,6 +55,7 @@ export function computePlayerAttack(p: Player, def: MonsterDef, backstab = false
   if (p.hasMagic('DK') && (def.isDragonType || def.isElite || def.isBoss)) {
     dmg = Math.floor(dmg * 1.8);
   }
+  dmg = Math.max(1, Math.floor(dmg * (options.multiplier ?? 1)));
 
   // ドレイン
   let drain = 0;
@@ -66,9 +68,20 @@ export function computePlayerAttack(p: Player, def: MonsterDef, backstab = false
   // 武器耐久（敵の防御が高いほど壊れやすい。消耗は2倍でどんどん壊れる）
   let weaponBroke = false;
   let weaponRevived = false;
-  if (w) {
-    const wear = (1 + Math.floor(def.def / 4)) * 2;
-    w.dur -= wear;
+  if (w && options.consumeDurability !== false) {
+    ({ weaponBroke, weaponRevived } = consumeWeaponDurability(w, def.def));
+  }
+
+  // 撃破スコアボーナス（K）
+  const killScoreBonus = p.hasMagic('K') ? Math.floor(def.score * 0.5) : 0;
+
+  return { damage: dmg, hits, crit, fire, drain, poison, freeze, weaponBroke, weaponRevived, killScoreBonus };
+}
+
+/** Skills spend durability once per activation, even when hitting multiple targets. */
+export function consumeWeaponDurability(w: Weapon, defense: number) {
+    let weaponBroke = false, weaponRevived = false;
+    w.dur -= (1 + Math.floor(defense / 4)) * 2;
     if (w.dur <= 0) {
       const rMagic = w.magics.find((m) => m.code === 'R');
       if (rMagic && !w.repairUsed) {
@@ -80,12 +93,7 @@ export function computePlayerAttack(p: Player, def: MonsterDef, backstab = false
         weaponBroke = true;
       }
     }
-  }
-
-  // 撃破スコアボーナス（K）
-  const killScoreBonus = p.hasMagic('K') ? Math.floor(def.score * 0.5) : 0;
-
-  return { damage: dmg, hits, crit, fire, drain, poison, freeze, weaponBroke, weaponRevived, killScoreBonus };
+    return { weaponBroke, weaponRevived };
 }
 
 // 敵→プレイヤー の攻撃計算

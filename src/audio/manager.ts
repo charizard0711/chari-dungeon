@@ -5,13 +5,14 @@
 // - Phaser の sound マネージャー(ゲーム全体で共有)経由で再生
 // ========================================================================
 import Phaser from 'phaser';
-import { BGM_DEFS, SE_DEFS, BgmName, SeName } from './config';
+import { BGM_DEFS, SE_DEFS, FILE_BGM_NAMES, BgmName, SeName } from './config';
 import { renderBgm, renderSe } from './synth';
 
 class AudioManagerImpl {
   private game: Phaser.Game | null = null;
   private currentBgm: Phaser.Sound.BaseSound | null = null;
   private currentName: BgmName | null = null;
+  private pendingAudio = new Map<string, Promise<boolean>>();
 
   bgmVolume = 0.2;  // 初期音量20%
   seVolume = 0.2;   // 初期音量20%
@@ -46,7 +47,17 @@ class AudioManagerImpl {
   }
 
   // キャッシュに無ければ仮音源を合成して登録
-  private async ensure(key: string, make: () => Promise<AudioBuffer>): Promise<boolean> {
+  private ensure(key: string, make: () => Promise<AudioBuffer>): Promise<boolean> {
+    if (!this.game) return Promise.resolve(false);
+    if (this.game.cache.audio.exists(key)) return Promise.resolve(true);
+    const pending = this.pendingAudio.get(key);
+    if (pending) return pending;
+    const request = this.makeAudio(key, make).finally(() => this.pendingAudio.delete(key));
+    this.pendingAudio.set(key, request);
+    return request;
+  }
+
+  private async makeAudio(key: string, make: () => Promise<AudioBuffer>): Promise<boolean> {
     if (!this.game) return false;
     if (this.game.cache.audio.exists(key)) return true;
     try {
@@ -60,12 +71,29 @@ class AudioManagerImpl {
     }
   }
 
+  private async makeBgm(name: BgmName): Promise<AudioBuffer> {
+    if (FILE_BGM_NAMES.includes(name) && this.game?.sound instanceof Phaser.Sound.WebAudioSoundManager) {
+      try {
+        const response = await fetch(BGM_DEFS[name].path);
+        if (!response.ok) throw new Error(`BGM HTTP ${response.status}`);
+        return await this.game.sound.context.decodeAudioData(await response.arrayBuffer());
+      } catch (error) {
+        console.warn('BGM読み込み失敗。内蔵音源を使用:', name, error);
+      }
+    }
+    return renderBgm(name);
+  }
+
+  preloadBgm(name: BgmName) {
+    void this.ensure(BGM_DEFS[name].key, () => this.makeBgm(name));
+  }
+
   async playBgm(name: BgmName) {
     if (!this.game) return;
     if (this.currentName === name && this.currentBgm?.isPlaying) return;
     const def = BGM_DEFS[name];
     this.currentName = name;
-    const ok = await this.ensure(def.key, () => renderBgm(name));
+    const ok = await this.ensure(def.key, () => this.makeBgm(name));
     // 生成待ちの間に別のBGMへ切り替わっていたら何もしない
     if (!ok || this.currentName !== name) return;
     this.stopBgmSound();

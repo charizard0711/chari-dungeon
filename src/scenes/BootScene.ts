@@ -12,6 +12,7 @@ import { MONSTER_ANIMATIONS } from '../monsterAnimation';
 import { DIRECTIONAL_MONSTERS } from '../monsterDirections';
 import { HELD_EQUIPMENT, HELD_FRAME_SIZE } from '../equipmentAppearance';
 import { RUIN_TERRAIN_FLOORS, RUIN_TERRAIN_PARTS, RUIN_FLOOR_FRAME_SIZE, ruinTerrainKey, ruinFloorKey } from '../ruinTerrain';
+import { GAME_W, GAME_H } from '../layout';
 
 const EXPANSION_MONSTER_KEYS = [
   'm_deep_kraken', 'm_valzeon', 'm_selene', 'm_abyss_lord', 'm_astravein',
@@ -23,7 +24,7 @@ const EXPANSION_MONSTER_KEYS = [
   'm_dark_ninja', 'm_obsidian_shogun', 'm_storm_minotaur', 'm_star_griffin', 'm_lucky_rabbit',
   'm_skel', 'm_archer', 'm_slime',
   'm_ember_drake', 'm_frost_wyrm', 'm_storm_wyvern', 'm_brass_dragon', 'm_void_drake', 'm_bone_dragon',
-  'm_horn_demon', 'm_chain_demon', 'm_flame_gargoyle', 'm_abyss_hound', 'm_mask_fiend', 'm_archdemon',
+  'm_giant_bull', 'm_horn_demon', 'm_chain_demon', 'm_flame_gargoyle', 'm_abyss_hound', 'm_mask_fiend', 'm_archdemon',
   'm_bone_hound', 'm_skeleton_mage', 'm_death_knight', 'm_lich', 'm_bone_colossus', 'm_grave_crawler',
   'm_cerberus', 'm_hydra', 'm_crystal_crab', 'm_blood_moth', 'm_clockwork_chimera'
 ] as const;
@@ -163,11 +164,23 @@ const TERRAIN_PROP_ART = {
 } as const;
 
 export class BootScene extends Phaser.Scene {
+  private loadingText?: Phaser.GameObjects.Text;
+  private loadingStage = '画像';
   constructor() {
     super('BootScene');
   }
 
   preload() {
+    this.loadingStage = '画像';
+    this.add.text(GAME_W / 2, GAME_H / 2 - 35, 'ちゃりだんじょん', {
+      fontFamily: '"Yu Gothic UI", "Meiryo", sans-serif', fontSize: '24px', color: '#ffe1a0'
+    }).setOrigin(.5);
+    this.loadingText = this.add.text(GAME_W / 2, GAME_H / 2 + 20, '画像を読み込み中… 0%', {
+      fontFamily: '"Yu Gothic UI", "Meiryo", sans-serif', fontSize: '16px', color: '#c8e4e0'
+    }).setOrigin(.5);
+    this.load.on('progress', (progress: number) => {
+      this.loadingText?.setText(`${this.loadingStage}を読み込み中… ${Math.round(progress * 100)}%`);
+    });
     for (const art of HELD_EQUIPMENT) {
       this.load.spritesheet(art.textureKey, art.path, {frameWidth:HELD_FRAME_SIZE,frameHeight:HELD_FRAME_SIZE});
     }
@@ -328,7 +341,10 @@ export class BootScene extends Phaser.Scene {
     // 3) 実在する音源ファイルだけを読み込む
     //    （Viteは存在しないパスにindex.htmlを返すため、content-typeで実在判定する。
     //     実ファイルが無い音は manager 側で仮チップチューンが合成される）
-    const allAudio: AudioDef[] = [...Object.values(BGM_DEFS), ...Object.values(SE_DEFS)];
+    // 探索・ボスBGMはAudioManagerが後から取得し、タイトル表示を待たせない。
+    this.loadingStage = '効果音';
+    this.loadingText?.setText('効果音を準備中…');
+    const allAudio: AudioDef[] = [BGM_DEFS.title, ...Object.values(SE_DEFS)];
     const existing = await this.filterExistingAudio(allAudio);
     if (existing.length > 0) {
       await this.loadAudioFiles(existing);

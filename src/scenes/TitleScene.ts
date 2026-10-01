@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GAME_W, GAME_H } from '../main';
 import { Audio } from '../audio/manager';
+import { readRunSave } from '../runSave';
 import {
   getSelectedGender,
   isPlayerGender,
@@ -33,23 +34,49 @@ export class TitleScene extends Phaser.Scene {
       Audio.seOn = false;
     }
     Audio.playBgm('title');
+    // タイトル表示中に探索BGMを先読み。入力を待たせず、再生時も同じ要求を共有する。
+    Audio.preloadBgm('floor01');
 
+    const savedRun = readRunSave();
     let starting = false;
-    const startGame = () => {
+    const startGame = (resume = !!savedRun) => {
       if (starting) return;
       starting = true;
       if (!(location.hostname === 'localhost' && isPlayerGender(qaGender))) setSelectedGender(this.selectedGender);
       this.cameras.main.fadeOut(180, 2, 7, 8);
-      this.time.delayedCall(190, () => this.scene.start('GameScene'));
+      this.time.delayedCall(190, () => this.scene.start('GameScene', { resume }));
     };
 
     if (GAME_W < 700) this.createMobileTitle(startGame);
     else this.createArtworkTitle(startGame);
 
+    if (savedRun && !(location.hostname === 'localhost' && qaParams.has('qa-game') && !qaParams.has('qa-resume'))) {
+      const w = Math.min(GAME_W - 24, 440);
+      const y = GAME_H / 2;
+      this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x020708, .86).setDepth(50).setInteractive();
+      this.add.rectangle(GAME_W / 2, y, w, 300, 0x102125, 1).setStrokeStyle(2, 0xe7b85e).setDepth(51);
+      this.add.text(GAME_W / 2, y - 106, '保存した冒険があります', {
+        fontFamily: FONT, fontSize: '22px', color: '#ffe1a0', fontStyle: 'bold'
+      }).setOrigin(.5).setDepth(52);
+      const state = savedRun.snapshot.state;
+      this.add.text(GAME_W / 2, y - 63, `${state.floor}${state.inBossRoom ? '.5' : ''}F · Lv.${savedRun.snapshot.player.level} · ${state.turn}ターン`, {
+        fontFamily: FONT, fontSize: '15px', color: '#c8e4e0'
+      }).setOrigin(.5).setDepth(52);
+      this.makeButton(GAME_W / 2, y + 4, '続きから', () => startGame(true)).setDepth(52);
+      let confirmNew = false;
+      const newGame = this.add.text(GAME_W / 2, y + 81, '新しく始める', {
+        fontFamily: FONT, fontSize: '16px', color: '#bdc5c4', padding: { x: 18, y: 12 }
+      }).setOrigin(.5).setDepth(52).setInteractive({ useHandCursor: true });
+      newGame.on('pointerdown', () => {
+        if (confirmNew) startGame(false);
+        else { confirmNew = true; newGame.setText('保存を上書きして始める（もう一度押す）').setFontSize('13px'); }
+      });
+    }
+
     this.input.keyboard?.once('keydown-ENTER', (event: KeyboardEvent) => { event.preventDefault(); startGame(); });
     this.input.keyboard?.once('keydown-SPACE', (event: KeyboardEvent) => { event.preventDefault(); startGame(); });
     if (location.hostname === 'localhost' && qaParams.has('qa-game')) {
-      this.time.delayedCall(80, startGame);
+      this.time.delayedCall(80, () => startGame(qaParams.has('qa-resume')));
     }
   }
 
@@ -314,5 +341,6 @@ export class TitleScene extends Phaser.Scene {
     });
     // 一部タッチ環境でdownが取りこぼされた場合もupで補完する（開始処理側で二重実行を防止）。
     container.on('pointerup', onClick);
+    return container;
   }
 }

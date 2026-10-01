@@ -991,7 +991,7 @@ export function generateBossArena(floor: number): DungeonData {
   carveRoom(tiles, bossRoom);
 
   // 中央を広く保ち、四隅の柱だけでボス攻撃を避ける駆け引きを作る。
-  const pillarInset = floor === 20 ? 3 : isSuper ? 4 : 3;
+  const pillarInset = floor === 10 ? 1 : floor === 20 ? 3 : isSuper ? 4 : 3;
   const pillars: Vec2[] = [
     { x: bossRoom.x + pillarInset, y: bossRoom.y + pillarInset },
     { x: bossRoom.x + bossRoom.w - 1 - pillarInset, y: bossRoom.y + pillarInset },
@@ -1012,6 +1012,14 @@ export function generateBossArena(floor: number): DungeonData {
       { x: bossRoom.cx - 3, y: bossRoom.y + bossRoom.h - 2, part: 'prop-4', blocking: true },
       { x: bossRoom.cx + 3, y: bossRoom.y + bossRoom.h - 2, part: 'prop-4', blocking: true }
     ] };
+    if (floor === 10) {
+      // Bull sanctuary: perimeter ruins leave the central charge and sidestep lanes clear.
+      waterArena.props = [
+        ...pillars.map(p => ({ ...p, part: 'prop-2' as const, blocking: true })),
+        { x: bossRoom.x + 1, y: bossRoom.cy, part: 'prop-1', blocking: true },
+        { x: bossRoom.x + bossRoom.w - 2, y: bossRoom.cy, part: 'prop-1', blocking: true }
+      ];
+    }
     for (const prop of waterArena.props) tiles[prop.y][prop.x] = 'wall';
   } else if (floor >= 26 && floor <= 30) {
     if (floor === 30) for (let y = 0; y < roomH; y++) for (let x = 0; x < roomW; x++) {
@@ -1094,8 +1102,8 @@ export function generateBossArena(floor: number): DungeonData {
   }
 
   const start = { x: bossRoom.cx, y: bossRoom.y + bossRoom.h - 1 };
-  // 強ボス撃破後の出口は見失わないよう、部屋の完全な中央に置く。
-  const stairs = { x: bossRoom.cx, y: bossRoom.cy };
+  // The bull needs a clear central charge lane; its exit sits opposite the entrance.
+  const stairs = { x: bossRoom.cx, y: floor === 10 ? bossRoom.y : bossRoom.cy };
   tiles[start.y][start.x] = 'floor';
   tiles[stairs.y][stairs.x] = 'door';
   return {

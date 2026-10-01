@@ -18,11 +18,11 @@ export const BGM_DEFS = {
   // タイトル画面：明るく不思議なレトロBGM
   title:    { key: 'bgm_title',    path: 'assets/audio/bgm_title.mp3',    volume: 0.5,  loop: true },
   // 通常探索：1F〜30Fを通して「古樹と石環（ハープ版）」を流す
-  floor01:  { key: 'bgm_floor01',  path: 'assets/audio/bgm_floors_01_02.wav', volume: 0.5, loop: true },
+  floor01:  { key: 'bgm_floor01',  path: 'assets/audio/bgm_floors_01_02.mp3', volume: 0.5, loop: true },
   // 7x7中ボス部屋：入口封鎖から撃破まで「紅蓮ブースト」（184 BPM）
-  midboss:  { key: 'bgm_midboss',  path: 'assets/audio/bgm_midboss_crimson_boost.wav', volume: 0.16, loop: true },
+  midboss:  { key: 'bgm_midboss',  path: 'assets/audio/bgm_midboss_crimson_boost.mp3', volume: 0.16, loop: true },
   // 5階ごとの大ボス部屋：氷晶大聖堂（チェレスタ＋弦楽＋控えめな合唱）
-  boss:     { key: 'bgm_boss',     path: 'assets/audio/bgm_boss.wav', volume: 0.46, loop: true },
+  boss:     { key: 'bgm_boss',     path: 'assets/audio/bgm_boss.mp3', volume: 0.46, loop: true },
   // クリア：短い勝利ジングル
   clear:    { key: 'bgm_clear',    path: 'assets/audio/bgm_clear.mp3',    volume: 0.6,  loop: false },
   // ゲームオーバー：短い敗北ジングル
@@ -30,6 +30,8 @@ export const BGM_DEFS = {
 } satisfies Record<string, AudioDef>;
 
 export type BgmName = keyof typeof BGM_DEFS;
+// 配置済みの圧縮BGM。タイトル・ジングルは未配置のため内蔵音を使う。
+export const FILE_BGM_NAMES: readonly BgmName[] = ['floor01', 'midboss', 'boss'];
 
 // 階層 → BGMトラックのマッピング
 export function bgmForFloor(_floor: number): BgmName {
@@ -40,7 +42,7 @@ export function bgmForFloor(_floor: number): BgmName {
 export const SE_DEFS = {
   click:   { key: 'se_click',   path: 'assets/audio/se_click.mp3',   volume: 0.5 },  // UIクリック
   step:    { key: 'se_step',    path: 'assets/audio/se_step.mp3',    volume: 0.35 }, // 足音
-  attack:  { key: 'se_attack',  path: 'assets/audio/se_attack.mp3',  volume: 0.6 },  // 攻撃
+  attack:  { key: 'se_attack',  path: 'assets/audio/se_attack.wav',  volume: 0.6 },  // 素手の打撃
   weaponDagger:     { key: 'se_weapon_dagger',     path: 'assets/audio/se_weapon_dagger.wav',     volume: 0.48 },
   weaponLongsword:  { key: 'se_weapon_longsword',  path: 'assets/audio/se_weapon_longsword.wav',  volume: 0.52 },
   weaponLance:      { key: 'se_weapon_lance',      path: 'assets/audio/se_weapon_lance.wav',      volume: 0.54 },
@@ -48,6 +50,13 @@ export const SE_DEFS = {
   weaponHandgun:    { key: 'se_weapon_handgun',    path: 'assets/audio/se_weapon_handgun.wav',    volume: 0.54 },
   weaponGreatsword: { key: 'se_weapon_greatsword', path: 'assets/audio/se_weapon_greatsword.wav', volume: 0.56 },
   weaponDual:       { key: 'se_weapon_dual',       path: 'assets/audio/se_weapon_dual.wav',       volume: 0.50 },
+  skillDagger: { key: 'se_skill_dagger', path: 'assets/audio/se_skill_dagger.wav', volume: 0.58 },
+  skillLongsword: { key: 'se_skill_longsword', path: 'assets/audio/se_skill_longsword.wav', volume: 0.58 },
+  skillLance: { key: 'se_skill_lance', path: 'assets/audio/se_skill_lance.wav', volume: 0.58 },
+  skillBow: { key: 'se_skill_bow', path: 'assets/audio/se_skill_bow.wav', volume: 0.58 },
+  skillHandgun: { key: 'se_skill_handgun', path: 'assets/audio/se_skill_handgun.wav', volume: 0.54 },
+  skillGreatsword: { key: 'se_skill_greatsword', path: 'assets/audio/se_skill_greatsword.wav', volume: 0.58 },
+  skillDual: { key: 'se_skill_dual', path: 'assets/audio/se_skill_dual.wav', volume: 0.58 },
   elementFire:    { key: 'se_element_fire',    path: 'assets/audio/se_element_fire.mp3',    volume: 0.62 }, // 火属性攻撃
   elementWater:   { key: 'se_element_water',   path: 'assets/audio/se_element_water.mp3',   volume: 0.58 }, // 水属性攻撃
   elementThunder: { key: 'se_element_thunder', path: 'assets/audio/se_element_thunder.mp3', volume: 0.62 }, // 雷属性攻撃

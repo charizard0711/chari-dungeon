@@ -23,8 +23,10 @@ import { customFloorBoss } from '../customFloorBosses';
 import { getMonsterAnimation, monsterAnimationFrame } from '../monsterAnimation';
 import type { MonsterAction } from '../monsterAnimation';
 import { DIRECTIONAL_MONSTERS, MONSTER_DIRECTION_FRAME, monsterDirectionPose } from '../monsterDirections';
-import { computePlayerAttack, computeEnemyAttack } from '../combat';
+import { computePlayerAttack, computeEnemyAttack, consumeWeaponDurability } from '../combat';
+import { planSkill, weaponSkill, directionVector } from '../weaponSkills';
 import { Audio } from '../audio/manager';
+import { clearRunSave, pickFields, readRunSave, writeRunSave, type RunSnapshot } from '../runSave';
 import { bgmForFloor, elementAttackSe, weaponAttackSe } from '../audio/config';
 import { enhancementChance, EQUIPMENT_LIMIT, ITEM_SELL_PRICES, SCROLL_DROP_RATE, SHOP_PRICES, type ShopItemKind } from '../balance';
 import { getFloorLayoutProfile } from '../floorLayout';
@@ -52,6 +54,20 @@ import {
 import { MAP_X, MAP_Y, MAP_W, MAP_H } from '../layout';
 
 const ANIM = 116;
+const RUN_STATE_KEYS = [
+  'floor', 'turn', 'floorTurn', 'score', 'floorStartHp', 'floorDamaged', 'floorBossDefeated',
+  'inBossRoom', 'bossRewardClaimed', 'bossEntranceClosed', 'weaponWonThisFloor', 'reviveSeedSeen',
+  'shopPurchases', 'enhancementScrollDrops', 'reservedBossScroll', 'pendingEquipment',
+  'secretDualUnlocked', 'itemCatalogUnlocked', 'playerRootTurns', 'itemSealTurns', 'playerGender',
+  'playerArmor', 'lightRadius', 'shroomTurns', 'torchTurns', 'lanternTurns', 'invisTurns',
+  'transformation', 'penaltyFlags', 'skillChargeSteps'
+] as const;
+const ENEMY_STATE_KEYS = [
+  'def', 'hp', 'hpMax', 'x', 'y', 'baseScale', 'slowToggle', 'freezeTurns', 'sealTurns', 'poisonTurns',
+  'loopDir', 'lineDir', 'facing', 'moveSteps', 'stealthRevealed', 'gimmickCounter', 'gimmickPhase',
+  'vulnerableTurns', 'guardOpenTurns', 'stunnedTurns', 'awakened', 'revived', 'regenBlockedTurns',
+  'summoned', 'cloneDepth', 'charging', 'chargeDir', 'plannedMove'
+] as const;
 // 探索画面のズーム倍率（大きいほど拡大。1.0=等倍）
 const MAP_ZOOM = 1.95;
 // アンチエイリアスとカメラ拡大で生じる細い隙間を隠すため、地形同士を少し重ねる。
@@ -96,7 +112,7 @@ const MID_DRAGONS: { key: string; name: string; tint: number }[] = [
 
 const MILESTONE_BOSSES: Record<number, { key: string; name: string; tint: number; scale: number; hp: number; atkMin: number; atkMax: number; def: number }> = {
   5: { key: 'm_archdemon', name: '封印王アウレリウス', tint: 0xffc96b, scale: 1.72, hp: 96, atkMin: 6, atkMax: 11, def: 4 },
-  10: { key: 'm_horn_demon', name: 'グランドバイソン', tint: 0xc98b52, scale: 1.82, hp: 150, atkMin: 9, atkMax: 16, def: 7 },
+  10: { key: 'm_giant_bull', name: '巨角の猛牛', tint: 0xc98b52, scale: 1.82, hp: 150, atkMin: 9, atkMax: 16, def: 7 },
   15: { key: 'm_ice_behemoth', name: '氷晶王ベヒーモス', tint: 0x8adfff, scale: 1.85, hp: 220, atkMin: 11, atkMax: 19, def: 10 },
   20: { key: 'm_valgrado', name: '熔獄竜ヴァルグラド', tint: 0xff783d, scale: 2.7, hp: 310, atkMin: 14, atkMax: 23, def: 12 },
   25: { key: 'm_raiga', name: '轟雷王ライガ', tint: 0xa7d7ff, scale: 2.35, hp: 410, atkMin: 17, atkMax: 28, def: 15 },
@@ -337,6 +353,9 @@ export class GameScene extends Phaser.Scene {
   itemCatalogUnlocked = false;
   playerRootTurns = 0;
   itemSealTurns = 0;
+  skillChargeSteps = 100;
+  private skillRangePreview?: Phaser.GameObjects.Graphics;
+  private skillRangePreviewKey = '';
 
   playerSprite!: Phaser.GameObjects.Image;
   playerShadow?: Phaser.GameObjects.Image; // 足元の影（接地感）
@@ -380,13 +399,20 @@ export class GameScene extends Phaser.Scene {
   holdStartedAt = 0;
   holdBoostTier = 0; // 0=通常 / 1=BOOST / 2=MAX BOOST
   touchDir: Dir | null = null; // スマホ用十字ボタンの押しっぱなし方向（UISceneが設定）
+  private savePending = false;
+  private saveWarningShown = false;
+  private restoringRun = false;
   boostBadge?: Phaser.GameObjects.Text;
 
   constructor() {
     super('GameScene');
   }
 
-  create() {
+  create(data?: { resume?: boolean }) {
+    const resume = data?.resume ? readRunSave()?.snapshot : undefined;
+    this.restoringRun = true;
+    this.savePending = false;
+    this.saveWarningShown = false;
     // 状態初期化
     this.player = new Player();
     const qaParams = new URLSearchParams(location.search);
@@ -455,6 +481,7 @@ export class GameScene extends Phaser.Scene {
     this.pendingEquipment = null;
     this.secretDualUnlocked = false;
     this.itemCatalogUnlocked = false;
+    this.skillChargeSteps = 100;
     this.playerAnimation = new PlayerAnimation();
     this.playerAttacking = false;
     this.playerAnimToken = 0;
@@ -516,11 +543,17 @@ export class GameScene extends Phaser.Scene {
     kb.on('keyup', this.handleMoveKeyUp, this);
     const descendKey = (event: KeyboardEvent) => { event.preventDefault(); this.tryDescend(); };
     kb.on('keydown-ENTER', descendKey);
+    const skillKey = (event: KeyboardEvent) => {
+      event.preventDefault();
+      if (!event.repeat) void this.useWeaponSkill();
+    };
+    kb.on('keydown-Q', skillKey);
     this.game.events.on(Phaser.Core.Events.BLUR, this.clearMoveInput, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       kb.off('keydown', this.handleMoveKeyDown, this);
       kb.off('keyup', this.handleMoveKeyUp, this);
       kb.off('keydown-ENTER', descendKey);
+      kb.off('keydown-Q', skillKey);
       this.game.events.off(Phaser.Core.Events.BLUR, this.clearMoveInput, this);
       this.queuedMove = null;
     });
@@ -541,7 +574,22 @@ export class GameScene extends Phaser.Scene {
       backgroundColor: '#000000aa', padding: { x: 4, y: 2 }
     }).setDepth(30).setVisible(false);
 
-    this.buildFloor(startFloor, this.qaBossMode);
+    this.buildFloor(resume?.state.floor ?? startFloor, resume?.state.inBossRoom ?? this.qaBossMode, resume);
+    this.restoringRun = false;
+    const saveOnLeave = () => this.saveRun();
+    const saveOnHidden = () => { if (document.visibilityState === 'hidden') this.saveRun(); };
+    window.addEventListener('pagehide', saveOnLeave);
+    document.addEventListener('visibilitychange', saveOnHidden);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      window.removeEventListener('pagehide', saveOnLeave);
+      document.removeEventListener('visibilitychange', saveOnHidden);
+    });
+    this.saveRun();
+    if (resume) {
+      this.log('保存した冒険の続きから再開しました。', 'sys');
+      this.time.delayedCall(50, () => this.emitRefresh());
+      return;
+    }
     if (location.hostname === 'localhost' && qaParams.has('qa-torch')) {
       this.player.inventory.push(makeItem('torch'));
     }
@@ -735,7 +783,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ============ フロア生成 ============
-  buildFloor(floor: number, bossRoom = false) {
+  buildFloor(floor: number, bossRoom = false, snapshot?: RunSnapshot) {
     this.clearMoveInput();
     if (this.player.fountainBlessingFloor !== floor) this.player.fountainBlessingFloor = null;
     this.floor = floor;
@@ -809,7 +857,8 @@ export class GameScene extends Phaser.Scene {
     for (const m of this.ambientMotes) m.sprite.destroy();
     this.ambientMotes = [];
 
-    this.dungeon = bossRoom ? generateBossArena(floor) : generateDungeon(floor, this.qaBossRoomZone);
+    if (snapshot) this.restoreRunState(snapshot);
+    this.dungeon = snapshot?.dungeon ?? (bossRoom ? generateBossArena(floor) : generateDungeon(floor, this.qaBossRoomZone));
     const d = this.dungeon;
 
     // explored初期化
@@ -819,6 +868,9 @@ export class GameScene extends Phaser.Scene {
       this.explored[y] = [];
       for (let x = 0; x < d.w; x++) this.explored[y][x] = false;
     }
+    if (snapshot) this.explored = snapshot.explored;
+    this.openedOptionalRooms = snapshot
+      ? new Set(snapshot.openedRooms.map(index => d.optionalRooms[index])) : new Set();
 
     // タイル描画（系統サフィックスは4種、色合いは2階ごとに変える）
     const theme = getTheme(floor);
@@ -857,9 +909,11 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBounds(-padX, -padY, Math.max(MAP_W, worldW), Math.max(MAP_H, worldH));
 
     // プレイヤー配置
-    this.player.x = d.start.x;
-    this.player.y = d.start.y;
-    this.player.dir = 'down';
+    if (!snapshot) {
+      this.player.x = d.start.x;
+      this.player.y = d.start.y;
+      this.player.dir = 'down';
+    }
     if (!this.playerSprite) {
       // 足元の影
       this.playerShadow = this.add.image(0, 0, 'shadow').setDepth(10.5).setAlpha(0.7);
@@ -872,29 +926,29 @@ export class GameScene extends Phaser.Scene {
       this.equipmentRenderer = new EquipmentRenderer(this);
       this.weaponSprite = this.equipmentRenderer.weapon;
     }
-    this.setPlayerVisual('down', 'idle');
-    this.placeSprite(this.playerSprite, d.start.x, d.start.y);
+    this.setPlayerVisual(this.player.dir, 'idle');
+    this.placeSprite(this.playerSprite, this.player.x, this.player.y);
     this.playerShadow?.setPosition(this.playerSprite.x, this.playerSprite.y + 13);
     this.updatePlayerAura();
     this.refreshTransformationVisual();
     // Keep sub-pixel movement, matching the antialiased renderer in main.ts.
     this.cameras.main.startFollow(this.playerSprite, false, 0.15, 0.15);
-    this.cameras.main.setZoom(floor === 30 && bossRoom ? Math.min(MAP_ZOOM, this.cameras.main.width / (27 * TILE), this.cameras.main.height / (22 * TILE)) : MAP_ZOOM);
-    if (floor === 30 && bossRoom && d.bossRoom) {
-      this.cameras.main.stopFollow();
-      this.cameras.main.centerOn((d.bossRoom.x + d.bossRoom.w / 2) * TILE, (d.bossRoom.y + d.bossRoom.h / 2) * TILE);
-    }
+    this.cameras.main.setZoom(MAP_ZOOM);
 
     // 敵配置
-    if (!bossRoom) {
-      this.spawnDungeonObjects(floor);
-      this.spawnRoomProps(floor);
-    }
-    this.spawnEnemies(floor);
-    if (!bossRoom) {
-      // 通常迷宮だけに探索用の宝箱とアイテムを置く。
-      this.spawnChests(floor);
-      this.spawnGroundItems(floor);
+    if (snapshot) {
+      this.restoreRunEntities(snapshot);
+    } else {
+      if (!bossRoom) {
+        this.spawnDungeonObjects(floor);
+        this.spawnRoomProps(floor);
+      }
+      this.spawnEnemies(floor);
+      if (!bossRoom) {
+        // 通常迷宮だけに探索用の宝箱とアイテムを置く。
+        this.spawnChests(floor);
+        this.spawnGroundItems(floor);
+      }
     }
 
     const qaParamsForFloor = new URLSearchParams(location.search);
@@ -973,7 +1027,8 @@ export class GameScene extends Phaser.Scene {
     }
     this.events.emit('floor', floor);
     // BGMは2階ごとに切り替わる。
-    Audio.playBgm(bossRoom ? 'boss' : bgmForFloor(floor));
+    Audio.playBgm(bossRoom ? 'boss' : this.bossEntranceClosed ? 'midboss' : bgmForFloor(floor));
+    this.savePending = true;
   }
 
   terrainConnectionMask(x: number, y: number): number {
@@ -1067,6 +1122,7 @@ export class GameScene extends Phaser.Scene {
         const tile = this.dungeon.tiles[y + dy]?.[x + dx];
         return tile && tile !== 'wall';
       }));
+      if (this.floor === 10 && this.inBossRoom) return { key: ruinTerrainKey(1, (x+y)%3 ? 'wall-a' : 'wall-b') };
       if (arena && !touchesFloor) return { key: 'terrain_water_surface' };
       const wallKey = waterTerrainKey(this.floor, (x * 13 + y * 7) % 3 === 0 ? 'wall-b' : 'wall-a');
       return { key: `${wallKey}_${arena ? 'water' : 'ground'}` };
@@ -1141,6 +1197,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   waterFloorVisual(x: number, y: number): TerrainVisual {
+    if (this.floor === 10 && this.inBossRoom) {
+      const edge = [[0,-1],[0,1],[-1,0],[1,0]].some(([dx,dy]) => this.dungeon.tiles[y+dy]?.[x+dx] === 'wall');
+      return { key: ruinFloorKey(1), frame: ruinFloorFrame(1, x, y, edge) };
+    }
     const edge = [[0, -1], [0, 1], [-1, 0], [1, 0]].some(([dx, dy]) => this.dungeon.tiles[y + dy]?.[x + dx] === 'wall');
     return { key: waterTerrainKey(this.floor, 'floor'), frame: waterFloorFrame(this.floor, x, y, edge) };
   }
@@ -1229,12 +1289,12 @@ export class GameScene extends Phaser.Scene {
       for (const prop of this.dungeon.waterArena.props) {
         const size = this.floor === 10 ? 1.65 : 1.4;
         const sprite = this.add.image(prop.x * TILE + TILE / 2, prop.y * TILE + TILE / 2,
-          waterTerrainKey(this.floor, prop.part)).setOrigin(.5, .78)
+          (this.floor === 10 ? ruinTerrainKey(1, prop.part === 'prop-2' ? 'relic' : 'rubble') : waterTerrainKey(this.floor, prop.part))).setOrigin(.5, .78)
           .setDisplaySize(TILE * size, TILE * size).setVisible(false)
           .setDepth(this.worldDepth(prop.y * TILE + TILE, -.2));
         this.bossRoomDecorSprites.push(sprite);
       }
-      this.createBossFloorDecor(0x78b6b1);
+      this.createBossFloorDecor(this.floor === 10 ? 0xc98b52 : 0x78b6b1);
       return;
     }
     if (this.dungeon.glacialArena) {
@@ -1276,8 +1336,12 @@ export class GameScene extends Phaser.Scene {
     if (this.dungeon.waterArena) {
       if (this.floor === 10) {
         const g = this.add.graphics().setDepth(.35).setVisible(false);
-        g.lineStyle(1, 0x87aaa0, .22);
-        g.strokeCircle((room.cx + .5) * TILE, (room.cy + .5) * TILE, TILE * 2.6);
+        const cx = (room.cx + .5) * TILE, cy = (room.cy + .5) * TILE;
+        g.lineStyle(1.5, 0xb69b59, .26).strokeCircle(cx, cy, TILE * 3.2);
+        g.lineStyle(1, 0xb69b59, .18).strokeCircle(cx, cy, TILE * 2.9);
+        // Horn-shaped engraving stays below actors and charge warnings.
+        g.beginPath().arc(cx - TILE*.7, cy, TILE*.8, -.9, 1.7).strokePath();
+        g.beginPath().arc(cx + TILE*.7, cy, TILE*.8, 1.4, 4).strokePath();
         this.bossFloorDecor = g;
       }
       return;
@@ -1525,7 +1589,7 @@ export class GameScene extends Phaser.Scene {
       isBoss: false,
       isFloorBoss: true,
       isDragonType: custom ? custom.isDragonType : true,
-      bossTint: custom ? 0xffffff : spec.tint
+      bossTint: custom || floor === 10 ? 0xffffff : spec.tint
     };
     const message = fieldPlacement
       ? `◆ ${floor}F 中ボス「${def.name}」が迷宮内のどこかに現れた！`
@@ -2298,7 +2362,7 @@ export class GameScene extends Phaser.Scene {
         if (p.x !== e.x && p.y !== e.y) return null;
         tiles = this.bossChargePath(e);
         if (tiles.length < 2) return null;
-        message = 'グランドバイソンが突進の構え！ 横へ避ければ壁へ激突する。';
+        message = `${e.def.name}が突進の構え！ 横へ避ければ壁へ激突する。`;
         break;
       case 'furnace_titan':
         tiles = this.bossCrossTiles(p.x, p.y, 2);
@@ -2669,7 +2733,7 @@ export class GameScene extends Phaser.Scene {
     this.log(`${broken.name}は壊れて砕け散った！`, 'dmg');
     Audio.playSe('break');
     this.player.shields = this.player.shields.filter((shield) => shield !== broken);
-    this.player.shield = this.player.shields[0] ?? null;
+    this.player.shield = this.player.weapon?.dual || this.player.weapon?.weaponType === 'bow' ? null : this.player.shields[0] ?? null;
   }
 
   spawnBossWalls(e: Enemy, candidates: Vec2[], count: number, kind: 'bone' | 'iron') {
@@ -3088,6 +3152,12 @@ export class GameScene extends Phaser.Scene {
       duration: 150, ease: 'Quad.easeIn', onComplete: () => object.sprite.destroy()
     });
 
+    // 樽だけは50%で空。壺の報酬と、当選時の中身・数量は維持する。
+    if (object.kind === 'barrel' && Math.random() >= 0.5) {
+      this.log('樽の中は空だった。', 'sys');
+      this.updateVisibility();
+      return;
+    }
     const roll = Math.random();
     if (roll < 0.32) {
       const gold = 12 + Math.floor(Math.random() * (20 + this.floor * 3));
@@ -3198,6 +3268,185 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ============ プレイヤー行動 ============
+  showSkillRangePreview(show: boolean) {
+    const ui = this.scene.get('UIScene') as { overlayMode?: string } | undefined;
+    const type = this.player?.weapon?.weaponType;
+    const skill = weaponSkill(type);
+    if (!show || !type || !skill || this.gameEnded || this.busy || ui?.overlayMode !== 'none') {
+      this.skillRangePreview?.setVisible(false);
+      this.skillRangePreviewKey = '';
+      return;
+    }
+    const plan = planSkill(type, this.player, this.player.dir, {
+      blocked: (x, y) => this.skillTileBlocked(x, y),
+      enemyAt: (x, y) => this.enemyAt(x, y),
+      canHit: () => true
+    });
+    const key = type + ':' + plan.tiles.map(p => p.x + ',' + p.y).join(';');
+    if (!this.skillRangePreview?.active) this.skillRangePreview = this.add.graphics().setDepth(2);
+    this.skillRangePreview.setVisible(true);
+    if (key === this.skillRangePreviewKey) return;
+    this.skillRangePreviewKey = key;
+    const g = this.skillRangePreview.clear();
+    g.fillStyle(skill.color, .2).lineStyle(1.5, skill.color, .8);
+    for (const tile of plan.tiles) {
+      g.fillRect(tile.x*TILE+2, tile.y*TILE+2, TILE-4, TILE-4);
+      g.strokeRect(tile.x*TILE+2, tile.y*TILE+2, TILE-4, TILE-4);
+    }
+  }
+
+  get skillStepsRemaining() {
+    return Math.max(0, 100 - this.skillChargeSteps);
+  }
+
+  private skillTileBlocked(x: number, y: number) {
+    const tile = this.dungeon.tiles[y]?.[x];
+    const entrance = this.dungeon.bossEntrance;
+    return !tile || !isWalkable(tile) || ['pit', 'door', 'roomDoor'].includes(tile)
+      || !!this.dungeonObjectAt(x, y) || !!this.bossObstacleAt(x, y)
+      || !!(this.bossEntranceClosed && entrance && entrance.x === x && entrance.y === y)
+      || (this.inBossRoom && !this.isInsideBossCombatFrame(x, y));
+  }
+
+  async useWeaponSkill() {
+    const ui = this.scene.get('UIScene') as { overlayMode?: string } | undefined;
+    if (this.busy || this.gameEnded || ui?.overlayMode && ui.overlayMode !== 'none' || this.pendingEquipment) return false;
+    const weapon = this.player.weapon;
+    const skill = weaponSkill(weapon?.weaponType);
+    if (!weapon || !skill) return false;
+    const deny = (message: string) => { this.log(message, 'sys'); Audio.playSe('deny'); return false; };
+    if (this.skillStepsRemaining > 0) return deny(`スキルはあと${this.skillStepsRemaining}歩で使える。`);
+    const plan = planSkill(weapon.weaponType, this.player, this.player.dir, {
+      blocked: (x, y) => this.skillTileBlocked(x, y),
+      enemyAt: (x, y) => this.enemyAt(x, y),
+      canHit: e => !e.def.isFloorBoss || !this.dungeon.bossRoom
+        || this.isInsideBossRoom(this.player.x, this.player.y) && this.isInsideBossRoom(e.x, e.y)
+    });
+    let destination: Vec2 | undefined;
+    if (weapon.weaponType === 'dagger' && plan.targets.length) {
+      if (this.playerRootTurns > 0) return deny('足を取られて背後へ移動できない。');
+      const enemy = plan.targets[0];
+      const facing = directionVector(enemy.facing);
+      const distance = bossBodyRadius(enemy.def) + 1;
+      destination = { x: enemy.x - facing.x * distance, y: enemy.y - facing.y * distance };
+      if (this.skillTileBlocked(destination.x, destination.y) || this.enemyAt(destination.x, destination.y)
+        || this.chestAt(destination.x, destination.y) || this.dungeon.tiles[destination.y]?.[destination.x] === 'stairs'
+        || this.dungeon.teleportPads.some(p => p.x === destination!.x && p.y === destination!.y)
+        || enemy.def.isFloorBoss && !this.isInsideBossRoom(destination.x, destination.y)) {
+        return deny('敵の背後へ移動できない。');
+      }
+    }
+    this.clearMoveInput();
+    this.busy = true;
+    this.playerAnimToken++;
+    this.playerAttacking = true;
+    this.skillChargeSteps = 0;
+    const origin = { x: this.player.x, y: this.player.y };
+    const direction = this.player.dir;
+    const maxDefense = Math.max(0, ...plan.targets.map(e => e.def.def));
+    Audio.playSe(skill.sound);
+    this.log(`${skill.name}！`, 'special');
+    this.emitRefresh();
+    try {
+      this.setPlayerVisual(direction, 'atkWindup');
+      if (destination) {
+        this.effectFx(origin.x, origin.y, 'fx_magic', 1.35, 250, skill.color);
+        await this.tween(this.playerSprite, { alpha: .08 }, 90, 'Quad.easeIn');
+        this.player.x = destination.x; this.player.y = destination.y;
+        this.player.dir = plan.targets[0].facing;
+        this.placeSprite(this.playerSprite, destination.x, destination.y);
+        this.playerSprite.setAlpha(this.invisTurns > 0 ? .4 : 1);
+        this.onEnterTile(destination.x, destination.y);
+        this.effectFx(destination.x, destination.y, 'fx_magic', 1.3, 250, skill.color);
+      }
+      this.setPlayerVisual(this.player.dir, 'atk');
+      this.drawSkillEffect(weapon.weaponType, origin, direction, plan.tiles, skill.color);
+      await new Promise<void>(resolve => this.time.delayedCall(destination ? 90 : weapon.weaponType === 'bow' ? 450 : weapon.weaponType === 'greatsword' ? 270 : weapon.weaponType === 'handgun' ? 10 : 150, resolve));
+      const shots = weapon.weaponType === 'handgun' ? 3 : 1;
+      for (let shot = 0; shot < shots && !this.gameEnded; shot++) {
+        for (const enemy of plan.targets) {
+          if (!enemy.alive || !this.enemies.includes(enemy) || this.gameEnded) continue;
+          const result = computePlayerAttack(this.player, enemy.def, weapon.weaponType === 'dagger', {
+            consumeDurability: false, multiplier: skill.multiplier,
+            hits: weapon.dual ? 2 : 1, defenseIgnore: weapon.weaponType === 'lance' ? .5 : 0
+          });
+          const damage = this.playerDamageAgainstGimmick(enemy, result.damage);
+          enemy.hp -= damage;
+          this.afterPlayerHitGimmick(enemy, weapon.element);
+          this.discovered.add(enemy.def.key);
+          this.hitFx(enemy.x, enemy.y);
+          this.effectFx(enemy.x, enemy.y, 'fx_slash', 1.2, 230, skill.color);
+          this.flashSprite(enemy.sprite);
+          this.log(`${skill.name}：${enemy.def.name}に${damage}ダメージ${result.crit ? '（会心）' : ''}`, result.crit ? 'special' : 'dmg');
+          if (result.drain > 0) this.player.heal(result.drain);
+          if (result.poison && enemy.hp > 0) { enemy.poisonTurns = 3; this.poisonFx(enemy.x, enemy.y); }
+          if (result.freeze && enemy.hp > 0) this.freezeEnemy(enemy, 2);
+          if (enemy.hp <= 0 && enemy.def.gimmick === 'revive' && !enemy.revived) {
+            enemy.revived = true; enemy.hp = Math.max(1, Math.floor(enemy.hpMax * .25));
+            this.log(`${enemy.def.name}が骨を組み直して復活した！`, 'special');
+            this.effectFx(enemy.x, enemy.y, 'fx_levelup', 1.6, 520, 0xc7eaff);
+          } else if (enemy.hp <= 0) this.killEnemy(enemy, result.killScoreBonus);
+          if (enemy.alive) {
+            if (weapon.weaponType === 'greatsword') await this.knockbackEnemy(enemy, Math.sign(enemy.x - origin.x), Math.sign(enemy.y - origin.y));
+            this.drawEnemyHp(enemy);
+          }
+        }
+        if (shot < shots - 1) await new Promise<void>(resolve => this.time.delayedCall(110, resolve));
+      }
+      const wear = consumeWeaponDurability(weapon, maxDefense);
+      if (wear.weaponRevived) this.log('武器のリペア効果が発動！ 壊れずに復活した。', 'special');
+      if (wear.weaponBroke) {
+        this.log(`${weapon.name}は壊れて消滅した…`, 'dmg'); Audio.playSe('break');
+        this.player.weapons = this.player.weapons.filter(w => w !== weapon);
+        this.player.weapon = this.player.weapons[0] ?? null;
+        if ((this.player.weapon?.dual || this.player.weapon?.weaponType === 'bow')) this.player.shield = null;
+        this.updatePlayerAura();
+      }
+      this.playerAttacking = false;
+      if (!this.gameEnded) {
+        this.setPlayerVisual(this.player.dir, 'idle');
+        await this.finishTurn();
+      }
+      return true;
+    } catch (error) {
+      console.error('スキル処理に失敗しました', error);
+      return false;
+    } finally {
+      this.playerAttacking = false;
+      this.busy = false;
+      if (!this.gameEnded) this.setPlayerVisual(this.player.dir, 'idle');
+      this.emitRefresh();
+      this.saveRun();
+    }
+  }
+
+  private drawSkillEffect(type: Weapon['weaponType'], origin: Vec2, dir: Dir, tiles: Vec2[], color: number) {
+    if (type === 'dagger') { this.slashFx(this.player.x, this.player.y, color); return; }
+    const x = origin.x * TILE + TILE / 2, y = origin.y * TILE + TILE / 2;
+    const graphics = this.add.graphics().setDepth(24).setBlendMode(Phaser.BlendModes.ADD);
+    graphics.lineStyle(3, color, .75);
+    if (type === 'greatsword') {
+      graphics.strokeCircle(x, y, TILE * 1.35);
+      graphics.lineStyle(7, color, .22).strokeCircle(x, y, TILE * 1.25);
+    } else {
+      const d = directionVector(dir);
+      for (const tile of tiles) {
+        const tx = tile.x * TILE + TILE / 2, ty = tile.y * TILE + TILE / 2;
+        if (type === 'dual_sword' || type === 'twin_daggers') {
+          graphics.lineBetween(tx - 11, ty - 11, tx + 11, ty + 11);
+          graphics.lineBetween(tx - 11, ty + 11, tx + 11, ty - 11);
+        } else if (type === 'longsword') {
+          graphics.beginPath().arc(tx, ty, 15, Math.atan2(d.y, d.x) - 1.1, Math.atan2(d.y, d.x) + 1.1).strokePath();
+        } else {
+          graphics.lineBetween(tx - d.x * 13, ty - d.y * 13, tx + d.x * 13, ty + d.y * 13);
+        }
+      }
+      const last = tiles[tiles.length - 1];
+      if (last && type !== 'longsword') graphics.lineStyle(7, color, .17).lineBetween(x, y, last.x * TILE + TILE / 2, last.y * TILE + TILE / 2);
+    }
+    this.tweens.add({ targets: graphics, alpha: 0, duration: type === 'bow' ? 600 : 450, onComplete: () => graphics.destroy() });
+  }
+
   async playerAct(dir: Dir) {
     if (this.busy || this.gameEnded) return;
     try {
@@ -3351,6 +3600,7 @@ export class GameScene extends Phaser.Scene {
       this.setPlayerVisual(dir, 'walk1');
       this.player.x = nx;
       this.player.y = ny;
+      this.skillChargeSteps = Math.min(100, this.skillChargeSteps + 1);
       await this.tween(this.playerSprite, {
         x: nx * TILE + TILE / 2, y: ny * TILE + TILE / 2
       }, moveDuration, this.holdBoostTier > 0 ? 'Quad.easeOut' : 'Sine.easeInOut');
@@ -3372,6 +3622,7 @@ export class GameScene extends Phaser.Scene {
     } finally {
       // Floor transitions own the input lock until the camera finishes fading.
       if (!this.cameras.main.fadeEffect.isRunning) this.busy = false;
+      this.saveRun();
     }
   }
 
@@ -3634,13 +3885,12 @@ export class GameScene extends Phaser.Scene {
     e.hp -= dealtDamage;
     this.afterPlayerHitGimmick(e, weaponElement);
     this.discovered.add(e.def.key);
-    Audio.playSe('hit');
+    // 攻撃音源に命中音を含むため、旧電子ヒット音は重ねない。
 
     // 二刀流：2撃目の斬撃を少し遅らせて重ねる
     if (res.hits >= 2) {
       this.time.delayedCall(130, () => {
         this.slashFx(e.x, e.y, elementColor);
-        Audio.playSe('hit');
       });
     }
 
@@ -3669,9 +3919,9 @@ export class GameScene extends Phaser.Scene {
       Audio.playSe('break');
       this.player.weapons = this.player.weapons.filter((x) => x !== bw);
       this.player.weapon = this.player.weapons[0] ?? null;
-      if (this.player.weapon?.dual && this.player.shield) {
+      if ((this.player.weapon?.dual || this.player.weapon?.weaponType === 'bow') && this.player.shield) {
         this.player.shield = null;
-        this.log('二刀流のため盾を外した。（両手がふさがる）', 'sys');
+        this.log('両手武器のため盾を外した。（両手がふさがる）', 'sys');
       }
       this.updatePlayerAura();
     }
@@ -3714,21 +3964,21 @@ export class GameScene extends Phaser.Scene {
         this.log(`福袋が弾けた！ 1000Gと属性付きSS武器 ${weaponFullName(reward)} を獲得！`, 'special');
       }
     } else {
-      // 通常敵からは消耗品と素材を落とす。
-      // ゴールドは高確率で多めに
-      if (Math.random() < 0.7) this.dropItem(e.x, e.y, 'coin', def.gold * 3 + Math.floor(Math.random() * this.floor * 4));
+      // 通常MOB（エリート含む）の各ドロップ率を半減。ボスは従来の確率を維持する。
+      const dropRateScale = def.isBoss || def.isFloorBoss ? 1 : 0.5;
+      if (Math.random() < 0.7 * dropRateScale) this.dropItem(e.x, e.y, 'coin', def.gold * 3 + Math.floor(Math.random() * this.floor * 4));
       // 通常消耗品とは別枠で抽選する。
-      if (Math.random() < 0.4) {
+      if (Math.random() < 0.4 * dropRateScale) {
         const pool: ItemKind[] = ['potion', 'torch', 'warp', 'invis'];
         this.dropItem(e.x, e.y, pool[Math.floor(Math.random() * pool.length)]);
       }
       // ボス用の1枚は予約し、通常敵・エリートからはもう一方だけを各マップ最大1枚に制限する。
-      if (!def.isFloorBoss && Math.random() < SCROLL_DROP_RATE) {
+      if (!def.isFloorBoss && Math.random() < SCROLL_DROP_RATE * dropRateScale) {
         const scroll = this.claimRegularEnhancementScroll();
         if (scroll) this.dropItem(e.x, e.y, scroll);
       }
       // エリート/ボスは超レアで復活の種。
-      if ((def.isElite || def.isBoss) && !this.reviveSeedSeen && Math.random() < 0.08) {
+      if ((def.isElite || def.isBoss) && !this.reviveSeedSeen && Math.random() < 0.08 * dropRateScale) {
         this.reviveSeedSeen = true;
         this.dropItem(e.x, e.y, 'revive');
         this.log('復活のタネがこぼれ落ちた…！ この冒険で現れるのは一度だけだ。', 'special');
@@ -5523,9 +5773,9 @@ export class GameScene extends Phaser.Scene {
       this.log(`さらに${gold}Gを入手！`, 'gold');
       this.effectFx(c.x, c.y, 'fx_levelup', 2.0, 700);
     } else {
-      // 通常宝箱から武器は出ない。消耗品・盾・服・ゴールドのみ。
+      // 通常宝箱は50%で空。各報酬の確率は従来の半分、当選時の数量は維持する。
       const roll = Math.random();
-      if (roll < 0.6) {
+      if (roll < 0.3) {
         const eq = Math.random();
         if (this.floor >= 8 && eq < 0.28) {
           const s = rollShield(this.floor);
@@ -5547,11 +5797,13 @@ export class GameScene extends Phaser.Scene {
           if (!regularScroll) this.player.inventory.push(makeItem(k));
           this.log(`宝箱から「${makeItem(k).name}」を入手。`, 'item');
         }
-      } else {
+      } else if (roll < 0.5) {
         const gold = 40 + Math.floor(Math.random() * this.floor * 12);
         this.player.gold += gold;
         this.addScore(Math.floor(gold / 2));
         this.log(`宝箱から${gold}Gを入手！`, 'gold');
+      } else {
+        this.log('宝箱の中は空だった。', 'sys');
       }
     }
     this.emitRefresh();
@@ -5814,7 +6066,7 @@ export class GameScene extends Phaser.Scene {
       this.tweens.add({ targets: fx, alpha: 0, scale: 2.2, duration: 500, onComplete: () => fx.destroy() });
       this.cameras.main.shake(150, 0.006);
       this.player.shields = this.player.shields.filter((x) => x !== s);
-      this.player.shield = this.player.shields[0] ?? null;
+      this.player.shield = this.player.weapon?.dual || this.player.weapon?.weaponType === 'bow' ? null : this.player.shields[0] ?? null;
     }
     this.emitRefresh();
     return true;
@@ -6118,17 +6370,17 @@ export class GameScene extends Phaser.Scene {
     this.player.weapon = w;
     this.log(`${weaponFullName(w)}を装備した。`, 'sys');
     // 二刀流は両手がふさがるので盾を外す
-    if (w.dual && this.player.shield) {
+    if ((w.dual || w.weaponType === 'bow') && this.player.shield) {
       this.player.shield = null;
-      this.log('二刀流のため盾を外した。（両手がふさがる）', 'sys');
+      this.log('両手武器のため盾を外した。（両手がふさがる）', 'sys');
     }
     Audio.playSe('pickup'); this.updatePlayerAura(); this.emitRefresh();
   }
   equipShield(i: number) {
     const s = this.player.shields[i];
     if (!s) return;
-    if (this.player.weapon?.dual) {
-      this.log('二刀流中は盾を持てない。（武器を持ち替えれば装備できる）', 'sys');
+    if ((this.player.weapon?.dual || this.player.weapon?.weaponType === 'bow')) {
+      this.log('弓・二刀流中は盾を持てない。（武器を持ち替えれば装備できる）', 'sys');
       Audio.playSe('deny');
       return;
     }
@@ -6288,6 +6540,7 @@ export class GameScene extends Phaser.Scene {
   gameOver(cleared: boolean) {
     if (this.gameEnded) return;
     this.gameEnded = true;
+    if (this.runSaveEnabled()) clearRunSave();
 
     if (cleared) {
       this.addScore(3000);
@@ -6439,6 +6692,7 @@ export class GameScene extends Phaser.Scene {
     if (pointer.button !== 0 || this.gameEnded) return;
     if (pointer.x < MAP_X || pointer.x >= MAP_X + MAP_W || pointer.y < MAP_Y || pointer.y >= MAP_Y + MAP_H) return;
     const ui = this.scene.get('UIScene') as any;
+    if (ui?.isSkillPointer?.(pointer.x, pointer.y)) return;
     if (ui?.overlayMode && ui.overlayMode !== 'none') return;
 
     const clickedAt = pointer.downTime || this.time.now;
@@ -6670,6 +6924,7 @@ export class GameScene extends Phaser.Scene {
 
   // 毎フレーム：影の追従・アイドルの呼吸・オーラ＆武器の追従
   update(time: number) {
+    if (this.savePending && !this.busy) this.saveRun();
     const ps = this.playerSprite;
     if (!ps) return;
     const entrance = this.dungeon?.bossEntrance;
@@ -6935,6 +7190,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   clearMoveInput() {
+    this.showSkillRangePreview(false);
+    this.events.emit('moveinputcleared');
     this.queuedMove = null;
     this.heldDir = null;
     this.holdStartedAt = 0;
@@ -7036,6 +7293,154 @@ export class GameScene extends Phaser.Scene {
 
   emitRefresh() {
     this.events.emit('refresh');
+    this.savePending = true;
+  }
+
+  captureRun() {
+    const { weapon, shield, armor, ...player } = this.player;
+    return {
+      state: pickFields(this, RUN_STATE_KEYS),
+      player,
+      equipped: {
+        weapon: weapon ? this.player.weapons.indexOf(weapon) : -1,
+        shield: shield ? this.player.shields.indexOf(shield) : -1,
+        armor: armor ? this.player.armors.indexOf(armor) : -1
+      },
+      dungeon: this.dungeon,
+      explored: this.explored,
+      openedRooms: [...this.openedOptionalRooms].map(room => this.dungeon.optionalRooms.indexOf(room)).filter(i => i >= 0),
+      discovered: [...this.discovered],
+      logs: this.logHistory,
+      enemies: this.enemies.map(enemy => ({
+        state: pickFields(enemy, ENEMY_STATE_KEYS),
+        visual: { texture: enemy.sprite.texture.key, scaleX: enemy.sprite.scaleX, scaleY: enemy.sprite.scaleY,
+          alpha: enemy.sprite.alpha, tint: enemy.sprite.tintTopLeft, aura: !!enemy.aura }
+      })),
+      chests: this.chests.map(({ sprite, glow, ...chest }) => chest),
+      ground: this.ground.map(({ sprite, glow, ...item }) => item),
+      objects: this.dungeonObjects.map(({ sprite, waterFx, waterDrops, waterRipples, ...object }) => object),
+      bosses: [...this.bossStates].map(([enemy, { coreLabel, intent, ...state }]) => ({
+        enemy: this.enemies.indexOf(enemy), state,
+        intent: intent ? { ...intent, markers: intent.markers.map(({ plate, label, ...marker }) => marker) } : undefined
+      })),
+      hazards: this.bossHazards.map(({ sprite, ...hazard }) => hazard),
+      obstacles: this.bossObstacles.map(({ sprite, ...obstacle }) => obstacle),
+      audio: { bgmVolume: Audio.bgmVolume, seVolume: Audio.seVolume, bgmOn: Audio.bgmOn, seOn: Audio.seOn }
+    };
+  }
+
+  saveRun() {
+    if (this.restoringRun || this.busy || this.gameEnded || !this.playerSprite || !this.dungeon || this.player.hp <= 0) return;
+    if (!this.runSaveEnabled()) return;
+    this.savePending = false;
+    if (!writeRunSave(this.captureRun()) && !this.saveWarningShown) {
+      this.saveWarningShown = true;
+      this.log('ブラウザに保存できません。保存データの設定・空き容量を確認してください。', 'sys');
+    }
+  }
+
+  private runSaveEnabled() {
+    // QA scenarios must neither overwrite nor delete a real local adventure.
+    const params = new URLSearchParams(location.search);
+    return location.hostname !== 'localhost' || ![...params.keys()].some(key => key.startsWith('qa-')) || params.has('qa-save');
+  }
+
+  private restoreRunState(snapshot: RunSnapshot) {
+    Object.assign(this, pickFields(snapshot.state, RUN_STATE_KEYS));
+    // Saves created before weapon skills remain readable.
+    if (!Number.isInteger(this.skillChargeSteps) || this.skillChargeSteps < 0) this.skillChargeSteps = 100;
+    this.skillChargeSteps = Math.min(100, this.skillChargeSteps);
+    this.player = Object.assign(new Player(), snapshot.player);
+    this.player.weapon = this.player.weapons[snapshot.equipped.weapon] ?? null;
+    this.player.shield = this.player.weapon?.dual || this.player.weapon?.weaponType === 'bow' ? null : this.player.shields[snapshot.equipped.shield] ?? null;
+    this.player.armor = this.player.armors[snapshot.equipped.armor] ?? null;
+    this.discovered = new Set(snapshot.discovered);
+    this.logHistory = [...snapshot.logs];
+    this.qaBossMode = false;
+    this.qaBossRoomZone = undefined;
+    setSelectedGender(this.playerGender);
+    Audio.setBgmVolume(snapshot.audio.bgmVolume);
+    Audio.setSeVolume(snapshot.audio.seVolume);
+    if (Audio.bgmOn !== snapshot.audio.bgmOn) Audio.toggleBgm();
+    if (Audio.seOn !== snapshot.audio.seOn) Audio.toggleSe();
+  }
+
+  private restoreRunEntities(snapshot: RunSnapshot) {
+    for (const saved of snapshot.enemies) {
+      if (this.floor === 10 && saved.state.def.isFloorBoss && saved.state.def.key === 'm_horn_demon') {
+        saved.state.def = { ...saved.state.def, key: 'm_giant_bull', name: '巨角の猛牛', bossTint: 0xffffff,
+          element: undefined, description: MONSTER_DEFS.find(m => m.key === 'm_giant_bull')!.description };
+        saved.visual.texture = 'giant_bull_directions_v1';
+        const art = DIRECTIONAL_MONSTERS.find(a => a.monsterKey === 'm_giant_bull')!;
+        saved.visual.scaleX = saved.visual.scaleY = 40 * 1.82 / art.artSize;
+        saved.state.baseScale = saved.visual.scaleX;
+        saved.visual.tint = 0xffffff;
+      }
+      const e = this.addEnemy(saved.state.def, saved.state.x, saved.state.y, 1);
+      Object.assign(e, saved.state);
+      e.sprite.setTexture(saved.visual.texture).setScale(saved.visual.scaleX, saved.visual.scaleY)
+        .setTint(saved.visual.tint).setAlpha(saved.visual.alpha);
+      if (saved.visual.aura && !e.aura) this.attachAura(e, 40, e.def.bossTint ?? 0xffa755);
+      this.updateEnemyDirection(e);
+      if (e.freezeTurns > 0) this.freezeEnemy(e, e.freezeTurns);
+      this.drawEnemyHp(e);
+    }
+    for (const saved of snapshot.chests) {
+      // Open chests may now share their tile with a monster: render without collision checks.
+      const size = saved.rare ? 27 : 26;
+      const sprite = this.add.image(0, 0, saved.rare
+        ? saved.opened ? 'chest_rare_open' : 'chest_rare'
+        : saved.opened ? 'chest_common_open' : 'chest_common')
+        .setDepth(6).setOrigin(0.5, 0.62).setDisplaySize(size, size);
+      this.placeSprite(sprite, saved.x, saved.y);
+      const glow = saved.rare ? this.add.image(sprite.x, sprite.y - 4, 'glow')
+        .setDepth(sprite.depth - .12).setBlendMode(Phaser.BlendModes.ADD)
+        .setTint(0xffca52).setDisplaySize(42, 42).setAlpha(saved.opened ? .46 : .34) : undefined;
+      this.chests.push({ ...saved, sprite, glow, baseScale: sprite.scaleX });
+    }
+    for (const item of snapshot.ground) {
+      const equipment = item.weapon ?? item.shield ?? item.armor;
+      const texture = item.kind === 'armor' ? armorTextureKey(item.armor!.key)
+        : equipment?.key ?? (item.kind === 'coin' ? 'coin' : `i_${item.kind}`);
+      const sprite = this.add.image(0, 0, texture).setDepth(5).setOrigin(.5, .6).setDisplaySize(equipment ? 24 : 22, equipment ? 24 : 22);
+      this.placeSprite(sprite, item.x, item.y);
+      const glow = this.add.image(sprite.x, sprite.y - 2, 'glow').setDepth(sprite.depth - .12)
+        .setBlendMode(Phaser.BlendModes.ADD).setTint(equipment ? gradeColor(equipment.grade) : item.kind === 'coin' ? 0xffc45a : 0x88dfd4)
+        .setDisplaySize(equipment ? 34 : 28, equipment ? 34 : 28).setAlpha(equipment ? .32 : .18);
+      this.ground.push({ ...item, sprite, glow });
+    }
+    for (const object of snapshot.objects) {
+      this.addDungeonObject(object.kind, object.x, object.y, object.w, object.h, object.breakable);
+      const restored = this.dungeonObjects[this.dungeonObjects.length - 1];
+      restored.used = object.used;
+      if (object.used) { restored.sprite.setTint(0x7b8c8a).setAlpha(.72); restored.waterFx?.setVisible(false); }
+    }
+    for (const saved of snapshot.bosses) {
+      const enemy = this.enemies[saved.enemy];
+      if (!enemy) continue;
+      this.registerBossGimmick(enemy, saved.state.kind);
+      const state = this.bossStates.get(enemy)!;
+      Object.assign(state, saved.state);
+      if (saved.intent) {
+        state.intent = { ...saved.intent, markers: saved.intent.markers.map(marker => {
+          const color = marker.element ? ELEMENT_INFO[marker.element].color : this.bossImpactColor(this.bossImpactKind(state.kind, marker.channel));
+          const restored = this.bossWarningMarkers([marker], color, this.player, marker.channel)[0];
+          Object.assign(restored, marker);
+          restored.label.setText(String(marker.turns));
+          return restored;
+        }) };
+      }
+    }
+    for (const hazard of snapshot.hazards) this.addBossHazards([hazard], hazard.kind, hazard.turns, false);
+    for (const obstacle of snapshot.obstacles) {
+      const sprite = this.add.image(obstacle.x * TILE + TILE / 2, obstacle.y * TILE + TILE / 2,
+        this.textures.exists('prop_statue') ? 'prop_statue' : `wall${eraSuffix(getTheme(this.floor).era)}`)
+        .setDepth(this.worldDepth(obstacle.y * TILE + TILE / 2, 12)).setDisplaySize(TILE - 5, TILE - 3)
+        .setTint(obstacle.kind === 'iron' ? 0x7a4b36 : 0xffe7c2);
+      this.bossObstacles.push({ ...obstacle, sprite });
+    }
+    this.playerSprite.setAlpha(this.invisTurns > 0 ? .4 : 1);
+    this.updatePlayerAura();
   }
 
   // UIScene起動前のログも保持し、UIScene側が起動時に復元できるようにする

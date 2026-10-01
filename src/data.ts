@@ -302,6 +302,7 @@ const MONSTER_GIMMICKS: Record<string, { kind: NonNullable<MonsterDef['gimmick']
   m_brass_dragon: { kind: 'heat', text: '行動するたび加熱し、3回目の攻撃が強化される。' },
   m_void_drake: { kind: 'warp', text: '4ターンごとにプレイヤーの近くへ転移する。' },
   m_bone_dragon: { kind: 'revive', text: '一度だけHP25%で復活するが、防御が大きく低下する。' },
+  m_giant_bull: { kind: 'enrage', text: 'HP半分以下で攻撃力が上昇する。' },
   m_horn_demon: { kind: 'enrage', text: 'HP半分以下で攻撃力が上昇する。' },
   m_chain_demon: { kind: 'pull', text: '同じ縦横の近距離にいる相手を1マス引き寄せる。' },
   m_flame_gargoyle: { kind: 'statue', text: '離れている間は石像化して被ダメージを軽減する。' },
@@ -337,6 +338,12 @@ const MONSTER_GIMMICKS: Record<string, { kind: NonNullable<MonsterDef['gimmick']
 };
 
 const MONSTER_DEFS_RAW: MonsterDef[] = [
+  {
+    key: 'm_giant_bull', name: '巨角の猛牛',
+    description: '黒い毛並みと巨大な角を持つ遺跡の猛牛。一直線の突進を横へ避け、壁に激突した隙に反撃しよう。',
+    hp: 25, atkMin: 5, atkMax: 11, def: 3, exp: 6, gold: 7, score: 48,
+    minFloor: 10, maxFloor: 10, behavior: 'chase', isBoss: true, color: 0xc98b52
+  },
   {
     key: 'm_mush', name: 'ランタンマッシュ', hp: 18, atkMin: 3, atkMax: 7, def: 1,
     exp: 4, gold: 3, score: 30, minFloor: 1, maxFloor: 10, behavior: 'chase', color: 0x8a6bff
@@ -561,6 +568,12 @@ const MONSTER_DEFS_RAW: MonsterDef[] = [
     key: 'm_watcher', name: 'コアウォッチャー', hp: 160, atkMin: 18, atkMax: 30, def: 16,
     exp: 80, gold: 100, score: 500, minFloor: 30, maxFloor: 30, behavior: 'ranged', ranged: true,
     isBoss: true, isDragonType: true, color: 0x2a2a4a
+  },
+  {
+    key: 'm_giant_bull', name: '巨角の猛牛',
+    description: '黒い毛並みと巨大な角を持つ遺跡の猛牛。一直線の突進を横へ避け、壁に激突した隙に反撃しよう。',
+    hp: 25, atkMin: 5, atkMax: 11, def: 3, exp: 6, gold: 7, score: 48,
+    minFloor: 10, maxFloor: 10, behavior: 'chase', isBoss: true, color: 0xc98b52
   }
 ];
 

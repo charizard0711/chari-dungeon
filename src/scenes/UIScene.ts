@@ -5,6 +5,8 @@ import { hasFinalDepthTerrain, FINAL_DEPTH_TITLES, FINAL_DEPTH_COLORS } from '..
 import { hasThunderTerrain, THUNDER_TITLES } from '../thunderTerrain';
 import { EquipmentRenderer } from '../equipmentRenderer';
 import { GameScene } from './GameScene';
+import { weaponSkill, joystickDirection } from '../weaponSkills';
+import { drawSkillGlyph } from '../skillIcon';
 import type { GachaResult, GachaPool } from './GameScene';
 import { GAME_W, GAME_H } from '../main';
 import { IS_MOBILE, MAP_X, MAP_Y, MAP_W, MAP_H } from '../layout';
@@ -54,6 +56,15 @@ export class UIScene extends Phaser.Scene {
   catalogDetail: CatalogEntry | null = null;
   catalogClaimMessage = '';
   enemyInfoText!: Phaser.GameObjects.Text;
+  skillButton?: Phaser.GameObjects.Container;
+  private skillBackground?: Phaser.GameObjects.Graphics;
+  private skillGlyph?: Phaser.GameObjects.Graphics;
+  private skillLabel?: Phaser.GameObjects.Text;
+  private skillCounter?: Phaser.GameObjects.Text;
+  private skillVisualKey = '';
+  joystick?: Phaser.GameObjects.Container;
+  private releaseJoystick?: () => void;
+  private skillHovered = false;
   // レイアウト依存の座標（PC / スマホ縦で切り替え）
   L!: {
     hpBar: { x: number; y: number; w: number };
@@ -127,6 +138,7 @@ export class UIScene extends Phaser.Scene {
       backgroundColor: '#0a1420ee', padding: { x: 8, y: 6 }, lineSpacing: 4,
       wordWrap: { width: IS_MOBILE ? 250 : 330 }
     }).setDepth(90).setVisible(false);
+    this.buildSkillButton();
 
     // イベント購読（GameSceneのイベントemitterに登録）
     const gsEvents = this.gs.events;
@@ -407,9 +419,9 @@ export class UIScene extends Phaser.Scene {
     this.add.text(16, 664, '移動', {
       fontFamily: '"Yu Gothic UI"', fontSize: '9px', color: '#65dcd4', fontStyle: 'bold', letterSpacing: 1
     });
-    this.buildTouchControls(76, 716, 29, 22);
-    this.add.text(142, 692, '十字キーで移動\n長押しで加速', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: '#91a8b4', lineSpacing: 6
+    this.buildJoystick(76, 716);
+    this.add.text(137, 692, 'スティックで移動\n長押しで加速', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#91a8b4', lineSpacing: 6
     });
 
     // ---- 下部ナビ（メニュー）----
@@ -442,6 +454,121 @@ export class UIScene extends Phaser.Scene {
   }
 
   // ---- タッチ操作：十字ボタン（スマホ=操作エリア、タッチPC=マップ左下に重ねる）----
+  private buildJoystick(cx: number, cy: number) {
+    const radius = 43, travel = 26;
+    this.input.addPointer(1); // One finger holds movement while another taps the skill.
+    const container = this.add.container(cx, cy).setDepth(60);
+    this.joystick = container;
+    const base = this.add.graphics();
+    base.fillStyle(0x0c343a, .18).fillCircle(0, 0, radius);
+    base.lineStyle(2, 0x55dff3, .45).strokeCircle(0, 0, radius);
+    base.lineStyle(1, 0x55dff3, .15).strokeCircle(0, 0, travel);
+    const thumb = this.add.circle(0, 0, 17, 0x55dff3, .5).setStrokeStyle(1.5, 0xa8ffff, .65);
+    container.add([base, thumb]).setSize(radius * 2, radius * 2)
+      .setInteractive(new Phaser.Geom.Circle(radius, radius, radius), Phaser.Geom.Circle.Contains);
+    let activePointer: number | null = null;
+    const move = (pointer: Phaser.Input.Pointer) => {
+      if (activePointer !== pointer.id) return;
+      if (this.overlayMode !== 'none' || this.gs.gameEnded) { release(); return; }
+      const dx = pointer.x - cx, dy = pointer.y - cy;
+      const distance = Math.hypot(dx, dy), factor = distance > travel ? travel / distance : 1;
+      thumb.setPosition(dx * factor, dy * factor);
+      this.gs.touchDir = joystickDirection(dx, dy);
+      if (!this.gs.touchDir) { this.gs.heldDir = null; this.gs.setBoostTier(0); }
+    };
+    const release = () => {
+      activePointer = null;
+      thumb.setPosition(0, 0);
+      this.gs.touchDir = null;
+      this.gs.heldDir = null;
+      this.gs.holdStartedAt = 0;
+      this.gs.setBoostTier(0);
+    };
+    this.releaseJoystick = release;
+    container.on('pointerdown', (pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+      if (activePointer !== null || this.overlayMode !== 'none' || this.gs.gameEnded) return;
+      activePointer = pointer.id; move(pointer); event.stopPropagation();
+    });
+    const up = (pointer: Phaser.Input.Pointer) => { if (activePointer === pointer.id) release(); };
+    this.input.on('pointermove', move);
+    this.input.on('pointerup', up);
+    this.input.on('pointerupoutside', up);
+    this.input.on('gameout', release);
+    this.game.events.on(Phaser.Core.Events.BLUR, release);
+    this.gs.events.on('moveinputcleared', release);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.input.off('pointermove', move); this.input.off('pointerup', up);
+      this.input.off('pointerupoutside', up); this.input.off('gameout', release);
+      this.game.events.off(Phaser.Core.Events.BLUR, release);
+      this.gs.events.off('moveinputcleared', release);
+      release(); this.releaseJoystick = undefined;
+    });
+  }
+
+  private buildSkillButton() {
+    const x = IS_MOBILE ? 326 : MAP_X + MAP_W - 64;
+    const y = IS_MOBILE ? 716 : MAP_Y + MAP_H - 62;
+    const radius = IS_MOBILE ? 38 : 48;
+    this.skillVisualKey = '';
+    this.skillHovered = false;
+    const button = this.add.container(x, y).setDepth(65);
+    this.skillButton = button;
+    this.skillBackground = this.add.graphics();
+    this.skillGlyph = this.add.graphics().setY(-7);
+    this.skillLabel = this.add.text(0, IS_MOBILE ? 22 : 27, '', {
+      fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '9px' : '11px', fontStyle: 'bold', color: '#ddffff'
+    }).setOrigin(.5);
+    this.skillCounter = this.add.text(0, -6, '', { fontFamily: 'Arial Black', fontSize: IS_MOBILE ? '28px' : '34px', color: '#ffffff', stroke: '#071115', strokeThickness: 3 }).setOrigin(.5);
+    button.add([this.skillBackground, this.skillGlyph, this.skillLabel, this.skillCounter]);
+    if (!IS_MOBILE) button.add(this.add.text(radius - 10, 9, 'Q', { fontSize: '13px', color: '#bde4e9', backgroundColor: '#071115aa', padding: {x:3,y:2} }).setOrigin(.5));
+    button.setSize(radius * 2, radius * 2).setInteractive({ hitArea: new Phaser.Geom.Circle(radius, radius, radius), hitAreaCallback: Phaser.Geom.Circle.Contains, useHandCursor: true });
+    button.on('pointerover', () => { this.skillHovered = true; this.gs.showSkillRangePreview(true); });
+    button.on('pointerout', () => { this.skillHovered = false; this.gs.showSkillRangePreview(false); });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.skillHovered = false; this.gs.showSkillRangePreview(false); });
+    button.on('pointerdown', (_pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation();
+      this.skillHovered = false; this.gs.showSkillRangePreview(false);
+      this.releaseJoystick?.();
+      void this.gs.useWeaponSkill();
+    });
+    this.refreshSkillButton();
+  }
+
+  isSkillPointer(x: number, y: number) {
+    if (!this.skillButton?.visible || this.overlayMode !== 'none') return false;
+    return Math.hypot(x - this.skillButton.x, y - this.skillButton.y) <= (IS_MOBILE ? 38 : 48);
+  }
+
+  private refreshSkillButton() {
+    if (!this.skillButton) return;
+    const type = this.gs.player?.weapon?.weaponType;
+    const skill = weaponSkill(type);
+    const visible = !!skill && !this.gs.gameEnded && this.overlayMode === 'none';
+    this.skillButton.setVisible(visible);
+    if (!skill || !type) return;
+    const remaining = this.gs.skillStepsRemaining;
+    const key = `${type}:${remaining}:${visible}`;
+    if (key === this.skillVisualKey) return;
+    this.skillVisualKey = key;
+    const radius = IS_MOBILE ? 38 : 48;
+    this.skillBackground!.clear().fillStyle(0x061316, .12).fillCircle(0, 0, radius);
+    this.skillBackground!.lineStyle(2, skill.color, .25).strokeCircle(0, 0, radius);
+    if (remaining < 100) {
+      this.skillBackground!.lineStyle(3, skill.color, .6).beginPath()
+        .arc(0, 0, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - Math.min(1, remaining / 100))).strokePath();
+    }
+    drawSkillGlyph(this.skillGlyph!, type, skill.color, IS_MOBILE ? 18 : 23);
+    this.skillGlyph!.setAlpha(1);
+    this.skillLabel!.setText(skill.name).setColor(`#${skill.color.toString(16).padStart(6, '0')}`);
+    this.skillCounter!.setText('');
+  }
+
+  update() {
+    this.refreshSkillButton();
+    this.gs.showSkillRangePreview(this.skillHovered && !!this.skillButton?.visible);
+    if (this.overlayMode !== 'none' || this.gs.gameEnded) this.releaseJoystick?.();
+  }
+
   // 押しっぱなしで歩き続ける（GameScene.touchDir 経由でキーボード長押しと同じ扱い）
   buildTouchControls(cx: number, cy: number, gap: number, R: number) {
     const mkButton = (dx: number, dy: number, angleDeg: number, onDown: () => void, onUp?: () => void) => {
@@ -528,8 +655,8 @@ export class UIScene extends Phaser.Scene {
         anchorX, anchorY
       );
     }
-    if (p.weapon?.dual) {
-      return this.showTooltip('盾を装備できない', '二刀流は両手を使うため、盾を持てない', anchorX, anchorY);
+    if ((p.weapon?.dual || p.weapon?.weaponType === 'bow')) {
+      return this.showTooltip('盾を装備できない', '弓と二刀流は両手を使うため、盾を持てない', anchorX, anchorY);
     }
     const shield = p.shield;
     if (!shield) return this.showTooltip('盾', '盾を装備していない', anchorX, anchorY);
@@ -565,6 +692,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   refresh() {
+    this.refreshSkillButton();
     const p = this.gs.player;
     this.fountainBadge?.setVisible(p.fountainBlessingFloor !== null);
     const th = this.gs.dungeon?.glacialArena
@@ -613,8 +741,8 @@ export class UIScene extends Phaser.Scene {
     const slotInfo: Record<'weapon' | 'armor' | 'shield', { tex: string | null; sub: string; plus: number; grade?: 'D' | 'C' | 'B' | 'A' | 'S'; element?: Element }> = {
       weapon: w ? { tex: w.key, sub: `攻${w.atkMin}-${w.atkMax}`, plus: w.plus, grade: w.grade, element: w.element } : empty,
       armor: a ? { tex: armorTextureKey(a.key), sub: `防+${a.defBonus + a.plus}`, plus: a.plus, grade: a.grade } : empty,
-      shield: w?.dual
-        ? { tex: w.key, sub: '二刀流', plus: w.plus, grade: w.grade, element: w.element }
+      shield: (w?.dual || w?.weaponType === 'bow')
+        ? { tex: w.key, sub: w.weaponType === 'bow' ? '両手持ち' : '二刀流', plus: w.plus, grade: w.grade, element: w.element }
         : s ? { tex: s.key, sub: `防+${s.defBonus + s.plus}`, plus: s.plus, grade: s.grade, element: s.element } : empty
     };
     this.equipSlots.forEach((slot) => {
@@ -801,6 +929,8 @@ export class UIScene extends Phaser.Scene {
       this.secretAlternatingPresses = 0;
     }
     this.overlayMode = mode;
+    this.releaseJoystick?.();
+    this.refreshSkillButton();
     this.gs.clearMoveInput();
     this.hideTooltip();
     if (mode === 'none') { this.overlay.setVisible(false); return; }
@@ -948,8 +1078,8 @@ export class UIScene extends Phaser.Scene {
       });
     } else {
       // 盾
-      if (p.weapon?.dual) {
-        this.overlay.add(this.add.text(x + 20, cy, '⚠ 二刀流中は盾を持てない（武器を持ち替えれば装備できる）', {
+      if ((p.weapon?.dual || p.weapon?.weaponType === 'bow')) {
+        this.overlay.add(this.add.text(x + 20, cy, '⚠ 弓・二刀流中は盾を持てない（武器を持ち替えれば装備できる）', {
           fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: '#f5c542'
         }));
         cy += 32;
@@ -1115,10 +1245,10 @@ export class UIScene extends Phaser.Scene {
       },
       {
         label: '盾',
-        name: p.weapon?.dual ? '二刀流中' : p.shield ? shieldFullName(p.shield) : '装備なし',
-        sub: p.weapon?.dual ? '盾は装備できない' : p.shield ? `防+${p.shield.defBonus + p.shield.plus}　耐久${p.shield.dur}/${p.shield.durMax}` : '装備なし',
-        texture: p.weapon?.dual ? p.weapon.key : p.shield?.key,
-        color: p.weapon?.dual
+        name: (p.weapon?.dual || p.weapon?.weaponType === 'bow') ? (p.weapon?.weaponType === 'bow' ? '弓装備中' : '二刀流中') : p.shield ? shieldFullName(p.shield) : '装備なし',
+        sub: (p.weapon?.dual || p.weapon?.weaponType === 'bow') ? '盾は装備できない' : p.shield ? `防+${p.shield.defBonus + p.shield.plus}　耐久${p.shield.dur}/${p.shield.durMax}` : '装備なし',
+        texture: (p.weapon?.dual || p.weapon?.weaponType === 'bow') ? p.weapon.key : p.shield?.key,
+        color: (p.weapon?.dual || p.weapon?.weaponType === 'bow')
           ? this.elementColor(p.weapon.element) ?? gradeColor(p.weapon.grade)
           : p.shield ? this.elementColor(p.shield.element) ?? gradeColor(p.shield.grade) : 0x36585d,
         slot: 2
