@@ -78,6 +78,12 @@ export const SE_DEFS = {
 } satisfies Record<string, AudioDef>;
 
 export type SeName = keyof typeof SE_DEFS;
+// Only packaged sounds are requested; the remaining effects use their synth definitions.
+export const FILE_SE_NAMES: readonly SeName[] = [
+  'attack', 'weaponDagger', 'weaponLongsword', 'weaponLance', 'weaponBow',
+  'weaponHandgun', 'weaponGreatsword', 'weaponDual', 'skillDagger', 'skillLongsword',
+  'skillLance', 'skillBow', 'skillHandgun', 'skillGreatsword', 'skillDual'
+];
 
 export function elementAttackSe(element?: MonsterElement): SeName {
   if (!element) return 'attack';

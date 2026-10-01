@@ -5,7 +5,7 @@ import { FINAL_DEPTH_FLOORS, finalDepthParts, finalDepthTerrainKey } from '../fi
 import Phaser from 'phaser';
 import { buildAllTextures } from '../textures';
 import { applyRealAssets } from '../assetLoader';
-import { BGM_DEFS, SE_DEFS, AudioDef } from '../audio/config';
+import { FILE_SE_NAMES, SE_DEFS, AudioDef } from '../audio/config';
 import { Audio } from '../audio/manager';
 import { PLAYER_FRAME_SIZE, PLAYER_SHEETS } from '../playerAppearance';
 import { MONSTER_ANIMATIONS } from '../monsterAnimation';
@@ -344,7 +344,7 @@ export class BootScene extends Phaser.Scene {
     // 探索・ボスBGMはAudioManagerが後から取得し、タイトル表示を待たせない。
     this.loadingStage = '効果音';
     this.loadingText?.setText('効果音を準備中…');
-    const allAudio: AudioDef[] = [BGM_DEFS.title, ...Object.values(SE_DEFS)];
+    const allAudio: AudioDef[] = FILE_SE_NAMES.map(name => SE_DEFS[name]);
     const existing = await this.filterExistingAudio(allAudio);
     if (existing.length > 0) {
       await this.loadAudioFiles(existing);

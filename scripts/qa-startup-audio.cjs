@@ -35,6 +35,7 @@ const assert = require('node:assert/strict');
     });
     for(const b of buffers)assert.ok(b.duration>20,'compressed music must decode into a complete track');
     assert.equal(requests.some(r=>/bgm_.*\.wav/.test(r.url)),false);
+    assert.equal(requests.some(r=>/bgm_title\.mp3|se_(step|hit|hurt|coin|pickup|chest|heal|levelup)\.mp3/.test(r.url)),false,'synthesized sounds must not probe missing files');
     assert.deepEqual(errors,[]);
     fs.mkdirSync('outputs/qa-run-save',{recursive:true});
     fs.writeFileSync('outputs/qa-run-save/startup.json',JSON.stringify({titleMs,delayedBgmDoesNotBlockTitle:true,buffers,errors},null,2));
