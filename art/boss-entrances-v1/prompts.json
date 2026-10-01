@@ -1,0 +1,40 @@
+{
+  "tool": "built-in image_gen",
+  "prompts": [
+    {
+      "key": "boss-descent",
+      "referenced_image_paths": [
+        "C:\\Users\\masam\\.codex\\generated_images\\01a0f778-8b1e-7140-996e-85ec0e4fa6cc\\exec-b0aee6d0-69ee-46c6-9c4d-eef618ff2f95.png"
+      ],
+      "prompt": "Edit target: the approved stone staircase illustration. Make a production game sprite on true transparent background. Preserve the central recessed downward staircase, four stone treads, chunky gray stone side borders, bronze trim, dark hole and restrained red light below, small red boss crest at front threshold. Remove ALL surrounding dungeon floor except the one small threshold crest stone attached to the stair. Center the entire compact isolated object in a square canvas, fill 92 percent of canvas with only 4 percent transparent margin, no object clipped. Fixed steep overhead RPG camera as source. Simplify fine detail into crisp pixel art readable at 64x64, while preserving the approved shapes and palette. No text or arrows, no chains, no floor background, no checkerboard painted into image."
+    },
+    {
+      "key": "boss-entry-north",
+      "referenced_image_paths": [
+        "C:\\Users\\masam\\.codex\\generated_images\\01a0f778-8b1e-7140-996e-85ec0e4fa6cc\\exec-11e0d437-cb60-4234-af6e-477bcdd13a91.png"
+      ],
+      "prompt": "Use case: precise-object-edit. Input is an approved 2x2 dungeon entrance concept sheet. Produce ONE isolated game sprite from the TOP LEFT north (walk UP) panel, not a sheet. Keep its gray dark stone, subtle bronze trim, two tiny orange torches, open black passage, red diamond threshold mark, fixed steep overhead RPG camera and horizontal/vertical map grid. Isolate ONLY the doorway jambs and one short dark passage segment, remove all surrounding floor, wall extensions, text, arrows and panel border. True transparent exterior, retain dark interior hole. Object fills 92 percent of a square canvas, 4 percent margin. Compact game pixel art readable at 64x64. Arch faces the viewer, opening centered and traversable from bottom to top. No doors, chains, padlocks, stairs, monsters, floor background, extra structures or labels."
+    },
+    {
+      "key": "boss-entry-east",
+      "referenced_image_paths": [
+        "C:\\Users\\masam\\.codex\\generated_images\\01a0f778-8b1e-7140-996e-85ec0e4fa6cc\\exec-11e0d437-cb60-4234-af6e-477bcdd13a91.png"
+      ],
+      "prompt": "Use case: precise-object-edit. Input is an approved 2x2 dungeon entrance concept sheet. Produce ONE isolated game sprite from the TOP RIGHT east (walk RIGHT) panel, not a sheet. Keep its gray dark stone, subtle bronze trim, two tiny orange torches, open black passage, red diamond threshold mark, fixed steep overhead RPG camera and horizontal/vertical map grid. Isolate ONLY the doorway jambs and one short dark passage segment, remove all surrounding floor, wall extensions, text, arrows and panel border. True transparent exterior, retain dark interior hole. Object fills 92 percent of a square canvas, 4 percent margin. Compact game pixel art readable at 64x64. The wall runs vertically, passage goes horizontally. IMPORTANT cut away the foreground lintel completely so there is a clear horizontal GAP between north and south stone jambs: do not draw continuous vertical stone blocking the gap. Opening is approached from LEFT and dark passage extends RIGHT. No doors, chains, padlocks, stairs, monsters, floor background, extra structures or labels."
+    },
+    {
+      "key": "boss-entry-south",
+      "referenced_image_paths": [
+        "C:\\Users\\masam\\.codex\\generated_images\\01a0f778-8b1e-7140-996e-85ec0e4fa6cc\\exec-11e0d437-cb60-4234-af6e-477bcdd13a91.png"
+      ],
+      "prompt": "Use case: precise-object-edit. Input is an approved 2x2 dungeon entrance concept sheet. Produce ONE isolated game sprite from the BOTTOM LEFT south (walk DOWN) panel, not a sheet. Keep its gray dark stone, subtle bronze trim, two tiny orange torches, open black passage, red diamond threshold mark, fixed steep overhead RPG camera and horizontal/vertical map grid. Isolate ONLY the doorway jambs and one short dark passage segment, remove all surrounding floor, wall extensions, text, arrows and panel border. True transparent exterior, retain dark interior hole. Object fills 92 percent of a square canvas, 4 percent margin. Compact game pixel art readable at 64x64. View from above/back, opening traversable from top to bottom; remove the front lintel so the open dark walkway is visible between two short stone piers. No doors, chains, padlocks, stairs, monsters, floor background, extra structures or labels."
+    },
+    {
+      "key": "boss-entry-west",
+      "referenced_image_paths": [
+        "C:\\Users\\masam\\.codex\\generated_images\\01a0f778-8b1e-7140-996e-85ec0e4fa6cc\\exec-11e0d437-cb60-4234-af6e-477bcdd13a91.png"
+      ],
+      "prompt": "Use case: precise-object-edit. Input is an approved 2x2 dungeon entrance concept sheet. Produce ONE isolated game sprite from the BOTTOM RIGHT west (walk LEFT) panel, not a sheet. Keep its gray dark stone, subtle bronze trim, two tiny orange torches, open black passage, red diamond threshold mark, fixed steep overhead RPG camera and horizontal/vertical map grid. Isolate ONLY the doorway jambs and one short dark passage segment, remove all surrounding floor, wall extensions, text, arrows and panel border. True transparent exterior, retain dark interior hole. Object fills 92 percent of a square canvas, 4 percent margin. Compact game pixel art readable at 64x64. The wall runs vertically, passage goes horizontally. IMPORTANT cut away the foreground lintel completely so there is a clear horizontal GAP between north and south stone jambs: do not draw continuous vertical stone blocking the gap. Opening is approached from RIGHT and dark passage extends LEFT. No doors, chains, padlocks, stairs, monsters, floor background, extra structures or labels."
+    }
+  ]
+}

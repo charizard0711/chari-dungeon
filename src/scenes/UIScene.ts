@@ -5,7 +5,7 @@ import { hasFinalDepthTerrain, FINAL_DEPTH_TITLES, FINAL_DEPTH_COLORS } from '..
 import { hasThunderTerrain, THUNDER_TITLES } from '../thunderTerrain';
 import { EquipmentRenderer } from '../equipmentRenderer';
 import { GameScene } from './GameScene';
-import type { GachaResult } from './GameScene';
+import type { GachaResult, GachaPool } from './GameScene';
 import { GAME_W, GAME_H } from '../main';
 import { IS_MOBILE, MAP_X, MAP_Y, MAP_W, MAP_H } from '../layout';
 import { durabilityRisk } from '../combat';
@@ -19,6 +19,11 @@ import { armorFullName, armorTextureKey, isPlayerArmor, PLAYER_ARMOR_DEFS, playe
 
 const COLORS: Record<string, string> = {
   sys: '#d7e3e2', dmg: '#ff7b82', item: '#6fdda8', gold: '#ffd47d', special: '#c9b2ff'
+};
+
+const GACHA_PALETTES = {
+  weapon: { fill: 0x5b271e, hover: 0x7a3525, dim: 0x271b1a, accent: 0xff8459, text: '#ffe2d4' },
+  armor: { fill: 0x174c56, hover: 0x1d6872, dim: 0x142b34, accent: 0x54d7e8, text: '#c8f7ff' }
 };
 
 export class UIScene extends Phaser.Scene {
@@ -39,6 +44,8 @@ export class UIScene extends Phaser.Scene {
   repairKind: 'weapon' | 'shield' = 'weapon';
   pickSlot = 0; // 'pick'モードで開いている装備スロット（0武器/1服/2盾）
   gachaAnimating = false; // ガチャ演出中は再描画をブロック
+  gachaPool: GachaPool = 'weapon';
+  fountainBadge?: Phaser.GameObjects.Container;
   codeDigits = '';
   codeMessage = '';
   catalogCategory: CatalogCategory = 'all';
@@ -69,6 +76,10 @@ export class UIScene extends Phaser.Scene {
   }
 
   create() {
+    this.overlayMode = 'none';
+    this.gachaAnimating = false;
+    this.gachaPool = 'weapon';
+    this.fountainBadge = undefined;
     this.paperDoll = undefined;
     this.paperDollEquipment = undefined;
     this.gs = this.scene.get('GameScene') as GameScene;
@@ -109,6 +120,7 @@ export class UIScene extends Phaser.Scene {
     }
 
     this.buildTooltip();
+    this.buildFountainBadge();
     this.overlay = this.add.container(0, 0).setDepth(100).setVisible(false);
     this.enemyInfoText = this.add.text(IS_MOBILE ? MAP_X + 8 : GAME_W - 360, IS_MOBILE ? MAP_Y + 8 : 300, '', {
       fontFamily: '"Yu Gothic UI"', fontSize: '14px', color: '#dfe7f0',
@@ -158,7 +170,9 @@ export class UIScene extends Phaser.Scene {
       }
       if (qaOverlay === 'gacha' && new URLSearchParams(location.search).has('qa-gacha-auto')) {
         this.time.delayedCall(320, () => {
-          const result = this.gs.gachaPull();
+          const category = new URLSearchParams(location.search).get('qa-gacha-category');
+          this.gachaPool = category === 'shield' || category === 'armor' ? 'armor' : 'weapon';
+          const result = this.gs.gachaPull(this.gachaPool);
           if (result) this.playGachaAnimation(result);
         });
       }
@@ -528,8 +542,31 @@ export class UIScene extends Phaser.Scene {
   }
 
   // ============ リフレッシュ ============
+  buildFountainBadge() {
+    const x = MAP_X + 10, y = MAP_Y + 10;
+    const bg = this.add.graphics();
+    bg.fillStyle(0x071e24, .95).fillRoundedRect(0, 0, 122, 30, 7);
+    bg.lineStyle(1, 0x62f7e8, .85).strokeRoundedRect(0, 0, 122, 30, 7);
+    bg.fillStyle(0x62f7e8, 1).fillTriangle(8, 16, 15, 5, 22, 16).fillCircle(15, 17, 7);
+    bg.fillStyle(0xe4ffff, .9).fillCircle(12, 16, 2);
+    const label = this.add.text(29, 7, '攻・防 ×1.1', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#b9fff5', fontStyle: 'bold'
+    });
+    const zone = this.add.zone(0, 0, 122, 30).setOrigin(0).setInteractive({ useHandCursor: true });
+    const show = () => this.showTooltip('噴水の加護',
+      `${this.gs.floor}階のボス討伐まで、攻撃力・防御力が1.1倍。\n重ねて使っても倍率は増えません。`, x, y + 34);
+    zone.on('pointerover', show);
+    zone.on('pointerout', () => this.hideTooltip());
+    zone.on('pointerdown', (_p: unknown, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation();
+      if (this.tooltip.visible) this.hideTooltip(); else show();
+    });
+    this.fountainBadge = this.add.container(x, y, [bg, label, zone]).setDepth(40).setVisible(false);
+  }
+
   refresh() {
     const p = this.gs.player;
+    this.fountainBadge?.setVisible(p.fountainBlessingFloor !== null);
     const th = this.gs.dungeon?.glacialArena
       ? { ...getTheme(this.gs.floor), name: '氷晶の広間', accent: 0x8adfff }
       : this.gs.dungeon?.volcanoArena
@@ -549,11 +586,11 @@ export class UIScene extends Phaser.Scene {
     const floorLabel = this.gs.inBossRoom ? `${this.gs.floor}.5階` : `${this.gs.floor}階`;
     const gate = this.gs.inBossRoom
       ? this.gs.bossRewardClaimed ? '出口解放' : 'ボス封印'
-      : this.gs.floor === 5
-        ? 'ボス扉'
+      : this.gs.floorHasGate(this.gs.floor) && !this.gs.dungeon?.bossRoom
+        ? 'ボス階段'
         : !this.gs.floorBossDefeated
           ? 'ボス封印'
-          : this.gs.floorHasGate(this.gs.floor) ? 'ボス扉' : '階段解放';
+          : this.gs.floorHasGate(this.gs.floor) ? 'ボス階段' : '階段解放';
     this.topText.setText(IS_MOBILE
       ? `${floorLabel}  ${gate}  得点${this.gs.score}${boost}`
       : `${floorLabel} / 30階  ${th.name}   ${gate}   得点 ${this.gs.score}   ${this.gs.turn}ターン${boost}`);
@@ -764,6 +801,8 @@ export class UIScene extends Phaser.Scene {
       this.secretAlternatingPresses = 0;
     }
     this.overlayMode = mode;
+    this.gs.clearMoveInput();
+    this.hideTooltip();
     if (mode === 'none') { this.overlay.setVisible(false); return; }
     this.overlay.setVisible(true);
     this.rebuildOverlay();
@@ -1415,34 +1454,40 @@ export class UIScene extends Phaser.Scene {
       fontFamily: '"Yu Gothic UI"', fontSize: '16px', color: '#f5c542', fontStyle: 'bold'
     }).setOrigin(1, 0));
 
-    this.overlay.add(this.add.text(x + w / 2, y + 54, '古代遺物召喚', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#58d9d1', fontStyle: 'bold', letterSpacing: 3
-    }).setOrigin(0.5));
+    const tabW = (w - 52) / 2;
+    for (const [i, pool] of (['weapon', 'armor'] as const).entries()) {
+      this.overlay.add(this.rowButton(x + 20 + i * (tabW + 12), y + 52, tabW,
+        pool === 'weapon' ? '武器ガチャ' : '防具ガチャ', this.gachaPool === pool,
+        () => { this.gachaPool = pool; this.rebuildOverlay(); }, true, GACHA_PALETTES[pool]));
+    }
+    const weaponPool = this.gachaPool === 'weapon';
+    const palette = GACHA_PALETTES[this.gachaPool];
+    const soldOut = weaponPool && this.gs.weaponWonThisFloor;
 
     // 説明
-    this.overlay.add(this.add.text(x + w / 2, y + 79, '500Gで武器・服・盾を召喚。等級に応じた装備が排出', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '15px', color: '#eef3ee', fontStyle: 'bold'
+    this.overlay.add(this.add.text(x + w / 2, y + 103, weaponPool ? '500Gで武器を1本召喚' : '500Gで盾・服・鎧を1つ召喚', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '15px', color: palette.text, fontStyle: 'bold'
     }).setOrigin(0.5));
 
     // 排出ランク表
-    this.overlay.add(this.add.text(x + w / 2, y + 132, [
+    this.overlay.add(this.add.text(x + w / 2, y + 164, [
       'SS  3%     S  12%     A  25%     B  35%     C  25%',
       '装備等級:  SS→S　S→A　A→B　B→C　C→D',
-      '排出カテゴリ: 武器50%　盾40%　服10%  /  属性装備は約5%',
-      this.gs.weaponWonThisFloor
-        ? 'この階の武器は取得済み  /  以降は盾80%・服20%'
-        : '武器は1階につき最大1本'
+      weaponPool ? '武器のみ排出  /  属性装備は約5%'
+        : '盾80%・服と鎧20%  /  所持済みの服・鎧は盾に変更',
+      weaponPool ? soldOut ? 'この階の武器は取得済み' : '武器は1階につき最大1本'
+        : '武器を取得済みでも利用できます'
     ].join('\n'), {
-      fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#859a9c', align: 'center', lineSpacing: 7
+      fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '10px' : '11px', color: '#859a9c', align: 'center', lineSpacing: 7
     }).setOrigin(0.5));
 
-    // 待機中の宝箱（金色の光をまとってふわふわ浮く）
+    // 選択中のガチャに合わせ、光と召喚陣も武器／防具の色にする。
     const idleGlow = this.add.image(x + w / 2, y + h / 2 + 42, 'glow')
-      .setBlendMode(Phaser.BlendModes.ADD).setTint(0xf5c542).setAlpha(0.3).setScale(2.4);
-    const idleRing = this.add.circle(x + w / 2, y + h / 2 + 28, 76, 0xe7b85e, .025)
-      .setStrokeStyle(1.5, 0xe7b85e, .5);
-    const idleRing2 = this.add.circle(x + w / 2, y + h / 2 + 28, 100, 0x58d9d1, .015)
-      .setStrokeStyle(1, 0x58d9d1, .25);
+      .setBlendMode(Phaser.BlendModes.ADD).setTint(palette.accent).setAlpha(0.3).setScale(2.4);
+    const idleRing = this.add.circle(x + w / 2, y + h / 2 + 28, 76, palette.accent, .025)
+      .setStrokeStyle(1.5, palette.accent, .5);
+    const idleRing2 = this.add.circle(x + w / 2, y + h / 2 + 28, 100, palette.accent, .015)
+      .setStrokeStyle(1, palette.accent, .25);
     const idle = this.add.image(x + w / 2, y + h / 2 + 28, 'chest_rare').setDisplaySize(96, 96);
     this.tweens.add({ targets: idle, y: '-=10', duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     this.tweens.add({ targets: idleGlow, alpha: 0.15, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
@@ -1452,24 +1497,24 @@ export class UIScene extends Phaser.Scene {
 
     // 回すボタン
     const bw = 260, bh = 54, bx = x + w / 2 - bw / 2, by = y + h - 84;
-    const afford = p.gold >= 500;
+    const afford = p.gold >= 500 && !soldOut;
     const g = this.add.graphics();
     const draw = (c: number) => {
       g.clear();
       g.fillStyle(c, 1).fillRoundedRect(bx, by, bw, bh, 12);
-      g.lineStyle(2, afford ? 0xe7b85e : 0x555f70).strokeRoundedRect(bx, by, bw, bh, 12);
+      g.lineStyle(2, afford ? palette.accent : 0x555f70).strokeRoundedRect(bx, by, bw, bh, 12);
     };
-    draw(afford ? 0x49361d : 0x142125);
-    const bt = this.add.text(bx + bw / 2, by + bh / 2, '◆  500Gで召喚', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '20px', color: afford ? '#ffe0a0' : '#5a6577', fontStyle: 'bold'
+    draw(afford ? palette.fill : 0x142125);
+    const bt = this.add.text(bx + bw / 2, by + bh / 2, soldOut ? 'この階の武器は取得済み' : `500Gで${weaponPool ? '武器' : '防具'}を召喚`, {
+      fontFamily: '"Yu Gothic UI"', fontSize: '17px', color: afford ? palette.text : '#5a6577', fontStyle: 'bold'
     }).setOrigin(0.5);
     const zone = this.add.zone(bx, by, bw, bh).setOrigin(0).setInteractive({ useHandCursor: true });
-    zone.on('pointerover', () => { if (afford) draw(0x6a4b22); });
-    zone.on('pointerout', () => draw(afford ? 0x49361d : 0x142125));
+    zone.on('pointerover', () => { if (afford) draw(palette.hover); });
+    zone.on('pointerout', () => draw(afford ? palette.fill : 0x142125));
     zone.on('pointerdown', () => {
-      if (this.gachaAnimating) return;
+      if (this.gachaAnimating || !afford) return;
       Audio.playSe('click');
-      const result = this.gs.gachaPull();
+      const result = this.gs.gachaPull(this.gachaPool);
       if (result) this.playGachaAnimation(result);
     });
     this.overlay.add([g, bt, zone]);
@@ -1812,13 +1857,16 @@ export class UIScene extends Phaser.Scene {
     }
   }
 
-  rowButton(x: number, y: number, w: number, label: string, highlight: boolean, onClick: () => void, enabled = true) {
+  rowButton(x: number, y: number, w: number, label: string, highlight: boolean, onClick: () => void,
+    enabled = true, palette?: (typeof GACHA_PALETTES)[GachaPool]) {
     const c = this.add.container(0, 0);
     const g = this.add.graphics();
-    const base = !enabled ? 0x141a22 : highlight ? 0x264a48 : 0x1c2536;
+    const base = !enabled ? 0x141a22 : highlight ? (palette?.fill ?? 0x264a48) : (palette?.dim ?? 0x1c2536);
+    const border = enabled ? (palette?.accent ?? 0x2f6f6a) : 0x303946;
+    const lineWidth = palette && highlight ? 2 : 1;
     g.fillStyle(base, 1).fillRoundedRect(x, y, w, 28, 5);
-    g.lineStyle(1, enabled ? 0x2f6f6a : 0x303946).strokeRoundedRect(x, y, w, 28, 5);
-    const t = this.add.text(x + 10, y + 14, label, { fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: enabled ? '#dfe7f0' : '#66727e' }).setOrigin(0, 0.5);
+    g.lineStyle(lineWidth, border).strokeRoundedRect(x, y, w, 28, 5);
+    const t = this.add.text(x + 10, y + 14, label, { fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: enabled ? (palette?.text ?? '#dfe7f0') : '#66727e', fontStyle: palette && highlight ? 'bold' : 'normal' }).setOrigin(0, 0.5);
     // 枠からはみ出す場合は末尾を「…」に切り詰める
     if (t.width > w - 18) {
       let s = label;
@@ -1829,8 +1877,8 @@ export class UIScene extends Phaser.Scene {
     }
     if (enabled) {
       const zone = this.add.zone(x, y, w, 28).setOrigin(0).setInteractive({ useHandCursor: true });
-      zone.on('pointerover', () => { g.clear(); g.fillStyle(0x3f8f88, 1).fillRoundedRect(x, y, w, 28, 5); g.lineStyle(1, 0x3fe0d0).strokeRoundedRect(x, y, w, 28, 5); });
-      zone.on('pointerout', () => { g.clear(); g.fillStyle(base, 1).fillRoundedRect(x, y, w, 28, 5); g.lineStyle(1, 0x2f6f6a).strokeRoundedRect(x, y, w, 28, 5); });
+      zone.on('pointerover', () => { g.clear(); g.fillStyle(palette?.hover ?? 0x3f8f88, 1).fillRoundedRect(x, y, w, 28, 5); g.lineStyle(lineWidth, palette?.accent ?? 0x3fe0d0).strokeRoundedRect(x, y, w, 28, 5); });
+      zone.on('pointerout', () => { g.clear(); g.fillStyle(base, 1).fillRoundedRect(x, y, w, 28, 5); g.lineStyle(lineWidth, border).strokeRoundedRect(x, y, w, 28, 5); });
       zone.on('pointerdown', onClick);
       c.add([g, t, zone]);
     } else {

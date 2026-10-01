@@ -122,6 +122,11 @@ const ORIGINAL_ITEM_ART = {
 } as const;
 
 const TERRAIN_PROP_ART = {
+  terrain_boss_entry_north: 'assets/terrain/boss-entrances/north.png',
+  terrain_boss_entry_east: 'assets/terrain/boss-entrances/east.png',
+  terrain_boss_entry_south: 'assets/terrain/boss-entrances/south.png',
+  terrain_boss_entry_west: 'assets/terrain/boss-entrances/west.png',
+  terrain_boss_descent: 'assets/terrain/boss-entrances/boss-descent.png',
   terrain_boss_gate: 'assets/terrain/boss-gate-v2.png',
   terrain_boss_gate_side: 'assets/terrain/boss-gate-side.png',
   terrain_boss_chain_gate: 'assets/terrain/objects/boss-chain-gate.png',
@@ -199,10 +204,13 @@ export class BootScene extends Phaser.Scene {
     for (const key of EXPANSION_MONSTER_KEYS) {
       this.load.image(key, `assets/monsters/${key}.png`);
     }
+    this.load.image('terrain_volcano_wall_block', 'assets/terrain/volcano-v2/wall-block.png');
     for (const floor of VOLCANO_FLOORS) {
       const root = `assets/terrain/volcano-v1/${floor}`;
       this.load.spritesheet(volcanoTerrainKey(floor, 'floor'), `${root}/floor.png`, { frameWidth: 64, frameHeight: 64 });
-      for (const part of VOLCANO_PARTS) this.load.image(volcanoTerrainKey(floor, part), `${root}/${part}.png`);
+      for (const part of VOLCANO_PARTS) {
+        if (!part.startsWith('wall-')) this.load.image(volcanoTerrainKey(floor, part), `${root}/${part}.png`);
+      }
     }
     this.load.image('terrain_volcano_lava', 'assets/terrain/volcano-v1/lava.png');
     for (const floor of WATER_FLOORS) {
@@ -293,8 +301,8 @@ export class BootScene extends Phaser.Scene {
         texture.refresh();
       }
     }
-    // Compose each painted low wall with its ground once, keeping one sprite per map cell.
-    // Transparent space above the rock shows stone or lava, rather than a black gap.
+    // Full-height square basalt blocks use the same tile footprint as the ice walls.
+    // Compose the transparent edges with each floor's ground; mirror one variant for variety.
     for (const floor of VOLCANO_FLOORS) for (const part of ['wall-a', 'wall-b'] as const) {
       const key = volcanoTerrainKey(floor, part);
       for (const ground of ['ground', 'lava'] as const) {
@@ -304,7 +312,10 @@ export class BootScene extends Phaser.Scene {
         context.imageSmoothingEnabled = false;
         const base = this.textures.get(ground === 'lava' ? 'terrain_volcano_lava' : volcanoTerrainKey(floor, 'floor')).getSourceImage() as HTMLImageElement;
         context.drawImage(base, 0, 0, 64, 64, 0, 0, 64, 64);
-        context.drawImage(this.textures.get(key).getSourceImage() as HTMLImageElement, 0, 0);
+        context.save();
+        if (part === 'wall-b') { context.translate(64, 0); context.scale(-1, 1); }
+        context.drawImage(this.textures.get('terrain_volcano_wall_block').getSourceImage() as HTMLImageElement, 0, 0, 64, 64);
+        context.restore();
         texture.refresh();
       }
     }

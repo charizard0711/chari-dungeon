@@ -87,6 +87,9 @@ function validateIce(dungeon: DungeonData, floor: number, run: number) {
 }
 
 function validateRoomShape(dungeon: DungeonData, floor: number, run: number) {
+  // 30F deliberately uses a fixed antechamber and straight final-boss approach.
+  // It does not apply the procedural hub profile, but still undergoes reachability checks.
+  if (floor === 30) return;
   const profile = getFloorLayoutProfile(floor);
   const hub = dungeon.rooms[0];
   const outer = { x: hub.x, y: hub.y };

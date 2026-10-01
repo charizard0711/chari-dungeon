@@ -5,6 +5,7 @@ import { FINAL_DEPTH_BOSSES, FINAL_ELEMENTS, FINAL_ELEMENT_LABEL, finalDepthMobC
 import { hasFinalDepthTerrain, finalDepthTerrainKey, finalDepthFloorFrame, finalDepthPropKinds, FINAL_DEPTH_COLORS, type FinalDepthPropKind, type FinalDepthPart } from '../finalDepthTerrain';
 import { hasThunderTerrain, thunderTerrainKey, thunderFloorFrame, THUNDER_PROP_KINDS, type ThunderPropKind, type ThunderPart } from '../thunderTerrain';
 import Phaser from 'phaser';
+import { awaitTween } from '../awaitTween';
 import { EquipmentRenderer } from '../equipmentRenderer';
 import { PlayerAnimation } from '../playerAnimation';
 import { TILE } from '../textures';
@@ -115,6 +116,8 @@ export interface GachaResult {
   elementName?: string;
   feature?: string;
 }
+
+export type GachaPool = 'weapon' | 'armor';
 
 interface Chest {
   x: number;
@@ -734,6 +737,7 @@ export class GameScene extends Phaser.Scene {
   // ============ フロア生成 ============
   buildFloor(floor: number, bossRoom = false) {
     this.clearMoveInput();
+    if (this.player.fountainBlessingFloor !== floor) this.player.fountainBlessingFloor = null;
     this.floor = floor;
     this.inBossRoom = bossRoom;
     this.enhancementScrollDrops = { stone: false, shieldstone: false };
@@ -781,7 +785,10 @@ export class GameScene extends Phaser.Scene {
     for (const pad of this.teleportPadVisuals) pad.sprite.destroy();
     this.teleportPadVisuals = [];
     this.destroyBossCompass();
-    for (const row of this.tileSprites) for (const s of row) s.destroy();
+    for (const row of this.tileSprites) for (const s of row) {
+      this.tweens.killTweensOf(s);
+      s.destroy();
+    }
     this.tileSprites = [];
     for (const facade of this.wallFacades) facade.sprite.destroy();
     this.wallFacades = [];
@@ -822,7 +829,7 @@ export class GameScene extends Phaser.Scene {
         const t = d.tiles[y][x];
         const visual = this.tileVisual(t, theme.era, x, y);
         if ((hasRuinTerrain(floor) || hasVolcanoTerrain(floor) || hasWaterTerrain(floor) || hasThunderTerrain(floor) || hasFinalDepthTerrain(floor)) && (t === 'stairs' || t === 'door' || t === 'roomDoor'
-          || visual.key.startsWith('terrain_boss_gate'))) {
+          || visual.key.startsWith('terrain_boss_gate') || visual.key.startsWith('terrain_boss_entry'))) {
           const base = hasFinalDepthTerrain(floor) ? this.finalDepthFloorVisual(x, y) : hasThunderTerrain(floor) ? this.thunderFloorVisual(x, y) : hasWaterTerrain(floor) ? this.waterFloorVisual(x, y) : hasVolcanoTerrain(floor) ? this.volcanoFloorVisual(x, y) : this.ruinFloorVisual(x, y);
           const sprite = this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, base.key, base.frame)
             .setDisplaySize(TERRAIN_RENDER_SIZE, TERRAIN_RENDER_SIZE).setDepth(-0.1).setVisible(false);
@@ -956,10 +963,8 @@ export class GameScene extends Phaser.Scene {
     this.updateVisibility();
     const floorIntro = bossRoom
       ? `${floor}.5F 強ボス部屋へ転送された。`
-      : floor === 5 || floor === 30
-        ? `${floor}F「${getTheme(floor).name}」に到達。この階に中ボスはおらず、最奥の扉は${floor}.5Fへ通じている。`
-        : floor % 5 === 0
-          ? `${floor}F「${getTheme(floor).name}」に到達。迷路内の10×10部屋で中ボスを倒すと、同じ部屋の扉から${floor}.5Fへ進める。`
+      : floor % 5 === 0
+          ? `${floor}F「${getTheme(floor).name}」に到達。最奥の赤い階段から${floor}.5Fの強ボス部屋へ進める。`
           : `${floor}F「${getTheme(floor).name}」に到達。迷路内の10×10部屋で中ボスを倒すと、同じ部屋に階段が現れる。`;
     this.log(floorIntro, 'sys');
     const bossDirection = this.bossCompassDirection();
@@ -1033,6 +1038,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   tileVisual(t: TileType, era: number, x: number, y: number): TerrainVisual {
+    const entrance = this.dungeon?.bossEntrance;
+    if (entrance && x === entrance.x && y === entrance.y && (t === 'floor' || t === 'door')) {
+      return this.bossGateVisual();
+    }
     if (hasFinalDepthTerrain(this.floor) && t === 'wall') {
       const arena = this.dungeon.finalDepthArena;
       if (arena?.props.some(p => p.blocking && p.x === x && p.y === y)) return this.finalDepthFloorVisual(x, y);
@@ -1085,11 +1094,6 @@ export class GameScene extends Phaser.Scene {
       return { key: ruinTerrainKey(this.floor, (x * 13 + y * 7) % 3 === 0 ? 'wall-b' : 'wall-a') };
     }
     const suffix = eraSuffix(era);
-    const bossEntry = this.dungeon?.bossEntry;
-    if (t === 'floor' && bossEntry && x === bossEntry.x && y === bossEntry.y
-      && !this.bossEntranceClosed && !this.floorBossDefeated) {
-      return this.bossGateVisual();
-    }
     switch (t) {
       case 'wall': return {
         key: this.inBossRoom ? `terrain_wall_${era}` : `terrain_biome_wall_${this.dungeon.biome}`,
@@ -1100,7 +1104,9 @@ export class GameScene extends Phaser.Scene {
         const isCentralStairSeal = x === this.dungeon.stairs.x && y === this.dungeon.stairs.y;
         const bossEntrance = this.dungeon.bossEntrance;
         const isBossEntrance = !!bossEntrance && x === bossEntrance.x && y === bossEntrance.y;
-        return isCentralStairSeal
+        return isCentralStairSeal && !this.inBossRoom && this.floorHasGate(this.floor)
+          ? { key: 'terrain_boss_descent', size: TILE * 2.1, depth: 3.4 }
+          : isCentralStairSeal
           ? { key: 'terrain_boss_chain_gate', size: TILE * 1.45, depth: 4.2 }
           : isBossEntrance ? this.bossGateVisual()
             : { key: 'terrain_boss_gate', size: TILE, depth: 4.2 };
@@ -1161,16 +1167,14 @@ export class GameScene extends Phaser.Scene {
 
   bossGateVisual(): TerrainVisual {
     const zone = this.dungeon?.bossRoomZone;
-    if (zone === 'east' || zone === 'west') {
-      return {
-        key: 'terrain_boss_gate_side', size: TILE, depth: 4.2,
-        flipX: zone === 'west'
-      };
-    }
-    return { key: 'terrain_boss_gate', size: TILE, depth: 4.2 };
+    const direction = zone === 'east' || zone === 'west' || zone === 'south' ? zone : 'north';
+    const entrance = this.dungeon.bossEntrance!;
+    return { key: `terrain_boss_entry_${direction}`, size: TILE * 2.6,
+      depth: this.worldDepth((entrance.y + .5) * TILE, 14) };
   }
 
   applyTileVisual(sprite: Phaser.GameObjects.Image, t: TileType, era: number, x: number, y: number) {
+    if (!sprite.active) return;
     const visual = this.tileVisual(t, era, x, y);
     sprite.setTexture(visual.key, visual.frame)
       .setFlipX(visual.flipX ?? false)
@@ -1744,7 +1748,7 @@ export class GameScene extends Phaser.Scene {
       : undefined;
     this.log(closed && revealedBoss
       ? `ボス部屋の入口が閉じ、中ボス「${revealedBoss.def.name}」が姿を現した！`
-      : closed ? 'ボス部屋の入口が閉じた！' : 'ボス部屋の入口の扉が消えた。', 'special');
+      : closed ? 'ボス部屋の入口に結界が張られた！' : 'ボス部屋の入口の結界が消えた。', 'special');
   }
 
   closeBossEntranceOnEntry(x: number, y: number) {
@@ -2015,7 +2019,7 @@ export class GameScene extends Phaser.Scene {
   bossChargePath(e: Enemy): Vec2[] {
     const dx = this.player.x === e.x ? 0 : Math.sign(this.player.x - e.x);
     const dy = this.player.y === e.y ? 0 : Math.sign(this.player.y - e.y);
-    if (dx !== 0 && dy !== 0) return [];
+    if ((dx === 0 && dy === 0) || (dx !== 0 && dy !== 0)) return [];
     const path: Vec2[] = [];
     let x = e.x + dx;
     let y = e.y + dy;
@@ -2661,7 +2665,7 @@ export class GameScene extends Phaser.Scene {
 
   handleShieldBreak() {
     const broken = this.player.shield;
-    if (!broken) return;
+    if (!broken || broken.dur > 0) return;
     this.log(`${broken.name}は壊れて砕け散った！`, 'dmg');
     Audio.playSe('break');
     this.player.shields = this.player.shields.filter((shield) => shield !== broken);
@@ -3056,6 +3060,8 @@ export class GameScene extends Phaser.Scene {
     const healed = Math.max(0, this.player.hpMax - this.player.hp);
     this.player.hp = this.player.hpMax;
     this.player.poisonTurns = 0;
+    const blessingAvailable = !this.floorBossDefeated || (!this.inBossRoom && this.floorHasGate(this.floor));
+    if (blessingAvailable) this.player.fountainBlessingFloor = this.floor;
     object.used = true;
     object.sprite.setTint(0x7b8c8a).setAlpha(0.72);
     object.waterFx?.setVisible(false);
@@ -3063,6 +3069,7 @@ export class GameScene extends Phaser.Scene {
     this.healFx();
     Audio.playSe('heal');
     this.log(`古代の噴水で体力が全回復した。${healed > 0 ? `（+${healed}）` : ''}`, 'item');
+    if (blessingAvailable) this.log('噴水の加護：この階のボス討伐まで攻撃・防御が1.1倍！', 'special');
     this.emitRefresh();
   }
 
@@ -3193,7 +3200,7 @@ export class GameScene extends Phaser.Scene {
   // ============ プレイヤー行動 ============
   async playerAct(dir: Dir) {
     if (this.busy || this.gameEnded) return;
-
+    try {
       this.player.dir = dir;
       const [dx, dy] = this.dirVec(dir);
       const nx = this.player.x + dx;
@@ -3358,6 +3365,14 @@ export class GameScene extends Phaser.Scene {
       }
       await this.finishTurn();
       this.busy = false;
+    } catch (error) {
+      console.error('プレイヤー行動の処理に失敗しました', error);
+      this.clearMoveInput();
+      if (!this.gameEnded) this.log('行動を中断しました。もう一度操作できます。', 'sys');
+    } finally {
+      // Floor transitions own the input lock until the camera finishes fading.
+      if (!this.cameras.main.fadeEffect.isRunning) this.busy = false;
+    }
   }
 
   onEnterTile(x: number, y: number) {
@@ -3596,23 +3611,16 @@ export class GameScene extends Phaser.Scene {
       const arrow = this.add.image(this.playerSprite.x, this.playerSprite.y, 'fx_bolt')
         .setDepth(20).setTint(elementColor).setScale(0.82);
       arrow.setRotation(Phaser.Math.Angle.Between(this.playerSprite.x, this.playerSprite.y, e.sprite.x, e.sprite.y));
-      await new Promise<void>((resolve) => this.tweens.add({
-        targets: arrow, x: e.sprite.x, y: e.sprite.y, duration: 180, ease: 'Quad.easeIn',
-        onComplete: () => { arrow.destroy(); resolve(); }
-      }));
+      await this.tween(arrow, { x: e.sprite.x, y: e.sprite.y }, 180, 'Quad.easeIn');
+      arrow.destroy();
       this.effectFx(e.x, e.y, 'fx_magic', 1.0, 220, elementColor);
     } else {
       this.slashFx(e.x, e.y, elementColor);
     }
     if (!ranged) {
-      await new Promise<void>((resolve) => {
-        this.tweens.add({
-          targets: this.playerSprite,
-          x: homeX + ddx * 10, y: homeY + ddy * 10,
-          duration: ANIM * 0.45, yoyo: true, ease: 'Quad.easeOut',
-          onComplete: () => { this.playerSprite.x = homeX; this.playerSprite.y = homeY; resolve(); }
-        });
-      });
+      await this.tween(this.playerSprite, { x: homeX + ddx * 10, y: homeY + ddy * 10, yoyo: true },
+        ANIM * .45, 'Quad.easeOut');
+      this.playerSprite.setPosition(homeX, homeY);
     }
 
     const res = computePlayerAttack(this.player, e.def, !ranged && dir === e.facing);
@@ -3817,15 +3825,21 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.floorBossDefeated = true;
+    if ((this.inBossRoom || !this.floorHasGate(this.floor)) && this.player.fountainBlessingFloor !== null) {
+      this.player.fountainBlessingFloor = null;
+      this.log('この階のボスを討伐し、噴水の加護が消えた。', 'sys');
+    }
     this.refreshBossCompassVisual();
     Audio.playSe('seal');
     this.setBossEntranceClosed(false);
     this.dropBossRewards(defeatedAt);
     const stairs = this.dungeon.stairs;
     if (this.inBossRoom || !this.floorHasGate(this.floor)) {
+      const dungeon = this.dungeon;
       const sprite = this.tileSprites[stairs.y]?.[stairs.x];
       if (sprite) {
         this.tweens.add({ targets: sprite, displayWidth: 8, displayHeight: 8, alpha: 0, duration: 240, ease: 'Back.easeIn', onComplete: () => {
+          if (!sprite.active || this.dungeon !== dungeon) return;
           this.applyTileVisual(sprite, 'stairs', getTheme(this.floor).era, stairs.x, stairs.y);
           const targetSize = TILE + 10;
           sprite.setDisplaySize(8, 8).setAlpha(0);
@@ -3837,7 +3851,7 @@ export class GameScene extends Phaser.Scene {
     this.log(this.inBossRoom
       ? `${bossName}を撃破！ 報酬がその場にドロップし、出口の封印が解けた。`
       : this.floorHasGate(this.floor)
-        ? `${bossName}を撃破！ 報酬がその場にドロップし、10×10部屋内の強ボス扉が開いた。`
+        ? `${bossName}を撃破！ 報酬がその場にドロップし、強ボスへ降りる階段が使えるようになった。`
         : `${bossName}を撃破！ 報酬がその場にドロップし、10×10部屋内に階段が現れた。`, 'special');
     this.updateVisibility();
     this.emitRefresh();
@@ -4139,9 +4153,10 @@ export class GameScene extends Phaser.Scene {
     if (!this.playerSprite || this.gameEnded) return;
     const token = ++this.playerAnimToken;
     const sprite = this.playerSprite;
-    const homeX = sprite.x;
+    const homeX = this.player.x * TILE + TILE / 2;
+    const homeY = this.player.y * TILE + TILE / 2;
     this.tweens.killTweensOf(sprite);
-    sprite.setAngle(0).setScale(PLAYER_WORLD_SCALE);
+    sprite.setPosition(homeX, homeY).setAngle(0).setScale(PLAYER_WORLD_SCALE);
     this.setPlayerVisual(this.player.dir, 'hurt');
     sprite.setTintFill(0xfff0ec);
     this.tweens.add({
@@ -4185,6 +4200,9 @@ export class GameScene extends Phaser.Scene {
   async finishTurn() {
     this.turn++;
     this.floorTurn++;
+    // Player status duration follows player turns, not the number/type of active enemies.
+    if (this.playerRootTurns > 0) this.playerRootTurns--;
+    if (this.itemSealTurns > 0) this.itemSealTurns--;
 
     // 毒ダメージ
     if (this.player.poisonTurns > 0) {
@@ -4575,9 +4593,6 @@ export class GameScene extends Phaser.Scene {
       e.y = escape.y;
       return this.animateEnemyMove(e, escape);
     }
-    if (this.playerRootTurns > 0) this.playerRootTurns--;
-    if (this.itemSealTurns > 0) this.itemSealTurns--;
-
     // 隣接なら攻撃
     if (dist === 1 && !unseen) {
       return this.enemyAttack(e);
@@ -4747,6 +4762,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   afterEnemyHitGimmick(e: Enemy, damage: number, ranged: boolean) {
+    if (!e.alive || !e.sprite.active) return;
     if (e.def.gimmick === 'mud_bind') {
       this.playerRootTurns = Math.max(this.playerRootTurns, 1);
       this.log('泥が足に絡み、次の移動が止まる！', 'dmg');
@@ -4817,31 +4833,19 @@ export class GameScene extends Phaser.Scene {
       yoyo: true,
       ease: 'Back.easeInOut'
     });
-    return new Promise((resolve) => {
-      this.tweens.add({
-        targets: e.sprite, x: (ox + px) / 2, y: (oy + py) / 2,
-        duration: this.currentTurnAnimDuration(ANIM / 2), yoyo: true,
-        onComplete: () => {
-          e.animating = false;
-          e.sprite.setScale(e.baseScale).setAngle(0);
-          Audio.playSe(elementAttackSe(enemyElement));
-          this.damagePlayer(damage, `${e.def.name}の${profile.label}${enemyElementInfo.name}属性攻撃！`, e);
-          this.afterEnemyHitGimmick(e, damage, false);
-          this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.4, 360, enemyElementInfo.color);
-          this.hitFx(this.player.x, this.player.y);
-          this.cameras.main.shake(90, 0.004);
-          if (res.shieldBroke) {
-            // 壊れた盾はその場で消滅し、持っている別の盾に持ち替える
-            const bs = this.player.shield!;
-            this.log(`${bs.name}は壊れて砕け散った！`, 'dmg');
-            Audio.playSe('break');
-            this.player.shields = this.player.shields.filter((x) => x !== bs);
-            this.player.shield = this.player.shields[0] ?? null;
-          }
-          this.flashSprite(this.playerSprite);
-          resolve();
-        }
-      });
+    return this.tween(e.sprite, { x: (ox + px) / 2, y: (oy + py) / 2, yoyo: true },
+      this.currentTurnAnimDuration(ANIM / 2)).then(() => {
+      if (!e.alive || !e.sprite.active || this.gameEnded) return;
+      e.animating = false;
+      e.sprite.setScale(e.baseScale).setAngle(0);
+      Audio.playSe(elementAttackSe(enemyElement));
+      this.damagePlayer(damage, `${e.def.name}の${profile.label}${enemyElementInfo.name}属性攻撃！`, e);
+      this.afterEnemyHitGimmick(e, damage, false);
+      this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.4, 360, enemyElementInfo.color);
+      this.hitFx(this.player.x, this.player.y);
+      this.cameras.main.shake(90, 0.004);
+      if (res.shieldBroke) this.handleShieldBreak();
+      this.flashSprite(this.playerSprite);
     });
   }
 
@@ -4878,25 +4882,20 @@ export class GameScene extends Phaser.Scene {
       yoyo: true,
       ease: 'Sine.easeInOut'
     });
-    return new Promise((resolve) => {
-      const bolt = this.add.image(e.sprite.x, e.sprite.y, 'fx_bolt').setDepth(20).setTint(enemyElementInfo.color);
-      this.tweens.add({
-        targets: bolt, x: this.playerSprite.x, y: this.playerSprite.y,
-        duration: this.currentTurnAnimDuration(180),
-        onComplete: () => {
-          e.animating = false;
-          e.sprite.setScale(e.baseScale);
-          bolt.destroy();
-          const res = computeEnemyAttack(this.player, e.def, profile.element);
-          const damage = Math.max(1, Math.floor(res.damage * profile.factor));
-          this.damagePlayer(damage, `${e.def.name}の${profile.label}${enemyElementInfo.name}属性遠距離攻撃！`, e);
-          this.afterEnemyHitGimmick(e, damage, true);
-          if (res.shieldBroke) this.handleShieldBreak();
-          this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.45, 360, enemyElementInfo.color);
-          resolve();
-        }
+    const bolt = this.add.image(e.sprite.x, e.sprite.y, 'fx_bolt').setDepth(20).setTint(enemyElementInfo.color);
+    return this.tween(bolt, { x: this.playerSprite.x, y: this.playerSprite.y }, this.currentTurnAnimDuration(180))
+      .then(() => {
+        bolt.destroy();
+        if (!e.alive || !e.sprite.active || this.gameEnded) return;
+        e.animating = false;
+        e.sprite.setScale(e.baseScale);
+        const res = computeEnemyAttack(this.player, e.def, profile.element);
+        const damage = Math.max(1, Math.floor(res.damage * profile.factor));
+        this.damagePlayer(damage, `${e.def.name}の${profile.label}${enemyElementInfo.name}属性遠距離攻撃！`, e);
+        this.afterEnemyHitGimmick(e, damage, true);
+        if (res.shieldBroke) this.handleShieldBreak();
+        this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.45, 360, enemyElementInfo.color);
       });
-    });
   }
 
   // ============ 敵移動ヘルパー ============
@@ -4911,7 +4910,8 @@ export class GameScene extends Phaser.Scene {
     if (this.inBossRoom && !this.isInsideBossCombatFrame(x, y)) return false;
     if (e.def.isFloorBoss && this.dungeon.bossRoom && !this.isInsideBossCombatFrame(x, y)) return false;
     if (t === 'wall' && !e.def.wallPass) return false;
-    if (t === 'pit' || (bossBodyRadius(e.def) > 0 && (t === 'door' || t === 'roomDoor' || t === 'stairs'))) return false;
+    // Doors and stairs are reserved for the player, including small and wall-passing enemies.
+    if (t === 'pit' || t === 'door' || t === 'roomDoor' || t === 'stairs') return false;
     if (this.enemyAt(x, y, e)) return false;
     if (this.player.x === x && this.player.y === y) return false;
     if (this.chestAt(x, y)) return false;
@@ -5616,7 +5616,8 @@ export class GameScene extends Phaser.Scene {
     this.emitRefresh();
     if (passTurn && consumed) {
       this.busy = true;
-      this.finishTurn().then(() => { this.busy = false; });
+      this.finishTurn().catch(error => console.error('道具使用後のターン処理に失敗しました', error))
+        .finally(() => { this.busy = false; });
     }
   }
 
@@ -5951,10 +5952,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ============ ガチャ ============
-  // 500Gで1回。武器・服・盾を抽選し、ランクが装備等級へ直結する。
+  // 500Gで1回。武器と防具（盾・服）を別々に抽選する。
   // 戻り値はUI演出用（rank/色/名前/アイコン）。ゴールド不足はnull。
-  gachaPull(): GachaResult | null {
-    if (this.gameEnded) return null;
+  gachaPull(pool: GachaPool = 'weapon'): GachaResult | null {
+    if (this.gameEnded || this.busy || this.pendingEquipment) return null;
+    if (pool === 'weapon' && this.weaponWonThisFloor) {
+      this.log('この階の武器は取得済みです。防具ガチャは利用できます。', 'sys');
+      Audio.playSe('deny');
+      return null;
+    }
     if (this.player.gold < 500) {
       this.log('ゴールドが足りない。（ガチャは500G）', 'sys');
       Audio.playSe('deny');
@@ -5992,15 +5998,12 @@ export class GameScene extends Phaser.Scene {
     let elementName: string | undefined;
     let feature: string | undefined;
 
-    // 排出カテゴリは武器50%・盾40%・服10%。
-    // この階で武器を取得済みの場合だけ、残りの比率を盾80%・服20%へ振り分ける。
+    // 武器は必ず武器、防具は盾80%・服20%。QA指定も選択したプール内に限定。
     const categoryRoll = Math.random();
     let prizeCategory: 'weapon' | 'shield' | 'armor' =
-      forcedCategory === 'weapon' || forcedCategory === 'shield' || forcedCategory === 'armor'
-        ? forcedCategory
-        : this.weaponWonThisFloor
-          ? categoryRoll < 0.8 ? 'shield' : 'armor'
-          : categoryRoll < 0.5 ? 'weapon' : categoryRoll < 0.9 ? 'shield' : 'armor';
+      pool === 'weapon' ? 'weapon'
+        : forcedCategory === 'shield' || forcedCategory === 'armor' ? forcedCategory
+          : categoryRoll < 0.8 ? 'shield' : 'armor';
     if (prizeCategory === 'armor' && this.ownsArmor(armorForGrade(grade).key)) prizeCategory = 'shield';
     if (prizeCategory === 'armor') {
       const armor = armorForGrade(grade);
@@ -6039,7 +6042,8 @@ export class GameScene extends Phaser.Scene {
       feature = s.passive?.name;
     }
 
-    this.log(`ガチャ【${rank}】${name}を引き当てた！`, rank === 'SS' || rank === 'S' ? 'special' : 'item');
+    this.log(`${pool === 'weapon' ? '武器' : '防具'}ガチャ【${rank}】${name}を引き当てた！`, rank === 'SS' || rank === 'S' ? 'special' : 'item');
+    this.emitRefresh();
     return {
       rank, color: RANK_COLOR[rank], name, texKey, hasEffect, elementColor, tintIcon,
       category, grade, elementName, feature
@@ -6524,6 +6528,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   findClickPath(targetX: number, targetY: number, stopAtEnemy = false): Dir[] {
+    const targetObject = this.dungeonObjectAt(targetX, targetY);
     const dirs: { dir: Dir; dx: number; dy: number }[] = [
       { dir: 'up', dx: 0, dy: -1 }, { dir: 'down', dx: 0, dy: 1 },
       { dir: 'left', dx: -1, dy: 0 }, { dir: 'right', dx: 1, dy: 0 }
@@ -6537,7 +6542,9 @@ export class GameScene extends Phaser.Scene {
         const key = `${nx},${ny}`;
         if (visited.has(key)) continue;
         const tile = this.dungeon.tiles[ny]?.[nx];
-        const isTarget = nx === targetX && ny === targetY;
+        // Large fountains are interacted with at their nearest edge, even when their center is clicked.
+        const isTarget = nx === targetX && ny === targetY
+          || !!targetObject && this.dungeonObjectAt(nx, ny) === targetObject;
         const bossDoorTarget = isTarget && tile === 'door' && !this.inBossRoom;
         if (!this.isTileCurrentlyVisible(nx, ny)) continue;
         if (!tile || (!isWalkable(tile) && !bossDoorTarget) || tile === 'pit') continue;
@@ -6549,7 +6556,7 @@ export class GameScene extends Phaser.Scene {
         }
         const object = this.dungeonObjectAt(nx, ny);
         if (!isTarget && (this.chestAt(nx, ny) || this.bossObstacleAt(nx, ny) || object)) continue;
-        if (object && (!isTarget || !object.breakable)) continue;
+        if (object && (!isTarget || (!object.breakable && object.kind !== 'fountain'))) continue;
         if (isTarget) return path;
         visited.add(key);
         queue.push({ x: nx, y: ny, path });
@@ -6651,10 +6658,13 @@ export class GameScene extends Phaser.Scene {
     if (this.enemyAt(nx, ny)) return true;
     if (this.bossObstacleAt(nx, ny)) return true;
     const object = this.dungeonObjectAt(nx, ny);
-    if (object) return object.breakable || object.kind === 'fountain';
+    if (object) return object.breakable || (object.kind === 'fountain' && !object.used);
     const c = this.chestAt(nx, ny);
     if (c && !c.opened) return true;
     const t = this.dungeon.tiles[ny]?.[nx];
+    if (t === 'roomDoor') return true;
+    if (t === 'door' && !this.inBossRoom && nx === this.dungeon.stairs.x && ny === this.dungeon.stairs.y
+      && this.floorHasGate(this.floor) && (!this.dungeon.bossRoom || this.floorBossDefeated)) return true;
     return !!t && isWalkable(t) && t !== 'pit';
   }
 
@@ -6662,6 +6672,16 @@ export class GameScene extends Phaser.Scene {
   update(time: number) {
     const ps = this.playerSprite;
     if (!ps) return;
+    const entrance = this.dungeon?.bossEntrance;
+    if (entrance) {
+      const gate = this.tileSprites[entrance.y]?.[entrance.x];
+      if (gate?.visible) {
+        const nearby = Math.max(Math.abs(ps.x / TILE - .5 - entrance.x),
+          Math.abs(ps.y / TILE - .5 - entrance.y)) < 1.5;
+        // Keep the traversable opening legible when the foreground stonework covers the player.
+        gate.setAlpha(nearby ? .48 : 1).setTint(this.bossEntranceClosed ? 0xff796f : 0xffffff);
+      }
+    }
 
     // 矢印長押しで連続移動
     this.handleMoveKeys(time);
@@ -7011,9 +7031,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   tween(target: any, props: any, ms: number, ease = 'Linear'): Promise<void> {
-    return new Promise((resolve) => {
-      this.tweens.add({ targets: target, ...props, duration: ms, ease, onComplete: () => resolve() });
-    });
+    return awaitTween(this, target, props, ms, ease);
   }
 
   emitRefresh() {
