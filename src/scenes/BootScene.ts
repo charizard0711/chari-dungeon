@@ -31,6 +31,7 @@ const EXPANSION_MONSTER_KEYS = [
 ] as const;
 
 const WEAPON_ART = {
+  w_hero_sword: 'assets/weapons/hero-sword-v1.png',
   w_dagger_fire: 'assets/weapons/affinities/dagger_fire.png',
   w_dagger_water: 'assets/weapons/affinities/dagger_water.png',
   w_dagger_thunder: 'assets/weapons/affinities/dagger_thunder.png',

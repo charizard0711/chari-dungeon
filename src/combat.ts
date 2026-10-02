@@ -58,8 +58,8 @@ export function computePlayerAttack(p: Player, def: MonsterDef, backstab = false
   dmg = Math.max(1, Math.floor(dmg * (options.multiplier ?? 1)));
 
   // ドレイン
-  let drain = 0;
-  if (p.hasMagic('D')) { drain = Math.floor(dmg * 0.3); }
+  let drain = w?.passive?.key === 'hero_heal' ? 10 : 0;
+  if (p.hasMagic('D')) { drain += Math.floor(dmg * 0.3); }
   if (w?.passive?.key === 'blood_edge') drain += Math.max(1, Math.floor(dmg * 0.03));
 
   const poison = !!p.hasMagic('P') && Math.random() < 0.5;

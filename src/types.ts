@@ -35,7 +35,7 @@ export type MonsterElement = Element | 'dark';
 export type WeaponType = 'dagger' | 'longsword' | 'lance' | 'bow' | 'handgun' | 'greatsword' | 'dual_sword' | 'twin_daggers';
 
 export interface WeaponPassive {
-  key: 'backstab' | 'sturdy' | 'pierce' | 'eagle_eye' | 'quickdraw' | 'heavy_strike' | 'twin_edge' | 'blood_edge' | 'knockback';
+  key: 'backstab' | 'sturdy' | 'pierce' | 'eagle_eye' | 'quickdraw' | 'heavy_strike' | 'twin_edge' | 'blood_edge' | 'knockback' | 'hero_heal';
   name: string;
   description: string;
 }
@@ -103,7 +103,7 @@ export type ItemKind =
   | 'slime_scroll' // スライムへ30ターン変身（ショップ限定）
   | 'boss5_scroll' // 封印王アウレリウスへ30ターン変身（ショップ限定）
   | 'invis'       // 透明ポーション（20ターン敵から見えなくなる）
-  | 'repair';     // 装備修復石（武器または盾1つの耐久を100回復）
+  | 'repair';     // 装備修復石（武器または盾1つの耐久を50回復）
 
 export interface Item {
   kind: ItemKind;

@@ -7,12 +7,16 @@ import { PLAYER_FRAME_SIZE, type PlayerGender, type PlayerVisualFrame } from './
 export class EquipmentRenderer {
   readonly weapon: Phaser.GameObjects.Image;
   readonly offhand: Phaser.GameObjects.Image;
+  private heroGlow?: Phaser.FX.Glow;
   constructor(private scene: Phaser.Scene) {
     this.weapon = scene.add.image(0,0,'w_soldier_blade').setVisible(false);
     this.offhand = scene.add.image(0,0,'s_iron_round').setVisible(false);
+    this.heroGlow = this.weapon.preFX?.addGlow(0xffd35a, 4, 1, false, .1, 12);
+    this.heroGlow?.setActive(false);
   }
   update(body: Phaser.GameObjects.Image, weapon: Weapon | null, shield: Shield | null, dir: Dir, frame: PlayerVisualFrame, gender: PlayerGender, elapsed = 0, enabled = true) {
     const second = weapon?.dual ? weapon : shield;
+    this.heroGlow?.setActive(enabled && weapon?.key === 'w_hero_sword');
     const show = enabled && body.visible && body.active && frame !== 'down';
     for (const [sprite,item,offhand] of [[this.weapon,weapon,false],[this.offhand,second,true]] as const) {
       if (!show || !item || !HELD_EQUIPMENT_KEYS.has(item.key)) { sprite.setVisible(false); continue; }
@@ -29,8 +33,8 @@ export class EquipmentRenderer {
       const dx = (pose.x - body.originX * 40) * body.scaleX * artScale;
       const dy = (pose.y - body.originY * 40) * body.scaleY * artScale;
       const cosine = Math.cos(body.rotation), sine = Math.sin(body.rotation);
-      const [ox,oy] = hasArt ? heldGrip(type,dir) : [.5,.65];
-      const size = heldArtSize(type) * Math.abs(body.scaleY) * artScale / .85;
+      const [ox,oy] = hasArt || item.key === 'w_hero_sword' ? heldGrip(type,dir) : [.5,.65];
+      const size = heldArtSize(type) * (item.key === 'w_hero_sword' ? 2 : 1) * Math.abs(body.scaleY) * artScale / .85;
       sprite.setVisible(true).setOrigin(ox,oy).setPosition(body.x + dx*cosine - dy*sine,body.y + dx*sine + dy*cosine)
         .setDisplaySize(size,size).setRotation(body.rotation + pose.angle).setFlipX(!!weapon?.dual && offhand && (dir === 'down' || dir === 'up'))
         .setDepth(body.depth + pose.depth).setAlpha(body.alpha).clearTint();

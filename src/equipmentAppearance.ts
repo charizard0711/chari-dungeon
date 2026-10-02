@@ -6,10 +6,10 @@ import { PLAYER_HAND_ANCHORS } from './playerHandAnchors';
 
 export const HELD_FRAME_SIZE = 64;
 export const HELD_DIRECTION_FRAME: Record<Dir, number> = {down:0,left:1,right:2,up:3};
-export const HELD_EQUIPMENT = [...WEAPON_DEFS, ...SHIELD_DEFS].map(def => ({
+export const HELD_EQUIPMENT = [...WEAPON_DEFS, ...SHIELD_DEFS].filter(def => def.key !== 'w_hero_sword').map(def => ({
   itemKey:def.key, textureKey:`held_${def.key}`, path:`assets/equipment/directional/${def.key}.png`
 }));
-export const HELD_EQUIPMENT_KEYS = new Set(HELD_EQUIPMENT.map(art=>art.itemKey));
+export const HELD_EQUIPMENT_KEYS = new Set([...HELD_EQUIPMENT.map(art=>art.itemKey), 'w_hero_sword']);
 
 export function heldArtSize(type: WeaponType | 'shield') {
   return {dagger:16,longsword:23,lance:32,bow:25,handgun:18,greatsword:29,dual_sword:20,twin_daggers:18,shield:13}[type];

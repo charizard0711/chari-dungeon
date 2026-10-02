@@ -15,9 +15,12 @@ export interface WeaponDef {
   element?: Element;
   passive?: WeaponPassive;
   ss?: boolean;
+  initialPlus?: number;
 }
 
 export const WEAPON_DEFS: WeaponDef[] = [
+  { key: 'w_hero_sword', name: '英雄ソード', atkMin: 16, atkMax: 30, durMax: 300, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'greatsword', initialPlus: 10,
+    passive: { key: 'hero_heal', name: '英雄の祝福', description: '敵に攻撃を当てるとHPが10回復' } },
   // 属性は後付け抽選せず、武器の種類・名前・専用アートに固定する。
   { key: 'w_dagger_fire', name: '焔牙カグツチ', atkMin: 6, atkMax: 14, durMax: 120, minFloor: 1, rarity: 10, grade: 'D', weaponType: 'dagger', element: 'fire' },
   { key: 'w_dagger_water', name: '潮刃ミナヅキ', atkMin: 6, atkMax: 14, durMax: 120, minFloor: 1, rarity: 10, grade: 'D', weaponType: 'dagger', element: 'water' },
@@ -230,7 +233,7 @@ export const ITEM_DEFS: Record<ItemKind, Omit<Item, 'kind'>> = {
   slime_scroll: { name: 'スライム変身スクロール', desc: '30ターンの間スライムへ変身。装備効果を引き継ぎ、攻撃力+5%・防御力+1', textureKey: 'i_slime_scroll' },
   boss5_scroll: { name: '封印王アウレリウス変身スクロール', desc: '30ターンの間「封印王アウレリウス」へ変身。装備効果を引き継ぎ、攻撃力+10%・防御力+3', textureKey: 'i_boss5_scroll' },
   invis:   { name: '透明ポーション', desc: '20ターンの間、敵から完全に見えなくなる', textureKey: 'i_invis' },
-  repair:  { name: '装備修復石', desc: '選んだ武器か盾1つの耐久を100回復（最大耐久まで）', textureKey: 'i_repair' }
+  repair:  { name: '装備修復石', desc: '選んだ武器か盾1つの耐久を50回復（最大耐久まで）', textureKey: 'i_repair' }
 };
 
 // レアアイテム（所持欄で赤枠になる）

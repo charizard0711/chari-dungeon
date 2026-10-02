@@ -764,6 +764,8 @@ export class UIScene extends Phaser.Scene {
     });
     if (this.paperDoll && this.gs.playerArmor) {
       this.paperDoll.setTexture(playerSheetKey(this.gs.playerGender, this.gs.playerArmor), playerFrameIndex('down', 'idle'));
+      const dollSize = p.weapon?.key === 'w_hero_sword' ? 82 : 116;
+      this.paperDoll.setDisplaySize(dollSize, dollSize);
       this.paperDollEquipment?.update(this.paperDoll,p.weapon,p.shield,'down','idle',this.gs.playerGender);
     }
 
@@ -1495,7 +1497,7 @@ export class UIScene extends Phaser.Scene {
   buildRepairOverlay(x: number, y: number, w: number) {
     const p = this.gs.player;
     const count = p.inventory.filter(item => item.kind === 'repair').length;
-    this.overlay.add(this.add.text(x + 20, y + 54, `修復石：${count}個　1個で耐久を100回復（最大まで）\n服には耐久がありません。選ばずに閉じると消費しません。`, {
+    this.overlay.add(this.add.text(x + 20, y + 54, `修復石：${count}個　1個で耐久を50回復（最大まで）\n服には耐久がありません。選ばずに閉じると消費しません。`, {
       fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '11px' : '13px', color: '#a9d4d5',
       wordWrap: { width: w - 40 }, lineSpacing: 5
     }));
@@ -1508,7 +1510,7 @@ export class UIScene extends Phaser.Scene {
     if (!owned.length) this.overlay.add(this.add.text(x + 24, y + 164, '修復できる装備を持っていません。', { fontSize: '14px', color: '#bccbce' }));
     owned.forEach((equipment, index) => {
       const cy = y + 154 + index * 72;
-      const restored = Math.max(0, Math.min(100, equipment.durMax - equipment.dur));
+      const restored = Math.max(0, Math.min(50, equipment.durMax - equipment.dur));
       const equipped = equipment === p.weapon || equipment === p.shield;
       const bg = this.add.graphics().fillStyle(0x112a31).fillRoundedRect(x + 16, cy, w - 32, 64, 8);
       const icon = this.framedIcon(x + 42, cy + 32, equipment.key, gradeColor(equipment.grade), 36);
@@ -1537,7 +1539,7 @@ export class UIScene extends Phaser.Scene {
 
     const rows: { kind: ShopItemKind; label: string }[] = [
       { kind: 'potion', label: '回復ポーション　体力を40回復' },
-      { kind: 'repair', label: '装備修復石　武器か盾の耐久を100回復' },
+      { kind: 'repair', label: '装備修復石　武器か盾の耐久を50回復' },
       { kind: 'slime_scroll', label: 'スライム変身　30ターン／攻撃+5%・防御+1' },
       { kind: 'boss5_scroll', label: '封印王アウレリウス変身　30ターン／攻撃+10%・防御+3' }
     ];

@@ -6034,7 +6034,7 @@ export class GameScene extends Phaser.Scene {
     const stoneIndex = this.player.inventory.findIndex(item => item.kind === 'repair');
     const owned: (Weapon | Shield)[] = kind === 'weapon' ? this.player.weapons : this.player.shields;
     if (stoneIndex < 0 || !owned.includes(equipment)) return false;
-    const restored = Math.min(100, equipment.durMax - equipment.dur);
+    const restored = Math.min(50, equipment.durMax - equipment.dur);
     if (restored <= 0) {
       this.log('この装備の耐久はすでに最大です。修復石は消費しません。', 'sys');
       Audio.playSe('deny');
@@ -6750,7 +6750,7 @@ export class GameScene extends Phaser.Scene {
       const highGrade = grade === 'A' || grade === 'S';
       if (plus > 0 || highGrade || element) {
         this.playerAura.setVisible(true)
-          .setTint(element ? ELEMENT_INFO[element].color : gradeColor(grade))
+          .setTint(this.player.weapon?.key === 'w_hero_sword' ? 0xffd35a : element ? ELEMENT_INFO[element].color : gradeColor(grade))
           .setAlpha(Math.min(0.92, 0.34 + plus * 0.12 + (highGrade ? 0.14 : 0)))
           .setScale(0.9 + Math.min(0.35, plus * 0.06));
       } else {

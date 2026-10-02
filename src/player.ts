@@ -128,7 +128,7 @@ export function makeWeapon(key: string, magics: Magic[]): Weapon {
   }
   return {
     key: def.key, name: def.name, atkMin, atkMax,
-    durMax, dur: durMax, magics, grade: def.grade, plus: 0, dual: def.dual,
+    durMax, dur: durMax, magics, grade: def.grade, plus: def.initialPlus ?? 0, dual: def.dual,
     weaponType: def.weaponType, element: def.element, ss: def.ss,
     passive: def.passive ? { ...def.passive } : undefined,
     specialCounter: 0
@@ -202,7 +202,7 @@ export function rollWeapon(floor: number): Weapon {
   // 一定確率で最初から強化済み（+1が多く、たまに+2/+3。深い階ほど出やすい）
   if (Math.random() < 0.22 + Math.min(0.18, floor * 0.01)) {
     const r = Math.random();
-    weapon.plus = r < 0.65 ? 1 : r < 0.9 ? 2 : 3;
+    weapon.plus = Math.max(weapon.plus, r < 0.65 ? 1 : r < 0.9 ? 2 : 3);
   }
   return addRandomLootTraits(weapon);
 }
