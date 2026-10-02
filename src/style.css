@@ -1,7 +1,7 @@
 :root {
-  --abyss: #03090b;
-  --deep: #061316;
-  --teal: #58d9d1;
+  --abyss: #08070b;
+  --deep: #110b13;
+  --teal: #c59a55;
   --gold: #e7b85e;
   --ink: #f4f1e8;
 }
@@ -34,9 +34,9 @@ body::before {
   content: "";
   pointer-events: none;
   background:
-    radial-gradient(circle at 18% 18%, rgba(32, 133, 130, .19), transparent 34rem),
+    radial-gradient(circle at 18% 18%, rgba(118, 26, 44, .19), transparent 34rem),
     radial-gradient(circle at 84% 74%, rgba(191, 125, 37, .12), transparent 30rem),
-    linear-gradient(145deg, #07181b, #020708 72%);
+    linear-gradient(145deg, #1a0b13, #050508 72%);
 }
 
 body::after {
@@ -65,12 +65,12 @@ body::after {
 #game-container {
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(112, 160, 160, .36);
+  border: 1px solid rgba(196, 151, 76, .5);
   border-radius: 18px;
-  background: #061013;
+  background: #100b12;
   box-shadow:
     0 30px 90px rgba(0, 0, 0, .62),
-    0 0 60px rgba(45, 175, 166, .1),
+    0 0 60px rgba(170, 60, 55, .1),
     inset 0 1px 0 rgba(255, 255, 255, .05);
 }
 
@@ -115,3 +115,20 @@ canvas {
     transition-duration: .01ms !important;
   }
 }
+
+/* Immediate HTML artwork stays visible while the game bundle and assets load. */
+#loading-screen {
+  position: fixed; inset: 0; z-index: 20;
+  display: flex; align-items: flex-end; justify-content: center;
+  padding: 7vh 20px;
+  background: #08070b url('/assets/ui/obsidian-v1/loading.webp') center / cover no-repeat;
+}
+#loading-screen::before { content: ''; position: absolute; inset: 0; background: linear-gradient(transparent 30%, rgba(5,3,8,.9)); }
+.loading-card { position: relative; width: min(520px, 100%); text-align: center; color: #f6deaa; text-shadow: 0 2px 8px #000; }
+.loading-crest { font-size: 26px; color: #b84249; }
+.loading-card h1 { font-size: clamp(25px, 5vw, 40px); letter-spacing: .12em; margin: 8px 0 12px; }
+.loading-story { color: #d3bca0; font-size: 14px; margin-bottom: 28px; }
+.loading-track { height: 10px; border: 1px solid #aa8243; padding: 2px; background: #0b080c; border-radius: 8px; overflow: hidden; }
+.loading-fill { height: 100%; width: 0; border-radius: 4px; background: linear-gradient(90deg, #84303c, #e4bc6d); transition: width .18s linear; }
+.loading-status { margin-top: 12px; font-size: 13px; color: #e1d2b6; }
+@media (max-width: 520px) { #loading-screen { background-position: 52% center; padding-bottom: max(50px, env(safe-area-inset-bottom)); } }

@@ -33,6 +33,7 @@ export class UIScene extends Phaser.Scene {
   logLines: { msg: string; type: string }[] = [];
 
   topText!: Phaser.GameObjects.Text;
+  goldText?: Phaser.GameObjects.Text;
   statusText!: Phaser.GameObjects.Text;
   hpBar!: Phaser.GameObjects.Graphics;
   equipSlots: { kind: 'weapon' | 'armor' | 'shield'; tag: string; bg: Phaser.GameObjects.Graphics; icon: Phaser.GameObjects.Image; name: Phaser.GameObjects.Text; sub: Phaser.GameObjects.Text; rect: [number, number, number, number] }[] = [];
@@ -94,13 +95,6 @@ export class UIScene extends Phaser.Scene {
     this.paperDoll = undefined;
     this.paperDollEquipment = undefined;
     this.gs = this.scene.get('GameScene') as GameScene;
-    if (this.textures.exists('dungeon_chamber')) {
-      this.add.image(GAME_W / 2, GAME_H / 2, 'dungeon_chamber')
-        .setDisplaySize(GAME_W, GAME_H)
-        .setTint(0x5e8583)
-        .setAlpha(.105)
-        .setDepth(-100);
-    }
     // UIScene起動前に発行されたログ（フロア到達など）を復元
     this.logLines = [...(this.gs.logHistory ?? [])];
 
@@ -194,17 +188,18 @@ export class UIScene extends Phaser.Scene {
   // ============ フレーム ============
   panel(x: number, y: number, w: number, h: number, title?: string) {
     const g = this.add.graphics();
-    g.fillStyle(0x061316, 0.95);
-    g.fillRoundedRect(x, y, w, h, 12);
-    g.fillStyle(0x102a2d, .28).fillRoundedRect(x + 4, y + 4, w - 8, h - 8, 9);
-    g.lineStyle(1.2, 0x426d70, .9);
-    g.strokeRoundedRect(x, y, w, h, 12);
-    g.lineStyle(1, 0xe7b85e, .26);
-    g.lineBetween(x + 14, y + 1, x + Math.min(w - 14, 118), y + 1);
+    g.fillStyle(0x0b0a10, 1).fillRoundedRect(x, y, w, h, 8);
+    if (this.textures.exists('ui_obsidian_panel')) {
+      this.add.image(x + w / 2, y + h / 2, 'ui_obsidian_panel').setDisplaySize(w, h);
+    }
+    if (!IS_MOBILE && (title === '冒険ログ' || (w > 1000 && h < 50))) {
+      this.add.image(x + w / 2, y + h / 2, 'ui_obsidian_castle').setDisplaySize(w - 12, h - 10).setAlpha(.24);
+    }
+    g.lineStyle(1, 0xb68b42, .85).strokeRoundedRect(x + 1, y + 1, w - 2, h - 2, 8);
     if (title) {
       this.add.text(x + 12, y + 6, title, {
-        fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: '#65dcd4', fontStyle: 'bold', letterSpacing: 1
-      });
+        fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: '#f0d398', fontStyle: 'bold', letterSpacing: 1
+      }).setShadow(0, 1, '#000000', 3);
     }
     return g;
   }
@@ -214,7 +209,7 @@ export class UIScene extends Phaser.Scene {
     // マップが完全に隠れてしまう。マップ部分(176,48,740,520)は透過のまま、
     // 枠線だけを描く。
     const g = this.add.graphics();
-    g.lineStyle(1, 0x6f8d8e, .8);
+    g.lineStyle(1, 0xb68b42, .8);
     g.strokeRoundedRect(174, 46, 744, 524, 14);
     g.lineStyle(1, 0xe7b85e, .45);
     g.lineBetween(190, 46, 400, 46);
@@ -224,10 +219,14 @@ export class UIScene extends Phaser.Scene {
   buildTopBar() {
     this.panel(8, 4, GAME_W - 16, 36);
     this.add.text(20, 8, 'ちゃりだんじょん', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '16px', color: '#65dcd4', fontStyle: 'bold', letterSpacing: 1
+      fontFamily: '"Yu Gothic UI"', fontSize: '16px', color: '#f0d398', fontStyle: 'bold', letterSpacing: 1
     });
-    this.topText = this.add.text(GAME_W - 26, 11, '', {
+    this.topText = this.add.text(GAME_W - 170, 11, '', {
       fontFamily: '"Yu Gothic UI"', fontSize: '14px', color: '#f2cf85', fontStyle: 'bold'
+    }).setOrigin(1, 0);
+    this.add.image(GAME_W - 144, 22, 'coin').setDisplaySize(26, 26);
+    this.goldText = this.add.text(GAME_W - 26, 13, '', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: '#ffe0a0', fontStyle: 'bold'
     }).setOrigin(1, 0);
   }
 
@@ -255,15 +254,15 @@ export class UIScene extends Phaser.Scene {
 
   menuButton(x: number, y: number, w: number, h: number, iconKey: string, label: string, onClick: () => void) {
     const g = this.add.graphics();
-    const draw = (c: number, line = 0x315155) => { g.clear(); g.fillStyle(c, .96); g.fillRoundedRect(x, y, w, h, 8); g.lineStyle(1, line, .9); g.strokeRoundedRect(x, y, w, h, 8); };
-    draw(0x0d2226);
+    const draw = (c: number, line = 0xb68b42) => { g.clear(); g.fillStyle(c, .96); g.fillRoundedRect(x, y, w, h, 8); g.lineStyle(1, line, .9); g.strokeRoundedRect(x, y, w, h, 8); };
+    draw(0x141017);
     const icon = this.add.image(x + 24, y + h / 2, iconKey).setDisplaySize(34, 34);
     const t = this.add.text(x + 46, y + h / 2, label, {
       fontFamily: '"Yu Gothic UI"', fontSize: label.length > 7 ? '12px' : '14px', color: '#dfe7f0', fontStyle: 'bold'
     }).setOrigin(0, 0.5);
     const zone = this.add.zone(x, y, w, h).setOrigin(0).setInteractive({ useHandCursor: true });
-    zone.on('pointerover', () => draw(0x1d4244, 0x58d9d1));
-    zone.on('pointerout', () => draw(0x0d2226));
+    zone.on('pointerover', () => draw(0x35202a, 0xffd78d));
+    zone.on('pointerout', () => draw(0x141017));
     zone.on('pointerdown', () => { Audio.playSe('click'); onClick(); });
     void icon; void t;
   }
@@ -286,9 +285,9 @@ export class UIScene extends Phaser.Scene {
     // ---- 装備（キャラクター見た目＋武器・服・盾）----
     this.panel(x, 232, w, 234, '装備');
     const dollFrame = this.add.graphics();
-    dollFrame.fillStyle(0x071417, 0.98).fillRoundedRect(x + 112, 260, 124, 180, 12);
+    dollFrame.fillStyle(0x0b0a10, 0.98).fillRoundedRect(x + 112, 260, 124, 180, 12);
     dollFrame.lineStyle(1.5, 0x9b793e, 0.9).strokeRoundedRect(x + 112, 260, 124, 180, 12);
-    dollFrame.lineStyle(1, 0x58d9d1, 0.45).strokeRoundedRect(x + 118, 266, 112, 168, 9);
+    dollFrame.lineStyle(1, 0xb68b42, 0.45).strokeRoundedRect(x + 118, 266, 112, 168, 9);
     this.paperDoll = this.add.image(x + 174, 343, playerSheetKey(this.gs.playerGender, this.gs.playerArmor ?? 'leather'), playerFrameIndex('down', 'idle'))
       .setDisplaySize(116, 116).setDepth(10);
     this.paperDollEquipment = new EquipmentRenderer(this);
@@ -354,7 +353,7 @@ export class UIScene extends Phaser.Scene {
     // ---- 上部バー（タイトル＋フロア情報）----
     this.panel(8, 8, 374, 38);
     this.add.text(16, 14, 'ちゃりだんじょん', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '14px', color: '#3fe0d0', fontStyle: 'bold', letterSpacing: 1
+      fontFamily: '"Yu Gothic UI"', fontSize: '14px', color: '#f0d398', fontStyle: 'bold', letterSpacing: 1
     });
     this.topText = this.add.text(374, 15, '', {
       fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#f5c542', fontStyle: 'bold'
@@ -370,7 +369,7 @@ export class UIScene extends Phaser.Scene {
 
     // ---- マップ枠 ----
     const fg = this.add.graphics();
-    fg.lineStyle(2, 0x2f6f6a, 1).strokeRoundedRect(MAP_X - 2, MAP_Y - 2, MAP_W + 4, MAP_H + 4, 6);
+    fg.lineStyle(2, 0xb68b42, 1).strokeRoundedRect(MAP_X - 2, MAP_Y - 2, MAP_W + 4, MAP_H + 4, 6);
 
     // ---- 装備（スマホは武器・服・盾の3枠を横並び）----
     this.panel(8, 498, 374, 82, '装備');
@@ -406,7 +405,7 @@ export class UIScene extends Phaser.Scene {
     // ---- 冒険ログ（最新1行）----
     this.panel(8, 766, 374, 30);
     this.add.text(16, 773, '冒険ログ', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '9px', color: '#65dcd4', fontStyle: 'bold', letterSpacing: 1
+      fontFamily: '"Yu Gothic UI"', fontSize: '9px', color: '#f0d398', fontStyle: 'bold', letterSpacing: 1
     });
     this.logTexts = [];
     this.logTexts.push(this.add.text(76, 771, '', {
@@ -417,7 +416,7 @@ export class UIScene extends Phaser.Scene {
     // ---- 操作エリア：四方向キー ----
     this.panel(8, 658, 374, 106);
     this.add.text(16, 664, '移動', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '9px', color: '#65dcd4', fontStyle: 'bold', letterSpacing: 1
+      fontFamily: '"Yu Gothic UI"', fontSize: '9px', color: '#f0d398', fontStyle: 'bold', letterSpacing: 1
     });
     this.buildJoystick(76, 716);
     this.add.text(137, 692, 'スティックで移動\n長押しで加速', {
@@ -441,15 +440,15 @@ export class UIScene extends Phaser.Scene {
       const x = 12 + i * 72, y = 803, w = 68, h = 30;
       const g = this.add.graphics();
       const draw = (c: number) => { g.clear(); g.fillStyle(c, 1).fillRoundedRect(x, y, w, h, 6); };
-      draw(0x1c2536);
+      draw(0x25121e);
       this.add.image(x + 14, y + h / 2, it.icon).setDisplaySize(24, 24);
       this.add.text(x + 28, y + h / 2, it.label, {
         fontFamily: '"Yu Gothic UI"', fontSize: '8px', color: '#dfe7f0'
       }).setOrigin(0, 0.5);
       const zone = this.add.zone(x, y, w, h).setOrigin(0).setInteractive({ useHandCursor: true });
       zone.on('pointerdown', () => { draw(0x264a48); Audio.playSe('click'); it.f(); });
-      zone.on('pointerup', () => draw(0x1c2536));
-      zone.on('pointerout', () => draw(0x1c2536));
+      zone.on('pointerup', () => draw(0x25121e));
+      zone.on('pointerout', () => draw(0x25121e));
     });
   }
 
@@ -551,7 +550,7 @@ export class UIScene extends Phaser.Scene {
     if (key === this.skillVisualKey) return;
     this.skillVisualKey = key;
     const radius = IS_MOBILE ? 38 : 48;
-    this.skillBackground!.clear().fillStyle(0x061316, .12).fillCircle(0, 0, radius);
+    this.skillBackground!.clear().fillStyle(0x110b13, .12).fillCircle(0, 0, radius);
     this.skillBackground!.lineStyle(2, skill.color, .25).strokeCircle(0, 0, radius);
     if (remaining < 100) {
       this.skillBackground!.lineStyle(3, skill.color, .6).beginPath()
@@ -576,7 +575,7 @@ export class UIScene extends Phaser.Scene {
       const g = this.add.graphics().setDepth(60);
       const draw = (active: boolean) => {
         g.clear();
-        g.fillStyle(active ? 0x2f6f6a : 0x0e1420, active ? 0.9 : 0.5).fillCircle(bx, by, R);
+        g.fillStyle(active ? 0xb68b42 : 0x0e1420, active ? 0.9 : 0.5).fillCircle(bx, by, R);
         g.lineStyle(2, 0x3fe0d0, 0.75).strokeCircle(bx, by, R);
         // 進行方向を指す三角矢印
         const a = Phaser.Math.DegToRad(angleDeg);
@@ -726,10 +725,11 @@ export class UIScene extends Phaser.Scene {
     this.statusText.setText(IS_MOBILE
       ? `${p.name} レベル${p.level}  経験値 ${p.exp}/${p.expNext}  ${this.gs.turn}ターン${transformation}`
       : `${p.name}  レベル${p.level}   （経験値 ${p.exp}/${p.expNext}）${transformation}`);
+    this.goldText?.setText(`所持金 ${p.gold}G`);
     this.hpLabel.setText(`体力  ${p.hp} / ${p.hpMax}`);
     this.atkLabel.setText(IS_MOBILE
       ? `攻 ${p.atkMin}-${p.atkMax}  防 ${p.def}  ${p.gold}G`
-      : `攻撃力 ${p.atkMin}-${p.atkMax}   防御力 ${p.def}   所持金 ${p.gold}G`);
+      : `攻撃力 ${p.atkMin}-${p.atkMax}   防御力 ${p.def}`);
     // HPバー（ラベルの下の固定位置。座標はレイアウト設定から）
     const { x: bx, y: by, w: bw } = this.L.hpBar;
     this.hpBar.clear();
@@ -749,7 +749,7 @@ export class UIScene extends Phaser.Scene {
       const info = slotInfo[slot.kind];
       const [sx, sy, sw, sh] = slot.rect;
       const has = info.tex !== null;
-      const rim = this.elementColor(info.element) ?? (info.grade ? gradeColor(info.grade) : 0x2f6f6a);
+      const rim = this.elementColor(info.element) ?? (info.grade ? gradeColor(info.grade) : 0xb68b42);
       slot.bg.clear();
       slot.bg.fillStyle(0x0a1c20, has ? .96 : 0.5).fillRoundedRect(sx, sy, sw, sh, 10);
       slot.bg.lineStyle(info.grade === 'S' ? 3 : info.grade === 'A' ? 2.5 : 1.5, rim, has ? 1 : 0.5).strokeRoundedRect(sx, sy, sw, sh, 8);
@@ -803,11 +803,11 @@ export class UIScene extends Phaser.Scene {
       const cx = startX + (i % cols) * cell;
       const cy = startY + Math.floor(i / cols) * 74;
       const rare = isRareItem(grp.kind);
-      const frameCol = rare ? 0xff4040 : 0x2f6f6a;      // レアは赤枠
+      const frameCol = rare ? 0xff4040 : 0xb68b42;      // レアは赤枠
       const frameHover = rare ? 0xff8080 : 0x3fe0d0;
       const bg = this.add.graphics();
       const drawBg = (fill: number, line: number, lw = 1.5) => { bg.clear(); bg.fillStyle(fill, 1).fillRoundedRect(cx, cy, 54, 54, 6); bg.lineStyle(lw, line).strokeRoundedRect(cx, cy, 54, 54, 6); };
-      drawBg(0x1c2536, frameCol, rare ? 2.5 : 1.5);
+      drawBg(0x25121e, frameCol, rare ? 2.5 : 1.5);
       // 枠だけ＋アイコン（名前は省略／カーソルでツールチップ表示）
       const icon = this.add.image(cx + 27, cy + 27, grp.item.textureKey).setDisplaySize(48, 48);
       this.itemContainer.add([bg, icon]);
@@ -822,7 +822,7 @@ export class UIScene extends Phaser.Scene {
       const zone = this.add.zone(cx, cy, 54, 54).setOrigin(0).setInteractive({ useHandCursor: true });
       const cntSuffix = grp.count > 1 ? ` ×${grp.count}` : '';
       zone.on('pointerover', () => { drawBg(0x264a48, frameHover, rare ? 2.5 : 1.5); this.showTooltip((rare ? '★' : '') + grp.item.name + cntSuffix, grp.item.desc, cx + 27, cy); });
-      zone.on('pointerout', () => { drawBg(0x1c2536, frameCol, rare ? 2.5 : 1.5); this.hideTooltip(); });
+      zone.on('pointerout', () => { drawBg(0x25121e, frameCol, rare ? 2.5 : 1.5); this.hideTooltip(); });
       zone.on('pointerdown', () => { this.hideTooltip(); this.gs.useItem(grp.firstIndex); });
       this.itemContainer.add(zone);
     });
@@ -867,7 +867,7 @@ export class UIScene extends Phaser.Scene {
 
   buildTooltip() {
     this.tooltipBg = this.add.graphics();
-    this.tooltipTitle = this.add.text(0, 0, '', { fontFamily: '"Yu Gothic UI"', fontSize: '14px', color: '#3fe0d0', fontStyle: 'bold' });
+    this.tooltipTitle = this.add.text(0, 0, '', { fontFamily: '"Yu Gothic UI"', fontSize: '14px', color: '#f0d398', fontStyle: 'bold' });
     this.tooltipDesc = this.add.text(0, 0, '', { fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#dfe7f0', wordWrap: { width: 220 } });
     this.tooltip = this.add.container(0, 0, [this.tooltipBg, this.tooltipTitle, this.tooltipDesc]).setDepth(200).setVisible(false);
   }
@@ -1000,9 +1000,9 @@ export class UIScene extends Phaser.Scene {
       : ['settings', 'shop', 'repair'].includes(this.overlayMode) && !IS_MOBILE
         ? { x: 200, y: 60, w: 680, h: 620 } : this.L.ov;
     const g = this.add.graphics();
-    g.fillStyle(0x061316, 0.985).fillRoundedRect(x, y, w, h, 14);
+    g.fillStyle(0x110b13, 0.985).fillRoundedRect(x, y, w, h, 14);
     g.fillStyle(0x143034, .26).fillRoundedRect(x + 5, y + 5, w - 10, h - 10, 10);
-    g.lineStyle(1.5, 0x58d9d1).strokeRoundedRect(x, y, w, h, 14);
+    g.lineStyle(1.5, 0xb68b42).strokeRoundedRect(x, y, w, h, 14);
     this.overlay.add(g);
 
     const pickTitles = ['武器を変更', '服を変更', '盾を変更'];
@@ -1018,7 +1018,7 @@ export class UIScene extends Phaser.Scene {
       'モンスター図鑑';
     this.overlay.add(this.add.text(x + 16, y + 12, title, {
       fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '15px' : '18px',
-      color: '#3fe0d0', fontStyle: 'bold', wordWrap: { width: w - 72 }
+      color: '#f0d398', fontStyle: 'bold', wordWrap: { width: w - 72 }
     }));
     // 閉じるボタン
     const cb = this.add.text(x + w - (IS_MOBILE ? 48 : 34), y + (IS_MOBILE ? 2 : 10), this.gs.pendingEquipment ? '🔒' : '✕', {
@@ -1363,7 +1363,7 @@ export class UIScene extends Phaser.Scene {
       } else {
         const group = entry.group;
         const count = ` ×${group.count}`;
-        const icon = this.framedIcon(x + 33, cy + 14, group.item.textureKey, isRareItem(group.kind) ? 0xff5f67 : 0x2f6f6a, 32);
+        const icon = this.framedIcon(x + 33, cy + 14, group.item.textureKey, isRareItem(group.kind) ? 0xff5f67 : 0xb68b42, 32);
         const use = () => { this.gs.useItem(group.firstIndex); if (this.overlayMode !== 'repair') this.setOverlay('inv'); };
         const sellW = 112;
         const useW = 64;
@@ -1698,7 +1698,7 @@ export class UIScene extends Phaser.Scene {
     vaultBg.fillGradientStyle(0x081e24, 0x081e24, 0x010506, 0x010506, .96);
     vaultBg.fillRect(mx, my, mw, mh);
     vaultBg.fillStyle(0x000000, .58).fillRect(mx, my, mw, 62).fillRect(mx, my + mh - 48, mw, 48);
-    vaultBg.lineStyle(1, 0x58d9d1, .18);
+    vaultBg.lineStyle(1, 0xb68b42, .18);
     for (let sy = my + 66; sy < my + mh - 48; sy += 12) vaultBg.lineBetween(mx + 10, sy, mx + mw - 10, sy);
     this.tweens.add({ targets: vaultBg, alpha: 1, duration: 320 });
 
@@ -1730,8 +1730,8 @@ export class UIScene extends Phaser.Scene {
     // ---- 隙間から漏れる光（宝箱の奥で脈動）----
     const leak = track(this.add.image(cx, cy + 40, 'glow').setDepth(301)
       .setBlendMode(Phaser.BlendModes.ADD).setTint(0xfff2c0).setAlpha(0).setScale(0.5));
-    const sealOuter = track(this.add.circle(cx, cy + 18, 104, 0x58d9d1, .025)
-      .setStrokeStyle(2, 0x58d9d1, .38).setDepth(301));
+    const sealOuter = track(this.add.circle(cx, cy + 18, 104, 0xb68b42, .025)
+      .setStrokeStyle(2, 0xb68b42, .38).setDepth(301));
     const sealInner = track(this.add.circle(cx, cy + 18, 78, 0xffffff, .012)
       .setStrokeStyle(1, 0xffffff, .22).setDepth(301));
     this.tweens.add({ targets: sealOuter, angle: 360, duration: 9000, repeat: -1 });
@@ -1991,8 +1991,8 @@ export class UIScene extends Phaser.Scene {
     enabled = true, palette?: (typeof GACHA_PALETTES)[GachaPool]) {
     const c = this.add.container(0, 0);
     const g = this.add.graphics();
-    const base = !enabled ? 0x141a22 : highlight ? (palette?.fill ?? 0x264a48) : (palette?.dim ?? 0x1c2536);
-    const border = enabled ? (palette?.accent ?? 0x2f6f6a) : 0x303946;
+    const base = !enabled ? 0x141a22 : highlight ? (palette?.fill ?? 0x264a48) : (palette?.dim ?? 0x25121e);
+    const border = enabled ? (palette?.accent ?? 0xb68b42) : 0x303946;
     const lineWidth = palette && highlight ? 2 : 1;
     g.fillStyle(base, 1).fillRoundedRect(x, y, w, 28, 5);
     g.lineStyle(lineWidth, border).strokeRoundedRect(x, y, w, 28, 5);
@@ -2143,7 +2143,7 @@ export class UIScene extends Phaser.Scene {
     page.entries.forEach((entry, index) => {
       const px = x + 16 + (index % columns) * (cardW + gap);
       const py = y + 114 + Math.floor(index / columns) * (cardH + gap);
-      const color = entry.element ? ELEMENT_INFO[entry.element].color : entry.grade ? gradeColor(entry.grade) : 0x58d9d1;
+      const color = entry.element ? ELEMENT_INFO[entry.element].color : entry.grade ? gradeColor(entry.grade) : 0xb68b42;
       const card = this.add.graphics();
       card.fillStyle(0x142630).fillRoundedRect(px, py, cardW, cardH, 8);
       card.lineStyle(1, color, .65).strokeRoundedRect(px, py, cardW, cardH, 8);
@@ -2208,13 +2208,13 @@ export class UIScene extends Phaser.Scene {
           g.fillStyle(c, 1).fillRoundedRect(bx, by, bw, 38, 6);
           g.lineStyle(2, 0x3fe0d0).strokeRoundedRect(bx, by, bw, 38, 6);
         };
-        draw(0x2f6f6a);
+        draw(0xb68b42);
         const t = this.add.text(bx + bw / 2, by + 19, text(), {
           fontFamily: '"Yu Gothic UI"', fontSize: '17px', color: '#ffffff', fontStyle: 'bold'
         }).setOrigin(0.5);
         const zone = this.add.zone(bx, by, bw, 38).setOrigin(0).setInteractive({ useHandCursor: true });
         zone.on('pointerover', () => draw(0x3f8f88));
-        zone.on('pointerout', () => draw(0x2f6f6a));
+        zone.on('pointerout', () => draw(0xb68b42));
         zone.on('pointerdown', () => {
           onClick();
           Audio.playSe('click'); // 変更後の音量で鳴らして確認できる
@@ -2256,7 +2256,7 @@ export class UIScene extends Phaser.Scene {
     const displayY = codeY + 29;
     const displayBg = this.add.graphics();
     displayBg.fillStyle(0x071317, 1).fillRoundedRect(displayX, displayY, displayW, 38, 7);
-    displayBg.lineStyle(1.5, 0x2f6f6a, 1).strokeRoundedRect(displayX, displayY, displayW, 38, 7);
+    displayBg.lineStyle(1.5, 0xb68b42, 1).strokeRoundedRect(displayX, displayY, displayW, 38, 7);
     const displayText = this.add.text(centerX, displayY + 19, this.codeDigits || 'コードを入力', {
       fontFamily: 'Consolas, monospace', fontSize: '18px', color: this.codeDigits ? '#ffffff' : '#63787b',
       letterSpacing: 5
@@ -2273,7 +2273,7 @@ export class UIScene extends Phaser.Scene {
       const g = this.add.graphics();
       const draw = (hover: boolean) => {
         g.clear();
-        g.fillStyle(hover ? 0x315957 : accent ? 0x49361d : 0x1c2536, 1).fillRoundedRect(bx, by, bw, buttonH, 6);
+        g.fillStyle(hover ? 0x315957 : accent ? 0x49361d : 0x25121e, 1).fillRoundedRect(bx, by, bw, buttonH, 6);
         g.lineStyle(1.5, accent ? 0xe7b85e : 0x3f8f88, 1).strokeRoundedRect(bx, by, bw, buttonH, 6);
       };
       draw(false);

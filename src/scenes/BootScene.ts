@@ -1,3 +1,4 @@
+import { updateLoading, finishLoading } from '../loadingScreen';
 import { VOLCANO_FLOORS, VOLCANO_PARTS, volcanoTerrainKey } from '../volcanoTerrain';
 import { WATER_FLOORS, WATER_PARTS, waterTerrainKey } from '../waterTerrain';
 import { THUNDER_FLOORS, THUNDER_PARTS, thunderTerrainKey } from '../thunderTerrain';
@@ -173,6 +174,8 @@ export class BootScene extends Phaser.Scene {
 
   preload() {
     this.loadingStage = '画像';
+    this.load.image('ui_obsidian_panel', 'assets/ui/obsidian-v1/panel.webp');
+    this.load.image('ui_obsidian_castle', 'assets/ui/obsidian-v1/loading.webp');
     this.add.text(GAME_W / 2, GAME_H / 2 - 35, 'ちゃりだんじょん', {
       fontFamily: '"Yu Gothic UI", "Meiryo", sans-serif', fontSize: '24px', color: '#ffe1a0'
     }).setOrigin(.5);
@@ -181,6 +184,8 @@ export class BootScene extends Phaser.Scene {
     }).setOrigin(.5);
     this.load.on('progress', (progress: number) => {
       this.loadingText?.setText(`${this.loadingStage}を読み込み中… ${Math.round(progress * 100)}%`);
+      updateLoading(this.loadingStage === '画像' ? progress * .85 : .9 + progress * .09,
+        this.loadingStage === '画像' ? '冒険の舞台を準備中…' : '冒険の音を準備中…');
     });
     for (const art of HELD_EQUIPMENT) {
       this.load.spritesheet(art.textureKey, art.path, {frameWidth:HELD_FRAME_SIZE,frameHeight:HELD_FRAME_SIZE});
@@ -344,6 +349,7 @@ export class BootScene extends Phaser.Scene {
     //     実ファイルが無い音は manager 側で仮チップチューンが合成される）
     // 探索・ボスBGMはAudioManagerが後から取得し、タイトル表示を待たせない。
     this.loadingStage = '効果音';
+    updateLoading(.88, '冒険の音を準備中…');
     this.loadingText?.setText('効果音を準備中…');
     const allAudio: AudioDef[] = FILE_SE_NAMES.map(name => SE_DEFS[name]);
     const existing = await this.filterExistingAudio(allAudio);
@@ -358,7 +364,9 @@ export class BootScene extends Phaser.Scene {
     Audio.init(this.game);
     Audio.preloadSynthSe();
 
+    updateLoading(1, '準備ができました');
     this.scene.start('TitleScene');
+    finishLoading();
   }
 
   // content-typeが音声のものだけ返す
