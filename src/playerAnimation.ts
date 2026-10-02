@@ -16,6 +16,8 @@ export class PlayerAnimation {
   action: PlayerAction = 'idle';
   since = 0;
   walkFrameMs = 48;
+  attackFrameMs = 26;
+  windupFrameMs = 29;
   private walkPhase = 0;
   private stoppedWalkingAt = -Infinity;
 
@@ -35,8 +37,8 @@ export class PlayerAnimation {
     const elapsed = Math.max(0, now - this.since);
     switch (this.action) {
       case 'walk': return WALK[Math.floor(this.walkPhase + elapsed / this.walkFrameMs) % WALK.length];
-      case 'windup': return elapsed < 29 ? 'atkWindup' : 'atkWindup2';
-      case 'attack': return STRIKE[Math.min(3, Math.floor(elapsed / 26))];
+      case 'windup': return elapsed < this.windupFrameMs ? 'atkWindup' : 'atkWindup2';
+      case 'attack': return STRIKE[Math.min(3, Math.floor(elapsed / this.attackFrameMs))];
       case 'idle': return elapsed % 1800 < 1100 ? 'idle' : 'idle2';
       default: return this.action;
     }

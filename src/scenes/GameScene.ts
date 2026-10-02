@@ -3349,6 +3349,7 @@ export class GameScene extends Phaser.Scene {
     this.emitRefresh();
     try {
       this.setPlayerVisual(direction, 'atkWindup');
+      if (weapon.key === 'w_hero_sword') await new Promise<void>(resolve => this.time.delayedCall(200, resolve));
       if (destination) {
         this.effectFx(origin.x, origin.y, 'fx_magic', 1.35, 250, skill.color);
         await this.tween(this.playerSprite, { alpha: .08 }, 90, 'Quad.easeIn');
@@ -3361,6 +3362,10 @@ export class GameScene extends Phaser.Scene {
       }
       this.setPlayerVisual(this.player.dir, 'atk');
       this.drawSkillEffect(weapon.weaponType, origin, direction, plan.tiles, skill.color);
+      if (weapon.key === 'w_hero_sword') {
+        const [dx,dy] = this.dirVec(direction);
+        this.arcadiaSlashFx(origin.x + dx, origin.y + dy, direction);
+      }
       await new Promise<void>(resolve => this.time.delayedCall(destination ? 90 : weapon.weaponType === 'bow' ? 450 : weapon.weaponType === 'greatsword' ? 270 : weapon.weaponType === 'handgun' ? 10 : 150, resolve));
       const shots = weapon.weaponType === 'handgun' ? 3 : 1;
       for (let shot = 0; shot < shots && !this.gameEnded; shot++) {
@@ -3846,8 +3851,9 @@ export class GameScene extends Phaser.Scene {
     this.playerAnimToken++;
     this.playerAttacking = true;
     this.playerSprite.setAngle(0).setScale(PLAYER_WORLD_SCALE);
+    const arcadiaAttack = this.player.weapon?.key === 'w_hero_sword';
     this.setPlayerVisual(dir, 'atkWindup');
-    await new Promise<void>((resolve) => this.time.delayedCall(58, () => resolve()));
+    await new Promise<void>((resolve) => this.time.delayedCall(arcadiaAttack ? 200 : 58, () => resolve()));
     this.setPlayerVisual(dir, 'atk');
     const weaponElement = this.player.weapon?.element;
     Audio.playSe(weaponAttackSe(this.player.weapon?.weaponType));
@@ -3866,11 +3872,12 @@ export class GameScene extends Phaser.Scene {
       arrow.destroy();
       this.effectFx(e.x, e.y, 'fx_magic', 1.0, 220, elementColor);
     } else {
-      this.slashFx(e.x, e.y, elementColor);
+      if (arcadiaAttack) this.arcadiaSlashFx(e.x, e.y, dir);
+      else this.slashFx(e.x, e.y, elementColor);
     }
     if (!ranged) {
       await this.tween(this.playerSprite, { x: homeX + ddx * 10, y: homeY + ddy * 10, yoyo: true },
-        ANIM * .45, 'Quad.easeOut');
+        arcadiaAttack ? 130 : ANIM * .45, 'Quad.easeOut');
       this.playerSprite.setPosition(homeX, homeY);
     }
 
@@ -6727,6 +6734,18 @@ export class GameScene extends Phaser.Scene {
     this.pickupBurst(e.sprite.x, e.sprite.y - 4, e.def.color || 0x58d9d1, e.def.isBoss ? 14 : 8);
   }
 
+  arcadiaSlashFx(x: number, y: number, dir: Dir) {
+    const fx = this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, 'fx_arcadia', 0)
+      .setDepth(22).setDisplaySize(TILE * 2.3, TILE * 2.3)
+      .setRotation({down:0,left:Math.PI/2,right:-Math.PI/2,up:Math.PI}[dir]);
+    for (const [frame, delay] of [[1,55],[2,110],[3,180]]) {
+      this.time.delayedCall(delay, () => { if (fx.active) fx.setFrame(frame); });
+    }
+    this.time.delayedCall(210, () => {
+      if (fx.active) this.tweens.add({targets:fx,alpha:0,duration:100,onComplete:()=>fx.destroy()});
+    });
+  }
+
   slashFx(x: number, y: number, tint?: number) {
     const fx = this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, 'fx_slash').setDepth(20);
     if (tint !== undefined && tint !== 0xdfe7f0) fx.setTint(tint);
@@ -7335,6 +7354,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   setPlayerVisual(dir: Dir, frame: PlayerVisualFrame) {
+    const arcadia = this.player.weapon?.key === 'w_hero_sword';
+    this.playerAnimation.attackFrameMs = arcadia ? 65 : 26;
+    this.playerAnimation.windupFrameMs = arcadia ? 90 : 29;
     this.playerAnimation.play(frame, this.time.now);
     this.playerVisualSince = this.playerAnimation.since;
     this.player.dir = dir;

@@ -193,6 +193,7 @@ export class BootScene extends Phaser.Scene {
       updateLoading(this.loadingStage === '画像' ? progress * .85 : .9 + progress * .09,
         this.loadingStage === '画像' ? '冒険の舞台を準備中…' : '冒険の音を準備中…');
     });
+    this.load.spritesheet('fx_arcadia', 'assets/effects/arcadia-slash-v1.png', {frameWidth:256,frameHeight:256});
     for (const art of HELD_EQUIPMENT) {
       this.load.spritesheet(art.textureKey, art.path, {frameWidth:HELD_FRAME_SIZE,frameHeight:HELD_FRAME_SIZE});
     }
