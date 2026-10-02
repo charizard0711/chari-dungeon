@@ -29,7 +29,7 @@ import { planSkill, weaponSkill, directionVector } from '../weaponSkills';
 import { Audio } from '../audio/manager';
 import { clearRunSave, pickFields, readRunSave, writeRunSave, type RunSnapshot } from '../runSave';
 import { bgmForFloor, elementAttackSe, weaponAttackSe } from '../audio/config';
-import { ARCADIA_GACHA_RATE, ARCADIA_BOSS_DROP_RATE, enhancementChance, EQUIPMENT_LIMIT, DYNAMITE_DROP_RATE, MYSTERY_BREAD_DROP_RATE, ITEM_SELL_PRICES, SCROLL_DROP_RATE, SHOP_PRICES, type ShopItemKind } from '../balance';
+import { ARCADIA_GACHA_RATE, ARCADIA_BOSS_DROP_RATE, enhancementChance, EQUIPMENT_LIMIT, FLOOR_KEY_DROP_RATE, DYNAMITE_DROP_RATE, MYSTERY_BREAD_DROP_RATE, ITEM_SELL_PRICES, SCROLL_DROP_RATE, SHOP_PRICES, type ShopItemKind } from '../balance';
 import { getFloorLayoutProfile } from '../floorLayout';
 import {
   armorForGrade,
@@ -3547,7 +3547,16 @@ export class GameScene extends Phaser.Scene {
         const optional = this.optionalRoomAtDoor(nx, ny);
         if (optional) {
           this.setPlayerVisual(dir, 'idle');
-          this.openOptionalRoom(optional);
+          const keyIndex = this.player.inventory.findIndex(item => item.kind === 'floorkey');
+          if (keyIndex < 0) {
+            this.log('鍵のかかった扉だ。フロアキーが1個必要。', 'sys');
+            Audio.playSe('deny');
+          } else {
+            this.player.inventory.splice(keyIndex, 1);
+            this.openOptionalRoom(optional);
+            this.log('フロアキーを1個使って扉を開けた。', 'item');
+            this.emitRefresh();
+          }
           return;
         }
       }
@@ -3752,16 +3761,11 @@ export class GameScene extends Phaser.Scene {
       this.log(`コインを拾った (+${gi.value}G)`, 'gold');
       Audio.playSe('coin');
     } else {
-      // 同じアイテムは重ねられるので所持上限は緩め
-      if (this.player.inventory.length < 60) {
+      {
         const it = makeItem(gi.kind as ItemKind);
         this.player.inventory.push(it);
         this.log(`${it.name}を拾った。`, 'item');
         Audio.playSe('pickup');
-      } else {
-        this.log('持ち物がいっぱいだ。', 'sys');
-        Audio.playSe('deny');
-        return;
       }
     }
     const pickupColor = gi.kind === 'coin' ? 0xffc45a
@@ -3997,6 +4001,10 @@ export class GameScene extends Phaser.Scene {
         this.dropItem(e.x, e.y, 'revive');
         this.log('復活のタネがこぼれ落ちた…！ この冒険で現れるのは一度だけだ。', 'special');
       }
+    }
+
+    if (!def.isBoss && !def.isFloorBoss && !def.isTreasureRabbit && Math.random() < FLOOR_KEY_DROP_RATE) {
+      this.dropItem(e.x, e.y, 'floorkey');
     }
 
     if (!def.isBoss && !def.isFloorBoss && !def.isTreasureRabbit && Math.random() < DYNAMITE_DROP_RATE) {
@@ -4338,10 +4346,6 @@ export class GameScene extends Phaser.Scene {
       this.addScore(Math.floor(gold / 2));
       this.log(`届かない場所のコインを自動回収した (+${gold}G)`, 'gold');
       Audio.playSe('coin');
-      return;
-    }
-    if (this.player.inventory.length >= 60) {
-      this.log(`${ITEM_DEFS[kind]?.name ?? kind}は持ち物がいっぱいで回収できなかった。`, 'sys');
       return;
     }
     const item = makeItem(kind);
@@ -5879,7 +5883,18 @@ export class GameScene extends Phaser.Scene {
       case 'warp': consumed = this.useWarp(); passTurn = false; break;
       case 'seal': this.useSeal(); break;
       case 'revive': this.log('復活のタネは倒れた時に自動で使われる。', 'sys'); Audio.playSe('deny'); consumed = false; passTurn = false; break;
-      case 'floorkey': this.log('近くに対応する扉がない。', 'sys'); Audio.playSe('deny'); consumed = false; passTurn = false; break;
+      case 'floorkey': {
+        const room = this.dungeon.optionalRooms.find(optional => !optional.opened
+          && Math.abs(optional.door.x - this.player.x) + Math.abs(optional.door.y - this.player.y) === 1);
+        if (room) {
+          this.openOptionalRoom(room);
+          this.log('フロアキーで扉を開けた。', 'item');
+        } else {
+          this.log('隣接する鍵のかかった部屋の扉がない。', 'sys');
+          Audio.playSe('deny'); consumed = false; passTurn = false;
+        }
+        break;
+      }
       case 'invis': {
         // 20ターンの間、敵から完全に見えなくなる
         this.invisTurns = 20;
@@ -6291,10 +6306,6 @@ export class GameScene extends Phaser.Scene {
       if (this.ownsArmor(armorKey)) return { status: 'unavailable', message: 'この服はすでに所持しています。' };
       received = this.receiveArmor(makePlayerArmor(armorKey), 'アイテム一覧');
     } else {
-      if (this.player.inventory.length >= 60) {
-        Audio.playSe('deny');
-        return { status: 'unavailable', message: '道具がいっぱいです（60個まで）。' };
-      }
       this.player.inventory.push(makeItem(entry.key as ItemKind));
       received = true;
     }
@@ -6421,11 +6432,6 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.player.gold < price) {
       this.log(`${ITEM_DEFS[kind].name}を買うゴールドが足りない。`, 'sys');
-      Audio.playSe('deny');
-      return false;
-    }
-    if (this.player.inventory.length >= 60) {
-      this.log('持ち物がいっぱいだ。', 'sys');
       Audio.playSe('deny');
       return false;
     }

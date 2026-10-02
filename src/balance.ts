@@ -27,7 +27,8 @@ export function enhancementChance(plus: number): number {
   return Math.max(0.3, 0.9 - Math.max(0, plus) * 0.1);
 }
 
-export const EQUIPMENT_LIMIT = 6;
+export const EQUIPMENT_LIMIT = 12;
+export const FLOOR_KEY_DROP_RATE = 0.005;
 export const ARCADIA_GACHA_RATE = 0.0001;
 export const ARCADIA_BOSS_DROP_RATE = 0.001;
 

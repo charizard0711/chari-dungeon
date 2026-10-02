@@ -227,7 +227,7 @@ export const ITEM_DEFS: Record<ItemKind, Omit<Item, 'kind'>> = {
   bomb:    { name: 'ボムナッツ', desc: '周囲の敵に範囲ダメージ', textureKey: 'i_bomb' },
   warp:    { name: 'リコールベル', desc: '今いる階のスタート位置へ戻る', textureKey: 'i_warp' },
   revive:  { name: '復活のタネ', desc: '倒れた時に一度だけ復活', textureKey: 'i_revive' },
-  floorkey:{ name: 'フロアキー', desc: '特殊な扉を開ける', textureKey: 'i_floorkey' },
+  floorkey:{ name: 'フロアキー', desc: '鍵のかかった部屋の扉を開ける。1回で1個消費' , textureKey: 'i_floorkey' },
   seal:    { name: '封印の魔導書', desc: '周囲の敵を数ターン止める', textureKey: 'i_seal' },
   stone:   { name: '武器強化スクロール', desc: '装備中の武器を強化。成功率90%から強化ごとに10%低下（最低30%）', textureKey: 'i_stone' },
   shieldstone: { name: '防具強化スクロール', desc: '装備中の盾を強化。成功率90%から強化ごとに10%低下（最低30%）', textureKey: 'i_shieldstone' },
@@ -238,7 +238,7 @@ export const ITEM_DEFS: Record<ItemKind, Omit<Item, 'kind'>> = {
 };
 
 // レアアイテム（所持欄で赤枠になる）
-const RARE_ITEMS = new Set<ItemKind>(['revive', 'slime_scroll', 'boss5_scroll', 'dynamite', 'mystery_bread']);
+const RARE_ITEMS = new Set<ItemKind>(['revive', 'slime_scroll', 'boss5_scroll', 'dynamite', 'mystery_bread', 'floorkey']);
 export function isRareItem(kind: ItemKind): boolean {
   return RARE_ITEMS.has(kind);
 }
@@ -299,7 +299,7 @@ const MONSTER_GIMMICKS: Record<string, { kind: NonNullable<MonsterDef['gimmick']
   m_moss: { kind: 'regen', text: 'ダメージを受けていない間、3ターンごとにHPを回復する。' },
   m_bat: { kind: 'shatter', text: '撃破時に隣接していると氷片のダメージを受ける。' },
   m_imp: { kind: 'stance', text: '攻撃重視と防御重視の姿勢を毎ターン切り替える。' },
-  m_snake: { kind: 'key_drop', text: '撃破時に70%で古びた鍵を落とす。' },
+  m_snake: { kind: 'key_drop', text: '他の通常MOBと同じく、撃破時に0.5%でフロアキーを落とす。' },
   m_skel: { kind: 'freeze_shot', text: '氷弾が低確率で足止めを与える。' },
   m_archer: { kind: 'sidestep', text: '射撃後に横へ移動して射線を変える。' },
   m_ember_drake: { kind: 'fire_breath', text: '3回に1回、通常攻撃が強い火炎ブレスになる。' },

@@ -272,6 +272,7 @@ export class UIScene extends Phaser.Scene {
   // 各要素は固定Y座標に配置（テキストとバーの重なり防止）
   hpLabel!: Phaser.GameObjects.Text;
   atkLabel!: Phaser.GameObjects.Text;
+  durabilityLabel?: Phaser.GameObjects.Text;
 
   buildStatusPanel() {
     const x = 924, w = 348;
@@ -282,6 +283,7 @@ export class UIScene extends Phaser.Scene {
     this.hpLabel = this.add.text(x + 14, 102, '', style);
     this.hpBar = this.add.graphics();
     this.atkLabel = this.add.text(x + 14, 166, '', style);
+    this.durabilityLabel = this.add.text(x + 14, 195, '', { ...style, fontSize: '12px' });
 
     // ---- 装備（キャラクター見た目＋武器・服・盾）----
     this.panel(x, 232, w, 234, '装備');
@@ -733,6 +735,7 @@ export class UIScene extends Phaser.Scene {
     this.atkLabel.setText(IS_MOBILE
       ? `攻 ${p.atkMin}-${p.atkMax}  防 ${p.def}  ${p.gold}G`
       : `攻撃力 ${p.atkMin}-${p.atkMax}   防御力 ${p.def}`);
+    this.durabilityLabel?.setText(`耐久　武器 ${p.weapon ? `${p.weapon.dur}/${p.weapon.durMax}` : 'なし'}　盾 ${p.shield ? `${p.shield.dur}/${p.shield.durMax}` : 'なし'}`);
     // HPバー（ラベルの下の固定位置。座標はレイアウト設定から）
     const { x: bx, y: by, w: bw } = this.L.hpBar;
     this.hpBar.clear();
@@ -1319,7 +1322,7 @@ export class UIScene extends Phaser.Scene {
     const listTitle = this.inventoryTab === 'equip'
       ? `所持装備　武器 ${p.weapons.length}/${EQUIPMENT_LIMIT}　服 ${p.armors.length}/${EQUIPMENT_LIMIT}　盾 ${p.shields.length}/${EQUIPMENT_LIMIT}`
       : this.inventoryTab === 'items'
-        ? `道具　${p.inventory.length}/60　／ 売却は1個ずつ`
+        ? `道具　${p.inventory.length}個（上限なし）　／ 売却は1個ずつ`
         : `所持品一覧　装備 ${equipmentEntries.length}　道具 ${p.inventory.length}`;
     this.overlay.add(this.add.text(x + 16, y + 160, listTitle, {
       fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '10px' : '12px', color: '#b8d8d6'
