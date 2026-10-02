@@ -119,16 +119,40 @@ canvas {
 /* Immediate HTML artwork stays visible while the game bundle and assets load. */
 #loading-screen {
   position: fixed; inset: 0; z-index: 20;
-  display: flex; align-items: flex-end; justify-content: center;
+  display: flex; align-items: center; justify-content: center;
   padding: 7vh 20px;
-  background: #08070b url('/assets/ui/obsidian-v1/loading.webp') center / cover no-repeat;
+  background: radial-gradient(ellipse at 50% 46%, #21151a 0%, #0b090d 42%, #060609 85%);
 }
-#loading-screen::before { content: ''; position: absolute; inset: 0; background: linear-gradient(transparent 30%, rgba(5,3,8,.9)); }
+#loading-screen::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent, rgba(0,0,0,.25)); }
 .loading-card { position: relative; width: min(520px, 100%); text-align: center; color: #f6deaa; text-shadow: 0 2px 8px #000; }
-.loading-crest { font-size: 26px; color: #b84249; }
+
+.loading-walk { position: relative; width: 210px; height: 210px; margin: 0 auto 12px; }
+.loading-adventurer {
+  position: relative; z-index: 1; width: 210px; height: 210px;
+  background: url('/assets/ui/walking-loader-v1/walk.webp') 0 0 / 400% 200% no-repeat;
+  animation: loading-walk-cycle .96s steps(1, end) infinite;
+}
+.loading-ground {
+  position: absolute; bottom: 7px; left: 24px; right: 24px; height: 2px;
+  background: linear-gradient(90deg, transparent, #8f7040, transparent); opacity: .5;
+}
+@keyframes loading-walk-cycle {
+  0%, 100% { background-position: 0% 0%; }
+  12.5% { background-position: 33.333333% 0%; }
+  25% { background-position: 66.666667% 0%; }
+  37.5% { background-position: 100% 0%; }
+  50% { background-position: 0% 100%; }
+  62.5% { background-position: 33.333333% 100%; }
+  75% { background-position: 66.666667% 100%; }
+  87.5% { background-position: 100% 100%; }
+}
 .loading-card h1 { font-size: clamp(25px, 5vw, 40px); letter-spacing: .12em; margin: 8px 0 12px; }
 .loading-story { color: #d3bca0; font-size: 14px; margin-bottom: 28px; }
 .loading-track { height: 10px; border: 1px solid #aa8243; padding: 2px; background: #0b080c; border-radius: 8px; overflow: hidden; }
 .loading-fill { height: 100%; width: 0; border-radius: 4px; background: linear-gradient(90deg, #84303c, #e4bc6d); transition: width .18s linear; }
 .loading-status { margin-top: 12px; font-size: 13px; color: #e1d2b6; }
-@media (max-width: 520px) { #loading-screen { background-position: 52% center; padding-bottom: max(50px, env(safe-area-inset-bottom)); } }
+@media (max-width: 520px) {
+  .loading-walk, .loading-adventurer { width: 180px; height: 180px; }
+  .loading-card h1 { font-size: 27px; }
+}
+@media (prefers-reduced-motion: reduce) { .loading-adventurer { animation: none; background-position: 0 0; } }
