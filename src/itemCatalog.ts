@@ -61,8 +61,8 @@ export const ITEM_CATALOG: readonly CatalogEntry[] = [
   }))
 ];
 
-export function catalogPage(category: CatalogCategory, page: number, pageSize: number) {
-  const entries = ITEM_CATALOG.filter((entry) => category === 'all' || entry.category === category);
+export function catalogPage(category: CatalogCategory, page: number, pageSize: number, equipmentOnly = false) {
+  const entries = ITEM_CATALOG.filter((entry) => (!equipmentOnly || entry.category !== 'item') && (category === 'all' || entry.category === category));
   const size = Math.max(1, Math.floor(pageSize));
   const pageCount = Math.max(1, Math.ceil(entries.length / size));
   const index = Math.max(0, Math.min(pageCount - 1, Math.floor(page)));

@@ -43,7 +43,7 @@ export class UIScene extends Phaser.Scene {
   logTexts: Phaser.GameObjects.Text[] = []; // 固定8行（行ごとに色分け）
   itemContainer!: Phaser.GameObjects.Container;
   overlay!: Phaser.GameObjects.Container;
-  overlayMode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' | 'itemcatalog' | 'repair' = 'none';
+  overlayMode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' | 'itemcatalog' | 'equipmentcatalog' | 'repair' = 'none';
   repairKind: 'weapon' | 'shield' = 'weapon';
   pickSlot = 0; // 'pick'モードで開いている装備スロット（0武器/1服/2盾）
   gachaAnimating = false; // ガチャ演出中は再描画をブロック
@@ -149,7 +149,7 @@ export class UIScene extends Phaser.Scene {
       if (this.overlayMode === 'equip' && dy !== 0) this.scrollEquipment(dy > 0 ? 1 : -1);
       if (this.overlayMode === 'inv' && dy !== 0) this.scrollInventory(dy > 0 ? 1 : -1);
       if (this.overlayMode === 'codex' && dy !== 0) this.scrollCodex(dy > 0 ? 1 : -1);
-      if (this.overlayMode === 'itemcatalog' && dy !== 0) this.turnCatalogPage(dy > 0 ? 1 : -1);
+      if (['itemcatalog', 'equipmentcatalog'].includes(this.overlayMode) && dy !== 0) this.turnCatalogPage(dy > 0 ? 1 : -1);
     };
     const onSecretKey = (event: KeyboardEvent) => this.handleEquipmentSecret(event);
     this.input.on('wheel', onWheel);
@@ -170,7 +170,7 @@ export class UIScene extends Phaser.Scene {
     // ローカル表示確認用。例: ?mobile=1&qa-game&qa-overlay=settings
     if (location.hostname === 'localhost') {
       const qaOverlay = new URLSearchParams(location.search).get('qa-overlay');
-      const allowed = ['equip', 'inv', 'codex', 'settings', 'shop', 'gacha'] as const;
+      const allowed = ['equip', 'inv', 'codex', 'equipmentcatalog', 'settings', 'shop', 'gacha'] as const;
       if (qaOverlay && allowed.includes(qaOverlay as typeof allowed[number])) {
         this.time.delayedCall(100, () => this.setOverlay(qaOverlay as typeof allowed[number]));
       }
@@ -239,6 +239,7 @@ export class UIScene extends Phaser.Scene {
       { t: 'ショップ', icon: 'ui_nav_shop', f: () => this.setOverlay('shop') },
       { t: 'ガチャ', icon: 'ui_nav_gacha', f: () => this.setOverlay('gacha') },
       { t: 'モンスター図鑑', icon: 'ui_nav_codex', f: () => this.setOverlay('codex') },
+      { t: '装備図鑑', icon: 'ui_nav_equipment_codex', f: () => this.setOverlay('equipmentcatalog') },
       { t: '設定', icon: 'ui_nav_settings', f: () => this.showSettings() }
     ];
     let y = 84;
@@ -433,17 +434,19 @@ export class UIScene extends Phaser.Scene {
       { icon: 'ui_nav_shop', label: '店', f: () => this.setOverlay('shop') },
       { icon: 'ui_nav_gacha', label: 'ガチャ', f: () => this.setOverlay('gacha') },
       { icon: 'ui_nav_codex', label: '図鑑', f: () => this.setOverlay('codex') },
+      { icon: 'ui_nav_equipment_codex', label: '装備図鑑', f: () => this.setOverlay('equipmentcatalog') },
       { icon: 'ui_nav_settings', label: '設定', f: () => this.showSettings() }
     ];
     this.panel(8, 800, 374, 36);
     items.forEach((it, i) => {
-      const x = 12 + i * 72, y = 803, w = 68, h = 30;
+      const step = 366 / items.length;
+      const x = 12 + i * step, y = 803, w = step - 4, h = 30;
       const g = this.add.graphics();
       const draw = (c: number) => { g.clear(); g.fillStyle(c, 1).fillRoundedRect(x, y, w, h, 6); };
       draw(0x25121e);
       this.add.image(x + 14, y + h / 2, it.icon).setDisplaySize(24, 24);
       this.add.text(x + 28, y + h / 2, it.label, {
-        fontFamily: '"Yu Gothic UI"', fontSize: '8px', color: '#dfe7f0'
+        fontFamily: '"Yu Gothic UI"', fontSize: it.label.length > 3 ? '7px' : '8px', color: '#dfe7f0'
       }).setOrigin(0, 0.5);
       const zone = this.add.zone(x, y, w, h).setOrigin(0).setInteractive({ useHandCursor: true });
       zone.on('pointerdown', () => { draw(0x264a48); Audio.playSe('click'); it.f(); });
@@ -921,11 +924,17 @@ export class UIScene extends Phaser.Scene {
     this.rebuildOverlay();
   }
 
-  setOverlay(mode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' | 'itemcatalog' | 'repair') {
+  setOverlay(mode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' | 'itemcatalog' | 'equipmentcatalog' | 'repair') {
     if (this.gachaAnimating) return; // 演出中は切替禁止
     if (this.gs.pendingEquipment && mode !== 'equip') mode = 'equip';
     if (mode === 'equip' && this.overlayMode !== 'equip') this.equipScrollIndex = 0;
     if (mode === 'codex' && this.overlayMode !== 'codex') this.codexScrollRow = 0;
+    if (mode === 'equipmentcatalog' && this.overlayMode !== mode) {
+      this.catalogCategory = 'all';
+      this.catalogPageIndex = 0;
+      this.catalogDetail = null;
+      this.catalogClaimMessage = '';
+    }
     if (mode !== 'equip') {
       this.secretDirection = null;
       this.secretAlternatingPresses = 0;
@@ -997,7 +1006,7 @@ export class UIScene extends Phaser.Scene {
   rebuildOverlay() {
     if (this.gachaAnimating) return; // 演出中に消さない
     this.overlay.removeAll(true);
-    const { x, y, w, h } = this.overlayMode === 'itemcatalog' && !IS_MOBILE
+    const { x, y, w, h } = ['itemcatalog', 'equipmentcatalog'].includes(this.overlayMode) && !IS_MOBILE
       ? { x: 180, y: 40, w: 920, h: 660 }
       : ['settings', 'shop', 'repair'].includes(this.overlayMode) && !IS_MOBILE
         ? { x: 200, y: 60, w: 680, h: 620 } : this.L.ov;
@@ -1013,6 +1022,7 @@ export class UIScene extends Phaser.Scene {
       this.overlayMode === 'inv' ? '所持品・装備' :
       this.overlayMode === 'settings' ? '設定' :
       this.overlayMode === 'itemcatalog' ? '全アイテム一覧' :
+      this.overlayMode === 'equipmentcatalog' ? '装備図鑑' :
       this.overlayMode === 'shop' ? 'フロアショップ' :
       this.overlayMode === 'repair' ? '修復する装備を選ぶ' :
       this.overlayMode === 'gacha' ? 'ダンジョンガチャ' :
@@ -1036,7 +1046,7 @@ export class UIScene extends Phaser.Scene {
     if (this.overlayMode === 'equip') this.buildEquipOverlay(x, y, w, h);
     else if (this.overlayMode === 'inv') this.buildUnifiedInventoryOverlay(x, y, w, h);
     else if (this.overlayMode === 'settings') this.buildSettingsOverlay(x, y, w, h);
-    else if (this.overlayMode === 'itemcatalog') this.buildItemCatalogOverlay(x, y, w, h);
+    else if (['itemcatalog', 'equipmentcatalog'].includes(this.overlayMode)) this.buildItemCatalogOverlay(x, y, w, h);
     else if (this.overlayMode === 'shop') this.buildShopOverlay(x, y, w);
     else if (this.overlayMode === 'repair') this.buildRepairOverlay(x, y, w);
     else if (this.overlayMode === 'gacha') this.buildGachaOverlay(x, y, w, h);
@@ -2059,12 +2069,12 @@ export class UIScene extends Phaser.Scene {
       }
       return true;
     }
-    if (this.overlayMode !== 'itemcatalog') return false;
+    if (!['itemcatalog', 'equipmentcatalog'].includes(this.overlayMode)) return false;
     const key = event.key;
     if (key === 'Escape') {
       event.preventDefault();
       if (this.catalogDetail) { this.catalogDetail = null; this.rebuildOverlay(); }
-      else this.setOverlay('settings');
+      else this.setOverlay(this.overlayMode === 'equipmentcatalog' ? 'none' : 'settings');
     } else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'ArrowRight', 'ArrowDown', 'PageDown'].includes(key)) {
       event.preventDefault();
       if (!event.repeat) this.turnCatalogPage(['ArrowLeft', 'ArrowUp', 'PageUp'].includes(key) ? -1 : 1);
@@ -2073,7 +2083,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   turnCatalogPage(delta: number) {
-    if (this.overlayMode !== 'itemcatalog' || this.catalogDetail) return;
+    if (!['itemcatalog', 'equipmentcatalog'].includes(this.overlayMode) || this.catalogDetail) return;
     const next = Phaser.Math.Clamp(this.catalogPageIndex + delta, 0, this.catalogPageCount - 1);
     if (next === this.catalogPageIndex) return;
     this.catalogPageIndex = next;
@@ -2081,6 +2091,11 @@ export class UIScene extends Phaser.Scene {
   }
 
   selectCatalogItem(entry: CatalogEntry) {
+    if (this.overlayMode === 'equipmentcatalog') {
+      this.catalogDetail = entry;
+      this.rebuildOverlay();
+      return;
+    }
     const result = this.gs.claimCatalogItem(entry.key);
     this.catalogClaimMessage = result.message;
     if (result.status === 'pending') {
@@ -2092,6 +2107,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   buildItemCatalogOverlay(x: number, y: number, w: number, h: number) {
+    const equipmentOnly = this.overlayMode === 'equipmentcatalog';
     const addText = (tx: number, ty: number, text: string, size = 14, color = '#dfe7f0', width = w - 40) => {
       const label = this.add.text(tx, ty, text, {
         fontFamily: '"Yu Gothic UI"', fontSize: `${size}px`, color,
@@ -2115,17 +2131,20 @@ export class UIScene extends Phaser.Scene {
       addText(x + 24, y + 320, entry.name, IS_MOBILE ? 21 : 26, '#fff2cb', w - 48);
       addText(x + 24, y + 396, entry.summary, 16, '#58d9d1', w - 48);
       addText(x + 24, y + 432, entry.description, 16, '#dfe7f0', w - 48);
-      addText(x + 24, y + h - 112, this.catalogClaimMessage, 14, '#fff2cb', w - 48);
-      const ownedArmor = entry.category === 'armor' && this.gs.ownsArmor(entry.key.slice('armor_'.length));
-      this.overlay.add(this.rowButton(x + 24, y + h - 74, 168, ownedArmor ? '所持済み' : 'もう1つ取得', true,
-        () => this.selectCatalogItem(entry), !ownedArmor));
+      if (!equipmentOnly) {
+        addText(x + 24, y + h - 112, this.catalogClaimMessage, 14, '#fff2cb', w - 48);
+        const ownedArmor = entry.category === 'armor' && this.gs.ownsArmor(entry.key.slice('armor_'.length));
+        this.overlay.add(this.rowButton(x + 24, y + h - 74, 168, ownedArmor ? '所持済み' : 'もう1つ取得', true,
+          () => this.selectCatalogItem(entry), !ownedArmor));
+      }
       addText(x + 24, y + h - 38, '装備の数値は未強化の基本性能です。', 12, '#86a9ad', w - 48);
       return;
     }
 
     const tabGap = 6;
-    const tabW = (w - 32 - tabGap * 4) / 5;
-    CATALOG_TABS.forEach((tab, i) => {
+    const tabs = equipmentOnly ? CATALOG_TABS.filter(tab => tab.key !== 'item') : CATALOG_TABS;
+    const tabW = (w - 32 - tabGap * (tabs.length - 1)) / tabs.length;
+    tabs.forEach((tab, i) => {
       this.overlay.add(this.rowButton(x + 16 + i * (tabW + tabGap), y + 49, tabW, tab.label,
         this.catalogCategory === tab.key, () => {
           this.catalogCategory = tab.key;
@@ -2135,10 +2154,11 @@ export class UIScene extends Phaser.Scene {
     });
     const columns = IS_MOBILE ? 2 : 3;
     const rows = Math.max(1, Math.floor((h - 164) / 140));
-    const page = catalogPage(this.catalogCategory, this.catalogPageIndex, columns * rows);
+    const page = catalogPage(this.catalogCategory, this.catalogPageIndex, columns * rows, equipmentOnly);
     this.catalogPageIndex = page.page;
     this.catalogPageCount = page.pageCount;
-    addText(x + 16, y + 87, `${page.total}種類 / 全${ITEM_CATALOG.length}種類　絵を押すと1個取得`, IS_MOBILE ? 12 : 14, '#86a9ad');
+    const total = equipmentOnly ? ITEM_CATALOG.filter(entry => entry.category !== 'item').length : ITEM_CATALOG.length;
+    addText(x + 16, y + 87, `${page.total}種類 / 全${total}種類　${equipmentOnly ? '絵を押すと詳細を表示' : '絵を押すと1個取得'}`, IS_MOBILE ? 12 : 14, '#86a9ad');
     const gap = 10;
     const cardW = (w - 32 - gap * (columns - 1)) / columns;
     const cardH = (h - 164 - gap * (rows - 1)) / rows;
@@ -2165,7 +2185,7 @@ export class UIScene extends Phaser.Scene {
       this.overlay.add(zone);
     });
     const footerY = y + h - 36;
-    this.overlay.add(this.rowButton(x + 16, footerY, IS_MOBILE ? 66 : 100, '設定へ', false, () => this.setOverlay('settings')));
+    this.overlay.add(this.rowButton(x + 16, footerY, IS_MOBILE ? 66 : 100, equipmentOnly ? '閉じる' : '設定へ', false, () => this.setOverlay(equipmentOnly ? 'none' : 'settings')));
     this.overlay.add(this.rowButton(x + w / 2 - 76, footerY, 44, '‹', false, () => this.turnCatalogPage(-1), page.page > 0));
     addText(x + w / 2, footerY + 14, `${page.page + 1} / ${page.pageCount}`, 13).setOrigin(.5);
     this.overlay.add(this.rowButton(x + w / 2 + 32, footerY, 44, '›', false, () => this.turnCatalogPage(1), page.page < page.pageCount - 1));

@@ -1,3 +1,4 @@
+import { readCodexSave, writeCodexSave } from '../codexSave';
 import { ITEM_CATALOG, ITEM_CATALOG_CODE, type CatalogClaimResult } from '../itemCatalog';
 import { hasVolcanoTerrain, volcanoTerrainKey, volcanoFloorFrame, VOLCANO_PROP_KINDS, type VolcanoPropKind, type VolcanoPart } from '../volcanoTerrain';
 import { hasWaterTerrain, waterTerrainKey, waterFloorFrame, WATER_PROP_KINDS, type WaterPropKind, type WaterPart } from '../waterTerrain';
@@ -477,7 +478,8 @@ export class GameScene extends Phaser.Scene {
     this.lastMapClickAt = 0;
     this.discovered = location.hostname === 'localhost' && qaParams.has('qa-codex')
       ? new Set(MONSTER_DEFS.map((monster) => monster.key))
-      : new Set();
+      : readCodexSave();
+    if (this.runSaveEnabled()) writeCodexSave(this.discovered);
     this.pendingEquipment = null;
     this.secretDualUnlocked = false;
     this.itemCatalogUnlocked = false;
@@ -3379,7 +3381,7 @@ export class GameScene extends Phaser.Scene {
           const damage = this.playerDamageAgainstGimmick(enemy, result.damage);
           enemy.hp -= damage;
           this.afterPlayerHitGimmick(enemy, weapon.element);
-          this.discovered.add(enemy.def.key);
+          this.discoverMonster(enemy.def.key);
           this.hitFx(enemy.x, enemy.y);
           this.effectFx(enemy.x, enemy.y, 'fx_slash', 1.2, 230, skill.color);
           this.flashSprite(enemy.sprite);
@@ -3892,7 +3894,7 @@ export class GameScene extends Phaser.Scene {
     const dealtDamage = this.playerDamageAgainstGimmick(e, res.damage);
     e.hp -= dealtDamage;
     this.afterPlayerHitGimmick(e, weaponElement);
-    this.discovered.add(e.def.key);
+    this.discoverMonster(e.def.key);
     // 攻撃音源に命中音を含むため、旧電子ヒット音は重ねない。
 
     // 二刀流：2撃目の斬撃を少し遅らせて重ねる
@@ -5987,7 +5989,7 @@ export class GameScene extends Phaser.Scene {
       const boss = !!(enemy.def.isBoss || enemy.def.isFloorBoss);
       const damage = boss ? Math.max(1, Math.ceil(enemy.hpMax * .2)) : enemy.hp;
       enemy.hp -= damage;
-      this.discovered.add(enemy.def.key);
+      this.discoverMonster(enemy.def.key);
       this.hitFx(enemy.x, enemy.y);
       this.log(boss ? `${enemy.def.name}に${damage}の爆発ダメージ！（最大HPの20%）`
         : `${enemy.def.name}を爆風で一撃撃破！`, 'dmg');
@@ -6635,7 +6637,10 @@ export class GameScene extends Phaser.Scene {
   gameOver(cleared: boolean) {
     if (this.gameEnded) return;
     this.gameEnded = true;
-    if (this.runSaveEnabled()) clearRunSave();
+    if (this.runSaveEnabled()) {
+      writeCodexSave(this.discovered);
+      clearRunSave();
+    }
 
     if (cleared) {
       this.addScore(3000);
@@ -7215,7 +7220,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   showEnemyInfo(e: Enemy) {
-    this.discovered.add(e.def.key);
+    this.discoverMonster(e.def.key);
     const element = monsterElement(e.def);
     const weakTo = element ? ELEMENT_INFO[element].weakTo : undefined;
     this.events.emit('enemyinfo', {
@@ -7403,6 +7408,12 @@ export class GameScene extends Phaser.Scene {
     return awaitTween(this, target, props, ms, ease);
   }
 
+  private discoverMonster(key: string) {
+    if (this.discovered.has(key)) return;
+    this.discovered.add(key);
+    if (this.runSaveEnabled()) writeCodexSave(this.discovered);
+  }
+
   emitRefresh() {
     this.events.emit('refresh');
     this.savePending = true;
@@ -7469,7 +7480,8 @@ export class GameScene extends Phaser.Scene {
     this.player.weapon = this.player.weapons[snapshot.equipped.weapon] ?? null;
     this.player.shield = this.player.weapon?.dual || this.player.weapon?.weaponType === 'bow' ? null : this.player.shields[snapshot.equipped.shield] ?? null;
     this.player.armor = this.player.armors[snapshot.equipped.armor] ?? null;
-    this.discovered = new Set(snapshot.discovered);
+    this.discovered = new Set([...this.discovered, ...snapshot.discovered]);
+    if (this.runSaveEnabled()) writeCodexSave(this.discovered);
     this.logHistory = snapshot.logs.map(entry => ({ ...entry, msg: this.playerFacingSavedLog(entry.msg) }));
     this.qaBossMode = false;
     this.qaBossRoomZone = undefined;

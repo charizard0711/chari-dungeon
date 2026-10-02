@@ -98,6 +98,7 @@ const UI_ART = {
   ui_nav_shop: 'assets/ui/generated/nav-shop.png',
   ui_nav_gacha: 'assets/ui/generated/nav-gacha.png',
   ui_nav_codex: 'assets/ui/generated/nav-codex.png',
+  ui_nav_equipment_codex: 'assets/ui/generated/nav-equipment-codex.png',
   ui_nav_settings: 'assets/ui/generated/nav-settings.png',
   armor_leather: 'assets/ui/generated/armor-leather.png',
   armor_chain: 'assets/ui/generated/armor-chain.png',
