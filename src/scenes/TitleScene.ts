@@ -39,7 +39,7 @@ export class TitleScene extends Phaser.Scene {
 
     const savedRun = readRunSave();
     let starting = false;
-    const startGame = (resume = !!savedRun) => {
+    const startGame = (resume = false) => {
       if (starting) return;
       starting = true;
       if (!(location.hostname === 'localhost' && isPlayerGender(qaGender))) setSelectedGender(this.selectedGender);
@@ -47,34 +47,52 @@ export class TitleScene extends Phaser.Scene {
       this.time.delayedCall(190, () => this.scene.start('GameScene', { resume }));
     };
 
-    if (GAME_W < 700) this.createMobileTitle(startGame);
-    else this.createArtworkTitle(startGame);
-
-    if (savedRun && !(location.hostname === 'localhost' && qaParams.has('qa-game') && !qaParams.has('qa-resume'))) {
+    let resumeDialog: Phaser.GameObjects.Container | undefined;
+    const closeResumeDialog = () => {
+      resumeDialog?.destroy(true);
+      resumeDialog = undefined;
+    };
+    const requestExplore = () => {
+      if (starting || resumeDialog) return;
+      if (!savedRun) { startGame(false); return; }
+      const previous = new Set(this.children.list);
       const w = Math.min(GAME_W - 24, 440);
       const y = GAME_H / 2;
-      this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x020708, .86).setDepth(50).setInteractive();
-      this.add.rectangle(GAME_W / 2, y, w, 300, 0x102125, 1).setStrokeStyle(2, 0xe7b85e).setDepth(51);
-      this.add.text(GAME_W / 2, y - 106, '保存した冒険があります', {
+      this.add.rectangle(GAME_W / 2, y, GAME_W, GAME_H, 0x020208, .82).setInteractive();
+      this.add.rectangle(GAME_W / 2, y, w, 330, 0x130d15, 1).setStrokeStyle(2, 0xc89a50);
+      this.add.text(GAME_W / 2, y - 122, '続きから探索しますか？', {
         fontFamily: FONT, fontSize: '22px', color: '#ffe1a0', fontStyle: 'bold'
-      }).setOrigin(.5).setDepth(52);
+      }).setOrigin(.5);
       const state = savedRun.snapshot.state;
-      this.add.text(GAME_W / 2, y - 63, `${state.floor}${state.inBossRoom ? '.5' : ''}F · Lv.${savedRun.snapshot.player.level} · ${state.turn}ターン`, {
-        fontFamily: FONT, fontSize: '15px', color: '#c8e4e0'
-      }).setOrigin(.5).setDepth(52);
-      this.makeButton(GAME_W / 2, y + 4, '続きから', () => startGame(true)).setDepth(52);
+      this.add.text(GAME_W / 2, y - 77, `${state.floor}${state.inBossRoom ? '.5' : ''}階 · レベル${savedRun.snapshot.player.level} · ${state.turn}ターン`, {
+        fontFamily: FONT, fontSize: '15px', color: '#d7c8b4'
+      }).setOrigin(.5);
+      this.makeButton(GAME_W / 2, y - 6, '続きから探索', () => startGame(true));
       let confirmNew = false;
-      const newGame = this.add.text(GAME_W / 2, y + 81, '新しく始める', {
-        fontFamily: FONT, fontSize: '16px', color: '#bdc5c4', padding: { x: 18, y: 12 }
-      }).setOrigin(.5).setDepth(52).setInteractive({ useHandCursor: true });
+      const newGame = this.add.text(GAME_W / 2, y + 64, '最初から始める', {
+        fontFamily: FONT, fontSize: '16px', color: '#d3c5b8', padding: { x: 18, y: 12 }
+      }).setOrigin(.5).setInteractive({ useHandCursor: true });
       newGame.on('pointerdown', () => {
         if (confirmNew) startGame(false);
         else { confirmNew = true; newGame.setText('保存を上書きして始める（もう一度押す）').setFontSize('13px'); }
       });
-    }
-
-    this.input.keyboard?.once('keydown-ENTER', (event: KeyboardEvent) => { event.preventDefault(); startGame(); });
-    this.input.keyboard?.once('keydown-SPACE', (event: KeyboardEvent) => { event.preventDefault(); startGame(); });
+      this.add.text(GAME_W / 2, y + 125, '戻る', {
+        fontFamily: FONT, fontSize: '15px', color: '#c2a66f', padding: { x: 24, y: 12 }
+      }).setOrigin(.5).setInteractive({ useHandCursor: true }).on('pointerdown', closeResumeDialog);
+      const dialogChildren = this.children.list.filter(child => !previous.has(child));
+      resumeDialog = this.add.container(0, 0, dialogChildren).setDepth(50);
+    };
+    if (GAME_W < 700) this.createMobileTitle(requestExplore);
+    else this.createArtworkTitle(requestExplore);
+    const exploreKey = (event: KeyboardEvent) => { event.preventDefault(); requestExplore(); };
+    this.input.keyboard?.on('keydown-ENTER', exploreKey);
+    this.input.keyboard?.on('keydown-SPACE', exploreKey);
+    this.input.keyboard?.on('keydown-ESC', closeResumeDialog);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.input.keyboard?.off('keydown-ENTER', exploreKey);
+      this.input.keyboard?.off('keydown-SPACE', exploreKey);
+      this.input.keyboard?.off('keydown-ESC', closeResumeDialog);
+    });
     if (location.hostname === 'localhost' && qaParams.has('qa-game')) {
       this.time.delayedCall(80, () => startGame(qaParams.has('qa-resume')));
     }
@@ -173,7 +191,7 @@ export class TitleScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     this.createGenderSelector(468, true);
-    this.makeButton(GAME_W / 2, 600, '深層へ降りる', startGame);
+    this.makeButton(GAME_W / 2, 600, '探索', startGame);
     const help = this.createHelpOverlay();
     this.add.text(GAME_W / 2, 678, '遊び方', {
       fontFamily: FONT,
