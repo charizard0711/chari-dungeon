@@ -217,7 +217,8 @@ export function magicLabel(code: MagicCode, level: number): string {
 export const ITEM_DEFS: Record<ItemKind, Omit<Item, 'kind'>> = {
   potion:  { name: '回復ポーション', desc: 'HPを40回復する', textureKey: 'i_potion' },
   shroom:  { name: '光るキノコ', desc: '周囲をしばらく明るくする', textureKey: 'i_shroom' },
-  torch:   { name: '松明', desc: '10ターンの間、壁を越えて上下左右10マスまで明るくする', textureKey: 'i_torch' },
+  torch:   { name: '松明', desc: '10ターンの間、壁の向こうまで明るくする', textureKey: 'i_torch' },
+  dynamite: { name: 'ダイナマイト', desc: '周囲の通常敵を爆風で一撃撃破。ボスには最大HPの20%の固定ダメージ。自分は無傷。', textureKey: 'i_dynamite' },
   bomb:    { name: 'ボムナッツ', desc: '周囲の敵に範囲ダメージ', textureKey: 'i_bomb' },
   warp:    { name: 'リコールベル', desc: '今いる階のスタート位置へ戻る', textureKey: 'i_warp' },
   revive:  { name: '復活のタネ', desc: '倒れた時に一度だけ復活', textureKey: 'i_revive' },
@@ -232,7 +233,7 @@ export const ITEM_DEFS: Record<ItemKind, Omit<Item, 'kind'>> = {
 };
 
 // レアアイテム（所持欄で赤枠になる）
-const RARE_ITEMS = new Set<ItemKind>(['revive', 'slime_scroll', 'boss5_scroll']);
+const RARE_ITEMS = new Set<ItemKind>(['revive', 'slime_scroll', 'boss5_scroll', 'dynamite']);
 export function isRareItem(kind: ItemKind): boolean {
   return RARE_ITEMS.has(kind);
 }
@@ -283,7 +284,7 @@ const MONSTER_ELEMENTS: Record<string, Element> = {
 };
 
 const MONSTER_GIMMICKS: Record<string, { kind: NonNullable<MonsterDef['gimmick']>; text: string }> = {
-  m_mush: { kind: 'lantern', text: '撃破すると5ターンの間、壁を越えて上下左右10マスまで明るくなる。' },
+  m_mush: { kind: 'lantern', text: '撃破すると5ターンの間、壁の向こうまで明るくなる。' },
   m_mole: { kind: 'burrow', text: '3回目の行動で地中へ潜り、次の行動で近くへ奇襲する。' },
   m_jelly: { kind: 'split', text: '最初の撃破時に小型ゼリー2体へ分裂する。' },
   m_ghost: { kind: 'phase', text: '普段は被ダメージを軽減し、攻撃直後だけ実体化する。' },

@@ -70,6 +70,7 @@ export const SE_DEFS = {
   stairs:  { key: 'se_stairs',  path: 'assets/audio/se_stairs.mp3',  volume: 0.6 },  // 階段
   levelup: { key: 'se_levelup', path: 'assets/audio/se_levelup.mp3', volume: 0.65 }, // レベルアップ
   heal:    { key: 'se_heal',    path: 'assets/audio/se_heal.mp3',    volume: 0.55 }, // 回復
+  dynamite: { key: 'se_dynamite', path: 'assets/audio/se_dynamite.wav', volume: 0.68 },
   bomb:    { key: 'se_bomb',    path: 'assets/audio/se_bomb.mp3',    volume: 0.7 },  // 爆発
   warp:    { key: 'se_warp',    path: 'assets/audio/se_warp.mp3',    volume: 0.55 }, // ワープ
   break:   { key: 'se_break',   path: 'assets/audio/se_break.mp3',   volume: 0.65 }, // 装備破損
@@ -80,7 +81,7 @@ export const SE_DEFS = {
 export type SeName = keyof typeof SE_DEFS;
 // Only packaged sounds are requested; the remaining effects use their synth definitions.
 export const FILE_SE_NAMES: readonly SeName[] = [
-  'attack', 'weaponDagger', 'weaponLongsword', 'weaponLance', 'weaponBow',
+  'dynamite', 'attack', 'weaponDagger', 'weaponLongsword', 'weaponLance', 'weaponBow',
   'weaponHandgun', 'weaponGreatsword', 'weaponDual', 'skillDagger', 'skillLongsword',
   'skillLance', 'skillBow', 'skillHandgun', 'skillGreatsword', 'skillDual'
 ];

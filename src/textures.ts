@@ -529,6 +529,11 @@ function buildItemTextures(scene: Phaser.Scene) {
       px(g, 10, 11, 4, 11, 0x63351f); px(g, 8, 10, 8, 3, 0xb86b25);
       px(g, 8, 4, 8, 7, 0xff5a18); px(g, 10, 2, 5, 8, 0xffb21f); px(g, 11, 3, 3, 5, 0xfff08a);
     },
+    dynamite: (g) => {
+      for(const x of [5,10,15]) { px(g,x,6,4,16,0xb9282d); px(g,x+1,7,1,13,0xff6258); }
+      px(g,4,11,16,3,0x513622); px(g,4,18,16,2,0x513622);
+      px(g,12,2,2,5,0xd6bc7b); px(g,13,1,3,2,0xffca4f);
+    },
     bomb: (g) => { px(g, 6, 8, 12, 12, 0x202028); px(g, 12, 3, 2, 5, 0x8a6a4a); px(g, 12, 2, 3, 2, 0xf5a020); px(g, 9, 12, 3, 3, 0x4a4a55); },
     warp: (g) => { px(g, 8, 4, 8, 12, 0xf5c542); px(g, 6, 16, 12, 3, 0xd0a020); px(g, 11, 6, 2, 8, 0x4fd0e0); },
     revive: (g) => { px(g, 11, 8, 2, 12, 0x8a5a2a); px(g, 6, 4, 5, 5, 0x6fae2a); px(g, 13, 4, 5, 5, 0x6fae2a); px(g, 10, 2, 4, 4, 0x9fdf3a); },

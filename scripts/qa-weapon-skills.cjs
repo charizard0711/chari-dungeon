@@ -6,7 +6,7 @@ const browser=await chromium.launch({channel:'chrome',headless:true});
 const errors=[];const page=await browser.newPage({viewport:{width:1280,height:800}});
 page.on('pageerror',e=>errors.push(e.message));
 try{
-await page.goto('http://localhost:5174/?qa-game&qa-save');
+await page.goto((process.env.QA_URL||'http://localhost:5174')+'/?qa-game&qa-save');
 await page.waitForFunction(()=>window.__game?.scene.getScene('GameScene').playerSprite?.active,{timeout:60000});
 const results=await page.evaluate(async()=>{
  const g=window.__game.scene.getScene('GameScene'),u=window.__game.scene.getScene('UIScene');

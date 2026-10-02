@@ -28,7 +28,7 @@ import { planSkill, weaponSkill, directionVector } from '../weaponSkills';
 import { Audio } from '../audio/manager';
 import { clearRunSave, pickFields, readRunSave, writeRunSave, type RunSnapshot } from '../runSave';
 import { bgmForFloor, elementAttackSe, weaponAttackSe } from '../audio/config';
-import { enhancementChance, EQUIPMENT_LIMIT, ITEM_SELL_PRICES, SCROLL_DROP_RATE, SHOP_PRICES, type ShopItemKind } from '../balance';
+import { enhancementChance, EQUIPMENT_LIMIT, DYNAMITE_DROP_RATE, ITEM_SELL_PRICES, SCROLL_DROP_RATE, SHOP_PRICES, type ShopItemKind } from '../balance';
 import { getFloorLayoutProfile } from '../floorLayout';
 import {
   armorForGrade,
@@ -1016,10 +1016,10 @@ export class GameScene extends Phaser.Scene {
 
     this.updateVisibility();
     const floorIntro = bossRoom
-      ? `${floor}.5F 強ボス部屋へ転送された。`
+      ? `重い扉の先で、強大な魔物が待ち構えている。`
       : floor % 5 === 0
-          ? `${floor}F「${getTheme(floor).name}」に到達。最奥の赤い階段から${floor}.5Fの強ボス部屋へ進める。`
-          : `${floor}F「${getTheme(floor).name}」に到達。迷路内の10×10部屋で中ボスを倒すと、同じ部屋に階段が現れる。`;
+          ? `${floor}階「${getTheme(floor).name}」に足を踏み入れた。奥の赤い階段から、強大な魔物の気配が漂っている。`
+          : `${floor}階「${getTheme(floor).name}」に足を踏み入れた。出口へ続く道は、魔物の封印に閉ざされている。`;
     this.log(floorIntro, 'sys');
     const bossDirection = this.bossCompassDirection();
     if (!bossRoom && bossDirection) {
@@ -1592,10 +1592,10 @@ export class GameScene extends Phaser.Scene {
       bossTint: custom || floor === 10 ? 0xffffff : spec.tint
     };
     const message = fieldPlacement
-      ? `◆ ${floor}F 中ボス「${def.name}」が迷宮内のどこかに現れた！`
+      ? `◆ 迷宮のどこかで「${def.name}」が待ち構えている……。`
       : this.inBossRoom
-        ? `◆ ${floor}.5F 中ボス「${def.name}」が現れた！`
-        : `◆ ${floor}F 10×10の専用部屋から強い気配がする。入口を探せ。`;
+        ? `◆ 「${def.name}」が姿を現した！`
+        : `◆ 重い扉の向こうから強い気配を感じる……。`;
     this.placeFloorBoss(def, hasFinalDepthTerrain(floor) ? 1.55 : custom && !custom.isDragonType ? 1 : 1.32, spec.tint, message, this.midBossGimmick(base.key), fieldPlacement);
   }
 
@@ -1623,8 +1623,8 @@ export class GameScene extends Phaser.Scene {
       bossTint: custom ? 0xffffff : spec.tint
     };
     const label = floor % 10 === 0
-      ? `★★ ${floor}.5F 超ボス「${def.name}」が降臨した！`
-      : `★ ${floor}.5F 強ボス「${def.name}」が立ちはだかった！`;
+      ? `★★ 強大な魔物「${def.name}」が立ちはだかった！`
+      : `★ 「${def.name}」が行く手を阻んだ！`;
     this.placeFloorBoss(def, spec.scale, spec.tint, label, this.milestoneGimmick(floor));
   }
 
@@ -1811,8 +1811,8 @@ export class GameScene extends Phaser.Scene {
       ? this.enemies.find((enemy) => enemy.def.isFloorBoss && this.isInsideBossRoom(enemy.x, enemy.y))
       : undefined;
     this.log(closed && revealedBoss
-      ? `ボス部屋の入口が閉じ、中ボス「${revealedBoss.def.name}」が姿を現した！`
-      : closed ? 'ボス部屋の入口に結界が張られた！' : 'ボス部屋の入口の結界が消えた。', 'special');
+      ? `背後の扉が閉じ、魔物「${revealedBoss.def.name}」が姿を現した！`
+      : closed ? '背後の扉が結界に閉ざされた！' : '扉を覆っていた結界が消えた。', 'special');
   }
 
   closeBossEntranceOnEntry(x: number, y: number) {
@@ -2268,7 +2268,7 @@ export class GameScene extends Phaser.Scene {
         if (Math.max(Math.abs(p.x - e.x), Math.abs(p.y - e.y)) > reach) return null;
         tiles = this.bossThunderCone(e, reach);
         message = state.kind === 'mid_thunder_jaw'
-          ? `${e.def.name}が帯電した顎を開いた！ 前方の予告マスから離れろ。`
+          ? `${e.def.name}が帯電した顎を開いた！ 前方の光っている床から離れよう。`
           : `${e.def.name}の甲殻が光った！ 扇形の放電を横へ避けろ。`;
         break;
       }
@@ -2304,13 +2304,13 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'mid_magic':
         tiles = this.bossCrossTiles(p.x, p.y, 1);
-        message = `${e.def.name}が魔力を集中している！ 銀色の予告マスから離れろ。`;
+        message = `${e.def.name}が魔力を集中している！ 銀色に光る床から離れよう。`;
         break;
       case 'mid_ember_shift':
         destination = this.findBossDestination(e) ?? undefined;
         if (!destination) return null;
         tiles = this.bossAreaTiles(destination.x, destination.y, 1);
-        message = `${e.def.name}が炎の中に消えた！ 赤いマスへの転移斬りに注意。`;
+        message = `${e.def.name}が炎の中に消えた！ 赤く光る床への転移斬りに注意。`;
         break;
       case 'mid_magma_lance': {
         const horizontal = Math.abs(p.x - e.x) >= Math.abs(p.y - e.y);
@@ -2324,14 +2324,14 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'magma_breath':
         tiles = this.bossBreathTiles(e, state.phaseTwo);
-        message = '熔獄竜ヴァルグラドが息を吸い込んだ！ 赤い予告マスへ熔岩の息吹が来る。';
+        message = '熔獄竜ヴァルグラドが息を吸い込んだ！ 赤く光る床に熔岩の息吹が来る。';
         break;
       case 'mid_rival':
         // An armed adventurer fights with its sword, not a dragon spell.
         return null;
       case 'mid_fire':
         tiles = this.bossCrossTiles(p.x, p.y, 1);
-        message = `${e.def.name}が火炎弾を溜めている！ 赤いマスから離れろ。`;
+        message = `${e.def.name}が火炎弾を溜めている！ 赤く光る床から離れよう。`;
         break;
       case 'mid_frost': {
         const horizontal = Math.abs(p.x - e.x) >= Math.abs(p.y - e.y);
@@ -2347,7 +2347,7 @@ export class GameScene extends Phaser.Scene {
         destination = this.findBossDestination(e) ?? undefined;
         if (!destination) return null;
         tiles = this.bossAreaTiles(destination.x, destination.y, 1);
-        message = `${e.def.name}が空間を歪めた！ 紫のマスへ転移攻撃が来る。`;
+        message = `${e.def.name}が空間を歪めた！ 紫に光る床へ転移攻撃が来る。`;
         break;
       case 'mid_bone':
         tiles = this.bossCrossTiles(p.x, p.y, 1);
@@ -2370,7 +2370,7 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'glacial_slam': {
         tiles = this.bossCrossTiles(p.x, p.y, state.phaseTwo ? 3 : 2);
-        message = '氷晶王ベヒーモスが両腕を振り上げた！ 氷晶震撃の予告マスから離れろ。';
+        message = '氷晶王ベヒーモスが両腕を振り上げた！ 青く光る床から離れよう。';
         break;
       }
       case 'ancient_fire':
@@ -2778,7 +2778,7 @@ export class GameScene extends Phaser.Scene {
   tickBossMechanics() {
     const standing = this.bossHazards.filter((hazard) => hazard.x === this.player.x && hazard.y === this.player.y);
     if (standing.some((hazard) => hazard.kind === 'fire')) {
-      this.damagePlayer(3 + Math.floor(this.floor / 6), '燃焼マスの炎！');
+      this.damagePlayer(3 + Math.floor(this.floor / 6), '足元の炎に焼かれた！');
     }
     if (standing.some((hazard) => hazard.kind === 'poison')) {
       this.player.poisonTurns = Math.max(this.player.poisonTurns, 2);
@@ -3547,7 +3547,7 @@ export class GameScene extends Phaser.Scene {
         } else {
           this.log(isExitDoor
             ? '中ボスを倒すまで階段の封印は解けない。'
-            : '戦闘中は10×10部屋の入口が封鎖されている。', 'sys');
+            : '入口は結界に閉ざされている。魔物を倒して封印を解こう。', 'sys');
           Audio.playSe('deny');
         }
         return;
@@ -3720,18 +3720,18 @@ export class GameScene extends Phaser.Scene {
 
   pickUp(gi: GroundItem) {
     if (gi.kind === 'weapon' && gi.weapon) {
-      if (this.receiveWeapon(gi.weapon, 'ボスドロップ')) {
+      if (this.receiveWeapon(gi.weapon, '魔物の宝')) {
         this.log(`ボス武器 ${weaponFullName(gi.weapon)} を拾った！`, 'special');
       }
       Audio.playSe('pickup');
     } else if (gi.kind === 'shield' && gi.shield) {
-      if (this.receiveShield(gi.shield, 'ボスドロップ')) {
-        this.log(`ボスドロップ ${shieldFullName(gi.shield)} を拾った！`, 'special');
+      if (this.receiveShield(gi.shield, '魔物の宝')) {
+        this.log(`魔物の宝 ${shieldFullName(gi.shield)} を拾った！`, 'special');
       }
       Audio.playSe('pickup');
     } else if (gi.kind === 'armor' && gi.armor) {
-      if (this.receiveArmor(gi.armor, 'ボスドロップ')) {
-        this.log(`ボスドロップ ${armorFullName(gi.armor)} を拾った！`, 'special');
+      if (this.receiveArmor(gi.armor, '魔物の宝')) {
+        this.log(`魔物の宝 ${armorFullName(gi.armor)} を拾った！`, 'special');
       }
       Audio.playSe('pickup');
     } else if (gi.kind === 'coin') {
@@ -3839,7 +3839,7 @@ export class GameScene extends Phaser.Scene {
   async playerAttack(e: Enemy, dir: Dir, ranged = false) {
     if (e.def.isFloorBoss && this.dungeon.bossRoom
       && (!this.isInsideBossRoom(this.player.x, this.player.y) || !this.isInsideBossRoom(e.x, e.y))) {
-      this.log('中ボスへの攻撃と技は10×10の専用エリア内でだけ使える。', 'sys');
+      this.log('魔物に近づくには、扉をくぐって部屋に入ろう。', 'sys');
       Audio.playSe('deny');
       return;
     }
@@ -3903,7 +3903,7 @@ export class GameScene extends Phaser.Scene {
     if (knockbackReady && e.hp > 0) {
       const pushed = await this.knockbackEnemy(e, ddx, ddy);
       this.log(
-        pushed ? `三撃破砕！ ${e.def.name}を1マス押し戻した！` : `三撃破砕！ ${e.def.name}は壁際で踏みとどまった！`,
+        pushed ? `三撃破砕！ ${e.def.name}を押し戻した！` : `三撃破砕！ ${e.def.name}は壁際で踏みとどまった！`,
         'special'
       );
     }
@@ -3921,7 +3921,7 @@ export class GameScene extends Phaser.Scene {
       this.player.weapon = this.player.weapons[0] ?? null;
       if ((this.player.weapon?.dual || this.player.weapon?.weaponType === 'bow') && this.player.shield) {
         this.player.shield = null;
-        this.log('両手武器のため盾を外した。（両手がふさがる）', 'sys');
+        this.log('両手で武器を構え、盾を外した。', 'sys');
       }
       this.updatePlayerAura();
     }
@@ -3946,14 +3946,14 @@ export class GameScene extends Phaser.Scene {
     this.emitRefresh();
   }
 
-  killEnemy(e: Enemy, scoreBonus: number) {
+  killEnemy(e: Enemy, scoreBonus: number, options: { quiet?: boolean; obliterate?: boolean } = {}) {
     const def = e.def;
     const leveled = this.player.addExp(def.exp);
     this.player.gold += def.gold;
     this.addScore(def.score + scoreBonus + (def.isElite ? 60 : 0) + (def.isBoss ? 0 : 0));
     this.log(`${def.name}を倒した！ EXP+${def.exp} G+${def.gold}`, 'gold');
-    Audio.playSe('kill');
-    if (leveled) { this.log(`レベルアップ！ Lv.${this.player.level} になった。`, 'special'); Audio.playSe('levelup'); this.levelupFx(); }
+    if (!options.quiet) Audio.playSe('kill');
+    if (leveled) { this.log(`レベルアップ！ Lv.${this.player.level} になった。`, 'special'); if (!options.quiet) Audio.playSe('levelup'); this.levelupFx(); }
     if (def.isTreasureRabbit) {
       const ssElemental = WEAPON_DEFS.filter((weapon) => weapon.ss && weapon.element);
       const rewardDef = ssElemental[Math.floor(Math.random() * ssElemental.length)];
@@ -3985,6 +3985,11 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
+    if (!def.isBoss && !def.isFloorBoss && !def.isTreasureRabbit && Math.random() < DYNAMITE_DROP_RATE) {
+      this.dropItem(e.x, e.y, 'dynamite');
+      this.log('ダイナマイトがこぼれ落ちた！', 'special');
+    }
+
     this.enemyDefeatFx(e);
     const bossState = this.bossStates.get(e);
     if (bossState) {
@@ -4000,11 +4005,11 @@ export class GameScene extends Phaser.Scene {
     e.hpBar?.destroy();
     e.shadow?.destroy();
     this.enemies = this.enemies.filter((x) => x !== e);
-    this.resolveMonsterDeathGimmick(e);
+    this.resolveMonsterDeathGimmick(e, options.obliterate);
 
     if (def.isFloorBoss) {
       const guaranteedScroll = this.dropGuaranteedBossScroll(e.x, e.y);
-      this.log(`ボス討伐報酬！ ${ITEM_DEFS[guaranteedScroll].name}が必ず出現した。`, 'special');
+      this.log(`倒れた魔物のそばに、${ITEM_DEFS[guaranteedScroll].name}が残されていた。`, 'special');
       this.unlockFloorGate(def.name, { x: e.x, y: e.y });
     }
   }
@@ -4099,28 +4104,28 @@ export class GameScene extends Phaser.Scene {
       this.effectFx(stairs.x, stairs.y, 'fx_magic', 2.3, 820, 0xff4b38);
     }
     this.log(this.inBossRoom
-      ? `${bossName}を撃破！ 報酬がその場にドロップし、出口の封印が解けた。`
+      ? `${bossName}を撃破！ 宝が残され、出口の封印が解けた。`
       : this.floorHasGate(this.floor)
-        ? `${bossName}を撃破！ 報酬がその場にドロップし、強ボスへ降りる階段が使えるようになった。`
-        : `${bossName}を撃破！ 報酬がその場にドロップし、10×10部屋内に階段が現れた。`, 'special');
+        ? `${bossName}を撃破！ 宝が残され、奥へ続く階段の封印が解けた。`
+        : `${bossName}を撃破！ 宝が残され、先へ続く階段が現れた。`, 'special');
     this.updateVisibility();
     this.emitRefresh();
   }
 
-  resolveMonsterDeathGimmick(e: Enemy) {
+  resolveMonsterDeathGimmick(e: Enemy, obliterate = false) {
     const dist = Math.abs(this.player.x - e.x) + Math.abs(this.player.y - e.y);
     if (e.def.gimmick === 'lantern') {
       this.lanternTurns = Math.max(this.lanternTurns, 5);
       this.updateVisibility();
       this.effectFx(e.x, e.y, 'fx_magic', 1.4, 420, 0xffc95a);
-      this.log('ランタンの光で5ターンの間、壁を越えて上下左右10マスまで明るくなった！', 'special');
+      this.log('ランタンの光で5ターンの間、壁の向こうまで明るくなった！', 'special');
     }
-    if ((e.def.gimmick === 'shatter' || e.def.gimmick === 'death_burst') && dist <= 1) {
+    if (!obliterate && (e.def.gimmick === 'shatter' || e.def.gimmick === 'death_burst') && dist <= 1) {
       const fiery = e.def.gimmick === 'death_burst';
       this.damagePlayer((fiery ? 5 : 3) + Math.floor(this.floor / 10), fiery ? '迷い火の爆発！' : '砕けた氷片が飛び散った！', e);
       this.effectFx(e.x, e.y, 'fx_magic', 1.5, 360, fiery ? 0xff8b42 : 0x8de9ff);
     }
-    if (e.def.gimmick === 'split' && e.cloneDepth === 0) {
+    if (!obliterate && e.def.gimmick === 'split' && e.cloneDepth === 0) {
       const spots = Phaser.Utils.Array.Shuffle([
         { x: e.x + 1, y: e.y }, { x: e.x - 1, y: e.y },
         { x: e.x, y: e.y + 1 }, { x: e.x, y: e.y - 1 }
@@ -4171,7 +4176,7 @@ export class GameScene extends Phaser.Scene {
 
     // 中ボス・専用部屋のボスともに、ランダム報酬とは別に1個確定。
     this.dropItem(origin.x, origin.y, 'repair');
-    this.log('ボス撃破報酬！ 装備修復石が1個ドロップした。', 'item');
+    this.log('魔物のそばで装備修復石を見つけた！', 'item');
 
     const bossEquipmentGrade: EquipmentGrade = this.floor >= 25 ? 'S'
       : this.floor >= 15 ? 'A'
@@ -4188,8 +4193,8 @@ export class GameScene extends Phaser.Scene {
       weapon.plus = Math.max(weapon.plus, Math.min(3, Math.floor(this.floor / 10)));
       this.dropEquipment(origin.x, origin.y, 'weapon', weapon);
       this.weaponWonThisFloor = true;
-      if (this.floor === 20) this.log(`熔獄竜の討伐報酬！ 火属性の武器「${weapon.name}」が確定ドロップした。`, 'special');
-      if (this.floor === 15) this.log(`氷晶王の討伐報酬！ 氷属性の武器「${weapon.name}」が確定ドロップした。`, 'special');
+      if (this.floor === 20) this.log(`熔獄竜の討伐報酬！ 火属性の武器「${weapon.name}」が残されていた。`, 'special');
+      if (this.floor === 15) this.log(`氷晶王の討伐報酬！ 氷属性の武器「${weapon.name}」が残されていた。`, 'special');
     }
 
     // 5階刻みの強ボスは服を確定、中ボスは5%で服を落とす。
@@ -4198,8 +4203,8 @@ export class GameScene extends Phaser.Scene {
       if (!this.ownsArmor(armorDef.key)) {
         this.dropEquipment(origin.x, origin.y, 'armor', makePlayerArmor(armorDef.key));
         this.log(isMilestoneBoss
-          ? `強ボス撃破報酬として「${armorDef.name}」が確定ドロップした！`
-          : `中ボスから希少な服「${armorDef.name}」がドロップした！`, 'special');
+          ? `魔物の宝として「${armorDef.name}」が残されていた！`
+          : `倒れた魔物のそばに希少な服「${armorDef.name}」が残されていた！`, 'special');
       }
     }
 
@@ -4260,9 +4265,9 @@ export class GameScene extends Phaser.Scene {
     if (kind === 'armor' && this.ownsArmor((equipment as Armor).key)) return;
     const pos = this.findGroundDropPosition(x, y);
     if (!pos) {
-      if (kind === 'weapon') this.receiveWeapon(equipment as Weapon, 'ボスドロップ');
-      else if (kind === 'shield') this.receiveShield(equipment as Shield, 'ボスドロップ');
-      else this.receiveArmor(equipment as Armor, 'ボスドロップ');
+      if (kind === 'weapon') this.receiveWeapon(equipment as Weapon, '魔物の宝');
+      else if (kind === 'shield') this.receiveShield(equipment as Shield, '魔物の宝');
+      else this.receiveArmor(equipment as Armor, '魔物の宝');
       this.log('落とせる床がないため、ボス装備を自動回収した。', 'special');
       return;
     }
@@ -5839,11 +5844,12 @@ export class GameScene extends Phaser.Scene {
       case 'torch': {
         this.torchTurns = 10;
         this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.45, 460, 0xffa52f);
-        this.log('松明に火を灯した！ 10ターンの間、壁を越えて上下左右10マスまで明るくなる。', 'item');
+        this.log('松明に火を灯した！ 10ターンの間、壁の向こうまで明るくなる。', 'item');
         Audio.playSe('pickup');
         passTurn = false;
         break;
       }
+      case 'dynamite': this.useDynamite(); break;
       case 'bomb': this.useBomb(); break;
       case 'warp': consumed = this.useWarp(); passTurn = false; break;
       case 'seal': this.useSeal(); break;
@@ -5929,6 +5935,55 @@ export class GameScene extends Phaser.Scene {
     if (kind === 'boss5') this.transformationSprite.setTint(0xffd28a);
     this.playerSprite.setAlpha(0);
     this.weaponSprite?.setVisible(false);
+  }
+
+  useDynamite() {
+    const origin = { x: this.player.x, y: this.player.y };
+    this.clearMoveInput();
+    this.log('ダイナマイトが大爆発！ 周囲を激しい爆風が包み込んだ！', 'special');
+    this.dynamiteExplosionFx(origin.x, origin.y);
+    for (const enemy of [...this.enemies]) {
+      const radius = bossBodyRadius(enemy.def);
+      if (!enemy.alive || Math.max(0, Math.abs(enemy.x-origin.x)-radius) > 2
+        || Math.max(0, Math.abs(enemy.y-origin.y)-radius) > 2) continue;
+      const boss = !!(enemy.def.isBoss || enemy.def.isFloorBoss);
+      const damage = boss ? Math.max(1, Math.ceil(enemy.hpMax * .2)) : enemy.hp;
+      enemy.hp -= damage;
+      this.discovered.add(enemy.def.key);
+      this.hitFx(enemy.x, enemy.y);
+      this.log(boss ? `${enemy.def.name}に${damage}の爆発ダメージ！（最大HPの20%）`
+        : `${enemy.def.name}を爆風で一撃撃破！`, 'dmg');
+      if (enemy.hp <= 0) this.killEnemy(enemy, 0, { quiet: true, obliterate: true });
+      else { this.flashSprite(enemy.sprite); this.drawEnemyHp(enemy); }
+    }
+    Audio.playSe('dynamite');
+  }
+
+  private dynamiteExplosionFx(x: number, y: number) {
+    const cx = (x+.5)*TILE, cy = (y+.5)*TILE;
+    this.cameras.main.shake(320, .012);
+    const area = this.add.graphics().setDepth(2);
+    area.fillStyle(0xffa02d, .3).fillRect((x-2)*TILE, (y-2)*TILE, TILE*5, TILE*5);
+    this.tweens.add({targets:area,alpha:0,duration:380,onComplete:()=>area.destroy()});
+    const shock = this.add.graphics().setPosition(cx,cy).setDepth(24).setBlendMode(Phaser.BlendModes.ADD);
+    shock.lineStyle(4,0xffcb72,.9).strokeCircle(0,0,TILE*.5);
+    this.tweens.add({targets:shock,scale:5,alpha:0,duration:330,ease:'Quad.easeOut',onComplete:()=>shock.destroy()});
+    for (let dy=-2;dy<=2;dy++) for (let dx=-2;dx<=2;dx++) {
+      const delay = Math.hypot(dx,dy)*24;
+      const px=(x+dx+.5)*TILE, py=(y+dy+.5)*TILE;
+      const fire = this.add.circle(px,py,TILE*.38,(dx+dy)%2 ? 0xff812b : 0xffd077,.8)
+        .setDepth(24).setScale(.1).setBlendMode(Phaser.BlendModes.ADD);
+      this.tweens.add({targets:fire,scale:1.35,alpha:0,delay,duration:330,ease:'Quad.easeOut',onComplete:()=>fire.destroy()});
+      const smoke = this.add.circle(px,py,TILE*.3,0x42342c,.5).setDepth(23).setScale(.3);
+      this.tweens.add({targets:smoke,y:py-TILE*.5,scale:1.35,alpha:0,delay:delay+100,duration:700,onComplete:()=>smoke.destroy()});
+    }
+    for(let i=0;i<28;i++) {
+      const angle=Math.random()*Math.PI*2, distance=TILE*(.6+Math.random()*1.8);
+      const spark=this.add.rectangle(cx,cy,3,6,i%2?0xffcc64:0xff6a28,.95)
+        .setAngle(angle*180/Math.PI).setDepth(25).setBlendMode(Phaser.BlendModes.ADD);
+      this.tweens.add({targets:spark,x:cx+Math.cos(angle)*distance,y:cy+Math.sin(angle)*distance,alpha:0,
+        duration:220+Math.random()*260,ease:'Cubic.easeOut',onComplete:()=>spark.destroy()});
+    }
   }
 
   useBomb() {
@@ -6372,7 +6427,7 @@ export class GameScene extends Phaser.Scene {
     // 二刀流は両手がふさがるので盾を外す
     if ((w.dual || w.weaponType === 'bow') && this.player.shield) {
       this.player.shield = null;
-      this.log('両手武器のため盾を外した。（両手がふさがる）', 'sys');
+      this.log('両手で武器を構え、盾を外した。', 'sys');
     }
     Audio.playSe('pickup'); this.updatePlayerAura(); this.emitRefresh();
   }
@@ -6494,13 +6549,13 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (!this.inBossRoom && this.dungeon.bossRoom && !this.floorBossDefeated) {
-      this.log('10×10部屋の中ボスを倒すまで次の階へは進めない。', 'sys');
+      this.log('出口はまだ封印されている。番人を倒して道を開こう。', 'sys');
       Audio.playSe('deny');
       this.busy = false;
       return;
     }
     if (this.inBossRoom && (!this.floorBossDefeated || !this.bossRewardClaimed)) {
-      this.log('ボスを倒して出口の封印を解くまで次の階へは進めない。', 'sys');
+      this.log('出口はまだ封印されている。魔物を倒して道を開こう。', 'sys');
       Audio.playSe('deny');
       this.busy = false;
       return;
@@ -7355,7 +7410,7 @@ export class GameScene extends Phaser.Scene {
     this.player.shield = this.player.weapon?.dual || this.player.weapon?.weaponType === 'bow' ? null : this.player.shields[snapshot.equipped.shield] ?? null;
     this.player.armor = this.player.armors[snapshot.equipped.armor] ?? null;
     this.discovered = new Set(snapshot.discovered);
-    this.logHistory = [...snapshot.logs];
+    this.logHistory = snapshot.logs.map(entry => ({ ...entry, msg: this.playerFacingSavedLog(entry.msg) }));
     this.qaBossMode = false;
     this.qaBossRoomZone = undefined;
     setSelectedGender(this.playerGender);
@@ -7444,6 +7499,19 @@ export class GameScene extends Phaser.Scene {
   }
 
   // UIScene起動前のログも保持し、UIScene側が起動時に復元できるようにする
+  private playerFacingSavedLog(msg: string): string {
+    // Old browser saves retain their adventure history; refresh only obsolete room-size messages.
+    if (!msg.includes('10×10')) return msg;
+    const arrival = msg.match(/(\d+)F「([^」]+)」に到達/);
+    if (arrival) return `${arrival[1]}階「${arrival[2]}」に足を踏み入れた。出口へ続く道は、魔物の封印に閉ざされている。`;
+    if (msg.includes('強い気配')) return '◆ 重い扉の向こうから強い気配を感じる……。';
+    if (msg.includes('への攻撃と技')) return '魔物に近づくには、扉をくぐって部屋に入ろう。';
+    if (msg.includes('次の階')) return '出口はまだ封印されている。番人を倒して道を開こう。';
+    if (msg.includes('封鎖')) return '入口は結界に閉ざされている。魔物を倒して封印を解こう。';
+    return msg.replace('報酬がその場にドロップし、10×10部屋内に階段が現れた。', '宝が残され、先へ続く階段が現れた。')
+      .split('10×10の専用部屋').join('魔物が待つ部屋').split('10×10部屋').join('魔物が待つ部屋');
+  }
+
   logHistory: { msg: string; type: string }[] = [];
 
   log(msg: string, type: 'sys' | 'dmg' | 'item' | 'gold' | 'special' = 'sys') {

@@ -427,7 +427,7 @@ export async function renderSe(name: SeName): Promise<AudioBuffer> {
     skillDagger: 'weaponDagger', skillLongsword: 'weaponLongsword', skillLance: 'weaponLance',
     skillBow: 'weaponBow', skillHandgun: 'weaponHandgun', skillGreatsword: 'weaponGreatsword', skillDual: 'weaponDual'
   };
-  const spec = SE_SPECS[skillFallback[name] ?? name]!;
+  const spec = SE_SPECS[name === 'dynamite' ? 'bomb' : skillFallback[name] ?? name]!;
   const sr = 44100;
   const ctx = new OfflineAudioContext(1, Math.ceil(sr * (spec.len + 0.15)), sr);
   const noise = makeNoise(ctx, 0.8);

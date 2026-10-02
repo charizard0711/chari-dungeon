@@ -6,6 +6,7 @@ export const ITEM_SELL_PRICES: Record<ItemKind, number> = {
   shroom: 12,
   torch: 8,
   bomb: 20,
+  dynamite: 60,
   warp: 20,
   revive: 150,
   floorkey: 30,
@@ -32,3 +33,6 @@ export const ELEMENTAL_EQUIPMENT_RATE = 0.05;
 
 // 敵や床から強化スクロールが出る確率。
 export const SCROLL_DROP_RATE = 1 / 3;
+
+// Independent ordinary-MOB drop roll; already the final 2% probability.
+export const DYNAMITE_DROP_RATE = 0.02;

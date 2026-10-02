@@ -119,6 +119,7 @@ const ORIGINAL_ITEM_ART = {
   i_slime_scroll: 'assets/items/slime-transformation-scroll.png',
   i_boss5_scroll: 'assets/items/aurelius-transformation-scroll.png',
   i_invis: 'assets/items/invisibility-potion.png',
+  i_dynamite: 'assets/items/dynamite-v1.png',
   i_repair: 'assets/items/equipment-repair-stone.png'
 } as const;
 
