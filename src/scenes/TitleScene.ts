@@ -82,8 +82,7 @@ export class TitleScene extends Phaser.Scene {
       const dialogChildren = this.children.list.filter(child => !previous.has(child));
       resumeDialog = this.add.container(0, 0, dialogChildren).setDepth(50);
     };
-    if (GAME_W < 700) this.createMobileTitle(requestExplore);
-    else this.createArtworkTitle(requestExplore);
+    this.createArtworkTitle(requestExplore);
     const exploreKey = (event: KeyboardEvent) => { event.preventDefault(); requestExplore(); };
     this.input.keyboard?.on('keydown-ENTER', exploreKey);
     this.input.keyboard?.on('keydown-SPACE', exploreKey);
@@ -99,59 +98,38 @@ export class TitleScene extends Phaser.Scene {
   }
 
   private createArtworkTitle(startGame: () => void) {
-    if (!this.textures.exists('title_screen_v2')) {
+    if (!this.textures.exists('title_departure_bg') || !this.textures.exists('title_departure_logo')) {
       this.createMobileTitle(startGame);
       return;
     }
-
-    const art = this.add.image(GAME_W / 2, GAME_H / 2, 'title_screen_v2');
+    const mobile = GAME_W < 700;
+    const art = this.add.image(GAME_W / 2, GAME_H / 2, 'title_departure_bg');
     art.setScale(Math.max(GAME_W / art.width, GAME_H / art.height));
-
-    this.createGenderSelector(GAME_H * 0.64);
-
-    // 画像内の開始ボタンへ操作領域とホバー発光だけを重ねる。
-    const buttonY = GAME_H * 0.806;
-    const buttonW = 420;
-    const buttonH = 108;
-    const hover = this.add.graphics().setDepth(2);
-    const drawHover = (active: boolean) => {
-      hover.clear();
-      if (!active) return;
-      hover.fillStyle(0x55e6ed, 0.06).fillRoundedRect(GAME_W / 2 - buttonW / 2, buttonY - buttonH / 2, buttonW, buttonH, 14);
-      hover.lineStyle(2, 0x6ff7ff, 0.62).strokeRoundedRect(GAME_W / 2 - buttonW / 2, buttonY - buttonH / 2, buttonW, buttonH, 14);
-    };
-    const startZone = this.add.zone(GAME_W / 2, buttonY, buttonW, buttonH)
-      .setDepth(3)
-      .setInteractive({ useHandCursor: true });
-    startZone.on('pointerover', () => drawHover(true));
-    startZone.on('pointerout', () => drawHover(false));
-    startZone.on('pointerdown', () => { Audio.playSe('click'); startGame(); });
-    startZone.on('pointerup', startGame);
-
+    if (mobile) art.setOrigin(0, .5).setPosition(0, GAME_H / 2);
+    const shade = this.add.graphics();
+    shade.fillStyle(0x07130f, mobile ? .4 : .18).fillRect(0, 0, GAME_W, GAME_H);
+    shade.fillStyle(0x07130f, .3).fillRoundedRect(GAME_W / 2 - (mobile ? 175 : 220), mobile ? 392 : 405, mobile ? 350 : 440, mobile ? 290 : 290, 20);
+    const logo = this.add.image(GAME_W / 2, mobile ? 248 : 200, 'title_departure_logo');
+    logo.setScale(Math.min((GAME_W - (mobile ? 28 : 300)) / logo.width, (mobile ? 190 : 280) / logo.height));
+    this.createGenderSelector(mobile ? 468 : GAME_H * .64, mobile);
+    this.makeButton(GAME_W / 2, mobile ? 600 : GAME_H * .806, '探索', startGame);
     const help = this.createHelpOverlay();
-    this.add.zone(GAME_W / 2, GAME_H * 0.925, 150, 38)
-      .setDepth(3)
-      .setInteractive({ useHandCursor: true })
+    this.add.text(GAME_W / 2, mobile ? 678 : GAME_H * .925, '遊び方', {
+      fontFamily: FONT, fontSize: '16px', color: '#ffe0a0', fontStyle: 'bold', padding: { x: 20, y: 8 }
+    }).setOrigin(.5).setStroke('#17221a', 3).setInteractive({ useHandCursor: true })
       .on('pointerdown', () => { Audio.playSe('click'); help.setVisible(true); });
-
-    // 画像右下のスピーカーを実際のミュート操作として機能させる。
-    const muteMark = this.add.text(GAME_W - 72, GAME_H - 52, '×', {
-      fontFamily: FONT,
-      fontSize: '30px',
-      color: '#ff7b72',
-      fontStyle: 'bold'
-    }).setOrigin(0.5).setDepth(4).setVisible(!Audio.bgmOn && !Audio.seOn);
-    this.add.zone(GAME_W - 72, GAME_H - 52, 48, 48)
-      .setDepth(3)
-      .setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => {
-        if (Audio.seOn) Audio.playSe('click');
-        const enable = !(Audio.bgmOn || Audio.seOn);
-        if (Audio.bgmOn !== enable) Audio.toggleBgm();
-        if (Audio.seOn !== enable) Audio.toggleSe();
-        if (Audio.seOn) Audio.playSe('click');
-        muteMark.setVisible(!enable);
-      });
+    const sound = this.add.text(GAME_W - 24, GAME_H - 30, '', {
+      fontFamily: FONT, fontSize: mobile ? '13px' : '15px', color: '#ffe0a0', backgroundColor: '#12251de0', padding: { x: 12, y: 10 }
+    }).setOrigin(1, 1).setInteractive({ useHandCursor: true });
+    const refreshSound = () => sound.setText(Audio.bgmOn || Audio.seOn ? '音 ON' : '音 OFF');
+    sound.on('pointerdown', () => {
+      const enable = !(Audio.bgmOn || Audio.seOn);
+      if (Audio.bgmOn !== enable) Audio.toggleBgm();
+      if (Audio.seOn !== enable) Audio.toggleSe();
+      if (enable) Audio.playSe('click');
+      refreshSound();
+    });
+    refreshSound();
   }
 
   private createMobileTitle(startGame: () => void) {
@@ -217,7 +195,7 @@ export class TitleScene extends Phaser.Scene {
     const panelY = GAME_H / 2 - panelH / 2;
     const panel = this.add.graphics();
     panel.fillStyle(0x071a1e, 0.98).fillRoundedRect(panelX, panelY, panelW, panelH, 18);
-    panel.lineStyle(2, 0x58d9d1, 0.72).strokeRoundedRect(panelX, panelY, panelW, panelH, 18);
+    panel.lineStyle(2, 0xe7b85e, 0.72).strokeRoundedRect(panelX, panelY, panelW, panelH, 18);
     const title = this.add.text(GAME_W / 2, panelY + 38, '遊び方', {
       fontFamily: FONT,
       fontSize: '22px',
@@ -225,8 +203,8 @@ export class TitleScene extends Phaser.Scene {
       fontStyle: 'bold'
     }).setOrigin(0.5);
     const guide = [
-      '移動　矢印キー / 画面の十字ボタン',
-      '加速　方向キー / 十字ボタンを長押し',
+      '移動　矢印キー / スティック',
+      '加速　方向キー / スティックを長押し',
       '戦闘　敵へ進むと通常攻撃',
       '道具　アイテム欄からクリック / タップ'
     ].join('\n\n');
@@ -271,12 +249,12 @@ export class TitleScene extends Phaser.Scene {
       for (const card of cards) {
         const selected = card.gender === this.selectedGender;
         card.background.clear();
-        card.background.fillStyle(selected ? 0x092b30 : 0x07161a, selected ? 0.96 : 0.88)
+        card.background.fillStyle(selected ? 0x173529 : 0x0e2018, selected ? 0.96 : 0.88)
           .fillRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 10);
-        card.background.lineStyle(2, selected ? 0x67f3ef : 0x53686b, selected ? 1 : 0.72)
+        card.background.lineStyle(2, selected ? 0xf0cd80 : 0x8a7547, selected ? 1 : 0.72)
           .strokeRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 10);
         if (selected) {
-          card.background.fillStyle(0x58d9d1, 0.09)
+          card.background.fillStyle(0xe7b85e, 0.09)
             .fillRoundedRect(-cardW / 2 + 5, -cardH / 2 + 5, cardW - 10, cardH - 10, 7);
         }
         card.portrait.setAlpha(selected ? 1 : 0.72);
@@ -335,9 +313,9 @@ export class TitleScene extends Phaser.Scene {
     const h = 68;
     const draw = (hover = false) => {
       bg.clear();
-      bg.fillStyle(0x121d20, 0.98).fillRoundedRect(-w / 2, -h / 2, w, h, 12);
-      bg.lineStyle(2, hover ? 0x7ff8ff : 0xe7b85e, 1).strokeRoundedRect(-w / 2, -h / 2, w, h, 12);
-      bg.fillStyle(hover ? 0x58d9d1 : 0xe7b85e, hover ? 0.12 : 0.06).fillRoundedRect(-w / 2 + 5, -h / 2 + 5, w - 10, h - 10, 8);
+      bg.fillStyle(0x12271b, 0.98).fillRoundedRect(-w / 2, -h / 2, w, h, 12);
+      bg.lineStyle(2, hover ? 0xffdf9f : 0xe7b85e, 1).strokeRoundedRect(-w / 2, -h / 2, w, h, 12);
+      bg.fillStyle(hover ? 0xe7b85e : 0xe7b85e, hover ? 0.12 : 0.06).fillRoundedRect(-w / 2 + 5, -h / 2 + 5, w - 10, h - 10, 8);
     };
     draw();
     const text = this.add.text(0, 0, label, {
