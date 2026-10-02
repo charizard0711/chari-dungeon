@@ -204,8 +204,6 @@ export class BootScene extends Phaser.Scene {
     this.load.image('sheet_items', 'assets/items.png');
     this.load.image('sheet_tiles', 'assets/tiles.png');
     this.load.image('dungeon_chamber', 'assets/dungeon-chamber.png');
-    this.load.image('title_departure_bg', 'assets/ui/departure-title-v1/background.webp');
-    this.load.image('title_departure_logo', 'assets/ui/departure-title-v1/logo.webp');
     for (const sheet of PLAYER_SHEETS) {
       this.load.spritesheet(sheet.key, sheet.path, { frameWidth: PLAYER_FRAME_SIZE, frameHeight: PLAYER_FRAME_SIZE });
     }
