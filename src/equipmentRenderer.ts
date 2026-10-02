@@ -12,12 +12,18 @@ export class EquipmentRenderer {
   constructor(private scene: Phaser.Scene) {
     this.weapon = scene.add.image(0,0,'w_soldier_blade').setVisible(false);
     this.offhand = scene.add.image(0,0,'s_iron_round').setVisible(false);
-    this.heroGlow = this.weapon.preFX?.addGlow(0xffd35a, 4, 1, false, .1, 12);
-    this.heroGlow?.setActive(false);
   }
   update(body: Phaser.GameObjects.Image, weapon: Weapon | null, shield: Shield | null, dir: Dir, frame: PlayerVisualFrame, gender: PlayerGender, elapsed = 0, enabled = true) {
     const second = weapon?.dual ? weapon : shield;
-    this.heroGlow?.setActive(enabled && weapon?.key === 'w_hero_sword');
+    // PreFX clips weapons in the narrow, offset mobile viewport.
+    // Attach PostFX only for Arcadia: inactive PostFX controllers still draw.
+    const glowing = enabled && weapon?.key === 'w_hero_sword';
+    if (glowing && !this.heroGlow) {
+      this.heroGlow = this.weapon.postFX?.addGlow(0xffd35a, 4, 1, false, .1, 12);
+    } else if (!glowing && this.heroGlow) {
+      this.weapon.postFX.remove(this.heroGlow);
+      this.heroGlow = undefined;
+    }
     const show = enabled && body.visible && body.active && frame !== 'down';
     for (const [sprite,item,offhand] of [[this.weapon,weapon,false],[this.offhand,second,true]] as const) {
       if (!show || !item || !HELD_EQUIPMENT_KEYS.has(item.key)) { sprite.setVisible(false); continue; }

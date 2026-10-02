@@ -14,10 +14,13 @@ const {HELD_EQUIPMENT} = load('src/equipmentAppearance.ts');
 const {makeWeapon,makeShield} = load('src/player.ts');
 const {WEAPON_DEFS,SHIELD_DEFS} = load('src/data.ts');
 let created=0;
+const glow={attached:false};
 const textures=new Set(HELD_EQUIPMENT.map(a=>a.textureKey));
 function image(x,y,key) {
   created++;
   return {x,y,texture:{key},frame:{name:0},
+    preFX:{addGlow(){throw Error("PreFX clips weapons in the mobile viewport");}},
+    postFX:{addGlow(){glow.attached=true;return glow;},remove(){glow.attached=false;}},
     setTexture(key,frame=0){this.texture={key};this.frame={name:frame};return this;},
     setVisible(v){this.visible=v;return this;},setOrigin(x,y){this.originX=x;this.originY=y;return this;},
     setPosition(x,y){this.x=x;this.y=y;return this;},setDisplaySize(w,h){this.displayWidth=w;this.displayHeight=h;return this;},
@@ -28,6 +31,9 @@ const gear=new EquipmentRenderer({add:{image},textures:{exists:k=>textures.has(k
 const body={x:100,y:200,texture:{key:'player_female_leather'},frame:{realWidth:128},originX:.5,originY:.6,scaleX:.34,scaleY:.34,rotation:0,depth:10,alpha:1,visible:true,active:true};
 const sword=makeWeapon('w_longsword_ice',[]),shield=makeShield('s_frost_aegis');
 const render=(dir='down',frame='idle',weapon=sword,offhand=shield,enabled=true,elapsed=0)=>gear.update(body,weapon,offhand,dir,frame,'female',elapsed,enabled);
+render();assert.equal(glow.attached,false);
+render('down','idle',makeWeapon('w_hero_sword',[]));assert.equal(glow.attached,true);
+render('down','idle',makeWeapon('w_hero_sword',[]),shield,false);assert.equal(glow.attached,false);
 render();const offset={x:gear.weapon.x-body.x,y:gear.weapon.y-body.y};
 body.x+=37;body.y-=23;render();assert.ok(Math.abs(gear.weapon.x-body.x-offset.x)<1e-8);assert.ok(Math.abs(gear.weapon.y-body.y-offset.y)<1e-8);
 body.rotation=Math.PI/2;render();assert.ok(Math.abs(gear.weapon.x-body.x+offset.y)<1e-8);assert.ok(Math.abs(gear.weapon.y-body.y-offset.x)<1e-8);
