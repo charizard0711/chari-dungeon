@@ -16,10 +16,11 @@ export interface WeaponDef {
   passive?: WeaponPassive;
   ss?: boolean;
   initialPlus?: number;
+  exclusiveLoot?: boolean;
 }
 
 export const WEAPON_DEFS: WeaponDef[] = [
-  { key: 'w_hero_sword', name: '英雄ソード', atkMin: 16, atkMax: 30, durMax: 300, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'greatsword', initialPlus: 10,
+  { key: 'w_hero_sword', name: '覇天剣アルカディア', atkMin: 16, atkMax: 30, durMax: 300, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'greatsword', initialPlus: 10, exclusiveLoot: true,
     passive: { key: 'hero_heal', name: '英雄の祝福', description: '敵に攻撃を当てるとHPが10回復' } },
   // 属性は後付け抽選せず、武器の種類・名前・専用アートに固定する。
   { key: 'w_dagger_fire', name: '焔牙カグツチ', atkMin: 6, atkMax: 14, durMax: 120, minFloor: 1, rarity: 10, grade: 'D', weaponType: 'dagger', element: 'fire' },

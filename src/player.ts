@@ -191,7 +191,7 @@ export function rollMagics(n: number): Magic[] {
 
 // マジック付き武器をランダム生成
 export function rollWeapon(floor: number): Weapon {
-  const pool = equipmentPoolAtElementRate(WEAPON_DEFS.filter((d) => d.minFloor <= floor));
+  const pool = equipmentPoolAtElementRate(WEAPON_DEFS.filter((d) => !d.exclusiveLoot && d.minFloor <= floor));
   const picked = weightedEquipmentPick(pool);
 
   const magicChance = 0.35 + Math.min(0.4, floor * 0.015);
@@ -208,7 +208,7 @@ export function rollWeapon(floor: number): Weapon {
 }
 
 export function rollWeaponByGrade(grade: EquipmentGrade): Weapon {
-  const pool = equipmentPoolAtElementRate(WEAPON_DEFS.filter((d) => d.grade === grade));
+  const pool = equipmentPoolAtElementRate(WEAPON_DEFS.filter((d) => !d.exclusiveLoot && d.grade === grade));
   const picked = pool[Math.floor(Math.random() * pool.length)] ?? WEAPON_DEFS[0];
   const magicCount = grade === 'S' ? 2 : grade === 'A' ? 1 : grade === 'B' && Math.random() < 0.35 ? 1 : 0;
   return addRandomLootTraits(makeWeapon(picked.key, rollMagics(magicCount)));

@@ -28,7 +28,7 @@ import { planSkill, weaponSkill, directionVector } from '../weaponSkills';
 import { Audio } from '../audio/manager';
 import { clearRunSave, pickFields, readRunSave, writeRunSave, type RunSnapshot } from '../runSave';
 import { bgmForFloor, elementAttackSe, weaponAttackSe } from '../audio/config';
-import { enhancementChance, EQUIPMENT_LIMIT, DYNAMITE_DROP_RATE, MYSTERY_BREAD_DROP_RATE, ITEM_SELL_PRICES, SCROLL_DROP_RATE, SHOP_PRICES, type ShopItemKind } from '../balance';
+import { ARCADIA_GACHA_RATE, ARCADIA_BOSS_DROP_RATE, enhancementChance, EQUIPMENT_LIMIT, DYNAMITE_DROP_RATE, MYSTERY_BREAD_DROP_RATE, ITEM_SELL_PRICES, SCROLL_DROP_RATE, SHOP_PRICES, type ShopItemKind } from '../balance';
 import { getFloorLayoutProfile } from '../floorLayout';
 import {
   armorForGrade,
@@ -3995,6 +3995,11 @@ export class GameScene extends Phaser.Scene {
       this.log('ふしぎパンがこぼれ落ちた！', 'special');
     }
 
+    if ((def.isBoss || def.isFloorBoss) && !def.isTreasureRabbit && Math.random() < ARCADIA_BOSS_DROP_RATE) {
+      this.dropEquipment(e.x, e.y, 'weapon', makeWeapon('w_hero_sword', []));
+      this.log('まばゆい光の中から、覇天剣アルカディアが現れた！', 'special');
+    }
+
     this.enemyDefeatFx(e);
     const bossState = this.bossStates.get(e);
     if (bossState) {
@@ -6300,6 +6305,8 @@ export class GameScene extends Phaser.Scene {
     }
     this.player.gold -= 500;
 
+    const arcadiaWon = pool === 'weapon' && Math.random() < ARCADIA_GACHA_RATE;
+
     // ランク抽選: SS 3% / S 12% / A 25% / B 35% / C 25%
     const forcedRank = location.hostname === 'localhost'
       ? new URLSearchParams(location.search).get('qa-gacha-rank')
@@ -6309,7 +6316,7 @@ export class GameScene extends Phaser.Scene {
       : null;
     const r = Math.random();
     const rank: 'SS' | 'S' | 'A' | 'B' | 'C' =
-      forcedRank && ['SS', 'S', 'A', 'B', 'C'].includes(forcedRank)
+      arcadiaWon ? 'SS' : forcedRank && ['SS', 'S', 'A', 'B', 'C'].includes(forcedRank)
         ? forcedRank as 'SS' | 'S' | 'A' | 'B' | 'C'
         : r < 0.03 ? 'SS' : r < 0.15 ? 'S' : r < 0.40 ? 'A' : r < 0.75 ? 'B' : 'C';
 
@@ -6348,7 +6355,7 @@ export class GameScene extends Phaser.Scene {
       elementName = '無属性';
       feature = `防御力 +${armor.defBonus}`;
     } else if (prizeCategory === 'weapon') {
-      const w = rollWeaponByGrade(grade);
+      const w = arcadiaWon ? makeWeapon('w_hero_sword', []) : rollWeaponByGrade(grade);
       if (rank === 'SS') w.plus = Math.max(w.plus, 3);
       else if (rank === 'S') w.plus = Math.max(w.plus, 1);
       this.receiveWeapon(w, 'ガチャ');
@@ -7433,6 +7440,9 @@ export class GameScene extends Phaser.Scene {
     if (!Number.isInteger(this.skillChargeSteps) || this.skillChargeSteps < 0) this.skillChargeSteps = 100;
     this.skillChargeSteps = Math.min(100, this.skillChargeSteps);
     this.player = Object.assign(new Player(), snapshot.player);
+    for (const weapon of this.player.weapons) {
+      if (weapon.key === 'w_hero_sword') weapon.name = WEAPON_DEFS.find(def => def.key === weapon.key)!.name;
+    }
     this.player.weapon = this.player.weapons[snapshot.equipped.weapon] ?? null;
     this.player.shield = this.player.weapon?.dual || this.player.weapon?.weaponType === 'bow' ? null : this.player.shields[snapshot.equipped.shield] ?? null;
     this.player.armor = this.player.armors[snapshot.equipped.armor] ?? null;

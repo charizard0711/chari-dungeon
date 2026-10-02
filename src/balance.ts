@@ -28,6 +28,8 @@ export function enhancementChance(plus: number): number {
 }
 
 export const EQUIPMENT_LIMIT = 6;
+export const ARCADIA_GACHA_RATE = 0.0001;
+export const ARCADIA_BOSS_DROP_RATE = 0.001;
 
 // 属性装備はガチャ・ドロップともに約5%。候補が存在しないグレードでは無属性へフォールバックする。
 export const ELEMENTAL_EQUIPMENT_RATE = 0.05;
