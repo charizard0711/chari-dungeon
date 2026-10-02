@@ -29,6 +29,9 @@ export class EquipmentRenderer {
       if (sprite.texture.key !== texture || (hasArt && String(sprite.frame.name) !== String(artFrame))) sprite.setTexture(texture,artFrame);
       const pose = heldHandPose(dir,frame,gender,offhand,elapsed,type,body.texture.key);
       if (item.key === 'w_hero_sword') {
+        // Bring the front-facing and right-facing grip closer to the body.
+        if (dir === 'right') { pose.x -= 7; pose.y -= 5; }
+        else if (dir === 'down') { pose.x -= 3; pose.y -= 3; }
         const action = playerAction(frame);
         const raised = {down:-.15,left:.5,right:-.5,up:.2}[dir];
         const finish = {down:2.45,left:-1.65,right:1.65,up:-.7}[dir];
