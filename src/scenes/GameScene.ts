@@ -6615,6 +6615,7 @@ export class GameScene extends Phaser.Scene {
 
     const stats = {
       cleared,
+      playerGender: this.playerGender,
       floor: this.floor,
       level: this.player.level,
       gold: this.player.gold,

@@ -1,9 +1,11 @@
 import Phaser from 'phaser';
 import { GAME_W, GAME_H } from '../main';
 import { Audio } from '../audio/manager';
+import { getSelectedGender, type PlayerGender } from '../playerAppearance';
 
 interface EndStats {
   cleared: boolean;
+  playerGender?: PlayerGender;
   floor: number;
   level: number;
   gold: number;
@@ -21,6 +23,7 @@ export class EndScene extends Phaser.Scene {
   }
 
   create(stats: EndStats) {
+    if (!stats.cleared) { this.createDefeat(stats); return; }
     const mobile = GAME_W < 700;
     this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x0b0e14);
 
@@ -90,6 +93,70 @@ export class EndScene extends Phaser.Scene {
     this.makeButton(GAME_W / 2, mobile ? 742 : 680, '🏠 タイトルへ', () => this.scene.start('TitleScene'));
 
     this.input.keyboard?.once('keydown-ENTER', () => this.scene.start('GameScene'));
+  }
+
+  private createDefeat(stats: EndStats) {
+    const mobile = GAME_W < 700;
+    const cx = GAME_W / 2;
+    this.add.rectangle(cx, GAME_H / 2, GAME_W, GAME_H, 0x101012);
+    const gender = stats.playerGender ?? getSelectedGender();
+    const art = this.add.image(cx, mobile ? 170 : 165, `defeat_${gender}`);
+    art.setScale(Math.min((mobile ? 330 : 440) / art.width, (mobile ? 200 : 240) / art.height));
+    this.add.text(cx, mobile ? 300 : 320, '力尽きた…', {
+      fontFamily: '"Yu Mincho", serif', fontSize: mobile ? '34px' : '46px', color: '#e1d9c9', letterSpacing: 3
+    }).setOrigin(.5);
+    const x = mobile ? 18 : cx - 360, y = mobile ? 350 : 375;
+    const w = mobile ? GAME_W - 36 : 720, h = mobile ? 244 : 180;
+    this.resultFrame(x, y, w, h);
+    const metrics: [string, string][] = [['到達階層', `${stats.floor}階`], ['レベル', `${stats.level}`], ['得点', stats.score.toLocaleString()]];
+    metrics.forEach(([label, value], i) => {
+      const mx = x + w * (i + .5) / 3;
+      this.add.text(mx, y + 32, label, { fontFamily: '"Yu Gothic UI"', fontSize: mobile ? '13px' : '16px', color: '#baa67f' }).setOrigin(.5);
+      this.add.text(mx, y + 76, value, { fontFamily: '"Yu Mincho", serif', fontSize: mobile ? '27px' : '36px', color: '#f3dfb4' }).setOrigin(.5);
+    });
+    const detailFont = { fontFamily: '"Yu Gothic UI"', fontSize: mobile ? '13px' : '14px', color: '#bfb7aa' };
+    if (mobile) {
+      [`所持金  ${stats.gold.toLocaleString()}G`, `総ターン数  ${stats.turns.toLocaleString()}`, `モンスター図鑑  ${stats.discovered} / ${stats.totalMonsters}`].forEach((text, i) => {
+        this.add.text(cx, y + 133 + i * 35, text, detailFont).setOrigin(.5);
+      });
+    } else {
+      this.add.text(cx, y + 127, `所持金 ${stats.gold.toLocaleString()}G    総ターン数 ${stats.turns.toLocaleString()}    図鑑 ${stats.discovered} / ${stats.totalMonsters}`, detailFont).setOrigin(.5);
+    }
+    let leaving = false;
+    const leave = (scene: string) => { if (leaving) return; leaving = true; this.scene.start(scene); };
+    this.defeatButton(mobile ? cx : cx - 166, mobile ? 658 : 640, 'もう一度挑戦', true, () => leave('GameScene'));
+    this.defeatButton(mobile ? cx : cx + 166, mobile ? 734 : 640, 'タイトルへ', false, () => leave('TitleScene'));
+    this.input.keyboard?.once('keydown-ENTER', () => leave('GameScene'));
+  }
+
+  private resultFrame(x: number, y: number, w: number, h: number) {
+    const g = this.add.graphics();
+    g.fillStyle(0x1b1818, .95).fillRoundedRect(x, y, w, h, 8);
+    g.lineStyle(1, 0x9c7743, .85).strokeRoundedRect(x, y, w, h, 8);
+    g.lineStyle(1, 0x9c7743, .28).strokeRoundedRect(x + 5, y + 5, w - 10, h - 10, 6);
+    for (const [cx, cy] of [[x + 9, y + 9], [x + w - 9, y + 9], [x + 9, y + h - 9], [x + w - 9, y + h - 9]]) {
+      g.fillStyle(0xbd9557, .8).fillPoints([{x:cx,y:cy-4},{x:cx+4,y:cy},{x:cx,y:cy+4},{x:cx-4,y:cy}],true);
+    }
+    g.lineStyle(1, 0x9c7743, .35).lineBetween(x + 24, y + 105, x + w - 24, y + 105);
+  }
+
+  private defeatButton(x: number, y: number, label: string, primary: boolean, action: () => void) {
+    const w = Math.min(300, GAME_W - 64), h = 56;
+    const g = this.add.graphics();
+    const draw = (hover = false) => {
+      g.clear();
+      g.fillStyle(primary ? (hover ? 0x69402d : 0x492d24) : (hover ? 0x343031 : 0x242123), 1).fillRoundedRect(x - w / 2, y - h / 2, w, h, 7);
+      g.lineStyle(1.5, hover ? 0xf0ce89 : 0xad834c).strokeRoundedRect(x - w / 2, y - h / 2, w, h, 7);
+      g.lineStyle(1, 0xad834c, .35).strokeRoundedRect(x - w / 2 + 5, y - h / 2 + 5, w - 10, h - 10, 4);
+      for (const dx of [-w / 2 + 17, w / 2 - 17]) {
+        g.fillStyle(0xc9a265, .8).fillPoints([{x:x+dx,y:y-4},{x:x+dx+4,y},{x:x+dx,y:y+4},{x:x+dx-4,y}],true);
+      }
+    };
+    draw();
+    this.add.text(x, y, label, { fontFamily: '"Yu Gothic UI"', fontSize: '19px', color: '#f4dfb9', fontStyle: 'bold' }).setOrigin(.5);
+    this.add.zone(x, y, w, h).setInteractive({useHandCursor:true})
+      .on('pointerover', () => draw(true)).on('pointerout', () => draw())
+      .on('pointerdown', () => { Audio.playSe('click'); action(); });
   }
 
   makeButton(x: number, y: number, label: string, onClick: () => void) {
