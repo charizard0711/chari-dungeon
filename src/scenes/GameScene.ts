@@ -1,4 +1,4 @@
-import { readCodexSave, writeCodexSave } from '../codexSave';
+import { equipmentKeys, readEquipmentCodexSave, writeEquipmentCodexSave, readCodexSave, writeCodexSave } from '../codexSave';
 import { ITEM_CATALOG, ITEM_CATALOG_CODE, type CatalogClaimResult } from '../itemCatalog';
 import { hasVolcanoTerrain, volcanoTerrainKey, volcanoFloorFrame, VOLCANO_PROP_KINDS, type VolcanoPropKind, type VolcanoPart } from '../volcanoTerrain';
 import { hasWaterTerrain, waterTerrainKey, waterFloorFrame, WATER_PROP_KINDS, type WaterPropKind, type WaterPart } from '../waterTerrain';
@@ -349,6 +349,7 @@ export class GameScene extends Phaser.Scene {
   teleportPadVisuals: TeleportPadVisual[] = [];
   bossCompassVisual?: BossCompassVisual;
   discovered: Set<string> = new Set();
+  discoveredEquipment: Set<string> = new Set();
   pendingEquipment: PendingEquipment | null = null;
   secretDualUnlocked = false;
   itemCatalogUnlocked = false;
@@ -480,6 +481,9 @@ export class GameScene extends Phaser.Scene {
       ? new Set(MONSTER_DEFS.map((monster) => monster.key))
       : readCodexSave();
     if (this.runSaveEnabled()) writeCodexSave(this.discovered);
+    this.discoveredEquipment = readEquipmentCodexSave();
+    this.recordOwnedEquipment();
+    if (this.runSaveEnabled()) writeEquipmentCodexSave(this.discoveredEquipment);
     this.pendingEquipment = null;
     this.secretDualUnlocked = false;
     this.itemCatalogUnlocked = false;
@@ -6177,6 +6181,7 @@ export class GameScene extends Phaser.Scene {
   receiveWeapon(weapon: Weapon, source: string): boolean {
     if (this.player.weapons.length < EQUIPMENT_LIMIT) {
       this.player.weapons.push(weapon);
+      this.recordOwnedEquipment();
       return true;
     }
     this.pendingEquipment = { kind: 'weapon', item: weapon, source };
@@ -6189,6 +6194,7 @@ export class GameScene extends Phaser.Scene {
   receiveShield(shield: Shield, source: string): boolean {
     if (this.player.shields.length < EQUIPMENT_LIMIT) {
       this.player.shields.push(shield);
+      this.recordOwnedEquipment();
       return true;
     }
     this.pendingEquipment = { kind: 'shield', item: shield, source };
@@ -6215,6 +6221,7 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.player.armors.length < EQUIPMENT_LIMIT) {
       this.player.armors.push(armor);
+      this.recordOwnedEquipment();
       return true;
     }
     this.pendingEquipment = { kind: 'armor', item: armor, source };
@@ -7414,7 +7421,19 @@ export class GameScene extends Phaser.Scene {
     if (this.runSaveEnabled()) writeCodexSave(this.discovered);
   }
 
+  private recordOwnedEquipment() {
+    let changed = false;
+    for (const key of equipmentKeys(this.player)) {
+      if (!this.discoveredEquipment.has(key)) {
+        this.discoveredEquipment.add(key);
+        changed = true;
+      }
+    }
+    if (changed && this.runSaveEnabled()) writeEquipmentCodexSave(this.discoveredEquipment);
+  }
+
   emitRefresh() {
+    this.recordOwnedEquipment();
     this.events.emit('refresh');
     this.savePending = true;
   }
@@ -7480,6 +7499,7 @@ export class GameScene extends Phaser.Scene {
     this.player.weapon = this.player.weapons[snapshot.equipped.weapon] ?? null;
     this.player.shield = this.player.weapon?.dual || this.player.weapon?.weaponType === 'bow' ? null : this.player.shields[snapshot.equipped.shield] ?? null;
     this.player.armor = this.player.armors[snapshot.equipped.armor] ?? null;
+    this.recordOwnedEquipment();
     this.discovered = new Set([...this.discovered, ...snapshot.discovered]);
     if (this.runSaveEnabled()) writeCodexSave(this.discovered);
     this.logHistory = snapshot.logs.map(entry => ({ ...entry, msg: this.playerFacingSavedLog(entry.msg) }));

@@ -27,3 +27,33 @@ export function writeCodexSave(discovered: Iterable<string>): boolean {
     return true;
   } catch { return false; }
 }
+
+export const EQUIPMENT_CODEX_SAVE_KEY = 'chari-dungeon.equipment-codex.v1';
+
+export function equipmentKeys(player: { weapons: { key: string }[]; shields: { key: string }[]; armors: { key: string }[] }): string[] {
+  return [...player.weapons.map(item => item.key), ...player.shields.map(item => item.key),
+    ...player.armors.map(item => `armor_${item.key}`)];
+}
+
+export function readEquipmentCodexSave(): Set<string> {
+  const keys = new Set<string>();
+  try {
+    for (const key of stringKeys(JSON.parse(localStorage.getItem(EQUIPMENT_CODEX_SAVE_KEY) ?? '[]'))) keys.add(key);
+  } catch { /* 壊れた記録でも起動を続ける。 */ }
+  try {
+    const player = JSON.parse(localStorage.getItem(LEGACY_RUN_KEY) ?? 'null')?.snapshot?.player;
+    if (player && [player.weapons, player.shields, player.armors].every(Array.isArray)) {
+      for (const key of equipmentKeys(player)) keys.add(key);
+    }
+  } catch { /* 旧セーブがなくても図鑑は使える。 */ }
+  return keys;
+}
+
+export function writeEquipmentCodexSave(discovered: Iterable<string>): boolean {
+  try {
+    const keys = readEquipmentCodexSave();
+    for (const key of discovered) keys.add(key);
+    localStorage.setItem(EQUIPMENT_CODEX_SAVE_KEY, JSON.stringify([...keys]));
+    return true;
+  } catch { return false; }
+}

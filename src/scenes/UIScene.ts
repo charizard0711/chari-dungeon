@@ -2092,6 +2092,7 @@ export class UIScene extends Phaser.Scene {
 
   selectCatalogItem(entry: CatalogEntry) {
     if (this.overlayMode === 'equipmentcatalog') {
+      if (!this.gs.discoveredEquipment.has(entry.key)) return;
       this.catalogDetail = entry;
       this.rebuildOverlay();
       return;
@@ -2158,27 +2159,31 @@ export class UIScene extends Phaser.Scene {
     this.catalogPageIndex = page.page;
     this.catalogPageCount = page.pageCount;
     const total = equipmentOnly ? ITEM_CATALOG.filter(entry => entry.category !== 'item').length : ITEM_CATALOG.length;
-    addText(x + 16, y + 87, `${page.total}種類 / 全${total}種類　${equipmentOnly ? '絵を押すと詳細を表示' : '絵を押すと1個取得'}`, IS_MOBILE ? 12 : 14, '#86a9ad');
+    const unlocked = ITEM_CATALOG.filter(entry => entry.category !== 'item' && this.gs.discoveredEquipment.has(entry.key)).length;
+    addText(x + 16, y + 87, equipmentOnly ? `開放 ${unlocked} / ${total}種類　入手すると開放` : `${page.total}種類 / 全${total}種類　絵を押すと1個取得`, IS_MOBILE ? 12 : 14, '#86a9ad');
     const gap = 10;
     const cardW = (w - 32 - gap * (columns - 1)) / columns;
     const cardH = (h - 164 - gap * (rows - 1)) / rows;
     page.entries.forEach((entry, index) => {
+      const found = !equipmentOnly || this.gs.discoveredEquipment.has(entry.key);
       const px = x + 16 + (index % columns) * (cardW + gap);
       const py = y + 114 + Math.floor(index / columns) * (cardH + gap);
-      const color = entry.element ? ELEMENT_INFO[entry.element].color : entry.grade ? gradeColor(entry.grade) : 0xb68b42;
+      const color = !found ? 0x465264 : entry.element ? ELEMENT_INFO[entry.element].color : entry.grade ? gradeColor(entry.grade) : 0xb68b42;
       const card = this.add.graphics();
       card.fillStyle(0x142630).fillRoundedRect(px, py, cardW, cardH, 8);
       card.lineStyle(1, color, .65).strokeRoundedRect(px, py, cardW, cardH, 8);
       this.overlay.add(card);
-      addArt(entry, px + cardW / 2, py + 43, 72);
-      const name = addText(px + 10, py + 85, entry.name, IS_MOBILE ? 12 : 15, '#f5ead1', cardW - 20);
+      if (found) addArt(entry, px + cardW / 2, py + 43, 72);
+      else addText(px + cardW / 2, py + 43, "?", 42, "#596579").setOrigin(.5);
+      const name = addText(px + 10, py + 85, found ? entry.name : '未入手', IS_MOBILE ? 12 : 15, '#f5ead1', cardW - 20);
       // 長い道具名も省略せず、カード内に収める。
       while (name.height > cardH - 115 && parseInt(name.style.fontSize as string) > 10) {
         name.setFontSize(parseInt(name.style.fontSize as string) - 1);
       }
-      addText(px + 10, py + cardH - 22, entry.summary, IS_MOBILE ? 10 : 12,
+      addText(px + 10, py + cardH - 22, found ? entry.summary : '???', IS_MOBILE ? 10 : 12,
         `#${color.toString(16).padStart(6, '0')}`, cardW - 20);
-      const zone = this.add.zone(px, py, cardW, cardH).setOrigin(0).setInteractive({ useHandCursor: true });
+      const zone = this.add.zone(px, py, cardW, cardH).setOrigin(0);
+      if (found) zone.setInteractive({ useHandCursor: true });
       zone.on('pointerdown', () => {
         this.selectCatalogItem(entry);
       });
