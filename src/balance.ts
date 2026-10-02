@@ -7,6 +7,7 @@ export const ITEM_SELL_PRICES: Record<ItemKind, number> = {
   torch: 8,
   bomb: 20,
   dynamite: 60,
+  mystery_bread: 100,
   warp: 20,
   revive: 150,
   floorkey: 30,
@@ -36,3 +37,4 @@ export const SCROLL_DROP_RATE = 1 / 3;
 
 // Independent ordinary-MOB drop roll; already the final 2% probability.
 export const DYNAMITE_DROP_RATE = 0.02;
+export const MYSTERY_BREAD_DROP_RATE = 0.02;

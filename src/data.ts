@@ -218,6 +218,7 @@ export const ITEM_DEFS: Record<ItemKind, Omit<Item, 'kind'>> = {
   potion:  { name: '回復ポーション', desc: 'HPを40回復する', textureKey: 'i_potion' },
   shroom:  { name: '光るキノコ', desc: '周囲をしばらく明るくする', textureKey: 'i_shroom' },
   torch:   { name: '松明', desc: '10ターンの間、壁の向こうまで明るくする', textureKey: 'i_torch' },
+  mystery_bread: { name: 'ふしぎパン', desc: 'HPと所持する武器・盾の耐久を全回復。所持するすべての武器・盾の強化値が必ず+1。', textureKey: 'i_mystery_bread' },
   dynamite: { name: 'ダイナマイト', desc: '周囲の通常敵を爆風で一撃撃破。ボスには最大HPの20%の固定ダメージ。自分は無傷。', textureKey: 'i_dynamite' },
   bomb:    { name: 'ボムナッツ', desc: '周囲の敵に範囲ダメージ', textureKey: 'i_bomb' },
   warp:    { name: 'リコールベル', desc: '今いる階のスタート位置へ戻る', textureKey: 'i_warp' },
@@ -233,7 +234,7 @@ export const ITEM_DEFS: Record<ItemKind, Omit<Item, 'kind'>> = {
 };
 
 // レアアイテム（所持欄で赤枠になる）
-const RARE_ITEMS = new Set<ItemKind>(['revive', 'slime_scroll', 'boss5_scroll', 'dynamite']);
+const RARE_ITEMS = new Set<ItemKind>(['revive', 'slime_scroll', 'boss5_scroll', 'dynamite', 'mystery_bread']);
 export function isRareItem(kind: ItemKind): boolean {
   return RARE_ITEMS.has(kind);
 }

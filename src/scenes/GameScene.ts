@@ -28,7 +28,7 @@ import { planSkill, weaponSkill, directionVector } from '../weaponSkills';
 import { Audio } from '../audio/manager';
 import { clearRunSave, pickFields, readRunSave, writeRunSave, type RunSnapshot } from '../runSave';
 import { bgmForFloor, elementAttackSe, weaponAttackSe } from '../audio/config';
-import { enhancementChance, EQUIPMENT_LIMIT, DYNAMITE_DROP_RATE, ITEM_SELL_PRICES, SCROLL_DROP_RATE, SHOP_PRICES, type ShopItemKind } from '../balance';
+import { enhancementChance, EQUIPMENT_LIMIT, DYNAMITE_DROP_RATE, MYSTERY_BREAD_DROP_RATE, ITEM_SELL_PRICES, SCROLL_DROP_RATE, SHOP_PRICES, type ShopItemKind } from '../balance';
 import { getFloorLayoutProfile } from '../floorLayout';
 import {
   armorForGrade,
@@ -3208,7 +3208,7 @@ export class GameScene extends Phaser.Scene {
       this.placeSprite(spr, pos.x, pos.y);
       const glow = this.add.image(spr.x, spr.y - 2, 'glow').setDepth(4.6)
         .setBlendMode(Phaser.BlendModes.ADD)
-        .setTint(kind === 'coin' ? 0xffc45a : 0x88dfd4)
+        .setTint(kind === 'coin' || kind === 'mystery_bread' ? 0xffc45a : 0x88dfd4)
         .setDisplaySize(28, 28).setAlpha(0.18);
       glow.setDepth(spr.depth - 0.12);
       const value = kind === 'coin' ? 10 + Math.floor(Math.random() * floor * 6) : undefined;
@@ -3990,6 +3990,11 @@ export class GameScene extends Phaser.Scene {
       this.log('ダイナマイトがこぼれ落ちた！', 'special');
     }
 
+    if (!def.isBoss && !def.isFloorBoss && !def.isTreasureRabbit && Math.random() < MYSTERY_BREAD_DROP_RATE) {
+      this.dropItem(e.x, e.y, 'mystery_bread');
+      this.log('ふしぎパンがこぼれ落ちた！', 'special');
+    }
+
     this.enemyDefeatFx(e);
     const bossState = this.bossStates.get(e);
     if (bossState) {
@@ -4300,7 +4305,7 @@ export class GameScene extends Phaser.Scene {
     spr.setVisible(this.isTileCurrentlyVisible(tx, ty));
     const glow = this.add.image(spr.x, spr.y - 2, 'glow').setDepth(4.6)
       .setBlendMode(Phaser.BlendModes.ADD)
-      .setTint(kind === 'coin' ? 0xffc45a : 0x88dfd4)
+      .setTint(kind === 'coin' || kind === 'mystery_bread' ? 0xffc45a : 0x88dfd4)
       .setDisplaySize(28, 28).setAlpha(0.18)
       .setVisible(spr.visible);
     glow.setDepth(spr.depth - 0.12);
@@ -5849,6 +5854,7 @@ export class GameScene extends Phaser.Scene {
         passTurn = false;
         break;
       }
+      case 'mystery_bread': this.useMysteryBread(); break;
       case 'dynamite': this.useDynamite(); break;
       case 'bomb': this.useBomb(); break;
       case 'warp': consumed = this.useWarp(); passTurn = false; break;
@@ -5877,6 +5883,25 @@ export class GameScene extends Phaser.Scene {
       this.finishTurn().catch(error => console.error('道具使用後のターン処理に失敗しました', error))
         .finally(() => { this.busy = false; });
     }
+  }
+
+  private useMysteryBread() {
+    this.player.hp = this.player.hpMax;
+    // 装備中の参照が所持リストと同じでも、一度だけ強化する。
+    const equipment = new Set<Weapon | Shield>([
+      ...this.player.weapons, ...this.player.shields,
+      ...(this.player.weapon ? [this.player.weapon] : []),
+      ...(this.player.shield ? [this.player.shield] : [])
+    ]);
+    for (const item of equipment) {
+      item.dur = item.durMax;
+      item.plus = (item.plus ?? 0) + 1;
+    }
+    this.updatePlayerAura();
+    this.healFx();
+    this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.4, 500, 0xffd17d);
+    Audio.playSe('heal');
+    this.log('ふしぎパンを食べた！ HPと所持装備の耐久が全回復し、すべての武器と盾が+1強化された。', 'special');
   }
 
   startTransformation(kind: TransformationKind) {
@@ -7096,7 +7121,8 @@ export class GameScene extends Phaser.Scene {
       g.sprite.setDepth(this.worldDepth(g.sprite.y, 7));
       if (g.glow) {
         g.glow.setPosition(g.sprite.x, g.sprite.y + 1);
-        g.glow.setAlpha(0.16 + pulse * 0.06).setScale(0.9 + pulse * 0.08);
+        g.glow.setAlpha((g.kind === 'mystery_bread' ? 0.24 : 0.16) + pulse * 0.06).setScale(0.9 + pulse * 0.08);
+        if (g.kind === 'mystery_bread') g.glow.setDisplaySize(30 + pulse * 2, 30 + pulse * 2);
         g.glow.setDepth(g.sprite.depth - 0.12);
       }
     }
@@ -7461,7 +7487,7 @@ export class GameScene extends Phaser.Scene {
       const sprite = this.add.image(0, 0, texture).setDepth(5).setOrigin(.5, .6).setDisplaySize(equipment ? 24 : 22, equipment ? 24 : 22);
       this.placeSprite(sprite, item.x, item.y);
       const glow = this.add.image(sprite.x, sprite.y - 2, 'glow').setDepth(sprite.depth - .12)
-        .setBlendMode(Phaser.BlendModes.ADD).setTint(equipment ? gradeColor(equipment.grade) : item.kind === 'coin' ? 0xffc45a : 0x88dfd4)
+        .setBlendMode(Phaser.BlendModes.ADD).setTint(equipment ? gradeColor(equipment.grade) : item.kind === 'coin' || item.kind === 'mystery_bread' ? 0xffc45a : 0x88dfd4)
         .setDisplaySize(equipment ? 34 : 28, equipment ? 34 : 28).setAlpha(equipment ? .32 : .18);
       this.ground.push({ ...item, sprite, glow });
     }

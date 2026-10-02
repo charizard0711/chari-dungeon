@@ -529,6 +529,7 @@ function buildItemTextures(scene: Phaser.Scene) {
       px(g, 10, 11, 4, 11, 0x63351f); px(g, 8, 10, 8, 3, 0xb86b25);
       px(g, 8, 4, 8, 7, 0xff5a18); px(g, 10, 2, 5, 8, 0xffb21f); px(g, 11, 3, 3, 5, 0xfff08a);
     },
+    mystery_bread: (g) => { px(g, 4, 8, 16, 10, 0xa9541c); px(g, 7, 5, 10, 8, 0xe6a64a); px(g, 9, 6, 3, 7, 0xffd78a); px(g, 13, 7, 3, 6, 0xffd78a); },
     dynamite: (g) => {
       for(const x of [5,10,15]) { px(g,x,6,4,16,0xb9282d); px(g,x+1,7,1,13,0xff6258); }
       px(g,4,11,16,3,0x513622); px(g,4,18,16,2,0x513622);

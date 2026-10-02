@@ -92,6 +92,7 @@ export type ItemKind =
   | 'shroom'      // 光るキノコ
   | 'torch'       // 松明（10ターン、壁を越えて上下左右10マスを照らす）
   | 'bomb'        // ボムナッツ
+  | 'mystery_bread' // ふしぎパン
   | 'dynamite'    // ダイナマイト（周囲5×5、通常敵即死・ボス最大HP20%）
   | 'warp'        // リコールベル（現在の階の開始地点へ戻る）
   | 'revive'      // 復活のタネ
