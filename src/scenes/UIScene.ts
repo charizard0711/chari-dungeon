@@ -2201,6 +2201,11 @@ export class UIScene extends Phaser.Scene {
 
   // ---- 設定オーバーレイ：BGMと効果音（システム音）を別々に調整 ----
   buildSettingsOverlay(x: number, y: number, w: number, h: number) {
+    this.overlay.add(this.add.text(x + w - 166, y + 18, 'アクセス計測について', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#8de0e4', padding: { x: 4, y: 8 }
+    }).setInteractive({ useHandCursor: true }).on('pointerdown', () => {
+      window.open('./privacy.html', '_blank', 'noopener,noreferrer');
+    }));
     const rows: {
       label: () => string;
       onMinus: () => void;

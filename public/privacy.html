@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>アクセス計測について｜ちゃりだんじょん</title>
+<style>body{font-family:system-ui,sans-serif;background:#110b13;color:#f4f1e8;max-width:680px;margin:40px auto;padding:0 24px;line-height:1.8}a{color:#8de0e4}button{font:inherit;padding:12px 18px;cursor:pointer}h1{font-size:24px}</style></head>
+<body><h1>アクセス計測について</h1>
+<p>ちゃりだんじょんでは、利用状況の把握とゲームの改善のため、Google Analyticsを利用しています。Cookieなどを使って、ページの閲覧、訪問回数、利用端末、流入元、滞在時間などがGoogleに送信・処理されます。広告のパーソナライズとGoogleシグナルは無効にしています。</p>
+<p>プレイヤー名、所持品、セーブデータを計測コードから送信することはありません。セーブデータは、このブラウザー内に保存されます。</p>
+<p><a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener noreferrer">Googleによるデータの利用について</a> ／ <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Googleのプライバシーポリシー</a></p>
+<h2>このブラウザーの計測設定</h2><p>計測を停止してもゲームやセーブデータに影響はありません。設定はこのブラウザーに保存され、次にゲームを開くときから適用されます。既に送信されたデータは削除されません。</p>
+<p id="status" role="status"></p><button id="toggle" type="button"></button>
+<p><a href="./">ゲームに戻る</a></p><script>
+const key='chari-dungeon:analytics-disabled';
+function refresh(){try{const disabled=localStorage.getItem(key)==='1';document.getElementById('status').textContent=disabled?'計測：停止中':'計測：有効';document.getElementById('toggle').textContent=disabled?'計測を有効にする':'計測を停止する';}catch{document.getElementById('status').textContent='ブラウザーの保存機能が利用できません。';document.getElementById('toggle').disabled=true;}}
+document.getElementById('toggle').onclick=()=>{try{localStorage.setItem(key,localStorage.getItem(key)==='1'?'0':'1');refresh();}catch{}};refresh();
+</script></body></html>
