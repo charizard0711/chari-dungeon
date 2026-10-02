@@ -63,7 +63,7 @@ const RUN_STATE_KEYS = [
   'transformation', 'penaltyFlags', 'skillChargeSteps'
 ] as const;
 const ENEMY_STATE_KEYS = [
-  'def', 'hp', 'hpMax', 'x', 'y', 'baseScale', 'slowToggle', 'freezeTurns', 'sealTurns', 'poisonTurns',
+  'def', 'hp', 'hpMax', 'x', 'y', 'baseScale', 'midBossVisualMultiplier', 'slowToggle', 'freezeTurns', 'sealTurns', 'poisonTurns',
   'loopDir', 'lineDir', 'facing', 'moveSteps', 'stealthRevealed', 'gimmickCounter', 'gimmickPhase',
   'vulnerableTurns', 'guardOpenTurns', 'stunnedTurns', 'awakened', 'revived', 'regenBlockedTurns',
   'summoned', 'cloneDepth', 'charging', 'chargeDir', 'plannedMove'
@@ -1650,9 +1650,10 @@ export class GameScene extends Phaser.Scene {
       if (!bodyCells(pos, 1).every(p => this.validMonsterTile(p.x, p.y) && !this.enemyAt(p.x, p.y))) return;
     }
     const enemy = this.addEnemy(def, pos.x, pos.y, 1);
-    enemy.baseScale *= scale;
+    enemy.midBossVisualMultiplier = this.floor >= 11 && this.floor % 5 !== 0 ? 1.5 : 1;
+    enemy.baseScale *= scale * enemy.midBossVisualMultiplier;
     enemy.sprite.setScale(enemy.baseScale);
-    this.attachAura(enemy, bossBodyRadius(def) ? TILE * 3 : 36 * scale, tint);
+    this.attachAura(enemy, bossBodyRadius(def) ? TILE * 3 : 36 * scale * enemy.midBossVisualMultiplier, tint);
     if (bossBodyRadius(def)) enemy.shadow?.setDisplaySize(TILE * 3, TILE * 1.2);
     this.registerBossGimmick(enemy, gimmick);
     this.log(message, 'dmg');
@@ -7494,7 +7495,12 @@ export class GameScene extends Phaser.Scene {
       Object.assign(e, saved.state);
       e.sprite.setTexture(saved.visual.texture).setScale(saved.visual.scaleX, saved.visual.scaleY)
         .setTint(saved.visual.tint).setAlpha(saved.visual.alpha);
-      if (saved.visual.aura && !e.aura) this.attachAura(e, 40, e.def.bossTint ?? 0xffa755);
+      const midBossMultiplier = e.def.isFloorBoss && this.floor >= 11 && this.floor % 5 !== 0 ? 1.5 : 1;
+      const sizeRatio = midBossMultiplier / e.midBossVisualMultiplier;
+      e.baseScale *= sizeRatio;
+      e.sprite.setScale(e.sprite.scaleX * sizeRatio, e.sprite.scaleY * sizeRatio);
+      e.midBossVisualMultiplier = midBossMultiplier;
+      if (saved.visual.aura && !e.aura) this.attachAura(e, 40 * midBossMultiplier, e.def.bossTint ?? 0xffa755);
       this.updateEnemyDirection(e);
       if (e.freezeTurns > 0) this.freezeEnemy(e, e.freezeTurns);
       this.drawEnemyHp(e);

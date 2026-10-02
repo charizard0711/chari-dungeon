@@ -13,6 +13,7 @@ export class Enemy {
   shadow?: Phaser.GameObjects.Image;
   aura?: Phaser.GameObjects.Image;   // ボス/エリートの特殊オーラ
   hpBar!: Phaser.GameObjects.Graphics;
+  midBossVisualMultiplier = 1;
   baseScale = 1;      // 呼吸アニメ用の基準スケール
   bobPhase = 0;       // アイドル揺れの位相
   animating = false;
