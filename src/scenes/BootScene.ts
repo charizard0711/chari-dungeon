@@ -175,6 +175,8 @@ export class BootScene extends Phaser.Scene {
 
   preload() {
     this.loadingStage = '画像';
+    this.load.image('title_map_background', 'assets/ui/map-title-v1/background.webp');
+    this.load.image('title_map_pixel_logo', 'assets/ui/map-title-v1/logo.webp');
     this.load.image('defeat_male', 'assets/ui/defeat-v1/male.webp');
     this.load.image('defeat_female', 'assets/ui/defeat-v1/female.webp');
     this.load.image('ui_obsidian_panel', 'assets/ui/obsidian-v1/panel.webp');

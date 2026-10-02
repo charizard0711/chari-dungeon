@@ -99,27 +99,28 @@ export class TitleScene extends Phaser.Scene {
 
   private createArtworkTitle(startGame: () => void) {
     const mobile = GAME_W < 700;
-    this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x0c090e);
-    const decor = this.add.graphics();
-    decor.fillStyle(0x35131d, .22).fillCircle(GAME_W / 2, 240, mobile ? 220 : 330);
-    const cx = GAME_W / 2, cy = mobile ? 176 : 150;
-    decor.lineStyle(1, 0xad8649, .48).strokeCircle(cx, cy, 48);
-    decor.lineStyle(1, 0xad8649, .22).strokeCircle(cx, cy, 56);
-    // 控えめな剣と封印の紋章。
-    decor.fillStyle(0xcdbb99, 1).fillTriangle(cx - 5, cy - 24, cx + 5, cy - 24, cx, cy + 33);
-    decor.fillStyle(0xad8649, 1).fillRoundedRect(cx - 18, cy - 29, 36, 5, 2);
-    decor.fillStyle(0x826136, 1).fillRoundedRect(cx - 3, cy - 46, 6, 18, 2);
-    decor.fillStyle(0x9a3c4d, 1).fillTriangle(cx, cy - 37, cx - 6, cy - 29, cx + 6, cy - 29);
-    const logoY = mobile ? 280 : 290;
-    this.add.text(cx, logoY, 'ちゃりだんじょん', {
-      fontFamily: '"Yu Mincho", "Hiragino Mincho ProN", serif',
-      fontSize: mobile ? '32px' : '62px', color: '#e5d3ad', letterSpacing: mobile ? 1 : 3
-    }).setOrigin(.5);
-    decor.lineStyle(1, 0xad8649, .38).lineBetween(cx - (mobile ? 130 : 230), logoY + 40, cx + (mobile ? 130 : 230), logoY + 40);
-    this.createGenderSelector(mobile ? 468 : GAME_H * .64, mobile);
-    this.makeButton(GAME_W / 2, mobile ? 600 : GAME_H * .806, '探索', startGame);
+    const cx = GAME_W / 2;
+    const backdrop = this.add.image(cx, GAME_H / 2, 'title_map_background');
+    if (mobile) backdrop.setScale(Math.max(GAME_W / backdrop.width, GAME_H / backdrop.height));
+    else backdrop.setDisplaySize(GAME_W, GAME_H);
+    if (mobile) this.add.rectangle(cx, GAME_H / 2, GAME_W, GAME_H, 0x100c08, .3);
+    this.textures.get('title_map_pixel_logo').setFilter(Phaser.Textures.FilterMode.NEAREST);
+    const logo = this.add.image(cx, mobile ? 248 : GAME_H * .315, 'title_map_pixel_logo');
+    logo.setScale(Math.min((mobile ? GAME_W - 42 : GAME_W * .55) / logo.width, (mobile ? 115 : 100) / logo.height));
+    this.createGenderSelector(mobile ? 468 : GAME_H * .615, mobile);
+    {
+      const y = GAME_H * .79, w = mobile ? GAME_W - 32 : GAME_W * .36, h = mobile ? 74 : GAME_H * .13;
+      this.add.text(cx, y, '探索', { fontFamily: FONT, fontSize: mobile ? '27px' : '34px', color: '#f6d688', fontStyle: 'bold' }).setOrigin(.5);
+      const hover = this.add.graphics();
+      const clear = () => hover.clear();
+      this.add.zone(cx, y, w, h).setInteractive({useHandCursor:true})
+        .on('pointerover', () => { hover.lineStyle(1, 0xffdfa1, .65).strokeRoundedRect(cx-w/2, y-h/2, w, h, 12); })
+        .on('pointerout', clear)
+        .on('pointerdown', () => { Audio.playSe('click'); startGame(); })
+        .on('pointerup', startGame);
+    }
     const help = this.createHelpOverlay();
-    this.add.text(GAME_W / 2, mobile ? 678 : GAME_H * .925, '遊び方', {
+    this.add.text(GAME_W / 2, mobile ? GAME_H * .91 : GAME_H * .925, '遊び方', {
       fontFamily: FONT, fontSize: '16px', color: '#ffe0a0', fontStyle: 'bold', padding: { x: 20, y: 8 }
     }).setOrigin(.5).setStroke('#0c090e', 2).setInteractive({ useHandCursor: true })
       .on('pointerdown', () => { Audio.playSe('click'); help.setVisible(true); });
