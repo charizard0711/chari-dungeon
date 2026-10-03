@@ -596,6 +596,8 @@ export class GameScene extends Phaser.Scene {
     });
     this.input.off('pointerdown', this.handleMapClick, this);
     this.input.on('pointerdown', this.handleMapClick, this);
+    // Enemies can disappear or move while the mouse stays still.
+    this.input.setPollAlways();
     this.heldDir = null;
     this.queuedMove = null;
     this.holdRepeatAt = 0;
@@ -2000,8 +2002,7 @@ export class GameScene extends Phaser.Scene {
     // 最終ボスは足元に特殊オーラ（中ボス/強ボスはspawnBossで付与）
     if (def.isBoss) this.attachAura(e, maxDim, 0x4fd0ff);
     else if (def.isTreasureRabbit) this.attachAura(e, maxDim, 0xffdc55);
-    e.sprite.setInteractive({ useHandCursor: true });
-    e.sprite.on('pointerdown', () => this.showEnemyInfo(e));
+    this.bindEnemyPointer(e);
     this.enemies.push(e);
     return e;
   }
@@ -7480,6 +7481,24 @@ export class GameScene extends Phaser.Scene {
     e.hpBar.fillStyle(0x40ff70, 1); e.hpBar.fillRect(x, y, w * Math.max(0, e.hp / e.hpMax), 3);
   }
 
+  private canInspectEnemy(enemy: Enemy): boolean {
+    if (!enemy.alive || !enemy.sprite?.active || !enemy.sprite.visible || enemy.sprite.alpha <= 0.1) return false;
+    if (enemy.def.isDarkNinja && !enemy.stealthRevealed) return false;
+    if (enemy.def.gimmick === 'burrow' && enemy.charging) return false;
+    return enemy.awakened || !['mimic', 'ambush', 'statue'].includes(enemy.def.gimmick ?? '');
+  }
+
+  private bindEnemyPointer(enemy: Enemy) {
+    enemy.sprite.setInteractive({ useHandCursor: true });
+    const input = enemy.sprite.input!;
+    const contains = input.hitAreaCallback;
+    // Keep Phaser's frame-aware bounds, but never expose a concealed enemy through the cursor.
+    input.hitAreaCallback = (area, x, y, sprite) => this.canInspectEnemy(enemy) && contains(area, x, y, sprite);
+    enemy.sprite.on('pointerdown', () => {
+      if (this.canInspectEnemy(enemy)) this.showEnemyInfo(enemy);
+    });
+  }
+
   private clearEnemyHover() {
     if (!this.hoveredEnemy) return;
     this.hoveredEnemy = undefined;
@@ -7503,9 +7522,7 @@ export class GameScene extends Phaser.Scene {
     const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
     let target: Enemy | undefined;
     for (const enemy of this.enemies) {
-      if (!enemy.alive || !enemy.sprite?.active || !enemy.sprite.visible) continue;
-      if (enemy.def.isDarkNinja && !enemy.stealthRevealed) continue;
-      if (!enemy.awakened && ['mimic', 'ambush', 'statue'].includes(enemy.def.gimmick ?? '')) continue;
+      if (!this.canInspectEnemy(enemy)) continue;
       if (enemy.sprite.getBounds().contains(world.x, world.y)
         && (!target || enemy.sprite.depth >= target.sprite.depth)) target = enemy;
     }

@@ -1,0 +1,30 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><title>隠れた敵のカーソル確認</title>
+<style>body{margin:16px;background:#101923;color:#eee1c4;font:14px system-ui}button{padding:8px 14px;margin:4px;background:#302a23;color:#ffe1a2;border:1px solid #997744}iframe{display:block;width:1120px;height:730px;max-width:100%;margin-top:12px;border:1px solid #997744}output{display:block;height:72px;overflow:hidden;margin:10px 0;color:#b8d9b4;white-space:pre-line}h1{font-size:22px}</style>
+<h1>隠れた敵のカーソル確認</h1><p>闇忍者にカーソルを置いたまま、出現・透明化の切り替えを確認。冒険セーブは変更しません。</p>
+<button id="show">姿を見せる</button><button id="hide">透明化</button><button id="auto">3秒ごとに切り替え</button><output>読み込み中</output><iframe title="隠れた敵の確認画面"></iframe>
+<script type="module">
+import {MONSTER_DEFS} from '/src/data.ts';
+if(location.hostname!=='localhost')throw Error('Local QA only');
+const frame=document.querySelector('iframe'),out=document.querySelector('output');let ready=false,ninja,cycle,baseline,history=[],last='';
+const scene=()=>frame.contentWindow?.__game?.scene.getScene('GameScene');
+const hud=()=>frame.contentWindow?.__game?.scene.getScene('UIScene');
+frame.src='/?qa-game&qa-silent&qa-boss&qa-floor=5&qa-gender=male&mobile=0';
+function reveal(visible){if(!ready)return;ninja.stealthRevealed=visible;scene().updateVisibility();}
+document.querySelector('#show').onclick=()=>{clearInterval(cycle);reveal(true);};
+document.querySelector('#hide').onclick=()=>{clearInterval(cycle);reveal(false);};
+document.querySelector('#auto').onclick=()=>{clearInterval(cycle);reveal(true);cycle=setInterval(()=>reveal(!ninja.stealthRevealed),3000);};
+setInterval(()=>{
+ const s=scene(),u=hud();if(!s?.playerSprite||!s.sys.isActive()||!u?.enemyInfoText)return;
+ if(!ready){
+  const r=s.dungeon.bossRoom;s.player.x=r.cx;s.player.y=r.cy+2;
+  for(const e of s.enemies){e.hp=0;e.sprite.destroy();e.shadow?.destroy();e.aura?.destroy();e.hpBar?.destroy();}s.enemies=[];
+  ninja=s.addEnemy(MONSTER_DEFS.find(d=>d.key==='m_dark_ninja'),r.cx-2,r.cy,1);ninja.stealthRevealed=true;
+  s.placeSprite(s.playerSprite,s.player.x,s.player.y);s.lightRadius=100;s.updateVisibility();s.emitRefresh();u.setOverlay('none');
+  baseline=JSON.stringify([s.turn,s.player.hp,ninja.hp]);ready=true;
+ }
+ const cursor=frame.contentDocument.querySelector('canvas').style.cursor||'default';
+ const state=`${ninja.stealthRevealed?'出現':'透明'} / カーソル ${cursor} / 詳細 ${u.enemyInfoText.visible?'ON':'OFF'}`;
+ if(state!==last){history.push(state);history=history.slice(-4);last=state;}
+ out.textContent=`${state}｜ターン・HP：${baseline===JSON.stringify([s.turn,s.player.hp,ninja.hp])?'変化なし':'変化あり'}\n履歴：${history.join(' → ')}`;
+},100);
+</script></html>
