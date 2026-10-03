@@ -1,0 +1,11 @@
+{
+  "title": "ちゃりだんじょん — 黄金の双剣",
+  "tool": "built-in image_gen",
+  "userSelected": true,
+  "image": "public/assets/ui/brand-v1/golden-crossed-swords.png",
+  "width": 1774,
+  "height": 887,
+  "transparent": true,
+  "sha256": "4d1f3b33832b8d35d0dd7813bcd78f33056d504a07269a8deced93dac30e1dc4",
+  "prompt": "Use case: logo-brand.\nCreate ONE exceptional polished illustrated title logo for an original Japanese dark fantasy dungeon crawler.\nExact and ONLY lettering: 「ちゃりだんじょん」. All hiragana, spell precisely: ち ゃ り だ ん じ ょ ん. Keep small ゃ and ょ correct, and the dakuten on だ and じ. Readable complete lettering is the first priority. No English subtitle, numbers, watermark, extra tagline, or specimen sheet.\nComposition: one centered wide horizontal logo lockup, designed as real game title art, clearly readable at smaller UI sizes. Integrate a strong CROSS / crossed-weapon motif behind or within the lettering without obscuring any kana. At least 8% empty margin around all edges. True transparent background (alpha), isolated artwork, no opaque rectangle, no checkerboard drawn into the art. High resolution. Original design, no imitation of any existing game logo.\nDirection 1: heroic royal dungeon fantasy. Two beautiful long swords cross in a very clear X behind the wordmark, with their hilts and upper blades framing it elegantly. Bold custom Japanese lettering sculpted from antique gold, dark bronze beveled edges and tiny turquoise insets, soft warm highlights. Slight heraldic symmetry, thick readable kana, deep navy shadow integrated tightly behind the letters, gorgeous hand-painted metal detail. Restrained flourishes, crisp strong silhouette. The entire title remains a single horizontal line."
+}

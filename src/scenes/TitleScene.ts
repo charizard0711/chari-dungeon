@@ -108,9 +108,10 @@ export class TitleScene extends Phaser.Scene {
     if (mobile) backdrop.setScale(Math.max(GAME_W / backdrop.width, GAME_H / backdrop.height));
     else backdrop.setDisplaySize(GAME_W, GAME_H);
     if (mobile) this.add.rectangle(cx, GAME_H / 2, GAME_W, GAME_H, 0x100c08, .3);
-    this.textures.get('title_map_pixel_logo').setFilter(Phaser.Textures.FilterMode.NEAREST);
-    const logo = this.add.image(cx, mobile ? 248 : GAME_H * .315, 'title_map_pixel_logo');
-    logo.setScale(Math.min((mobile ? GAME_W - 42 : GAME_W * .55) / logo.width, (mobile ? 115 : 100) / logo.height));
+    this.textures.get('title_golden_crossed_swords').setFilter(Phaser.Textures.FilterMode.LINEAR);
+    const logo = this.add.image(cx, mobile ? 242 : 182, 'title_golden_crossed_swords').setName('title-logo');
+    // The crossed blades are taller than the old wordmark; keep them clear of the character selector.
+    logo.setScale(Math.min((mobile ? GAME_W - 32 : GAME_W * .5) / logo.width, (mobile ? 190 : 300) / logo.height));
     this.createGenderSelector(mobile ? 414 : 412, mobile);
     this.createDifficultySelector(mobile ? 547 : 529, mobile);
     {
