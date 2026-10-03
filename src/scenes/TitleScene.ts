@@ -205,14 +205,18 @@ export class TitleScene extends Phaser.Scene {
     const width = mobile ? 112 : 150, gap = mobile ? 8 : 12, cx = GAME_W / 2;
     this.add.text(cx, y - 51, '難易度を選ぶ', { fontFamily: FONT, fontSize: '14px', color: '#e6d7b8', fontStyle: 'bold' }).setOrigin(.5).setStroke('#030711', 4);
     const description = this.add.text(cx, descriptionY, '', { fontFamily: FONT, fontSize: mobile ? '10px' : '12px', color: '#e0d6c3', align: 'center' }).setOrigin(.5).setStroke('#030711', 3);
-    const cards: { mode: Difficulty; bg: Phaser.GameObjects.Graphics; x: number }[] = [];
+    const cards: { mode: Difficulty; bg: Phaser.GameObjects.Graphics; x: number; title: Phaser.GameObjects.Text; status: Phaser.GameObjects.Text }[] = [];
     const refresh = () => {
       for (const card of cards) {
         const selected = card.mode === this.selectedDifficulty, rule = DIFFICULTY_RULES[card.mode];
-        card.bg.clear().fillStyle(0x070d17, .94).fillRoundedRect(card.x - width / 2, y - 30, width, 60, 7)
-          .lineStyle(selected || card.mode !== 'normal' ? 2 : 1, rule.color, selected ? 1 : card.mode === 'normal' ? .65 : .9)
+        const unlocked = isDifficultyUnlocked(card.mode, progress);
+        card.bg.clear().fillStyle(selected ? rule.color : 0x070d17, .98).fillRoundedRect(card.x - width / 2, y - 30, width, 60, 7)
+          .lineStyle(selected ? 3 : card.mode !== 'normal' ? 2 : 1, selected ? 0xfff1c4 : rule.color, selected ? 1 : card.mode === 'normal' ? .65 : .9)
           .strokeRoundedRect(card.x - width / 2, y - 30, width, 60, 7);
-        if (selected) card.bg.fillStyle(rule.color, .13).fillRoundedRect(card.x - width / 2 + 3, y - 27, width - 6, 54, 5);
+        card.title.setColor(selected ? '#101923' : unlocked ? rule.text : '#87919d');
+        card.status.setText(selected ? '✓ 選択中' : !unlocked ? `${card.mode === 'hard' ? 'ノーマル' : 'ハード'}クリアで解放` : progress.cleared.includes(card.mode) ? '★ CLEAR' : '選択する')
+          .setColor(selected ? '#101923' : unlocked ? '#d5cbbb' : '#9aa3ad')
+          .setFontSize(selected ? '12px' : '10px').setFontStyle(selected ? 'bold' : 'normal');
       }
       const mode = this.selectedDifficulty;
       description.setText(mode === 'normal' ? progress.cleared.includes('normal') ? '踏破済み / ハードに挑戦できます' : '30階踏破でハードを解放' : mode === 'hard'
@@ -222,10 +226,10 @@ export class TitleScene extends Phaser.Scene {
     };
     DIFFICULTIES.forEach((mode, index) => {
       const x = cx + (index - 1) * (width + gap), unlocked = isDifficultyUnlocked(mode, progress), rule = DIFFICULTY_RULES[mode];
-      const bg = this.add.graphics(); cards.push({ mode, bg, x });
-      this.add.text(x, y - 10, rule.name, { fontFamily: FONT, fontSize: mobile ? '17px' : '20px', fontStyle: 'bold', color: unlocked ? rule.text : '#78808f' }).setOrigin(.5);
-      this.add.text(x, y + 16, progress.cleared.includes(mode) ? '★ CLEAR' : unlocked ? '挑戦可能' : `${mode === 'hard' ? 'ノーマル' : 'ハード'}クリアで解放`,
-        { fontFamily: FONT, fontSize: '10px', color: unlocked ? '#d5cbbb' : '#7c8492' }).setOrigin(.5);
+      const bg = this.add.graphics();
+      const title = this.add.text(x, y - 10, `${unlocked ? '' : '🔒 '}${rule.name}`, { fontFamily: FONT, fontSize: mobile ? '17px' : '20px', fontStyle: 'bold' }).setOrigin(.5);
+      const status = this.add.text(x, y + 16, '', { fontFamily: FONT, fontSize: '10px' }).setOrigin(.5);
+      cards.push({ mode, bg, x, title, status });
       if (unlocked) this.add.zone(x, y, width, 60).setName(`difficulty-${mode}`).setInteractive({ useHandCursor: true }).on('pointerdown', () => {
         this.selectedDifficulty = mode; selectDifficulty(mode); Audio.playSe('click'); refresh();
       });
@@ -283,6 +287,7 @@ export class TitleScene extends Phaser.Scene {
       container: Phaser.GameObjects.Container;
       background: Phaser.GameObjects.Graphics;
       portrait: Phaser.GameObjects.Image;
+      label: Phaser.GameObjects.Text;
     }[] = [];
 
     this.add.text(GAME_W / 2, y - cardH / 2 - 20, '冒険者を選ぶ', {
@@ -297,14 +302,18 @@ export class TitleScene extends Phaser.Scene {
       for (const card of cards) {
         const selected = card.gender === this.selectedGender;
         card.background.clear();
-        card.background.fillStyle(selected ? 0x35202a : 0x19131b, selected ? 0.96 : 0.88)
+        card.background.fillStyle(selected ? 0x634626 : 0x10131b, .98)
           .fillRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 10);
-        card.background.lineStyle(2, selected ? 0xf0cd80 : 0x8a7547, selected ? 1 : 0.72)
+        card.background.lineStyle(selected ? 3 : 1, selected ? 0xffe6a5 : 0x8a7547, selected ? 1 : 0.6)
           .strokeRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 10);
         if (selected) {
-          card.background.fillStyle(0xe7b85e, 0.09)
-            .fillRoundedRect(-cardW / 2 + 5, -cardH / 2 + 5, cardW - 10, cardH - 10, 7);
+          card.background.fillStyle(0xf0cd80, 1)
+            .fillRoundedRect(-cardW / 2 + 3, cardH / 2 - 26, cardW - 6, 23, 5);
         }
+        const label = card.gender === 'male' ? '男性' : '女性';
+        card.label.setText(selected ? `✓ ${label} 選択中` : label)
+          .setFontSize(selected ? compact ? '11px' : '12px' : compact ? '13px' : '14px')
+          .setColor(selected ? '#241a0b' : '#c2b8a6');
         card.portrait.setAlpha(selected ? 1 : 0.72);
         this.tweens.add({ targets: card.container, scale: selected ? 1.04 : 1, duration: 120, ease: 'Quad.easeOut' });
       }
@@ -342,7 +351,7 @@ export class TitleScene extends Phaser.Scene {
       container.add([background, portrait, label]);
       container.setSize(cardW, cardH).setInteractive({ useHandCursor: true });
       container.on('pointerdown', () => choose(option.gender));
-      cards.push({ gender: option.gender, container, background, portrait });
+      cards.push({ gender: option.gender, container, background, portrait, label });
     }
 
     const chooseMale = () => choose('male');
