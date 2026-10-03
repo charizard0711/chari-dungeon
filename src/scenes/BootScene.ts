@@ -16,6 +16,7 @@ import { RUIN_TERRAIN_FLOORS, RUIN_TERRAIN_PARTS, RUIN_FLOOR_FRAME_SIZE, ruinTer
 import { GAME_W, GAME_H } from '../layout';
 import { SKILL_ICON_ART } from '../skillArt';
 import { ADVENTURE_ART } from '../adventureArt';
+import { DURABILITY_WARNING_ART } from '../durabilityWarnings';
 
 const EXPANSION_MONSTER_KEYS = [
   'm_deep_kraken', 'm_valzeon', 'm_selene', 'm_abyss_lord', 'm_astravein',
@@ -238,7 +239,7 @@ export class BootScene extends Phaser.Scene {
     for (const [key, path] of Object.entries({ ...SHIELD_ART, ...SKILL_ICON_ART, ...ADVENTURE_ART })) {
       this.load.image(key, path);
     }
-    for (const [key, path] of Object.entries(UI_ART)) {
+    for (const [key, path] of Object.entries({ ...UI_ART, ...DURABILITY_WARNING_ART })) {
       this.load.image(key, path);
     }
     for (const key of EXPANSION_MONSTER_KEYS) {

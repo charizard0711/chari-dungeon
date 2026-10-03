@@ -1,0 +1,31 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><title>羊皮紙の耐久警告</title>
+<style>body{margin:16px;background:#101923;color:#eee1c4;font:14px system-ui}h1{font-size:22px}button{padding:8px 12px;margin:3px;background:#302a23;color:#ffe1a2;border:1px solid #997744}iframe{display:block;width:1120px;height:730px;max-width:100%;margin-top:12px;border:1px solid #997744}output{display:block;margin:10px 0;color:#b8d9b4}</style>
+<h1>羊皮紙の耐久警告</h1><p>マップ右上に点滅表示。ローカル確認用。冒険セーブは変更しません。</p>
+<button id="pc">PC</button><button id="mobile">スマホ</button><button id="both">両方20％</button><button id="weapon">武器だけ</button><button id="shield">盾だけ</button><button id="repair">修復石で修理</button><button id="switch">予備の装備に交換</button><button id="menu">設定</button><button id="close">探索へ</button>
+<output>読み込み中</output><iframe title="耐久警告の確認画面"></iframe>
+<script type="module">
+import {makeWeapon,makeShield} from '/src/player.ts';
+import {makeItem} from '/src/data.ts';
+if(location.hostname!=='localhost')throw Error('Local QA only');
+const frame=document.querySelector('iframe'),out=document.querySelector('output');let ready=false,min=1,max=0;
+const game=()=>frame.contentWindow?.__game?.scene.getScene('GameScene');
+const ui=()=>frame.contentWindow?.__game?.scene.getScene('UIScene');
+function load(mobile){ready=false;frame.style.width=mobile?'390px':'1120px';frame.style.height=mobile?'844px':'730px';frame.src=`/?qa-game&qa-silent&qa-boss&qa-floor=5&qa-gender=male&mobile=${mobile?1:0}`;}
+function damage(kind){if(!ready)return;const s=game(),p=s.player;ui().setOverlay('none');p.weapon=p.weapons[0];p.shield=p.shields[0];p.weapon.dur=kind==='shield'?p.weapon.durMax:Math.floor(p.weapon.durMax*.2);p.shield.dur=kind==='weapon'?p.shield.durMax:Math.floor(p.shield.durMax*.2);s.emitRefresh();min=1;max=0;}
+document.querySelector('#pc').onclick=()=>load(false);document.querySelector('#mobile').onclick=()=>load(true);
+for(const kind of ['both','weapon','shield'])document.querySelector('#'+kind).onclick=()=>damage(kind);
+document.querySelector('#repair').onclick=()=>{if(!ready)return;const s=game();s.repairEquipment('weapon',s.player.weapon);s.repairEquipment('shield',s.player.shield);};
+document.querySelector('#switch').onclick=()=>{if(!ready)return;game().equipWeapon(1);game().equipShield(1);};
+document.querySelector('#menu').onclick=()=>{if(ready)ui().setOverlay('settings');};
+document.querySelector('#close').onclick=()=>{if(ready)ui().setOverlay('none');};
+setInterval(()=>{
+ const s=game(),u=ui();if(!s?.playerSprite||!s.sys.isActive()||!u?.durabilityWarnings)return;
+ if(!ready){
+  s.player.weapons=[makeWeapon('w_soldier_blade',[]),makeWeapon('w_soldier_blade',[])];s.player.shields=[makeShield('s_iron_round'),makeShield('s_iron_round')];
+  s.player.inventory=Array.from({length:6},()=>makeItem('repair'));ready=true;damage('both');
+ }
+ const shown=u.durabilityWarnings.entries.filter(e=>e.image.visible);for(const e of shown){min=Math.min(min,e.image.alpha);max=Math.max(max,e.image.alpha);}
+ out.textContent=`警告：${shown.map(e=>e.kind==='weapon'?'武器':'盾').join('・')||'なし'}｜点滅の透明度：${min.toFixed(2)}〜${max.toFixed(2)}｜武器：${s.player.weapon?.dur}/${s.player.weapon?.durMax}｜盾：${s.player.shield?.dur}/${s.player.shield?.durMax}｜${s.turn}ターン｜メニュー：${u.overlayMode}`;
+},100);
+load(false);
+</script></html>

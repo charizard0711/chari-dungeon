@@ -1,0 +1,26 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><title>装備の詳細・ページ切り替え</title>
+<style>body{margin:16px;background:#101923;color:#eee1c4;font:14px system-ui}h1{font-size:22px}button{padding:8px 12px;margin:3px;background:#302a23;color:#ffe1a2;border:1px solid #997744}iframe{display:block;width:1120px;height:730px;max-width:100%;margin-top:12px;border:1px solid #997744}output{display:block;margin:10px 0;color:#b8d9b4;white-space:pre-line}</style>
+<h1>装備の詳細・ページ切り替え</h1><p>カーソルだけで未装備品を確認。各12個の装備を用意。冒険セーブは変更しません。</p>
+<button id="pc">PC</button><button id="mobile">スマホ</button><button id="list">装備一覧</button><button id="weapon">右の武器アイコン</button><button id="armor">右の服アイコン</button><button id="shield">右の盾アイコン</button>
+<output>読み込み中</output><iframe title="装備の確認画面"></iframe>
+<script type="module">
+import {makeWeapon,makeShield} from '/src/player.ts';import {WEAPON_DEFS,SHIELD_DEFS} from '/src/data.ts';import {makePlayerArmor,PLAYER_ARMOR_DEFS} from '/src/playerAppearance.ts';
+if(location.hostname!=='localhost')throw Error('Local QA only');
+const frame=document.querySelector('iframe'),out=document.querySelector('output');let ready=false,before='';
+const game=()=>frame.contentWindow?.__game?.scene.getScene('GameScene');const ui=()=>frame.contentWindow?.__game?.scene.getScene('UIScene');
+function load(mobile){ready=false;frame.style.width=mobile?'390px':'1120px';frame.style.height=mobile?'844px':'730px';frame.src=`/?qa-game&qa-silent&qa-boss&qa-floor=5&qa-gender=male&mobile=${mobile?1:0}`;}
+document.querySelector('#pc').onclick=()=>load(false);document.querySelector('#mobile').onclick=()=>load(true);
+document.querySelector('#list').onclick=()=>{if(ready)ui().openInventory('equip');};
+for(const [i,kind]of ['weapon','armor','shield'].entries())document.querySelector('#'+kind).onclick=()=>{if(ready){ui().pickSlot=i;ui().setOverlay('pick');}};
+const state=p=>JSON.stringify([p.weapon?.key,p.weapon?.plus,p.shield?.key,p.shield?.plus,p.armor?.key,p.armor?.plus]);
+setInterval(()=>{
+ const s=game(),u=ui();if(!s?.playerSprite||!s.sys.isActive()||!u?.overlay)return;
+ if(!ready){
+  const p=s.player;p.weapons=WEAPON_DEFS.slice(0,12).map((d,i)=>{const w=makeWeapon(d.key,[]);w.plus=i%4;return w;});
+  p.shields=SHIELD_DEFS.slice(0,12).map((d,i)=>{const sh=makeShield(d.key);sh.plus=i%4;return sh;});
+  const keys=Object.keys(PLAYER_ARMOR_DEFS);p.armors=Array.from({length:12},(_,i)=>{const a=makePlayerArmor(keys[i%keys.length]);a.plus=i;return a;});
+  p.weapon=p.weapons[0];p.shield=p.shields[0];p.armor=p.armors[0];before=state(p);s.emitRefresh();ready=true;u.openInventory('equip');
+ }
+ out.textContent=`${u.overlayMode==='pick'?`${u.pickPageIndex+1} / ${u.pickPageCount}ページ`:'装備一覧'}｜装備：${before===state(s.player)?'変更なし':'変更あり'}｜${s.turn}ターン｜詳細：${u.tooltip.visible?u.tooltipTitle.text+' '+u.tooltipDesc.text.replaceAll('\n',' / '):'なし'}`;
+},100);load(false);
+</script></html>
