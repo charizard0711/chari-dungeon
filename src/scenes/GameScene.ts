@@ -6040,21 +6040,24 @@ export class GameScene extends Phaser.Scene {
 
   private useMysteryBread() {
     this.player.hp = this.player.hpMax;
-    // 装備中の参照が所持リストと同じでも、一度だけ強化する。
-    const equipment = new Set<Weapon | Shield>([
-      ...this.player.weapons, ...this.player.shields,
+    const equipped = new Set<Weapon | Shield>([
       ...(this.player.weapon ? [this.player.weapon] : []),
       ...(this.player.shield ? [this.player.shield] : [])
     ]);
-    for (const item of equipment) {
-      item.dur = item.durMax;
+    // 耐久は所持品すべてを回復し、+1強化は装備中の武器・盾だけ。
+    const equipment = new Set<Weapon | Shield>([
+      ...this.player.weapons, ...this.player.shields,
+      ...equipped
+    ]);
+    for (const item of equipment) item.dur = item.durMax;
+    for (const item of equipped) {
       item.plus = (item.plus ?? 0) + 1;
     }
     this.updatePlayerAura();
     this.healFx();
     this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.4, 500, 0xffd17d);
     Audio.playSe('heal');
-    this.log('ふしぎパンを食べた！ HPと所持装備の耐久が全回復し、すべての武器と盾が+1強化された。', 'special');
+    this.log('ふしぎパンを食べた！ HPと所持する武器・盾の耐久が全回復し、装備中の武器と盾が+1強化された。', 'special');
   }
 
   startTransformation(kind: TransformationKind) {
@@ -7714,6 +7717,9 @@ export class GameScene extends Phaser.Scene {
     if (!Number.isInteger(this.skillChargeSteps) || this.skillChargeSteps < 0) this.skillChargeSteps = 100;
     this.skillChargeSteps = Math.min(100, this.skillChargeSteps);
     this.player = Object.assign(new Player(), snapshot.player);
+    for (const item of this.player.inventory) {
+      if (item.kind === 'mystery_bread') Object.assign(item, makeItem('mystery_bread'));
+    }
     for (const item of [...this.player.weapons, ...this.player.shields]) refreshLegendaryEquipment(item);
     if (this.pendingEquipment) refreshLegendaryEquipment(this.pendingEquipment.item);
     this.player.weapon = this.player.weapons[snapshot.equipped.weapon] ?? null;
