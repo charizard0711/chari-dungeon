@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ja"><meta charset="utf-8"><title>ボスの迂回・装備修復の確認</title>
+<style>body{margin:16px;background:#111923;color:#ece1ca;font:14px system-ui}h1{font-size:22px}button{padding:8px 14px;margin:4px;background:#292a38;color:#ffe1a2;border:1px solid #8d764a}iframe{display:block;width:1120px;max-width:100%;height:730px;border:1px solid #8d764a;margin-top:12px}output{display:block;margin:10px 0;color:#a9dbb5}pre{white-space:pre-wrap}</style>
+<h1>ボスの迂回・装備修復の確認</h1><p>ローカル専用。実際の冒険セーブは変更しません。</p>
+<button id="desktop">PC画面</button><button id="mobile">スマホ画面</button><button id="repair">武器・盾を12個用意</button><button id="trap">ボスの行き止まりを再現</button><button id="walk">迂回を実行</button>
+<output>読み込み中</output><iframe title="ゲーム確認画面"></iframe><pre></pre>
+<script type="module">
+import {WEAPON_DEFS,SHIELD_DEFS,makeItem,getTheme} from '/src/data.ts';
+import {makeWeapon,makeShield} from '/src/player.ts';
+if(location.hostname!=='localhost')throw Error('Local QA only');
+const frame=document.querySelector('iframe'),output=document.querySelector('output'),report=document.querySelector('pre');
+let ready=false,mobile=false,boss,route=[];
+const game=()=>frame.contentWindow?.__game?.scene.getScene('GameScene');
+const ui=()=>frame.contentWindow?.__game?.scene.getScene('UIScene');
+function load(phone){ready=false;route=[];mobile=phone;frame.style.width=phone?'390px':'1120px';frame.style.height=phone?'860px':'730px';frame.src=`/?qa-silent&qa-game&qa-boss&qa-floor=5&qa-gender=male&mobile=${phone?1:0}`;output.textContent='読み込み中';}
+document.querySelector('#desktop').onclick=()=>load(false);
+document.querySelector('#mobile').onclick=()=>load(true);
+document.querySelector('#repair').onclick=()=>{
+ if(!ready)return;const s=game();
+ s.player.weapons=WEAPON_DEFS.slice(0,12).map((d,i)=>{const w=makeWeapon(d.key,[]);w.dur=10+i;return w;});
+ s.player.shields=SHIELD_DEFS.slice(0,12).map((d,i)=>{const w=makeShield(d.key);w.dur=10+i;return w;});
+ s.player.weapon=s.player.weapons[0];s.player.shield=s.player.shields[0];s.player.inventory=Array.from({length:3},()=>makeItem('repair'));s.emitRefresh();
+ ui().repairKind='weapon';ui().setOverlay('repair');output.textContent='各12個。次へで最後の装備まで選択できます。';
+};
+document.querySelector('#trap').onclick=()=>{
+ if(!ready)return;const s=game(),r=s.dungeon.bossRoom;ui().setOverlay('none');
+ for(const e of s.enemies)if(e!==boss){e.hp=0;e.sprite.setVisible(false);e.shadow?.setVisible(false);}
+ for(const ob of s.bossObstacles)ob.sprite.destroy();s.bossObstacles=[];
+ boss.x=r.x+4;boss.y=r.y+5;s.player.x=boss.x+5;s.player.y=boss.y;
+ for(let y=boss.y-3;y<=boss.y+3;y++)for(let x=boss.x-2;x<=s.player.x+1;x++){
+  s.dungeon.tiles[y][x]='floor';s.applyTileVisual(s.tileSprites[y][x],'floor',getTheme(s.floor).era,x,y);
+ }
+ s.chests=s.chests.filter(c=>{if(c.x>=boss.x-2&&c.x<=s.player.x+1&&Math.abs(c.y-boss.y)<=3){c.sprite?.destroy();return false;}return true;});
+ for(const [dx,dy] of [[1,0],[0,-1],[0,1]]){
+  const x=boss.x+dx,y=boss.y+dy;s.dungeon.tiles[y][x]='wall';s.applyTileVisual(s.tileSprites[y][x],'wall',getTheme(s.floor).era,x,y);
+ }
+ s.placeSprite(boss.sprite,boss.x,boss.y);s.placeSprite(s.playerSprite,s.player.x,s.player.y);s.updateEnemyShadow(boss);s.lightRadius=100;s.updateVisibility();
+ const c=s.cameras.main;c.stopFollow();c.setZoom(1.45);c.centerOn((boss.x+2)*32,(boss.y+0.5)*32);
+ route=[{x:boss.x,y:boss.y}];output.textContent='正面と上下が壁。後ろへ下がって回り込む必要があります。';
+};
+document.querySelector('#walk').onclick=async()=>{
+ if(!ready||!route.length)return;const s=game();
+ for(let turn=0;turn<35;turn++){
+  if(Math.abs(boss.x-s.player.x)+Math.abs(boss.y-s.player.y)===1)break;
+  const x=boss.x,y=boss.y;await s.enemyAct(boss);route.push({x:boss.x,y:boss.y});
+  if(boss.x===x&&boss.y===y)break;
+ }
+ const reached=Math.abs(boss.x-s.player.x)+Math.abs(boss.y-s.player.y)===1;
+ output.textContent=(reached&&route[1]?.x<route[0].x?'PASS':'FAIL')+'：ボスが行き止まりから後退し、壁を迂回してプレイヤーに接近';
+};
+setInterval(()=>{
+ const s=game(),u=ui();if(!s?.playerSprite||!s.sys.isActive()||!u?.overlay)return;
+ if(!ready){boss=s.enemies.find(e=>e.def.isFloorBoss);if(!boss)return;ready=true;output.textContent='準備完了';}
+ report.textContent=JSON.stringify({mobile,overlay:u.overlayMode,kind:u.repairKind,page:u.repairPageIndex+1,pages:u.repairPageCount,stones:s.player.inventory.filter(i=>i.kind==='repair').length,lastWeaponDur:s.player.weapons.at(-1)?.dur,lastShieldDur:s.player.shields.at(-1)?.dur,route},null,2);
+},150);
+load(false);
+</script></html>

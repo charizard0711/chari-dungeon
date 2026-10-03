@@ -50,6 +50,8 @@ export class UIScene extends Phaser.Scene {
   overlay!: Phaser.GameObjects.Container;
   overlayMode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' | 'itemcatalog' | 'equipmentcatalog' | 'repair' | 'quests' = 'none';
   repairKind: 'weapon' | 'shield' = 'weapon';
+  repairPageIndex = 0;
+  repairPageCount = 1;
   pickSlot = 0; // 'pick'モードで開いている装備スロット（0武器/1服/2盾）
   gachaAnimating = false; // ガチャ演出中は再描画をブロック
   gachaPool: GachaPool = 'weapon';
@@ -164,6 +166,7 @@ export class UIScene extends Phaser.Scene {
       if (this.overlayMode === 'inv' && dy !== 0) this.scrollInventory(dy > 0 ? 1 : -1);
       if (this.overlayMode === 'codex' && dy !== 0) this.scrollCodex(dy > 0 ? 1 : -1);
       if (['itemcatalog', 'equipmentcatalog'].includes(this.overlayMode) && dy !== 0) this.turnCatalogPage(dy > 0 ? 1 : -1);
+      if (this.overlayMode === 'repair' && dy !== 0) this.turnRepairPage(dy > 0 ? 1 : -1);
     };
     const onSecretKey = (event: KeyboardEvent) => this.handleEquipmentSecret(event);
     this.input.on('wheel', onWheel);
@@ -954,6 +957,7 @@ export class UIScene extends Phaser.Scene {
     if (this.gs.pendingEquipment && mode !== 'equip') mode = 'equip';
     if (mode === 'equip' && this.overlayMode !== 'equip') this.equipScrollIndex = 0;
     if (mode === 'codex' && this.overlayMode !== 'codex') this.codexScrollRow = 0;
+    if (mode === 'repair' && this.overlayMode !== 'repair') this.repairPageIndex = 0;
     if (mode === 'equipmentcatalog' && this.overlayMode !== mode) {
       this.catalogCategory = 'all';
       this.catalogPageIndex = 0;
@@ -983,6 +987,16 @@ export class UIScene extends Phaser.Scene {
   }
 
   handleEquipmentSecret(event: KeyboardEvent) {
+    if (this.overlayMode === 'repair') {
+      if (['ArrowLeft', 'ArrowUp', 'PageUp', 'ArrowRight', 'ArrowDown', 'PageDown'].includes(event.key)) {
+        event.preventDefault();
+        if (!event.repeat) this.turnRepairPage(['ArrowLeft', 'ArrowUp', 'PageUp'].includes(event.key) ? -1 : 1);
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        this.setOverlay('inv');
+      }
+      return;
+    }
     if (this.handleCodeAndCatalogKey(event)) return;
     if (this.overlayMode === 'codex' && (event.code === 'ArrowUp' || event.code === 'ArrowDown')) {
       event.preventDefault();
@@ -1077,7 +1091,7 @@ export class UIScene extends Phaser.Scene {
     else if (this.overlayMode === 'settings') this.buildSettingsOverlay(x, y, w, h);
     else if (['itemcatalog', 'equipmentcatalog'].includes(this.overlayMode)) this.buildItemCatalogOverlay(x, y, w, h);
     else if (this.overlayMode === 'shop') this.buildShopOverlay(x, y, w);
-    else if (this.overlayMode === 'repair') this.buildRepairOverlay(x, y, w);
+    else if (this.overlayMode === 'repair') this.buildRepairOverlay(x, y, w, h);
     else if (this.overlayMode === 'gacha') this.buildGachaOverlay(x, y, w, h);
     else if (this.overlayMode === 'pick') this.buildPickOverlay(x, y, w);
     else this.buildCodexOverlay(x, y, w, h);
@@ -1533,7 +1547,15 @@ export class UIScene extends Phaser.Scene {
     }
   }
 
-  buildRepairOverlay(x: number, y: number, w: number) {
+  turnRepairPage(delta: number) {
+    if (this.overlayMode !== 'repair') return;
+    const next = Phaser.Math.Clamp(this.repairPageIndex + delta, 0, this.repairPageCount - 1);
+    if (next === this.repairPageIndex) return;
+    this.repairPageIndex = next;
+    this.rebuildOverlay();
+  }
+
+  buildRepairOverlay(x: number, y: number, w: number, h: number) {
     const p = this.gs.player;
     const count = p.inventory.filter(item => item.kind === 'repair').length;
     this.overlay.add(this.add.text(x + 20, y + 54, `修復石：${count}個　1個で耐久を50回復（最大まで）\n服には耐久がありません。選ばずに閉じると消費しません。`, {
@@ -1543,11 +1565,15 @@ export class UIScene extends Phaser.Scene {
     for (const [i, kind] of (['weapon', 'shield'] as const).entries()) {
       this.overlay.add(this.rowButton(x + 20 + i * (w - 32) / 2, y + 106, (w - 48) / 2,
         kind === 'weapon' ? '武器' : '盾', this.repairKind === kind,
-        () => { this.repairKind = kind; this.rebuildOverlay(); }));
+        () => { this.repairKind = kind; this.repairPageIndex = 0; this.rebuildOverlay(); }));
     }
     const owned: (Weapon | Shield)[] = this.repairKind === 'weapon' ? p.weapons : p.shields;
+    const rowsPerPage = Math.max(1, Math.floor((h - 154 - 50) / 72));
+    this.repairPageCount = Math.max(1, Math.ceil(owned.length / rowsPerPage));
+    this.repairPageIndex = Phaser.Math.Clamp(this.repairPageIndex, 0, this.repairPageCount - 1);
+    const start = this.repairPageIndex * rowsPerPage;
     if (!owned.length) this.overlay.add(this.add.text(x + 24, y + 164, '修復できる装備を持っていません。', { fontSize: '14px', color: '#bccbce' }));
-    owned.forEach((equipment, index) => {
+    owned.slice(start, start + rowsPerPage).forEach((equipment, index) => {
       const cy = y + 154 + index * 72;
       const restored = Math.max(0, Math.min(50, equipment.durMax - equipment.dur));
       const equipped = equipment === p.weapon || equipment === p.shield;
@@ -1560,9 +1586,18 @@ export class UIScene extends Phaser.Scene {
         fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#82dfcb'
       });
       const button = this.rowButton(x + w - 94, cy + 17, 74, restored ? '修復する' : '修復不要', restored > 0 && count > 0,
-        () => { if (this.gs.repairEquipment(this.repairKind, equipment)) this.setOverlay('inv'); });
+        () => { if (this.gs.repairEquipment(this.repairKind, equipment)) this.setOverlay('inv'); }, restored > 0 && count > 0);
       this.overlay.add([bg, ...icon, name, dur, button]);
     });
+    const footerY = y + h - 42;
+    this.overlay.add(this.rowButton(x + 20, footerY, 80, '‹ 前へ', false,
+      () => this.turnRepairPage(-1), this.repairPageIndex > 0));
+    this.overlay.add(this.add.text(x + w / 2, footerY + 14,
+      `${this.repairPageIndex + 1} / ${this.repairPageCount}　全${owned.length}個`, {
+        fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: '#dfe7f0'
+      }).setOrigin(0.5));
+    this.overlay.add(this.rowButton(x + w - 100, footerY, 80, '次へ ›', false,
+      () => this.turnRepairPage(1), this.repairPageIndex < this.repairPageCount - 1));
   }
 
   // ============ フロアショップ ============

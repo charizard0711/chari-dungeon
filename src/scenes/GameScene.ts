@@ -28,6 +28,7 @@ import {
 import { Enemy } from '../enemy';
 import { customFloorBoss } from '../customFloorBosses';
 import { strengthenLateBoss } from '../bossBalance';
+import { bossApproach } from '../bossNavigation';
 import { getMonsterAnimation, monsterAnimationFrame } from '../monsterAnimation';
 import type { MonsterAction } from '../monsterAnimation';
 import { AURELIUS_DIRECTIONS, DIRECTIONAL_MONSTERS, MONSTER_DIRECTION_FRAME, monsterDirectionPose } from '../monsterDirections';
@@ -2181,7 +2182,10 @@ export class GameScene extends Phaser.Scene {
 
   findBossDestination(e: Enemy, edge = false): Vec2 | null {
     const room = this.dungeon.bossRoom;
-    if (!room) return this.randomFieldBossPosition();
+    if (!room) {
+      const position = this.randomFieldBossPosition();
+      return position && this.canBossRelocate(e, position) ? position : null;
+    }
     const candidates: Vec2[] = edge
       ? [
           { x: room.x + 1, y: this.player.y }, { x: room.x + room.w - 2, y: this.player.y },
@@ -2196,26 +2200,28 @@ export class GameScene extends Phaser.Scene {
       const offset = this.bossStates.get(e)?.phase ?? 0;
       for (let i = 0; i < offset % candidates.length; i++) candidates.push(candidates.shift()!);
     }
-    if (e.def.key === 'm_fallen_angel') {
-      // Props can occupy all four preferred corners and the central gate.
-      // Scan other room cells after those preferred positions, without moving through props.
-      for (let y = room.y + 1; y < room.y + room.h - 1; y++) {
-        for (let x = room.x + 1; x < room.x + room.w - 1; x++) {
-          if (Math.abs(x - this.player.x) + Math.abs(y - this.player.y) < 2 || (x === e.x && y === e.y)) continue;
-          candidates.push({ x, y });
-        }
+    // Every teleporting boss needs a fallback when preferred corners are blocked.
+    for (let y = room.y + 1; y < room.y + room.h - 1; y++) {
+      for (let x = room.x + 1; x < room.x + room.w - 1; x++) {
+        if (Math.abs(x - this.player.x) + Math.abs(y - this.player.y) < 2) continue;
+        candidates.push({ x, y });
       }
     }
     for (const pos of candidates) {
-      if (!this.validBossTile(pos.x, pos.y) || !this.isInsideBossCombatFrame(pos.x, pos.y)) continue;
-      if (this.player.x === pos.x && this.player.y === pos.y) continue;
-      if (this.enemyAt(pos.x, pos.y, e) || this.bossObstacleAt(pos.x, pos.y)) continue;
-      return pos;
+      if (this.canBossRelocate(e, pos)) return pos;
     }
     return null;
   }
 
+  canBossRelocate(e: Enemy, destination: Vec2): boolean {
+    if (destination.x === e.x && destination.y === e.y) return false;
+    if (!this.passable(e, destination.x, destination.y)) return false;
+    return bossApproach(destination, this.player, bossBodyRadius(e.def), (x, y) => this.passable(e, x, y)).reachesTarget;
+  }
+
   teleportBoss(e: Enemy, destination: Vec2) {
+    // The telegraph can last several turns; its destination may now be occupied.
+    if (e.def.isFloorBoss ? !this.canBossRelocate(e, destination) : !this.passable(e, destination.x, destination.y)) return;
     this.effectFx(e.x, e.y, 'fx_magic', 1.5, 360, e.def.bossTint ?? e.def.color);
     e.x = destination.x;
     e.y = destination.y;
@@ -4982,6 +4988,8 @@ export class GameScene extends Phaser.Scene {
         && this.passable(e, planned.x, planned.y)) {
         mv = planned;
       }
+    } else if (e.def.isFloorBoss && !unseen && (this.dungeon.bossRoom || aggro)) {
+      mv = bossApproach(e, this.player, bossBodyRadius(e.def), (x, y) => this.passable(e, x, y)).step;
     } else {
       switch (e.def.behavior) {
         case 'chase':
