@@ -47,6 +47,7 @@ export class UIScene extends Phaser.Scene {
   codexText?: Phaser.GameObjects.Text; // モンスター図鑑サイドパネル（PCのみ）
   logTexts: Phaser.GameObjects.Text[] = []; // 固定8行（行ごとに色分け）
   itemContainer!: Phaser.GameObjects.Container;
+  private itemSlotKinds: ItemKind[] = [];
   overlay!: Phaser.GameObjects.Container;
   overlayMode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' | 'itemcatalog' | 'equipmentcatalog' | 'repair' | 'quests' = 'none';
   repairKind: 'weapon' | 'shield' = 'weapon';
@@ -95,6 +96,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   create() {
+    this.itemSlotKinds = [];
     this.secretRewardOpen = false;
     this.slotAuras = [];
     this.overlayMode = 'none';
@@ -815,15 +817,25 @@ export class UIScene extends Phaser.Scene {
     if (this.overlayMode !== 'none') this.rebuildOverlay();
   }
 
-  // 同じ種類のアイテムをまとめて {kind, count, firstIndex} にする
+  // Keep each discovered kind in its slot for this adventure, even at zero.
+  // Removing a consumed array entry must not put another item under the cursor.
   stackInventory(inv: Item[]): { kind: ItemKind; item: Item; count: number; firstIndex: number }[] {
-    const groups: { kind: ItemKind; item: Item; count: number; firstIndex: number }[] = [];
+    const groups = new Map<ItemKind, { kind: ItemKind; item: Item; count: number; firstIndex: number }>();
     inv.forEach((it, i) => {
-      const g = groups.find((g) => g.kind === it.kind);
+      if (!this.itemSlotKinds.includes(it.kind)) this.itemSlotKinds.push(it.kind);
+      const g = groups.get(it.kind);
       if (g) g.count++;
-      else groups.push({ kind: it.kind, item: it, count: 1, firstIndex: i });
+      else groups.set(it.kind, { kind: it.kind, item: it, count: 1, firstIndex: i });
     });
-    return groups;
+    return this.itemSlotKinds.map(kind => groups.get(kind) ?? {
+      kind, item: { kind, ...ITEM_DEFS[kind] }, count: 0, firstIndex: -1
+    });
+  }
+
+  useInventoryKind(kind: ItemKind) {
+    // Resolve at click time: old callbacks must never consume a shifted index.
+    const index = this.gs.player.inventory.findIndex(item => item.kind === kind);
+    if (index >= 0) this.gs.useItem(index);
   }
 
   rebuildItems() {
@@ -836,16 +848,17 @@ export class UIScene extends Phaser.Scene {
       const cx = startX + (i % cols) * cell;
       const cy = startY + Math.floor(i / cols) * 74;
       const rare = isRareItem(grp.kind);
+      const available = grp.count > 0;
       const frameCol = rare ? 0xff4040 : this.theme.color;      // レアは赤枠
       const frameHover = rare ? 0xff8080 : 0x3fe0d0;
       const bg = this.add.graphics();
       const drawBg = (fill: number, line: number, lw = 1.5) => { bg.clear(); bg.fillStyle(fill, 1).fillRoundedRect(cx, cy, 54, 54, 6); bg.lineStyle(lw, line).strokeRoundedRect(cx, cy, 54, 54, 6); };
-      drawBg(0x25121e, frameCol, rare ? 2.5 : 1.5);
+      drawBg(available ? 0x25121e : 0x141a22, available ? frameCol : 0x303946, rare ? 2.5 : 1.5);
       // 枠だけ＋アイコン（名前は省略／カーソルでツールチップ表示）
-      const icon = this.add.image(cx + 27, cy + 27, grp.item.textureKey).setDisplaySize(48, 48);
+      const icon = this.add.image(cx + 27, cy + 27, grp.item.textureKey).setDisplaySize(48, 48).setAlpha(available ? 1 : 0.3);
       this.itemContainer.add([bg, icon]);
       // ×N（2個以上のとき）
-      if (grp.count > 1) {
+      if (grp.count !== 1) {
         const cnt = this.add.text(cx + 50, cy + 50, `×${grp.count}`, {
           fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: '#ffffff', fontStyle: 'bold',
           backgroundColor: '#000000aa', padding: { x: 2, y: 0 }
@@ -853,10 +866,10 @@ export class UIScene extends Phaser.Scene {
         this.itemContainer.add(cnt);
       }
       const zone = this.add.zone(cx, cy, 54, 54).setOrigin(0).setInteractive({ useHandCursor: true });
-      const cntSuffix = grp.count > 1 ? ` ×${grp.count}` : '';
-      zone.on('pointerover', () => { drawBg(0x264a48, frameHover, rare ? 2.5 : 1.5); this.showTooltip((rare ? '★' : '') + grp.item.name + cntSuffix, grp.item.desc, cx + 27, cy); });
-      zone.on('pointerout', () => { drawBg(0x25121e, frameCol, rare ? 2.5 : 1.5); this.hideTooltip(); });
-      zone.on('pointerdown', () => { this.hideTooltip(); this.gs.useItem(grp.firstIndex); });
+      const cntSuffix = available ? grp.count > 1 ? ` ×${grp.count}` : '' : '（所持なし）';
+      zone.on('pointerover', () => { if (available) drawBg(0x264a48, frameHover, rare ? 2.5 : 1.5); this.showTooltip((rare ? '★' : '') + grp.item.name + cntSuffix, grp.item.desc, cx + 27, cy); });
+      zone.on('pointerout', () => { drawBg(available ? 0x25121e : 0x141a22, available ? frameCol : 0x303946, rare ? 2.5 : 1.5); this.hideTooltip(); });
+      if (available) zone.on('pointerdown', () => { this.hideTooltip(); this.useInventoryKind(grp.kind); });
       this.itemContainer.add(zone);
     });
     if (groups.length === 0) {
@@ -1417,19 +1430,20 @@ export class UIScene extends Phaser.Scene {
         this.overlay.add([...icon, row, action]);
       } else {
         const group = entry.group;
+        const available = group.count > 0;
         const count = ` ×${group.count}`;
         const icon = this.framedIcon(x + 33, cy + 14, group.item.textureKey, isRareItem(group.kind) ? 0xff5f67 : this.theme.color, 32);
-        const use = () => { this.gs.useItem(group.firstIndex); if (this.overlayMode !== 'repair') this.setOverlay('inv'); };
+        const use = () => { this.useInventoryKind(group.kind); if (this.overlayMode !== 'repair') this.setOverlay('inv'); };
         const sellW = 112;
         const useW = 64;
         const actionY = IS_MOBILE ? cy + 30 : cy;
         const sellX = x + w - sellW - 10;
         const useX = sellX - useW - 6;
         const row = this.rowButton(x + 54, cy, IS_MOBILE ? w - 64 : useX - x - 60,
-          `${group.item.name}${count}　—　${group.item.desc}`, false, use);
-        const action = this.rowButton(useX, actionY, useW, '使用', false, use);
+          `${group.item.name}${count}　—　${group.item.desc}`, false, use, available);
+        const action = this.rowButton(useX, actionY, useW, available ? '使用' : 'なし', false, use, available);
         const sell = this.rowButton(sellX, actionY, sellW, `売却 ${this.gs.itemSellPrice(group.kind)}G`, false,
-          () => this.gs.sellItem(group.kind));
+          () => this.gs.sellItem(group.kind), available);
         this.overlay.add([...icon, row, action, sell]);
       }
     });
@@ -1452,9 +1466,9 @@ export class UIScene extends Phaser.Scene {
     const groups = this.stackInventory(p.inventory);
     if (groups.length === 0) this.overlay.add(this.add.text(x + 16, cy, 'アイテムはありません。', { fontFamily: '"Yu Gothic UI"', fontSize: '14px', color: '#8a97ab' }));
     groups.forEach((grp) => {
-      const cntLabel = grp.count > 1 ? ` ×${grp.count}` : '';
+      const cntLabel = grp.count !== 1 ? ` ×${grp.count}` : '';
       const icon = this.add.image(x + 30, cy + 14, grp.item.textureKey).setDisplaySize(26, 26);
-      const row = this.rowButton(x + 48, cy, w - 64, `${grp.item.name}${cntLabel} — ${grp.item.desc}`, false, () => { this.gs.useItem(grp.firstIndex); if (this.overlayMode !== 'repair') this.setOverlay('inv'); });
+      const row = this.rowButton(x + 48, cy, w - 64, `${grp.item.name}${cntLabel} — ${grp.item.desc}`, false, () => { this.useInventoryKind(grp.kind); if (this.overlayMode !== 'repair') this.setOverlay('inv'); }, grp.count > 0);
       this.overlay.add([icon, row]);
       cy += 34;
     });

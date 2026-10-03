@@ -3,6 +3,7 @@
 <style>body{margin:16px;background:#111923;color:#ece1ca;font:14px system-ui}h1{font-size:22px}button{padding:8px 14px;margin:4px;background:#292a38;color:#ffe1a2;border:1px solid #8d764a}iframe{display:block;width:1120px;max-width:100%;height:730px;border:1px solid #8d764a;margin-top:12px}output{display:block;margin:10px 0;color:#a9dbb5}pre{white-space:pre-wrap}</style>
 <h1>ボスの迂回・装備修復の確認</h1><p>ローカル専用。実際の冒険セーブは変更しません。</p>
 <button id="desktop">PC画面</button><button id="mobile">スマホ画面</button><button id="repair">武器・盾を12個用意</button><button id="trap">ボスの行き止まりを再現</button><button id="walk">迂回を実行</button>
+<button id="items">連打テストの道具</button><button id="inventory">道具一覧を開く</button><button id="explore">探索へ</button>
 <output>読み込み中</output><iframe title="ゲーム確認画面"></iframe><pre></pre>
 <script type="module">
 import {WEAPON_DEFS,SHIELD_DEFS,makeItem,getTheme} from '/src/data.ts';
@@ -15,6 +16,12 @@ const ui=()=>frame.contentWindow?.__game?.scene.getScene('UIScene');
 function load(phone){ready=false;route=[];mobile=phone;frame.style.width=phone?'390px':'1120px';frame.style.height=phone?'860px':'730px';frame.src=`/?qa-silent&qa-game&qa-boss&qa-floor=5&qa-gender=male&mobile=${phone?1:0}`;output.textContent='読み込み中';}
 document.querySelector('#desktop').onclick=()=>load(false);
 document.querySelector('#mobile').onclick=()=>load(true);
+document.querySelector('#items').onclick=()=>{
+ if(!ready)return;const s=game(),u=ui();s.player.inventory=['torch','potion','torch','bomb'].map(makeItem);u.itemSlotKinds=[];u.setOverlay('none');s.emitRefresh();
+ output.textContent='松明2個・ポーション1個・ボムナッツ1個。松明を連打しても他の道具は減りません。';
+};
+document.querySelector('#inventory').onclick=()=>{if(ready)ui().openInventory('items');};
+document.querySelector('#explore').onclick=()=>{if(ready)ui().setOverlay('none');};
 document.querySelector('#repair').onclick=()=>{
  if(!ready)return;const s=game();
  s.player.weapons=WEAPON_DEFS.slice(0,12).map((d,i)=>{const w=makeWeapon(d.key,[]);w.dur=10+i;return w;});
@@ -51,7 +58,7 @@ document.querySelector('#walk').onclick=async()=>{
 setInterval(()=>{
  const s=game(),u=ui();if(!s?.playerSprite||!s.sys.isActive()||!u?.overlay)return;
  if(!ready){boss=s.enemies.find(e=>e.def.isFloorBoss);if(!boss)return;ready=true;output.textContent='準備完了';}
- report.textContent=JSON.stringify({mobile,overlay:u.overlayMode,kind:u.repairKind,page:u.repairPageIndex+1,pages:u.repairPageCount,stones:s.player.inventory.filter(i=>i.kind==='repair').length,lastWeaponDur:s.player.weapons.at(-1)?.dur,lastShieldDur:s.player.shields.at(-1)?.dur,route},null,2);
+ report.textContent=JSON.stringify({mobile,overlay:u.overlayMode,kind:u.repairKind,page:u.repairPageIndex+1,pages:u.repairPageCount,stones:s.player.inventory.filter(i=>i.kind==='repair').length,lastWeaponDur:s.player.weapons.at(-1)?.dur,lastShieldDur:s.player.shields.at(-1)?.dur,itemSlots:u.itemSlotKinds.map(kind=>({kind,count:s.player.inventory.filter(i=>i.kind===kind).length})),route},null,2);
 },150);
 load(false);
 </script></html>
