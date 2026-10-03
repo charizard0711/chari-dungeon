@@ -1640,14 +1640,12 @@ export class UIScene extends Phaser.Scene {
       fontFamily: '"Yu Gothic UI"', fontSize: '15px', color: palette.text, fontStyle: 'bold'
     }).setOrigin(0.5));
 
-    // 排出ランク表
+    // 召喚できる装備と利用条件
     this.overlay.add(this.add.text(x + w / 2, y + 164, [
-      'SS  3%     S  12%     A  25%     B  35%     C  25%',
-      '装備等級:  SS→S　S→A　A→B　B→C　C→D',
-      weaponPool ? '武器のみ排出  /  属性装備は約5%'
-        : '通常抽選：盾80%・服と鎧20%（所持済みの服は盾へ）',
-      weaponPool ? '特別抽選：覇天剣アルカディア+10  0.01%'
-        : '特別抽選：漆黒の盾ルファルゼント+10  0.01%',
+      weaponPool ? '武器のみ排出  /  属性装備も登場'
+        : '盾・服・鎧を排出（所持済みの服は盾へ）',
+      weaponPool ? '特別な装備：覇天剣アルカディア+10'
+        : '特別な装備：漆黒の盾ルファルゼント+10',
       weaponPool ? soldOut ? 'この階の武器は取得済み' : '武器は1階につき最大1本'
         : '武器を取得済みでも利用できます'
     ].join('\n'), {
