@@ -3,7 +3,7 @@ import Phaser from 'phaser';
 export type LegendaryAuraKind = 'sword' | 'shield';
 /** Two helices share a blade axis; phase travels upward like a barber pole. */
 export function spiralPoint(t: number, clock: number, strand: number) {
-  const phase = t * Math.PI * 5.2 - clock * .0026 + strand * Math.PI;
+  const phase = t * Math.PI * 5.2 - clock * .0052 + strand * Math.PI;
   return { x: Math.sin(phase), front: Math.cos(phase) >= 0 };
 }
 
