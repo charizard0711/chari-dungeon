@@ -47,7 +47,7 @@ export const ITEM_CATALOG: readonly CatalogEntry[] = [
       key: shield.key, category: 'shield', name: shield.name, textureKey: shield.key,
       grade: shield.grade, element: shield.element,
       summary: `${shield.grade} / 盾 / ${affinity(shield.element)}`,
-      description: `防御力 +${shield.defBonus}　耐久 ${shield.durMax}\n${def.passive.name}：${def.passive.description}`
+      description: `防御力 +${shield.defBonus + shield.plus}　耐久 ${shield.durMax}${shield.plus ? `（初期強化 +${shield.plus}）` : ''}\n${def.passive.name}：${def.passive.description}`
     };
   }),
   ...PLAYER_ARMORS.map((key): CatalogEntry => {

@@ -6,7 +6,13 @@ import { PLAYER_HAND_ANCHORS } from './playerHandAnchors';
 
 export const HELD_FRAME_SIZE = 64;
 export const HELD_DIRECTION_FRAME: Record<Dir, number> = {down:0,left:1,right:2,up:3};
-export const HELD_EQUIPMENT = [...WEAPON_DEFS, ...SHIELD_DEFS].filter(def => def.key !== 'w_hero_sword').map(def => ({
+// Only these shields have separate directional atlases. New shields use their painted item art in hand.
+const DIRECTIONAL_SHIELD_KEYS = new Set([
+  's_iron_round', 's_mirror_silver', 's_thorn_guard', 's_chrono_guard', 's_seraph_guard',
+  's_flame_aegis', 's_tidal_aegis', 's_storm_aegis', 's_frost_aegis'
+]);
+export const HELD_EQUIPMENT = [...WEAPON_DEFS, ...SHIELD_DEFS]
+  .filter(def => def.key !== 'w_hero_sword' && ('weaponType' in def || DIRECTIONAL_SHIELD_KEYS.has(def.key))).map(def => ({
   itemKey:def.key, textureKey:`held_${def.key}`, path:`assets/equipment/directional/${def.key}.png`
 }));
 export const HELD_EQUIPMENT_KEYS = new Set([...HELD_EQUIPMENT.map(art=>art.itemKey), 'w_hero_sword']);

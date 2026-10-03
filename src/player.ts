@@ -142,7 +142,7 @@ export function makeShield(key: string, gradeOverride?: EquipmentGrade): Shield 
   const defBonus = Math.max(def.defBonus, 2 + gradeIndex * 2);
   const durMax = Math.max(def.durMax, 40 + gradeIndex * 15);
   return {
-    key: def.key, name: def.name, defBonus, durMax, dur: durMax, grade, plus: 0,
+    key: def.key, name: def.name, defBonus, durMax, dur: durMax, grade, plus: def.initialPlus ?? 0,
     element: def.element, passive: { ...def.passive }, guardCounter: 0
   };
 }
@@ -236,13 +236,13 @@ export function weaponFullName(w: Weapon): string {
 }
 
 export function rollShield(floor: number): Shield {
-  const pool = equipmentPoolAtElementRate(SHIELD_DEFS.filter((d) => d.minFloor <= floor));
+  const pool = equipmentPoolAtElementRate(SHIELD_DEFS.filter((d) => !d.exclusiveLoot && d.minFloor <= floor));
   const picked = weightedEquipmentPick(pool);
   return makeShield(picked.key);
 }
 
 export function rollShieldByGrade(grade: EquipmentGrade): Shield {
-  const pool = equipmentPoolAtElementRate(SHIELD_DEFS.filter((d) => d.grade === grade));
+  const pool = equipmentPoolAtElementRate(SHIELD_DEFS.filter((d) => !d.exclusiveLoot && d.grade === grade));
   const picked = pool[Math.floor(Math.random() * pool.length)] ?? SHIELD_DEFS[0];
   return makeShield(picked.key, grade);
 }

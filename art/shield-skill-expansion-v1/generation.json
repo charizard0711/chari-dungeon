@@ -1,0 +1,140 @@
+{
+  "tool": "image_gen.imagegen",
+  "date": "2026-10-03",
+  "transparent_background": true,
+  "processing": "Uniform resize to 256x256 RGBA PNG, no artwork changes.",
+  "assets": [
+    {
+      "key": "skill_dagger",
+      "prompt": "Use case: stylized-concept. Asset: a polished hand-painted fantasy RPG ability icon on a genuinely transparent background. Subject: a sharply rendered curved silver assassin dagger sweeping diagonally upward, wrapped in two graceful violet shadow ribbons that evoke a swift teleporting backstab. Dominant bright lilac edged blade, midnight violet accents. Single compact cohesive emblem centered in a square with clear transparent negative space, readable at 56 pixels. High-contrast solid weapon silhouette, fine professional painted metallic details, restrained glowing edge highlights. No circular badge, no border, no opaque backdrop, no scenic background, no text, letters, numbers, hand, person or watermark. Full motif inside frame with 8% empty transparent margin; transparency between blades and effects. Do not fill the background with smoke or light.",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-ca734a4c-3033-43e3-920f-591a3c1c2791.png",
+      "target": "public/assets/skills/painted-v1/skill_dagger.png"
+    },
+    {
+      "key": "skill_longsword",
+      "prompt": "Use case: stylized-concept. Asset: a polished hand-painted fantasy RPG ability icon on a genuinely transparent background. Subject: one majestic steel longsword cutting through a broad fan-shaped arc of luminous blue energy, suggesting three adjacent targets struck in one sweep. Cobalt and bright silver palette, clean curved slash. Single compact cohesive emblem centered in a square with clear transparent negative space, readable at 56 pixels. High-contrast solid weapon silhouette, fine professional painted metallic details, restrained glowing edge highlights. No circular badge, no border, no opaque backdrop, no scenic background, no text, letters, numbers, hand, person or watermark. Full motif inside frame with 8% empty transparent margin; transparency between blades and effects. Do not fill the background with smoke or light.",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-744819a9-284d-4d01-85eb-ee451cf3e104.png",
+      "target": "public/assets/skills/painted-v1/skill_longsword.png"
+    },
+    {
+      "key": "skill_lance",
+      "prompt": "Use case: stylized-concept. Asset: a polished hand-painted fantasy RPG ability icon on a genuinely transparent background. Subject: one slender ornate gold spear thrusting diagonally upward through three small golden impact arcs in a straight line. Polished silver spearhead with a warm gold piercing trail, decisive forward motion. Single compact cohesive emblem centered in a square with clear transparent negative space, readable at 56 pixels. High-contrast solid weapon silhouette, fine professional painted metallic details, restrained glowing edge highlights. No circular badge, no border, no opaque backdrop, no scenic background, no text, letters, numbers, hand, person or watermark. Full motif inside frame with 8% empty transparent margin; transparency between blades and effects. Do not fill the background with smoke or light.",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-43737195-5101-4d62-83c9-040e0251f0ba.png",
+      "target": "public/assets/skills/painted-v1/skill_lance.png"
+    },
+    {
+      "key": "skill_bow",
+      "prompt": "Use case: stylized-concept. Asset: a polished hand-painted fantasy RPG ability icon on a genuinely transparent background. Subject: a graceful dark silver recurve bow with a single brilliant emerald arrow drawn taut, elegant green energy extending along the arrow, one very powerful precise piercing shot. Single compact cohesive emblem centered in a square with clear transparent negative space, readable at 56 pixels. High-contrast solid weapon silhouette, fine professional painted metallic details, restrained glowing edge highlights. No circular badge, no border, no opaque backdrop, no scenic background, no text, letters, numbers, hand, person or watermark. Full motif inside frame with 8% empty transparent margin; transparency between blades and effects. Do not fill the background with smoke or light.",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-5c71d78e-4890-4194-968f-5d4c46852768.png",
+      "target": "public/assets/skills/painted-v1/skill_bow.png"
+    },
+    {
+      "key": "skill_handgun",
+      "prompt": "Use case: stylized-concept. Asset: a polished hand-painted fantasy RPG ability icon on a genuinely transparent background. Subject: one beautifully crafted dark steel flintlock-style fantasy pistol aimed diagonally right with precisely three distinct small amber bullet streaks beside its muzzle, polished silver metal and warm orange-gold highlights. Single compact cohesive emblem centered in a square with clear transparent negative space, readable at 56 pixels. High-contrast solid weapon silhouette, fine professional painted metallic details, restrained glowing edge highlights. No circular badge, no border, no opaque backdrop, no scenic background, no text, letters, numbers, hand, person or watermark. Full motif inside frame with 8% empty transparent margin; transparency between blades and effects. Do not fill the background with smoke or light.",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-6611a9e2-fc8e-4ade-86bd-6468fdd01aea.png",
+      "target": "public/assets/skills/painted-v1/skill_handgun.png"
+    },
+    {
+      "key": "skill_greatsword",
+      "prompt": "Use case: stylized-concept. Asset: a polished hand-painted fantasy RPG ability icon on a genuinely transparent background. Subject: one heavy broad dark steel greatsword sweeping through a powerful circular crimson whirlwind slash, silver cutting edge and rich ruby red motion arc, substantial impressive blade. Single compact cohesive emblem centered in a square with clear transparent negative space, readable at 56 pixels. High-contrast solid weapon silhouette, fine professional painted metallic details, restrained glowing edge highlights. No circular badge, no border, no opaque backdrop, no scenic background, no text, letters, numbers, hand, person or watermark. Full motif inside frame with 8% empty transparent margin; transparency between blades and effects. Do not fill the background with smoke or light.",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-10a84143-02f8-4240-a913-2a4854af327e.png",
+      "target": "public/assets/skills/painted-v1/skill_greatsword.png"
+    },
+    {
+      "key": "skill_dual_sword",
+      "prompt": "Use case: stylized-concept. Asset: a polished hand-painted fantasy RPG ability icon on a genuinely transparent background. Subject: two elegant long silver swords crossing in a clear X, two intense cyan energy slashes crossing alongside them, turquoise and pale blue accents, perfectly readable crossed swords motif. Single compact cohesive emblem centered in a square with clear transparent negative space, readable at 56 pixels. High-contrast solid weapon silhouette, fine professional painted metallic details, restrained glowing edge highlights. No circular badge, no border, no opaque backdrop, no scenic background, no text, letters, numbers, hand, person or watermark. Full motif inside frame with 8% empty transparent margin; transparency between blades and effects. Do not fill the background with smoke or light.",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-86dfd758-6a1f-438f-bfbe-b5395ddbb159.png",
+      "target": "public/assets/skills/painted-v1/skill_dual_sword.png"
+    },
+    {
+      "key": "s_arcadia_guard",
+      "prompt": "Use case: stylized-concept. Asset: a single ultimate fallen-angel shield for a hand-painted dark fantasy RPG, transparent inventory sprite, frontal symmetrical near-orthographic full object. A magnificent black obsidian kite shield with sweeping layered black raven-feather wings forming its sides, silver and aged gold armor filigree, a blazing amethyst heart gem, a shattered golden halo above the crest incorporated into the shield, regal celestial metal and ominous angelic majesty. Extremely cool legendary masterpiece, rich precise painted detail, sharp substantial silhouette readable at 64 pixels. Shield only, entire object inside square frame with 8% transparent margin. No character, hand, floor, background disc, letters, text, watermark, floating particles. Genuine transparent background.",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-fbc066ba-d412-4e6f-8093-d736a96c5c13.png",
+      "target": "public/assets/shields/expansion-v1/s_arcadia_guard.png"
+    },
+    {
+      "key": "s_oak_guard",
+      "prompt": "Use case: stylized-concept. Asset: a single hand-painted dark fantasy RPG equipment shield sprite. Subject: a sturdy round oak-plank shield with dark iron bands and a large square central rivet, rugged novice defender, worn warm wood, broad readable silhouette. Front-facing near-orthographic view, complete object centered within a square with 8% transparent empty margin. Highly polished detailed professional fantasy game art, bold distinctive shape readable at 64 pixels, dimensional metal and material highlights, same coherent realistic painted RPG inventory style. Shield only: no hand, character, floor, scenic background, circular badge, lettering, numbers, text or watermark. Genuine transparent background, no particles outside silhouette.",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-5fbebf25-5d93-4d5b-bd28-39654b454c44.png",
+      "target": "public/assets/shields/expansion-v1/s_oak_guard.png"
+    },
+    {
+      "key": "s_scout_guard",
+      "prompt": "Use case: stylized-concept. Asset: a single hand-painted dark fantasy RPG equipment shield sprite. Subject: a compact pointed triangular leather-and-bronze buckler, swept wing-like side ridges for a nimble scout, silver arrowhead central boss, agile elegant silhouette. Front-facing near-orthographic view, complete object centered within a square with 8% transparent empty margin. Highly polished detailed professional fantasy game art, bold distinctive shape readable at 64 pixels, dimensional metal and material highlights, same coherent realistic painted RPG inventory style. Shield only: no hand, character, floor, scenic background, circular badge, lettering, numbers, text or watermark. Genuine transparent background, no particles outside silhouette.",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-74343bc6-3fe9-4b01-ba20-2faab5297ebf.png",
+      "target": "public/assets/shields/expansion-v1/s_scout_guard.png"
+    },
+    {
+      "key": "s_steel_bastion",
+      "prompt": "Use case: stylized-concept. Asset: a single hand-painted dark fantasy RPG equipment shield sprite. Subject: a tall rectangular tower shield made of articulated dark steel plates and polished silver reinforcements, massive rectangular central spine, disciplined fortress geometry. Front-facing near-orthographic view, complete object centered within a square with 8% transparent empty margin. Highly polished detailed professional fantasy game art, bold distinctive shape readable at 64 pixels, dimensional metal and material highlights, same coherent realistic painted RPG inventory style. Shield only: no hand, character, floor, scenic background, circular badge, lettering, numbers, text or watermark. Genuine transparent background, no particles outside silhouette.",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-96a93859-65d0-46f0-8a68-993264f2e707.png",
+      "target": "public/assets/shields/expansion-v1/s_steel_bastion.png"
+    },
+    {
+      "key": "s_pilgrim_guard",
+      "prompt": "Use case: stylized-concept. Asset: a single hand-painted dark fantasy RPG equipment shield sprite. Subject: a weathered teardrop-shaped white-enamel and brass pilgrim shield, small emerald reliquary at center and graceful leaf engraving, benevolent sanctuary mood. Front-facing near-orthographic view, complete object centered within a square with 8% transparent empty margin. Highly polished detailed professional fantasy game art, bold distinctive shape readable at 64 pixels, dimensional metal and material highlights, same coherent realistic painted RPG inventory style. Shield only: no hand, character, floor, scenic background, circular badge, lettering, numbers, text or watermark. Genuine transparent background, no particles outside silhouette.",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-426cb885-a0bc-42f9-83e7-6b0243d9df84.png",
+      "target": "public/assets/shields/expansion-v1/s_pilgrim_guard.png"
+    },
+    {
+      "key": "s_duelist_guard",
+      "prompt": "Use case: stylized-concept. Asset: a single hand-painted dark fantasy RPG equipment shield sprite. Subject: a stylish asymmetric dueling buckler, crescent-shaped polished steel rim, blue sapphire center and elegant hooked sword-catching guard, dark navy leather accents. Front-facing near-orthographic view, complete object centered within a square with 8% transparent empty margin. Highly polished detailed professional fantasy game art, bold distinctive shape readable at 64 pixels, dimensional metal and material highlights, same coherent realistic painted RPG inventory style. Shield only: no hand, character, floor, scenic background, circular badge, lettering, numbers, text or watermark. Genuine transparent background, no particles outside silhouette.",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-d57a3aa8-3038-44be-bd69-6ce6c3bece37.png",
+      "target": "public/assets/shields/expansion-v1/s_duelist_guard.png"
+    },
+    {
+      "key": "s_watchman_guard",
+      "prompt": "Use case: stylized-concept. Asset: a single hand-painted dark fantasy RPG equipment shield sprite. Subject: a hexagonal brass-and-gunmetal watchman's shield with a single striking silver eye-shaped mechanical crest, disciplined strong silhouette, no letters. Front-facing near-orthographic view, complete object centered within a square with 8% transparent empty margin. Highly polished detailed professional fantasy game art, bold distinctive shape readable at 64 pixels, dimensional metal and material highlights, same coherent realistic painted RPG inventory style. Shield only: no hand, character, floor, scenic background, circular badge, lettering, numbers, text or watermark. Genuine transparent background, no particles outside silhouette.",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-b3634467-224f-441d-a560-c9c728ec3472.png",
+      "target": "public/assets/shields/expansion-v1/s_watchman_guard.png"
+    },
+    {
+      "key": "s_sun_guard",
+      "prompt": "Use case: stylized-concept. Asset: a single hand-painted dark fantasy RPG equipment shield sprite. Subject: a regal elongated shield of gold and ivory with an embossed radiant sun crest, layered fan-like solar rays on its broad shoulders, pale amber gemstone. Front-facing near-orthographic view, complete object centered within a square with 8% transparent empty margin. Highly polished detailed professional fantasy game art, bold distinctive shape readable at 64 pixels, dimensional metal and material highlights, same coherent realistic painted RPG inventory style. Shield only: no hand, character, floor, scenic background, circular badge, lettering, numbers, text or watermark. Genuine transparent background, no particles outside silhouette.",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-506c0acb-aff3-41d5-ba43-f20686a18e03.png",
+      "target": "public/assets/shields/expansion-v1/s_sun_guard.png"
+    },
+    {
+      "key": "s_moon_guard",
+      "prompt": "Use case: stylized-concept. Asset: a single hand-painted dark fantasy RPG equipment shield sprite. Subject: a sleek dark midnight-blue shield with a luminous silver crescent moon crest, three layered curved silver blades on its rim and a violet gemstone, dignified nocturnal guardian. Front-facing near-orthographic view, complete object centered within a square with 8% transparent empty margin. Highly polished detailed professional fantasy game art, bold distinctive shape readable at 64 pixels, dimensional metal and material highlights, same coherent realistic painted RPG inventory style. Shield only: no hand, character, floor, scenic background, circular badge, lettering, numbers, text or watermark. Genuine transparent background, no particles outside silhouette.",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-3cb1c1de-3149-4c7a-992f-6e0f200ff2e0.png",
+      "target": "public/assets/shields/expansion-v1/s_moon_guard.png"
+    },
+    {
+      "key": "s_requiem_guard",
+      "prompt": "Use case: stylized-concept. Asset: a single hand-painted dark fantasy RPG equipment shield sprite. Subject: a grand gothic black and crimson shield, strong polished black steel pointed silhouette, restrained blood-red crystalline thorns and an elaborate silver funerary crest, commanding S-rank majesty. Front-facing near-orthographic view, complete object centered within a square with 8% transparent empty margin. Highly polished detailed professional fantasy game art, bold distinctive shape readable at 64 pixels, dimensional metal and material highlights, same coherent realistic painted RPG inventory style. Shield only: no hand, character, floor, scenic background, circular badge, lettering, numbers, text or watermark. Genuine transparent background, no particles outside silhouette.",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-a63387f8-bac3-4e9d-a63a-52c58fad2016.png",
+      "target": "public/assets/shields/expansion-v1/s_requiem_guard.png"
+    },
+    {
+      "key": "s_prism_guard",
+      "prompt": "Use case: stylized-concept. Asset: a single hand-painted dark fantasy RPG equipment shield sprite. Subject: a magnificent faceted diamond-shaped crystal shield held in a filigree platinum frame, four small gemstone inlays in red blue emerald and violet, brilliant prismatic guardian barrier, tasteful regal power. Front-facing near-orthographic view, complete object centered within a square with 8% transparent empty margin. Highly polished detailed professional fantasy game art, bold distinctive shape readable at 64 pixels, dimensional metal and material highlights, same coherent realistic painted RPG inventory style. Shield only: no hand, character, floor, scenic background, circular badge, lettering, numbers, text or watermark. Genuine transparent background, no particles outside silhouette.",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-f6a5c882-5335-403a-94fe-d4d09da1f8e0.png",
+      "target": "public/assets/shields/expansion-v1/s_prism_guard.png"
+    },
+    {
+      "key": "s_ember_guard",
+      "prompt": "Use case: stylized-concept. Asset: a single hand-painted dark fantasy RPG equipment shield sprite. Subject: a magnificent phoenix-shaped shield, layered burnished gold feathers enclosing a molten ruby core, upward curling flame-like steel blades, orange and crimson elemental fire, powerful but shield silhouette. Front-facing near-orthographic view, complete object centered within a square with 8% transparent empty margin. Highly polished detailed professional fantasy game art, bold distinctive shape readable at 64 pixels, dimensional metal and material highlights, same coherent realistic painted RPG inventory style. Shield only: no hand, character, floor, scenic background, circular badge, lettering, numbers, text or watermark. Genuine transparent background, no particles outside silhouette.",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-c386c0dc-b598-43ec-a267-fb5b5cc3d90c.png",
+      "target": "public/assets/shields/expansion-v1/s_ember_guard.png"
+    },
+    {
+      "key": "s_pearl_guard",
+      "prompt": "Use case: stylized-concept. Asset: a single hand-painted dark fantasy RPG equipment shield sprite. Subject: an elegant scalloped pearlescent ocean shield, swirling silver wave filigree, a lustrous large moon pearl and aquamarine gems, deep turquoise crystal shell, graceful water element. Front-facing near-orthographic view, complete object centered within a square with 8% transparent empty margin. Highly polished detailed professional fantasy game art, bold distinctive shape readable at 64 pixels, dimensional metal and material highlights, same coherent realistic painted RPG inventory style. Shield only: no hand, character, floor, scenic background, circular badge, lettering, numbers, text or watermark. Genuine transparent background, no particles outside silhouette.",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-a6941b5d-3798-4f3b-bc8f-4b96ad853125.png",
+      "target": "public/assets/shields/expansion-v1/s_pearl_guard.png"
+    },
+    {
+      "key": "s_thunder_crown",
+      "prompt": "Use case: stylized-concept. Asset: a single hand-painted dark fantasy RPG equipment shield sprite. Subject: a majestic angular golden thunder shield with a jagged crowned crest, bright violet lightning crystal at center and black obsidian inset plates, bold angular branching arms, lightning emperor. Front-facing near-orthographic view, complete object centered within a square with 8% transparent empty margin. Highly polished detailed professional fantasy game art, bold distinctive shape readable at 64 pixels, dimensional metal and material highlights, same coherent realistic painted RPG inventory style. Shield only: no hand, character, floor, scenic background, circular badge, lettering, numbers, text or watermark. Genuine transparent background, no particles outside silhouette.",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-8ddc326e-9a2c-4e9d-88c2-6fefc501c840.png",
+      "target": "public/assets/shields/expansion-v1/s_thunder_crown.png"
+    },
+    {
+      "key": "s_glacier_guard",
+      "prompt": "Use case: stylized-concept. Asset: a single hand-painted dark fantasy RPG equipment shield sprite. Subject: a grand frost citadel shield made of massive translucent blue ice-crystal battlements and polished platinum braces, a central snowflake sapphire and sharp crystalline lower point, cold majestic ice element. Front-facing near-orthographic view, complete object centered within a square with 8% transparent empty margin. Highly polished detailed professional fantasy game art, bold distinctive shape readable at 64 pixels, dimensional metal and material highlights, same coherent realistic painted RPG inventory style. Shield only: no hand, character, floor, scenic background, circular badge, lettering, numbers, text or watermark. Genuine transparent background, no particles outside silhouette.",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-1074dbd5-8988-417d-95e5-ee804b8010c6.png",
+      "target": "public/assets/shields/expansion-v1/s_glacier_guard.png"
+    }
+  ]
+}

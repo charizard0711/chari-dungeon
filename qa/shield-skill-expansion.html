@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ja"><meta charset="utf-8"><title>変身・スキル・新しい盾</title>
+<style>
+body{background:#0c171e;color:#e9eef1;font:14px system-ui;margin:16px}h1{font-size:24px;margin:8px 0}h2{font-size:19px;color:#e5cb93}p{color:#aac0c9}button,select{padding:8px;margin:3px;background:#20303d;color:#eee;border:1px solid #586776;border-radius:5px;cursor:pointer}iframe{display:block;width:1280px;max-width:100%;height:800px;border:1px solid #82754e}output{display:block;margin:10px 0;color:#a6e4c3}pre{white-space:pre-wrap;font-size:12px}.skills{display:flex;gap:14px;flex-wrap:wrap}.skill{width:105px;text-align:center}.skill img{width:72px;height:72px;object-fit:contain}.shields{display:grid;grid-template-columns:repeat(auto-fit,minmax(205px,1fr));gap:10px;max-width:1280px}.card{padding:13px;background:#142733;border:1px solid #425661;border-radius:8px}.card img{display:block;width:110px;height:110px;object-fit:contain;margin:auto}.card b{display:block;color:#ead7ac;margin:8px 0}.card small{display:block;color:#a1bdcc;margin:6px 0}.legend{border-color:#b188eb;background:#241d36}.card p{font-size:12px;line-height:1.6;margin:6px 0}
+</style>
+<h1>変身・スキル・新しい盾</h1><p>ローカル確認用。冒険セーブには書き込みません。</p>
+<nav><button id="transform">アウレリウス変身</button><button id="slime">スライム変身</button><button id="normal">変身解除・最強盾装備</button><button id="resume">以前の変身データで再開</button><button id="codex">盾の図鑑</button><button id="mobile">スマホ表示</button><button id="desktop">PC表示</button></nav>
+<nav><button data-dir="down">下向き</button><button data-dir="left">左向き</button><button data-dir="right">右向き</button><button data-dir="up">上向き</button><label>スキル <select id="weapon"></select></label><button id="lastpage">盾の図鑑・最終ページ</button><button id="legend">アルカディア詳細</button></nav>
+<output>読み込み中</output><iframe title="変身と装備のゲーム画面"></iframe><pre></pre>
+<h2>新しく描いた7種類のスキル</h2><div class="skills"></div>
+<h2>盾の全24種類と効果</h2><p>無属性：D〜S各3種類／火・水・雷・氷：各2種類／最強盾：1種類。★は今回追加した盾。</p><div class="shields"></div>
+<script type="module">
+import {SHIELD_DEFS,WEAPON_DEFS,ELEMENT_INFO} from '/src/data.ts';
+import {makeShield,makeWeapon} from '/src/player.ts';
+import {WEAPON_SKILLS} from '/src/weaponSkills.ts';
+import {SKILL_ICON_ART} from '/src/skillArt.ts';
+import {ITEM_CATALOG} from '/src/itemCatalog.ts';
+if(location.hostname!=='localhost')throw Error('Local QA only');
+const frame=document.querySelector('iframe'),output=document.querySelector('output'),report=document.querySelector('pre');
+const game=()=>frame.contentWindow?.__game?.scene.getScene('GameScene');let ready=false,phone=false;
+const oldArt={s_iron_round:'neutral/iron_round',s_mirror_silver:'neutral/mirror_silver',s_thorn_guard:'neutral/thorn_guard',s_chrono_guard:'neutral/chrono_guard',s_seraph_guard:'neutral/seraph_guard',s_flame_aegis:'elemental/flame_aegis',s_tidal_aegis:'elemental/tidal_aegis',s_storm_aegis:'elemental/storm_aegis',s_frost_aegis:'elemental/frost_aegis'};
+for(const d of SHIELD_DEFS){const s=makeShield(d.key),c=document.createElement('article');c.className='card'+(d.exclusiveLoot?' legend':'');c.innerHTML=`<img alt="${d.name}" src="/assets/shields/${oldArt[d.key]||'expansion-v1/'+d.key}.png"><b>${oldArt[d.key]?'':'★ '}${d.name}${s.plus?' +'+s.plus:''}</b><small>${d.grade} ／ ${d.element?ELEMENT_INFO[d.element].name:'無'}属性 ／ 防御 ${s.defBonus+s.plus} ／ 耐久 ${s.durMax}</small><p>${d.passive.description}</p>${d.exclusiveLoot?'<p>防具ガチャ 0.01％ ／ ボス撃破 0.1％</p>':''}`;document.querySelector('.shields').append(c);}
+for(const [type,s] of Object.entries(WEAPON_SKILLS)){const div=document.createElement('div');div.className='skill';div.innerHTML=`<img alt="${s.name}" src="/${SKILL_ICON_ART['skill_'+type]}"><div>${s.name}</div>`;document.querySelector('.skills').append(div);const option=document.createElement('option');option.value=type;option.textContent=s.name;document.querySelector('#weapon').append(option);}
+const ui=()=>game().scene.get('UIScene');
+function close(){ui().setOverlay('none');}
+function load(mobile=false){phone=mobile;ready=false;frame.style.width=mobile?'390px':'1280px';frame.style.height=mobile?'860px':'800px';frame.src='/?qa-game&qa-floor=5&qa-boss&qa-field-arena&mobile='+(mobile?1:0);}
+function transform(kind){close();game().startTransformation(kind);game().emitRefresh();}
+document.querySelector('#transform').onclick=()=>transform('boss5');
+document.querySelector('#slime').onclick=()=>transform('slime');
+document.querySelector('#normal').onclick=()=>{const g=game();close();g.clearTransformation();g.player.weapon=makeWeapon('w_soldier_blade',[]);g.player.shield=makeShield('s_arcadia_guard');g.player.shields=[g.player.shield];g.emitRefresh();};
+document.querySelector('#resume').onclick=()=>{const g=game();transform('boss5');const saved=JSON.parse(JSON.stringify(g.captureRun()));saved.state.transformation.textureKey='m_archdemon';saved.state.transformation.displaySize=43;g.buildFloor(5,saved.state.inBossRoom,saved);};
+document.querySelector('#codex').onclick=()=>{const g=game();close();for(const d of SHIELD_DEFS)g.discoveredEquipment.add(d.key);ui().setOverlay('equipmentcatalog');ui().catalogCategory='shield';ui().catalogPageIndex=1;ui().rebuildOverlay();};
+document.querySelector('#lastpage').onclick=()=>{document.querySelector('#codex').click();ui().turnCatalogPage(99);};
+document.querySelector('#legend').onclick=()=>{document.querySelector('#codex').click();ui().selectCatalogItem(ITEM_CATALOG.find(e=>e.key==='s_arcadia_guard'));};
+for(const btn of document.querySelectorAll('[data-dir]'))btn.onclick=()=>{const g=game();close();g.setPlayerVisual(btn.dataset.dir,'idle');};
+document.querySelector('#weapon').onchange=e=>{const g=game();close();const def=WEAPON_DEFS.find(d=>d.weaponType===e.target.value);g.player.weapon=makeWeapon(def.key,[]);if(g.player.weapon.dual||e.target.value==='bow')g.player.shield=null;g.skillChargeSteps=100;g.emitRefresh();};
+document.querySelector('#mobile').onclick=()=>load(true);document.querySelector('#desktop').onclick=()=>load();
+setInterval(()=>{const g=game();if(!g?.playerSprite||!g.sys.isActive())return;const boss=g.enemies.find(e=>e.def.key==='m_archdemon'&&e.def.isFloorBoss);
+ if(!ready){g.lightRadius=100;g.player.hp=g.player.hpMax=500;g.player.gold=10000;g.player.weapon=makeWeapon('w_iron_dagger',[]);g.skillChargeSteps=100;if(boss){g.player.x=boss.x-3;g.player.y=boss.y;g.placeSprite(g.playerSprite,g.player.x,g.player.y);g.cameras.main.stopFollow();g.cameras.main.setZoom(phone?1.3:2);g.cameras.main.centerOn(boss.sprite.x-48,boss.sprite.y);}g.updateVisibility();g.startTransformation('boss5');g.emitRefresh();ready=true;}
+ const s=g.transformationSprite;const same=!!boss&&s?.visible&&s.texture.key===boss.sprite.texture.key&&Math.abs(s.scaleX-boss.baseScale)<.00001;
+ const state={mode:phone?'mobile':'PC',transformation:g.transformation?.kind,texture:s?.texture.key,direction:g.player.dir,frame:s?.frame.name,flipX:s?.flipX,transformationScale:g.transformationBaseScale,bossScale:boss?.baseScale,sameBossSize:same,skill:ui().skillGlyph?.texture.key,skillSize:ui().skillGlyph?.displayWidth,shield:g.player.shield?.key,shieldHeld:g.equipmentRenderer?.offhand?.visible,assetsLoaded:[...Object.keys(SKILL_ICON_ART),...SHIELD_DEFS.map(d=>d.key)].every(k=>g.textures.exists(k))};
+ output.textContent=`${state.assetsLoaded?'PASS':'FAIL'}：22枚の新規素材を読込 ／ 盾24種類 ／ ${g.transformation?.kind==='boss5'?'5Fボスと同じ絵・サイズ：'+(same?'一致':'不一致'):'変身：'+(g.transformation?.name||'なし')} ／ ${g.player.dir}`;report.textContent=JSON.stringify(state,null,2);
+},250);load();
+</script></html>

@@ -14,6 +14,7 @@ import { DIRECTIONAL_MONSTERS } from '../monsterDirections';
 import { HELD_EQUIPMENT, HELD_FRAME_SIZE } from '../equipmentAppearance';
 import { RUIN_TERRAIN_FLOORS, RUIN_TERRAIN_PARTS, RUIN_FLOOR_FRAME_SIZE, ruinTerrainKey, ruinFloorKey } from '../ruinTerrain';
 import { GAME_W, GAME_H } from '../layout';
+import { SKILL_ICON_ART } from '../skillArt';
 
 const EXPANSION_MONSTER_KEYS = [
   'm_deep_kraken', 'm_valzeon', 'm_selene', 'm_abyss_lord', 'm_astravein',
@@ -81,6 +82,11 @@ const WEAPON_ART = {
 } as const;
 
 const SHIELD_ART = {
+  ...Object.fromEntries([
+    's_oak_guard', 's_scout_guard', 's_steel_bastion', 's_pilgrim_guard', 's_duelist_guard',
+    's_watchman_guard', 's_sun_guard', 's_moon_guard', 's_requiem_guard', 's_prism_guard',
+    's_ember_guard', 's_pearl_guard', 's_thunder_crown', 's_glacier_guard', 's_arcadia_guard'
+  ].map(key => [key, `assets/shields/expansion-v1/${key}.png`])),
   s_iron_round: 'assets/shields/neutral/iron_round.png',
   s_mirror_silver: 'assets/shields/neutral/mirror_silver.png',
   s_thorn_guard: 'assets/shields/neutral/thorn_guard.png',
@@ -226,7 +232,7 @@ export class BootScene extends Phaser.Scene {
     for (const [key, path] of Object.entries(WEAPON_ART)) {
       this.load.image(key, path);
     }
-    for (const [key, path] of Object.entries(SHIELD_ART)) {
+    for (const [key, path] of Object.entries({ ...SHIELD_ART, ...SKILL_ICON_ART })) {
       this.load.image(key, path);
     }
     for (const [key, path] of Object.entries(UI_ART)) {

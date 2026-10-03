@@ -26,7 +26,7 @@ export class EquipmentRenderer {
     }
     const show = enabled && body.visible && body.active && frame !== 'down';
     for (const [sprite,item,offhand] of [[this.weapon,weapon,false],[this.offhand,second,true]] as const) {
-      if (!show || !item || !HELD_EQUIPMENT_KEYS.has(item.key)) { sprite.setVisible(false); continue; }
+      if (!show || !item || ('weaponType' in item && !HELD_EQUIPMENT_KEYS.has(item.key))) { sprite.setVisible(false); continue; }
       const type = 'weaponType' in item ? item.weaponType : 'shield';
       const key = `held_${item.key}`;
       // Keep old saves readable if an asset fails to load.

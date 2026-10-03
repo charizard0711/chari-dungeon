@@ -140,10 +140,12 @@ export interface ShieldDef {
   grade: EquipmentGrade;
   element?: Element;
   passive: ShieldPassive;
+  initialPlus?: number;
+  exclusiveLoot?: boolean;
 }
 
 export const SHIELD_DEFS: ShieldDef[] = [
-  // 無属性盾5種：すべて形と固有効果が異なる。
+  // 通常盾は無属性15種（各グレード3種）＋属性8種（各属性2種）。
   {
     key: 's_iron_round', name: '黒鉄の円盾', defBonus: 2, durMax: 65, minFloor: 1, rarity: 14, grade: 'D',
     passive: { key: 'brace', name: '踏ん張り', description: '10以上の攻撃ダメージを20%軽減' }
@@ -181,7 +183,37 @@ export const SHIELD_DEFS: ShieldDef[] = [
   {
     key: 's_frost_aegis', name: '氷城盾グレイシア', defBonus: 4, durMax: 70, minFloor: 8, rarity: 6, grade: 'B', element: 'ice',
     passive: { key: 'element_guard', name: '氷雪障壁', description: '氷属性の攻撃に強い' }
-  }
+  },
+  { key: 's_oak_guard', name: '樫の護盾', defBonus: 2, durMax: 85, minFloor: 1, rarity: 14, grade: 'D',
+    passive: { key: 'oak_guard', name: '小傷払い', description: '8以下の攻撃ダメージを2軽減（最低1）' } },
+  { key: 's_scout_guard', name: '斥候の軽盾', defBonus: 2, durMax: 55, minFloor: 1, rarity: 14, grade: 'D',
+    passive: { key: 'scout_guard', name: '身かわしの拍子', description: '4回目ごとの攻撃ダメージを50%軽減' } },
+  { key: 's_steel_bastion', name: '鋼壁盾バスティオン', defBonus: 4, durMax: 95, minFloor: 3, rarity: 10, grade: 'C',
+    passive: { key: 'flat_guard', name: '鋼板装甲', description: '攻撃ダメージを常に2軽減（最低1）' } },
+  { key: 's_pilgrim_guard', name: '巡礼盾グレイス', defBonus: 4, durMax: 70, minFloor: 3, rarity: 10, grade: 'C',
+    passive: { key: 'pilgrim_heal', name: '巡礼の祈り', description: '4回攻撃を受けるごとにHPを3回復' } },
+  { key: 's_duelist_guard', name: '決闘盾リポスト', defBonus: 6, durMax: 85, minFloor: 8, rarity: 6, grade: 'B',
+    passive: { key: 'duelist_parry', name: '受け流し', description: '3回目ごとの攻撃ダメージを50%軽減' } },
+  { key: 's_watchman_guard', name: '番人盾ウォーデン', defBonus: 6, durMax: 100, minFloor: 8, rarity: 6, grade: 'B',
+    passive: { key: 'neutral_guard', name: '無色の守り', description: '無属性の敵からの攻撃ダメージを20%軽減' } },
+  { key: 's_sun_guard', name: '陽光盾ソレイユ', defBonus: 8, durMax: 110, minFloor: 14, rarity: 3, grade: 'A',
+    passive: { key: 'sun_guard', name: '健勝の障壁', description: 'HPが70%以上のとき攻撃ダメージを25%軽減' } },
+  { key: 's_moon_guard', name: '月影盾ルナヴェール', defBonus: 8, durMax: 100, minFloor: 14, rarity: 3, grade: 'A',
+    passive: { key: 'moon_guard', name: '窮地の月光', description: 'HPが40%以下のとき攻撃ダメージを35%軽減' } },
+  { key: 's_requiem_guard', name: '鎮魂盾レクイエム', defBonus: 10, durMax: 125, minFloor: 21, rarity: 1, grade: 'S',
+    passive: { key: 'requiem_guard', name: '魂の応報', description: '攻撃ダメージを15%軽減し、軽減後の10%を反射' } },
+  { key: 's_prism_guard', name: '万華盾プリズマ', defBonus: 10, durMax: 130, minFloor: 21, rarity: 1, grade: 'S',
+    passive: { key: 'prism_guard', name: '万色の結界', description: '属性を持つ敵からの攻撃ダメージを25%軽減' } },
+  { key: 's_ember_guard', name: '鳳炎盾フェニクス', defBonus: 8, durMax: 110, minFloor: 14, rarity: 3, grade: 'A', element: 'fire',
+    passive: { key: 'ember_retort', name: '鳳凰の返火', description: '火属性に強い。受けた攻撃ダメージの15%を反射' } },
+  { key: 's_pearl_guard', name: '真珠盾マリステラ', defBonus: 8, durMax: 115, minFloor: 14, rarity: 3, grade: 'A', element: 'water',
+    passive: { key: 'pearl_mend', name: '癒やしの潮', description: '水属性に強い。3回攻撃を受けるごとにHPを4回復' } },
+  { key: 's_thunder_crown', name: '雷冠盾インドラ', defBonus: 10, durMax: 125, minFloor: 21, rarity: 1, grade: 'S', element: 'thunder',
+    passive: { key: 'thunder_parry', name: '雷閃防御', description: '雷属性に強い。4回目ごとの攻撃を完全に無効化' } },
+  { key: 's_glacier_guard', name: '氷皇盾アイスベルク', defBonus: 10, durMax: 145, minFloor: 21, rarity: 1, grade: 'S', element: 'ice',
+    passive: { key: 'glacier_guard', name: '氷壁の重層', description: '氷属性に強い。12以上の攻撃ダメージを20%軽減' } },
+  { key: 's_arcadia_guard', name: '堕天盾アルカディア', defBonus: 16, durMax: 300, minFloor: 1, rarity: 1, grade: 'S', initialPlus: 10, exclusiveLoot: true,
+    passive: { key: 'arcadia_guard', name: '堕天の裁き', description: '受けた攻撃ダメージの20%を反射。3回目ごとの攻撃を完全に無効化' } }
 ];
 
 // ===== マジック定義 =====

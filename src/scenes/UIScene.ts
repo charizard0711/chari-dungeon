@@ -6,7 +6,7 @@ import { hasThunderTerrain, THUNDER_TITLES } from '../thunderTerrain';
 import { EquipmentRenderer } from '../equipmentRenderer';
 import { GameScene } from './GameScene';
 import { weaponSkill, joystickDirection } from '../weaponSkills';
-import { drawSkillGlyph } from '../skillIcon';
+import { skillIconKey } from '../skillArt';
 import type { GachaResult, GachaPool } from './GameScene';
 import { GAME_W, GAME_H } from '../main';
 import { IS_MOBILE, MAP_X, MAP_Y, MAP_W, MAP_H } from '../layout';
@@ -59,7 +59,7 @@ export class UIScene extends Phaser.Scene {
   enemyInfoText!: Phaser.GameObjects.Text;
   skillButton?: Phaser.GameObjects.Container;
   private skillBackground?: Phaser.GameObjects.Graphics;
-  private skillGlyph?: Phaser.GameObjects.Graphics;
+  private skillGlyph?: Phaser.GameObjects.Image;
   private skillLabel?: Phaser.GameObjects.Text;
   private skillCounter?: Phaser.GameObjects.Text;
   private skillVisualKey = '';
@@ -518,9 +518,10 @@ export class UIScene extends Phaser.Scene {
     const button = this.add.container(x, y).setDepth(65);
     this.skillButton = button;
     this.skillBackground = this.add.graphics();
-    this.skillGlyph = this.add.graphics().setY(-7);
+    this.skillGlyph = this.add.image(0, -7, 'skill_dagger').setDisplaySize(IS_MOBILE ? 44 : 56, IS_MOBILE ? 44 : 56);
     this.skillLabel = this.add.text(0, IS_MOBILE ? 22 : 27, '', {
-      fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '9px' : '11px', fontStyle: 'bold', color: '#ddffff'
+      fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '9px' : '11px', fontStyle: 'bold', color: '#ddffff',
+      stroke: '#071115', strokeThickness: 3, align: 'center'
     }).setOrigin(.5);
     this.skillCounter = this.add.text(0, -6, '', { fontFamily: 'Arial Black', fontSize: IS_MOBILE ? '28px' : '34px', color: '#ffffff', stroke: '#071115', strokeThickness: 3 }).setOrigin(.5);
     button.add([this.skillBackground, this.skillGlyph, this.skillLabel, this.skillCounter]);
@@ -555,15 +556,14 @@ export class UIScene extends Phaser.Scene {
     if (key === this.skillVisualKey) return;
     this.skillVisualKey = key;
     const radius = IS_MOBILE ? 38 : 48;
-    this.skillBackground!.clear().fillStyle(0x110b13, .12).fillCircle(0, 0, radius);
+    this.skillBackground!.clear();
     this.skillBackground!.lineStyle(2, skill.color, .25).strokeCircle(0, 0, radius);
     if (remaining < 100) {
       this.skillBackground!.lineStyle(3, skill.color, .6).beginPath()
         .arc(0, 0, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - Math.min(1, remaining / 100))).strokePath();
     }
-    drawSkillGlyph(this.skillGlyph!, type, skill.color, IS_MOBILE ? 18 : 23);
-    this.skillGlyph!.setAlpha(1);
-    this.skillLabel!.setText(skill.name).setColor(`#${skill.color.toString(16).padStart(6, '0')}`);
+    this.skillGlyph!.setTexture(skillIconKey(type)).setAlpha(remaining > 0 ? .72 : 1);
+    this.skillLabel!.setText(skill.name === 'クロスビーム斬撃' ? 'クロスビーム\n斬撃' : skill.name).setColor(`#${skill.color.toString(16).padStart(6, '0')}`);
     this.skillCounter!.setText('');
   }
 
@@ -1619,7 +1619,9 @@ export class UIScene extends Phaser.Scene {
       'SS  3%     S  12%     A  25%     B  35%     C  25%',
       '装備等級:  SS→S　S→A　A→B　B→C　C→D',
       weaponPool ? '武器のみ排出  /  属性装備は約5%'
-        : '盾80%・服と鎧20%  /  所持済みの服・鎧は盾に変更',
+        : '通常抽選：盾80%・服と鎧20%（所持済みの服は盾へ）',
+      weaponPool ? '特別抽選：覇天剣アルカディア+10  0.01%'
+        : '特別抽選：堕天盾アルカディア+10  0.01%',
       weaponPool ? soldOut ? 'この階の武器は取得済み' : '武器は1階につき最大1本'
         : '武器を取得済みでも利用できます'
     ].join('\n'), {
@@ -2141,7 +2143,7 @@ export class UIScene extends Phaser.Scene {
         this.overlay.add(this.rowButton(x + 24, y + h - 74, 168, ownedArmor ? '所持済み' : 'もう1つ取得', true,
           () => this.selectCatalogItem(entry), !ownedArmor));
       }
-      addText(x + 24, y + h - 38, '装備の数値は未強化の基本性能です。', 12, '#86a9ad', w - 48);
+      addText(x + 24, y + h - 38, '装備の数値は入手時の基本性能です。', 12, '#86a9ad', w - 48);
       return;
     }
 

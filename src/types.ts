@@ -60,7 +60,10 @@ export interface Weapon {
 }
 
 export interface ShieldPassive {
-  key: 'brace' | 'mirror' | 'thorns' | 'perfect_guard' | 'recovery' | 'element_guard';
+  key: 'brace' | 'mirror' | 'thorns' | 'perfect_guard' | 'recovery' | 'element_guard'
+    | 'oak_guard' | 'scout_guard' | 'flat_guard' | 'pilgrim_heal' | 'duelist_parry'
+    | 'neutral_guard' | 'sun_guard' | 'moon_guard' | 'requiem_guard' | 'prism_guard'
+    | 'ember_retort' | 'pearl_mend' | 'thunder_parry' | 'glacier_guard' | 'arcadia_guard';
   name: string;
   description: string;
 }

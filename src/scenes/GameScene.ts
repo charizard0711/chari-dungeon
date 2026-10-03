@@ -13,6 +13,7 @@ import { TILE } from '../textures';
 import { hasRuinTerrain, ruinTerrainKey, ruinFloorKey, ruinFloorFrame } from '../ruinTerrain';
 import { generateDungeon, generateBossArena, DungeonData, randomFloor, isWalkable, addDiamondTreasury, removeLegacyRoomDoors } from '../dungeon';
 import { rollTreasuryReward } from '../treasury';
+import { resolveShieldHit } from '../shieldEffects';
 import type { BossRoomZone, OptionalRoom, OptionalRoomKind, Room } from '../dungeon';
 import { getTheme, eraSuffix, MONSTER_DEFS, WEAPON_DEFS, makeItem, gradeColor, ITEM_DEFS, ELEMENT_INFO, monsterElement } from '../data';
 import type { Armor, Dir, Element, MonsterElement, EquipmentGrade, ItemKind, MonsterDef, Shield, TileType, Vec2, Weapon } from '../types';
@@ -24,7 +25,7 @@ import { Enemy } from '../enemy';
 import { customFloorBoss } from '../customFloorBosses';
 import { getMonsterAnimation, monsterAnimationFrame } from '../monsterAnimation';
 import type { MonsterAction } from '../monsterAnimation';
-import { DIRECTIONAL_MONSTERS, MONSTER_DIRECTION_FRAME, monsterDirectionPose } from '../monsterDirections';
+import { AURELIUS_DIRECTIONS, DIRECTIONAL_MONSTERS, MONSTER_DIRECTION_FRAME, monsterDirectionPose } from '../monsterDirections';
 import { computePlayerAttack, computeEnemyAttack, consumeWeaponDurability } from '../combat';
 import { planSkill, weaponSkill, directionVector } from '../weaponSkills';
 import { Audio } from '../audio/manager';
@@ -170,7 +171,7 @@ interface PlayerTransformation {
   kind: TransformationKind;
   turns: number;
   name: string;
-  textureKey: 'm_jelly' | 'm_archdemon';
+  textureKey: string;
   displaySize: number;
   attackRate: number;
   defenseBonus: number;
@@ -4056,6 +4057,10 @@ export class GameScene extends Phaser.Scene {
       this.dropEquipment(e.x, e.y, 'weapon', makeWeapon('w_hero_sword', []));
       this.log('まばゆい光の中から、覇天剣アルカディアが現れた！', 'special');
     }
+    if ((def.isBoss || def.isFloorBoss) && !def.isTreasureRabbit && Math.random() < ARCADIA_BOSS_DROP_RATE) {
+      this.dropEquipment(e.x, e.y, 'shield', makeShield('s_arcadia_guard'));
+      this.log('黒い羽根が舞い、堕天盾アルカディア+10が現れた！', 'special');
+    }
 
     this.enemyDefeatFx(e);
     const bossState = this.bossStates.get(e);
@@ -4408,13 +4413,13 @@ export class GameScene extends Phaser.Scene {
 
     if (shieldResult.heal > 0 && this.player.hp > 0) {
       this.player.heal(shieldResult.heal);
-      this.log(`聖域再生でHPを${shieldResult.heal}回復した。`, 'special');
+      this.log(`${this.player.shield?.passive?.name ?? '盾の加護'}でHPを${shieldResult.heal}回復した。`, 'special');
       this.effectFx(this.player.x, this.player.y, 'fx_heal', 1.4, 420);
     }
 
     if (shieldResult.reflect > 0 && attacker?.alive) {
       attacker.hp -= shieldResult.reflect;
-      this.log(`反射棘が${attacker.def.name}へ${shieldResult.reflect}ダメージを返した！`, 'special');
+      this.log(`${this.player.shield?.passive?.name ?? '盾の反射'}が${attacker.def.name}へ${shieldResult.reflect}ダメージを返した！`, 'special');
       this.hitFx(attacker.x, attacker.y);
       if (attacker.hp <= 0) this.killEnemy(attacker, 0);
       else this.drawEnemyHp(attacker);
@@ -4424,35 +4429,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   resolveShieldDefense(damage: number, attacker?: Enemy): { damage: number; heal: number; reflect: number; message?: string } {
-    const shield = this.player.shield;
-    if (!shield || !attacker || !shield.passive) return { damage, heal: 0, reflect: 0 };
-
-    const passive = shield.passive;
-    let adjusted = damage;
-    let heal = 0;
-    let reflect = 0;
-    let message: string | undefined;
-
-    if (passive.key === 'brace' && damage >= 10) {
-      adjusted = Math.max(1, Math.floor(damage * 0.8));
-      message = `${shield.name}の踏ん張りでダメージを軽減！`;
-    } else if (passive.key === 'mirror' && Math.random() < 0.15) {
-      adjusted = 0;
-      message = `${shield.name}が攻撃を映し、完全に無効化！`;
-    } else if (passive.key === 'thorns') {
-      reflect = Math.max(1, Math.floor(damage * 0.25));
-    } else if (passive.key === 'perfect_guard') {
-      shield.guardCounter = (shield.guardCounter ?? 0) + 1;
-      if (shield.guardCounter % 5 === 0) {
-        adjusted = 0;
-        message = `${shield.name}の時止め防御！ 5回目の攻撃を完全に無効化！`;
-      }
-    } else if (passive.key === 'recovery') {
-      shield.guardCounter = (shield.guardCounter ?? 0) + 1;
-      if (shield.guardCounter % 4 === 0) heal = 6;
-    }
-
-    return { damage: adjusted, heal, reflect, message };
+    if (!attacker) return { damage, heal: 0, reflect: 0 };
+    return resolveShieldHit(this.player.shield, damage, {
+      hp: this.player.hp, hpMax: this.player.hpMax, attackerElement: monsterElement(attacker.def)
+    });
   }
 
   handlePlayerDown() {
@@ -6000,7 +5980,7 @@ export class GameScene extends Phaser.Scene {
   startTransformation(kind: TransformationKind) {
     const transformation: PlayerTransformation = kind === 'slime'
       ? { kind, turns: 30, name: 'スライム', textureKey: 'm_jelly', displaySize: 35, attackRate: 1.05, defenseBonus: 1 }
-      : { kind, turns: 30, name: '封印王アウレリウス', textureKey: 'm_archdemon', displaySize: 43, attackRate: 1.1, defenseBonus: 3 };
+      : { kind, turns: 30, name: '封印王アウレリウス', textureKey: AURELIUS_DIRECTIONS.textureKey, displaySize: 40 * MILESTONE_BOSSES[5].scale, attackRate: 1.1, defenseBonus: 3 };
     this.transformation = transformation;
     this.player.transformationAttackRate = transformation.attackRate;
     this.player.transformationDefBonus = transformation.defenseBonus;
@@ -6035,22 +6015,28 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    // Old run saves may still reference the single-direction portrait and 43px size.
+    if (this.transformation.kind === 'boss5') {
+      this.transformation.textureKey = AURELIUS_DIRECTIONS.textureKey;
+      this.transformation.displaySize = 40 * MILESTONE_BOSSES[5].scale;
+    }
     const { textureKey, displaySize, kind } = this.transformation;
     if (!this.transformationSprite || !this.transformationSprite.scene) {
       this.transformationSprite = this.add.image(this.playerSprite.x, this.playerSprite.y, textureKey)
         .setOrigin(0.5, 0.62)
         .setDepth(this.playerSprite.depth + 0.05);
     }
-    this.transformationSprite.setTexture(textureKey).setVisible(true);
+    this.transformationSprite.setTexture(textureKey, kind === 'boss5' ? MONSTER_DIRECTION_FRAME[this.player.dir] : undefined).setVisible(true)
+      .setOrigin(.5, kind === 'boss5' ? BOSS_GROUND_ORIGIN_Y : .62);
     const source = this.textures.get(textureKey).getSourceImage() as { width?: number; height?: number };
     const maxEdge = Math.max(1, source?.width ?? displaySize, source?.height ?? displaySize);
-    this.transformationBaseScale = displaySize / maxEdge;
+    this.transformationBaseScale = displaySize / (kind === 'boss5' ? AURELIUS_DIRECTIONS.artSize : maxEdge);
     this.transformationSprite
       .setScale(this.transformationBaseScale)
-      .setFlipX(this.player.dir === 'left')
+      .setFlipX(kind !== 'boss5' && this.player.dir === 'left')
       .setAlpha(this.invisTurns > 0 ? 0.4 : 1)
       .clearTint();
-    if (kind === 'boss5') this.transformationSprite.setTint(0xffd28a);
+    if (kind === 'boss5') this.transformationSprite.setTint(MILESTONE_BOSSES[5].tint);
     this.playerSprite.setAlpha(0);
     this.weaponSprite?.setVisible(false);
   }
@@ -6392,7 +6378,10 @@ export class GameScene extends Phaser.Scene {
     }
     this.player.gold -= 500;
 
-    const arcadiaWon = pool === 'weapon' && Math.random() < ARCADIA_GACHA_RATE;
+    // Each selected pool has its own 0.01% legendary; the armor category roll does not dilute it.
+    const legendaryWon = Math.random() < ARCADIA_GACHA_RATE;
+    const arcadiaWon = pool === 'weapon' && legendaryWon;
+    const arcadiaShieldWon = pool === 'armor' && legendaryWon;
 
     // ランク抽選: SS 3% / S 12% / A 25% / B 35% / C 25%
     const forcedRank = location.hostname === 'localhost'
@@ -6403,7 +6392,7 @@ export class GameScene extends Phaser.Scene {
       : null;
     const r = Math.random();
     const rank: 'SS' | 'S' | 'A' | 'B' | 'C' =
-      arcadiaWon ? 'SS' : forcedRank && ['SS', 'S', 'A', 'B', 'C'].includes(forcedRank)
+      legendaryWon ? 'SS' : forcedRank && ['SS', 'S', 'A', 'B', 'C'].includes(forcedRank)
         ? forcedRank as 'SS' | 'S' | 'A' | 'B' | 'C'
         : r < 0.03 ? 'SS' : r < 0.15 ? 'S' : r < 0.40 ? 'A' : r < 0.75 ? 'B' : 'C';
 
@@ -6427,7 +6416,7 @@ export class GameScene extends Phaser.Scene {
     // 武器は必ず武器、防具は盾80%・服20%。QA指定も選択したプール内に限定。
     const categoryRoll = Math.random();
     let prizeCategory: 'weapon' | 'shield' | 'armor' =
-      pool === 'weapon' ? 'weapon'
+      pool === 'weapon' ? 'weapon' : arcadiaShieldWon ? 'shield'
         : forcedCategory === 'shield' || forcedCategory === 'armor' ? forcedCategory
           : categoryRoll < 0.8 ? 'shield' : 'armor';
     if (prizeCategory === 'armor' && this.ownsArmor(armorForGrade(grade).key)) prizeCategory = 'shield';
@@ -6455,9 +6444,9 @@ export class GameScene extends Phaser.Scene {
       elementName = w.element ? `${ELEMENT_INFO[w.element].name}属性` : '無属性';
       feature = w.passive?.name ?? (w.magics.length ? `魔法刻印 ${w.magics.map((magic) => magic.label).join('')}` : undefined);
     } else {
-      const s = rollShieldByGrade(grade);
-      if (rank === 'SS') s.plus = 2;
-      else if (rank === 'S') s.plus = 1;
+      const s = arcadiaShieldWon ? makeShield('s_arcadia_guard') : rollShieldByGrade(grade);
+      if (rank === 'SS') s.plus = Math.max(s.plus, 2);
+      else if (rank === 'S') s.plus = Math.max(s.plus, 1);
       this.receiveShield(s, 'ガチャ');
       name = shieldFullName(s);
       texKey = s.key;
@@ -7130,16 +7119,17 @@ export class GameScene extends Phaser.Scene {
     ps.setDepth(this.worldDepth(ps.y, 13));
     if (this.enemies.some(e => e.alive && bossBodyRadius(e.def) && Math.abs(ps.x - e.sprite.x) < TILE * 5 && Math.abs(ps.y - e.sprite.y) < TILE * 5)) ps.setDepth(40);
     if (this.transformationSprite?.visible && this.transformation) {
-      const pulse = Math.sin(time * 0.004);
+      const pulse = this.transformation.kind === 'boss5' ? 0 : Math.sin(time * 0.004);
       this.transformationSprite
         .setPosition(ps.x, ps.y)
         .setScale(
           this.transformationBaseScale * (1 - pulse * 0.018),
           this.transformationBaseScale * (1 + pulse * 0.045)
         )
-        .setFlipX(this.player.dir === 'left')
+        .setFlipX(this.transformation.kind !== 'boss5' && this.player.dir === 'left')
         .setAlpha(this.invisTurns > 0 ? 0.4 : 1)
         .setDepth(ps.depth + 0.05);
+      if (this.transformation.kind === 'boss5') this.transformationSprite.setFrame(MONSTER_DIRECTION_FRAME[this.player.dir]);
     }
     // 足元の影
     if (this.playerShadow) {
@@ -7434,7 +7424,8 @@ export class GameScene extends Phaser.Scene {
     this.playerAnimation.play(frame, this.time.now);
     this.playerVisualSince = this.playerAnimation.since;
     this.player.dir = dir;
-    this.transformationSprite?.setFlipX(dir === 'left');
+    if (this.transformation?.kind === 'boss5') this.transformationSprite?.setFrame(MONSTER_DIRECTION_FRAME[dir]).setFlipX(false);
+    else this.transformationSprite?.setFlipX(dir === 'left');
     this.drawPlayerFrame(dir, this.playerAnimation.sample(this.time.now));
     this.updateHeldEquipment();
   }
