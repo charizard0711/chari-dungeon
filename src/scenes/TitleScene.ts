@@ -112,15 +112,18 @@ export class TitleScene extends Phaser.Scene {
     const logo = this.add.image(cx, mobile ? 242 : 182, 'title_golden_crossed_swords').setName('title-logo');
     // The crossed blades are taller than the old wordmark; keep them clear of the character selector.
     logo.setScale(Math.min((mobile ? GAME_W - 32 : GAME_W * .5) / logo.width, (mobile ? 190 : 300) / logo.height));
+    // Anchor the action to the frame painted into the backdrop, including its mobile crop.
+    const exploreX = backdrop.x + (0.497 - .5) * backdrop.displayWidth;
+    const exploreY = backdrop.y + (0.794 - .5) * backdrop.displayHeight;
     this.createGenderSelector(mobile ? 414 : 412, mobile);
-    this.createDifficultySelector(mobile ? 547 : 529, mobile);
+    this.createDifficultySelector(mobile ? 547 : 529, mobile, mobile ? undefined : exploreY + backdrop.displayHeight * .09);
     {
-      const y = mobile ? GAME_H * .80 : 635, w = mobile ? GAME_W - 32 : GAME_W * .36, h = 68;
-      this.add.text(cx, y, '探索', { fontFamily: FONT, fontSize: mobile ? '27px' : '34px', color: '#f6d688', fontStyle: 'bold' }).setOrigin(.5);
+      const x = exploreX, y = exploreY, w = Math.min(GAME_W - 32, backdrop.displayWidth * .36), h = backdrop.displayHeight * .08;
+      this.add.text(x, y, '探索', { fontFamily: FONT, fontSize: mobile ? '27px' : '34px', color: '#f6d688', fontStyle: 'bold' }).setOrigin(.5);
       const hover = this.add.graphics();
       const clear = () => hover.clear();
-      this.add.zone(cx, y, w, h).setInteractive({useHandCursor:true})
-        .on('pointerover', () => { hover.lineStyle(1, 0xffdfa1, .65).strokeRoundedRect(cx-w/2, y-h/2, w, h, 12); })
+      this.add.zone(x, y, w, h).setInteractive({useHandCursor:true})
+        .on('pointerover', () => { hover.lineStyle(1, 0xffdfa1, .65).strokeRoundedRect(x-w/2, y-h/2, w, h, 12); })
         .on('pointerout', clear)
         .on('pointerdown', () => { Audio.playSe('click'); startGame(); })
         .on('pointerup', startGame);
@@ -197,11 +200,11 @@ export class TitleScene extends Phaser.Scene {
     }).setOrigin(0.5);
   }
 
-  private createDifficultySelector(y: number, mobile: boolean) {
+  private createDifficultySelector(y: number, mobile: boolean, descriptionY = y + 50) {
     const progress = readDifficultyProgress();
     const width = mobile ? 112 : 150, gap = mobile ? 8 : 12, cx = GAME_W / 2;
     this.add.text(cx, y - 51, '難易度を選ぶ', { fontFamily: FONT, fontSize: '14px', color: '#e6d7b8', fontStyle: 'bold' }).setOrigin(.5).setStroke('#030711', 4);
-    const description = this.add.text(cx, y + 50, '', { fontFamily: FONT, fontSize: mobile ? '10px' : '12px', color: '#e0d6c3', align: 'center' }).setOrigin(.5).setStroke('#030711', 3);
+    const description = this.add.text(cx, descriptionY, '', { fontFamily: FONT, fontSize: mobile ? '10px' : '12px', color: '#e0d6c3', align: 'center' }).setOrigin(.5).setStroke('#030711', 3);
     const cards: { mode: Difficulty; bg: Phaser.GameObjects.Graphics; x: number }[] = [];
     const refresh = () => {
       for (const card of cards) {
