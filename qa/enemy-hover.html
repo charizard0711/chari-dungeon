@@ -1,0 +1,27 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><title>敵にカーソルを合わせて詳細確認</title>
+<style>body{margin:16px;background:#101923;color:#eee1c4;font:14px system-ui}button{padding:8px 14px;margin:4px;background:#302a23;color:#ffe1a2;border:1px solid #997744}iframe{display:block;width:1120px;height:730px;max-width:100%;margin-top:12px;border:1px solid #997744}output{display:block;margin:10px 0;color:#b8d9b4;white-space:pre-line}h1{font-size:22px}</style>
+<h1>敵にカーソルを合わせて詳細確認</h1><p>敵やボスにカーソルを合わせてください。クリック不要。冒険セーブは変更しません。</p>
+<button id="menu">設定を開く</button><button id="close">探索へ</button><output>読み込み中</output><iframe title="敵の詳細確認画面"></iframe>
+<script type="module">
+import {MONSTER_DEFS} from '/src/data.ts';
+if(location.hostname!=='localhost')throw Error('Local QA only');
+const frame=document.querySelector('iframe'),out=document.querySelector('output');let ready=false,baseline,hoverStart=0;
+const scene=()=>frame.contentWindow?.__game?.scene.getScene('GameScene');
+const hud=()=>frame.contentWindow?.__game?.scene.getScene('UIScene');
+frame.src='/?qa-game&qa-silent&qa-boss&qa-floor=5&qa-gender=male&mobile=0';
+document.querySelector('#menu').onclick=()=>{if(ready)hud().setOverlay('settings');};
+document.querySelector('#close').onclick=()=>{if(ready)hud().setOverlay('none');};
+setInterval(()=>{
+ const s=scene(),u=hud();if(!s?.playerSprite||!s.sys.isActive()||!u?.enemyInfoText)return;
+ if(!ready){
+  const r=s.dungeon.bossRoom;s.player.x=r.cx;s.player.y=r.cy+2;
+  for(const e of s.enemies){if(e.def.isBoss||e.def.isFloorBoss){e.x=r.cx+2;e.y=r.cy;s.placeSprite(e.sprite,e.x,e.y);}else{e.hp=0;}}
+  s.addEnemy(MONSTER_DEFS.find(d=>d.key==='m_jelly'),r.cx-2,r.cy+1,1);
+  s.placeSprite(s.playerSprite,s.player.x,s.player.y);s.lightRadius=100;s.updateVisibility();s.emitRefresh();u.setOverlay('none');
+  for(const e of s.enemies){if(!e.alive){e.sprite.setVisible(false);e.shadow?.setVisible(false);e.aura?.setVisible(false);e.hpBar?.setVisible(false);}}
+  baseline=JSON.stringify([s.turn,s.player.hp,...s.enemies.map(e=>e.hp)]);ready=true;
+ }
+ if(u.enemyInfoText.visible){if(!hoverStart)hoverStart=Date.now();}else hoverStart=0;
+ out.textContent=`準備完了｜詳細：${u.enemyInfoText.visible?'ON '+u.enemyInfoText.text.split('\n')[0]:'OFF'}｜表示時間：${hoverStart?Math.floor((Date.now()-hoverStart)/1000):0}秒｜ターン・HP：${baseline===JSON.stringify([s.turn,s.player.hp,...s.enemies.map(e=>e.hp)])?'変化なし':'変化あり'}｜メニュー：${u.overlayMode}`;
+},100);
+</script></html>

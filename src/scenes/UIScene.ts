@@ -66,6 +66,8 @@ export class UIScene extends Phaser.Scene {
   catalogDetail: CatalogEntry | null = null;
   catalogClaimMessage = '';
   enemyInfoText!: Phaser.GameObjects.Text;
+  private enemyInfoTimer?: Phaser.Time.TimerEvent;
+  private enemyInfoHovered = false;
   skillButton?: Phaser.GameObjects.Container;
   private skillBackground?: Phaser.GameObjects.Graphics;
   private skillGlyph?: Phaser.GameObjects.Image;
@@ -153,6 +155,7 @@ export class UIScene extends Phaser.Scene {
     const onLog = (d: any) => this.addLog(d.msg, d.type);
     const onFloor = () => this.refresh();
     const onEnemy = (info: any) => this.showEnemyInfo(info);
+    const onEnemyHoverEnd = () => { if (this.enemyInfoHovered) this.hideEnemyInfo(); };
     gsEvents.on('refresh', onRefresh);
     const celebrations = new QuestCelebrations(this, MAP_X + MAP_W / 2, MAP_Y + 77, MAP_W);
     gsEvents.on('quest-notice', celebrations.push);
@@ -164,6 +167,7 @@ export class UIScene extends Phaser.Scene {
     gsEvents.on('log', onLog);
     gsEvents.on('floor', onFloor);
     gsEvents.on('enemyinfo', onEnemy);
+    gsEvents.on('enemyhoverend', onEnemyHoverEnd);
 
     const onWheel = (_pointer: Phaser.Input.Pointer, _objects: Phaser.GameObjects.GameObject[], _dx: number, dy: number) => {
       if (this.overlayMode === 'equip' && dy !== 0) this.scrollEquipment(dy > 0 ? 1 : -1);
@@ -185,6 +189,8 @@ export class UIScene extends Phaser.Scene {
       gsEvents.off('log', onLog);
       gsEvents.off('floor', onFloor);
       gsEvents.off('enemyinfo', onEnemy);
+      gsEvents.off('enemyhoverend', onEnemyHoverEnd);
+      this.hideEnemyInfo();
       this.input.off('wheel', onWheel);
       this.input.keyboard?.off('keydown', onSecretKey);
     });
@@ -948,6 +954,9 @@ export class UIScene extends Phaser.Scene {
   }
 
   showEnemyInfo(info: any) {
+    this.enemyInfoTimer?.remove();
+    this.enemyInfoTimer = undefined;
+    this.enemyInfoHovered = !!info.hover;
     const lines = [
       `【${info.name}】`,
       ...(info.description ? [info.description] : []),
@@ -957,7 +966,16 @@ export class UIScene extends Phaser.Scene {
       `行動: ${info.behavior}`
     ];
     this.enemyInfoText.setText(lines.join('\n')).setVisible(true);
-    this.time.delayedCall(3000, () => this.enemyInfoText.setVisible(false));
+    if (!this.enemyInfoHovered) {
+      this.enemyInfoTimer = this.time.delayedCall(3000, () => this.hideEnemyInfo());
+    }
+  }
+
+  private hideEnemyInfo() {
+    this.enemyInfoTimer?.remove();
+    this.enemyInfoTimer = undefined;
+    this.enemyInfoHovered = false;
+    if (this.enemyInfoText?.active) this.enemyInfoText.setVisible(false);
   }
 
   // ============ オーバーレイ ============
@@ -997,6 +1015,7 @@ export class UIScene extends Phaser.Scene {
     for (const entry of this.slotAuras) entry.aura.enabled = entry.icon.texture.key === entry.key;
     this.gs.clearMoveInput();
     this.hideTooltip();
+    this.hideEnemyInfo();
     if (mode === 'none') { this.overlay.setVisible(false); return; }
     this.overlay.setVisible(true);
     this.rebuildOverlay();

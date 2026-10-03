@@ -375,6 +375,8 @@ export class GameScene extends Phaser.Scene {
   private skillRangePreviewKey = '';
   private dynamiteRangePreview?: Phaser.GameObjects.Graphics;
   private dynamiteRangePreviewKey = '';
+  private hoveredEnemy?: Enemy;
+  private enemyHoverInfoKey = '';
 
   playerSprite!: Phaser.GameObjects.Image;
   playerShadow?: Phaser.GameObjects.Image; // 足元の影（接地感）
@@ -589,6 +591,7 @@ export class GameScene extends Phaser.Scene {
       kb.off('keydown-ENTER', descendKey);
       kb.off('keydown-Q', skillKey);
       this.game.events.off(Phaser.Core.Events.BLUR, this.clearMoveInput, this);
+      this.clearEnemyHover();
       this.queuedMove = null;
     });
     this.input.off('pointerdown', this.handleMapClick, this);
@@ -7456,6 +7459,7 @@ export class GameScene extends Phaser.Scene {
       m.sprite.x += Math.sin(time * 0.001 + m.phase) * 0.015;
       m.sprite.setAlpha(0.12 + (pulse + 1) * 0.13);
     }
+    this.updateEnemyHover();
   }
   flashSprite(spr: Phaser.GameObjects.Image) {
     if (!spr.active || !spr.scene) return;
@@ -7476,11 +7480,53 @@ export class GameScene extends Phaser.Scene {
     e.hpBar.fillStyle(0x40ff70, 1); e.hpBar.fillRect(x, y, w * Math.max(0, e.hp / e.hpMax), 3);
   }
 
+  private clearEnemyHover() {
+    if (!this.hoveredEnemy) return;
+    this.hoveredEnemy = undefined;
+    this.enemyHoverInfoKey = '';
+    this.events.emit('enemyhoverend');
+  }
+
+  private updateEnemyHover() {
+    const pointer = this.input.activePointer;
+    const ui = this.scene.get('UIScene') as any;
+    if (!this.input.isOver || pointer.wasTouch || this.gameEnded || !ui?.enemyInfoText?.active
+      || ui.overlayMode !== 'none' || ui.isSkillPointer?.(pointer.x, pointer.y)
+      || pointer.x < MAP_X || pointer.x >= MAP_X + MAP_W
+      || pointer.y < MAP_Y || pointer.y >= MAP_Y + MAP_H) {
+      this.clearEnemyHover();
+      return;
+    }
+
+    // Use the map camera, not pointer.worldX/Y (the HUD has its own camera).
+    // Check every frame so enemies moving under a stationary cursor stay accurate.
+    const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+    let target: Enemy | undefined;
+    for (const enemy of this.enemies) {
+      if (!enemy.alive || !enemy.sprite?.active || !enemy.sprite.visible) continue;
+      if (enemy.def.isDarkNinja && !enemy.stealthRevealed) continue;
+      if (!enemy.awakened && ['mimic', 'ambush', 'statue'].includes(enemy.def.gimmick ?? '')) continue;
+      if (enemy.sprite.getBounds().contains(world.x, world.y)
+        && (!target || enemy.sprite.depth >= target.sprite.depth)) target = enemy;
+    }
+    if (!target) {
+      this.clearEnemyHover();
+      return;
+    }
+    const key = [target.hp, target.hpMax, target.def.atkMin, target.def.atkMax,
+      target.def.def, target.def.behavior, monsterElement(target.def)].join(':');
+    if (target === this.hoveredEnemy && key === this.enemyHoverInfoKey) return;
+    this.hoveredEnemy = target;
+    this.enemyHoverInfoKey = key;
+    this.showEnemyInfo(target);
+  }
+
   showEnemyInfo(e: Enemy) {
     this.discoverMonster(e.def.key);
     const element = monsterElement(e.def);
     const weakTo = element ? ELEMENT_INFO[element].weakTo : undefined;
     this.events.emit('enemyinfo', {
+      hover: e === this.hoveredEnemy,
       name: e.def.name, hp: e.hp, hpMax: e.hpMax,
       atk: `${e.def.atkMin}-${e.def.atkMax}`, def: e.def.def,
       behavior: this.behaviorLabel(e.def.behavior),
@@ -7561,6 +7607,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   clearMoveInput() {
+    this.clearEnemyHover();
     this.showSkillRangePreview(false);
     this.showDynamiteRangePreview(false);
     this.events.emit('moveinputcleared');
