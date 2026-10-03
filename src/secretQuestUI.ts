@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { UIScene } from './scenes/UIScene';
-import { SECRET_QUESTS, SECRET_WEAPON_KEYS, questsRevealed, canClaimQuest, completedQuestCount } from './secretQuests';
+import { SECRET_QUESTS, SECRET_WEAPON_KEYS, QUEST_FRAGMENT_RATE, questsRevealed, canClaimQuest, completedQuestCount } from './secretQuests';
 import { WEAPON_DEFS, ELEMENT_INFO } from './data';
 import { Audio } from './audio/manager';
 
@@ -38,7 +38,7 @@ export function buildQuestJournal(ui: UIScene, x: number, y: number, w: number, 
   }
   ui.overlay.add(ui.add.image(x + 47, y + 91, 'ui_nav_quests').setDisplaySize(62, 62));
   text(x + 89, y + 55, revealed ? '失われた依頼書、解読完了' : 'まだ、誰も知らない依頼', mobile ? 15 : 20, '#f0dba8', w - 115);
-  text(x + 89, y + 85, revealed ? '各20体・5つすべて達成で、秘宝を1本。' : '紙の切れ端を5枚集めると、内容が明かされる。', 11, '#b3a7c4', w - 110);
+  text(x + 89, y + 85, revealed ? '各20体・5つすべて達成で、秘宝を1本。' : '紙の切れ端を5枚集めると、クエスト開始。', 11, '#b3a7c4', w - 110);
   for (let i = 0; i < 5; i++) {
     ui.overlay.add(ui.add.image(x + 102 + i * 31, y + 128, 'quest_fragment').setDisplaySize(25, 25).setAlpha(i < p.fragments ? 1 : .14));
   }
@@ -63,8 +63,8 @@ export function buildQuestJournal(ui: UIScene, x: number, y: number, w: number, 
     if (canClaimQuest(p)) button(x + w - 164, y + h - 104, 144, '全達成の報酬を選ぶ', () => { ui.secretRewardOpen = true; ui.rebuildOverlay(); });
     else text(x + w - 164, y + h - 94, p.claimed.length ? '報酬は受取済み' : '5つすべて達成で報酬', 11, '#b3a7c4', 148);
   }
-  text(x + 20, y + h - 40, revealed ? '討伐数・解読状況は冒険を越えて引き継がれます。' : '魔物撃破時に5%で切れ端が出現。自動で手帳へ収めます。', 10, '#9491a3');
-  text(x + 20, y + h - 23, '解読前の討伐も記録。報酬の武器は受け取った冒険で使用します。', 10, '#9491a3');
+  text(x + 20, y + h - 40, revealed ? '討伐数・解読状況は冒険を越えて引き継がれます。' : `魔物撃破時に${QUEST_FRAGMENT_RATE * 100}%で切れ端を自動回収。`, 10, '#9491a3');
+  text(x + 20, y + h - 23, revealed ? '報酬の武器は受け取った冒険で使用します。' : '討伐数は5枚そろってからカウントします。', 10, '#9491a3');
 }
 
 export interface QuestNotice { title: string; detail: string }

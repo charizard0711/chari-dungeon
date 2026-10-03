@@ -19,19 +19,23 @@ function load(name){
 const q=load('secretQuests'),data=load('data'),player=load('player'),treasury=load('treasury');
 const allKills=Object.fromEntries(q.SECRET_QUESTS.map(quest=>[quest.id,quest.count]));
 let p=q.normalizeQuests();
+assert.equal(q.QUEST_FRAGMENT_RATE,.005);
+assert.equal(q.recordQuestKill(p,'other',()=>.005).fragment,false);
 assert.equal(q.recordQuestKill(p,'other',()=>.05).fragment,false);
-assert.equal(q.recordQuestKill(p,'other',()=>.049999).fragment,true);
+assert.equal(q.recordQuestKill(p,'other',()=>.004999).fragment,true);
 assert.equal(p.fragments,1);
-for(let i=0;i<20;i++)q.recordQuestKill(p,'m_mush',()=>.99);
-assert.equal(p.kills.lantern,20);assert.equal(p.kills.owl,0);assert.equal(q.canClaimQuest(p),false);
+for(const quest of q.SECRET_QUESTS)for(let i=0;i<20;i++)q.recordQuestKill(p,quest.monster,()=>.99);
+assert.ok(Object.values(p.kills).every(n=>n===0),'locked quests never bank kills');
+assert.equal(q.canClaimQuest(p),false);
 for(let i=0;i<3;i++)assert.equal(q.recordQuestKill(p,'other',()=>0).revealed,false);
-const fifth=q.recordQuestKill(p,'other',()=>0);
-assert.equal(fifth.revealed,true);assert.equal(fifth.completed.length,1);assert.equal(fifth.completed[0].id,'lantern');
-assert.equal(fifth.rewardReady,false);assert.equal(q.completedQuestCount(p),1);
-assert.equal(q.claimQuest(p,q.SECRET_WEAPON_KEYS[0]),false,'one quest cannot award a weapon');
-assert.equal(q.recordQuestKill(p,'m_mush',()=>0).completed.length,0);assert.equal(p.fragments,5);assert.equal(p.kills.lantern,20);
-for(const quest of q.SECRET_QUESTS.slice(1)){
- for(let i=0;i<19;i++)q.recordQuestKill(p,quest.monster,()=>.99);
+const fifth=q.recordQuestKill(p,'m_mush',()=>0);
+assert.equal(fifth.revealed,true);assert.equal(fifth.completed.length,0);
+assert.equal(p.kills.lantern,0,'the fifth-fragment kill precedes quest activation');
+assert.equal(fifth.rewardReady,false);assert.equal(q.completedQuestCount(p),0);
+assert.equal(q.recordQuestKill(p,'m_mush',()=>{throw Error('no fragment rolls after unlock');}).completed.length,0);
+assert.equal(p.fragments,5);assert.equal(p.kills.lantern,1,'the first kill after unlocking counts');
+for(const quest of q.SECRET_QUESTS){
+ while(p.kills[quest.id]<19)q.recordQuestKill(p,quest.monster,()=>.99);
  assert.equal(q.canClaimQuest(p),false);
  assert.equal(q.claimQuest(p,q.SECRET_WEAPON_KEYS[0]),false,'even four complete quests plus 19 kills is insufficient');
  const r=q.recordQuestKill(p,quest.monster,()=>.99);assert.equal(r.completed[0].id,quest.id);
@@ -43,10 +47,23 @@ assert.equal(q.claimQuest(p,q.SECRET_WEAPON_KEYS[0]),true);
 for(const key of q.SECRET_WEAPON_KEYS)assert.equal(q.claimQuest(p,key),false,'only one of the five weapons may be claimed');
 assert.equal(p.claimed.length,5,'v1 clients must see every individual reward as consumed');
 const concealed=q.normalizeQuests({fragments:4,kills:allKills});
-assert.equal(q.canClaimQuest(concealed),false,'all kills still require the five fragments');
-assert.equal(q.recordQuestKill(concealed,'other',()=>0).rewardReady,true,'reveal after all kills also unlocks reward');
+assert.ok(Object.values(concealed.kills).every(n=>n===0),'legacy pre-unlock kills are discarded');
+assert.equal(q.canClaimQuest(concealed),false);
+assert.equal(q.recordQuestKill(concealed,'other',()=>0).rewardReady,false,'unlock cannot auto-complete old pre-unlock kills');
+assert.equal(q.completedQuestCount(concealed),0);
 const clean=q.normalizeQuests({fragments:Infinity,kills:{lantern:-1,owl:500,eye:NaN},claimed:['lantern','lantern','fake'],announced:'invalid'});
-assert.equal(clean.fragments,0);assert.equal(clean.kills.owl,20);assert.equal(clean.kills.lantern,0);assert.equal(clean.claimed.length,1);assert.equal(clean.announced.length,0);
+assert.equal(clean.fragments,0);assert.equal(clean.kills.owl,0);assert.equal(clean.kills.lantern,0);assert.equal(clean.claimed.length,1);assert.equal(clean.announced.length,0);
+const revealed=q.normalizeQuests({fragments:5,kills:{lantern:7,owl:500,eye:NaN},announced:['owl']});
+assert.equal(revealed.kills.lantern,7);assert.equal(revealed.kills.owl,20);assert.equal(revealed.kills.eye,0);assert.equal(revealed.announced[0],'owl');
+const lockedLegacy={fragments:4,kills:allKills,announced:q.SECRET_QUESTS.map(quest=>quest.id)};
+for(const [a,b]of [[lockedLegacy,revealed],[revealed,lockedLegacy]]){
+ const restored=q.mergeQuests(a,b);
+ assert.equal(restored.kills.lantern,7,'a locked snapshot cannot overwrite revealed progress');
+ assert.equal(restored.kills.eye,0);assert.equal(restored.announced.length,1);
+}
+storage.set(q.QUEST_SAVE_KEY,JSON.stringify(lockedLegacy));
+assert.equal(q.readQuestJournal().fragments,4);assert.ok(Object.values(q.readQuestJournal().kills).every(n=>n===0));
+q.writeQuestJournal(revealed);assert.equal(q.readQuestJournal().kills.lantern,7);
 for(const quest of q.SECRET_QUESTS){
  const old=q.normalizeQuests({fragments:5,kills:allKills,claimed:[quest.id]});
  assert.equal(q.claimQuest(old,q.SECRET_WEAPON_KEYS[0]),false,'a legacy individual reward consumes the journal reward');
@@ -96,4 +113,4 @@ const aura=new LegendaryAura(scene,target,'sword');scene.events.emit('postupdate
 const shield=new LegendaryAura(scene,target,'shield');scene.events.emit('postupdate');const sizes=objects.slice(-3).map(o=>o.displayWidth);scene.time.now+=500;scene.events.emit('postupdate');assert.notDeepEqual(objects.slice(-3).map(o=>o.displayWidth),sizes);scene.events.emit('shutdown');assert.equal(scene.events.entries.length,0);
 for(const [key,rel]of Object.entries(load('adventureArt').ADVENTURE_ART)){const f=new URL('../public/'+rel,import.meta.url);assert.ok(fs.existsSync(f),key);assert.ok(fs.statSync(f).size>1000);}
 for(const art of load('equipmentAppearance').HELD_EQUIPMENT)assert.ok(fs.existsSync(new URL('../public/'+art.path,import.meta.url)),art.itemKey);
-console.log('PASS: exact 5% / five fragments / all five 20-kill quests required / single journal reward and full inventory / persistence and migration / 12,000 loot rolls / animated aura lifecycle / 15 image assets.');
+console.log('PASS: exact 0.5% / kills start after the fifth fragment / all five 20-kill quests required / single journal reward and full inventory / legacy hidden kills discarded, revealed progress retained through saves and merges / 12,000 loot rolls / animated aura lifecycle / 15 image assets.');

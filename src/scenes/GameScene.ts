@@ -6344,8 +6344,8 @@ export class GameScene extends Phaser.Scene {
       this.tweens.add({ targets: scrap, alpha: 0, duration: 300, delay: 650, onComplete: () => scrap.destroy() });
     }
     if (result.revealed) {
-      this.log('5枚の切れ端がつながり、秘密クエストの封印が解けた！', 'special');
-      this.events.emit('quest-notice', { title: '秘密が、いま明かされる', detail: '5枚の切れ端を解読。秘密クエストが開放されました。' });
+      this.log('5枚の切れ端がつながり、秘密クエスト開始！ ここから討伐数をカウントします。', 'special');
+      this.events.emit('quest-notice', { title: '秘密が、いま明かされる', detail: '5枚の切れ端を解読。秘密クエスト開始！\nここから対象の魔物を各20体討伐しよう。' });
     }
     for (const quest of result.completed) {
       this.log(`秘密クエスト達成「${quest.title}」！（${completedQuestCount(this.secretQuests)}/5）`, 'special');

@@ -1,5 +1,5 @@
 /** The journal persists across adventures; rewards belong to the adventure that claims them. */
-export const QUEST_FRAGMENT_RATE = .05;
+export const QUEST_FRAGMENT_RATE = .005;
 export const QUEST_FRAGMENTS_REQUIRED = 5;
 export const SECRET_QUESTS = [
   { id: 'lantern', monster: 'm_mush', targetName: 'ランタンマッシュ', title: '消えない森の灯', count: 20 },
@@ -14,9 +14,12 @@ const count = (n: unknown, max: number) => typeof n === 'number' && Number.isFin
 export function normalizeQuests(value?: Partial<SecretQuestProgress> | null): SecretQuestProgress {
   const ids = new Set<string>(SECRET_QUESTS.map(q => q.id));
   const list = (v: unknown) => Array.isArray(v) ? [...new Set(v.filter(id => typeof id === 'string' && ids.has(id)))] : [];
-  return { fragments: count(value?.fragments, QUEST_FRAGMENTS_REQUIRED),
-    kills: Object.fromEntries(SECRET_QUESTS.map(q => [q.id, count(value?.kills?.[q.id], q.count)])),
-    claimed: list(value?.claimed), announced: list(value?.announced) };
+  const fragments = count(value?.fragments, QUEST_FRAGMENTS_REQUIRED);
+  const revealed = fragments >= QUEST_FRAGMENTS_REQUIRED;
+  // Discard pre-unlock credit from old saves; retain already revealed progress and claimed rewards.
+  return { fragments,
+    kills: Object.fromEntries(SECRET_QUESTS.map(q => [q.id, revealed ? count(value?.kills?.[q.id], q.count) : 0])),
+    claimed: list(value?.claimed), announced: revealed ? list(value?.announced) : [] };
 }
 export function mergeQuests(a?: Partial<SecretQuestProgress>, b?: Partial<SecretQuestProgress>): SecretQuestProgress {
   const x = normalizeQuests(a), y = normalizeQuests(b);
@@ -34,7 +37,10 @@ export function canClaimQuest(p: SecretQuestProgress) {
 export function recordQuestKill(p: SecretQuestProgress, monster: string, random = Math.random) {
   const wasRevealed = questsRevealed(p);
   const wasRewardReady = canClaimQuest(p);
-  for (const q of SECRET_QUESTS) if (q.monster === monster) p.kills[q.id] = Math.min(q.count, (p.kills[q.id] || 0) + 1);
+  // The enemy dropping the fifth fragment was defeated before the quest started.
+  if (wasRevealed) {
+    for (const q of SECRET_QUESTS) if (q.monster === monster) p.kills[q.id] = Math.min(q.count, (p.kills[q.id] || 0) + 1);
+  }
   const fragment = !wasRevealed && random() < QUEST_FRAGMENT_RATE;
   if (fragment) p.fragments = Math.min(QUEST_FRAGMENTS_REQUIRED, p.fragments + 1);
   const revealed = !wasRevealed && questsRevealed(p);
