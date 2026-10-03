@@ -3893,7 +3893,7 @@ export class GameScene extends Phaser.Scene {
     const elementColor = this.player.weapon?.element ? ELEMENT_INFO[this.player.weapon.element].color : 0xdfe7f0;
     if (ranged) {
       const arrow = this.add.image(this.playerSprite.x, this.playerSprite.y, 'fx_bolt')
-        .setDepth(20).setTint(elementColor).setScale(0.82);
+        .setDepth(20).setTint(elementColor).setDisplaySize(TILE * .9, TILE * .45);
       arrow.setRotation(Phaser.Math.Angle.Between(this.playerSprite.x, this.playerSprite.y, e.sprite.x, e.sprite.y));
       await this.tween(arrow, { x: e.sprite.x, y: e.sprite.y }, 180, 'Quad.easeIn');
       arrow.destroy();
@@ -5139,7 +5139,7 @@ export class GameScene extends Phaser.Scene {
         Audio.playSe(elementAttackSe(enemyElement));
         const [dx, dy] = this.dirVec(e.facing);
         const bolt = this.add.image(e.sprite.x + dx * 17, e.sprite.y - 5 + dy * 17, 'fx_bolt')
-          .setDepth(20).setTint(enemyElementInfo.color);
+          .setDepth(20).setTint(enemyElementInfo.color).setDisplaySize(TILE, TILE * .5);
         bolt.setRotation(Phaser.Math.Angle.Between(bolt.x, bolt.y, this.playerSprite.x, this.playerSprite.y));
         await this.tween(bolt, { x: this.playerSprite.x, y: this.playerSprite.y }, this.currentTurnAnimDuration(180));
         bolt.destroy();
@@ -5162,7 +5162,9 @@ export class GameScene extends Phaser.Scene {
       yoyo: true,
       ease: 'Sine.easeInOut'
     });
-    const bolt = this.add.image(e.sprite.x, e.sprite.y, 'fx_bolt').setDepth(20).setTint(enemyElementInfo.color);
+    const bolt = this.add.image(e.sprite.x, e.sprite.y, 'fx_bolt')
+      .setDepth(20).setTint(enemyElementInfo.color).setDisplaySize(TILE, TILE * .5);
+    bolt.setRotation(Phaser.Math.Angle.Between(bolt.x, bolt.y, this.playerSprite.x, this.playerSprite.y));
     return this.tween(bolt, { x: this.playerSprite.x, y: this.playerSprite.y }, this.currentTurnAnimDuration(180))
       .then(() => {
         bolt.destroy();
@@ -6838,9 +6840,14 @@ export class GameScene extends Phaser.Scene {
   // 汎用エフェクト（効果シートの画像を表示。tint指定で色を変えられる）
   effectFx(x: number, y: number, key: string, scale = 1.5, dur = 500, tint?: number) {
     if (!this.textures.exists(key)) return;
-    const fx = this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, key).setDepth(22).setScale(0.8);
+    const fx = this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, key).setDepth(22);
+    // The painted bolt is 768px wide; its world size must not depend on asset resolution.
+    const width = key === 'fx_bolt' ? TILE : fx.width;
+    const height = key === 'fx_bolt' ? TILE * .5 : fx.height;
+    fx.setDisplaySize(width * .8, height * .8);
     if (tint !== undefined) fx.setTint(tint);
-    this.tweens.add({ targets: fx, alpha: 0, scale, duration: dur, onComplete: () => fx.destroy() });
+    this.tweens.add({ targets: fx, alpha: 0, displayWidth: width * scale, displayHeight: height * scale,
+      duration: dur, onComplete: () => fx.destroy() });
   }
   healFx() { this.effectFx(this.player.x, this.player.y, 'fx_heal', 1.6, 550); }
   levelupFx() { this.effectFx(this.player.x, this.player.y, 'fx_levelup', 1.8, 700); }

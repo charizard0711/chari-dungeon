@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ja"><meta charset="utf-8"><title>遠距離エフェクトのサイズ確認</title>
+<style>body{margin:14px;background:#101923;color:#eee;font:14px system-ui}h1{font-size:21px}button,select{padding:8px;margin:3px;background:#253144;color:#fff;border:1px solid #88794e}iframe{display:block;width:1280px;max-width:100%;height:800px;margin-top:12px;border:1px solid #88794e}pre{white-space:pre-wrap;font-size:12px}output{display:block;margin:10px;color:#f1d999}</style>
+<h1>遠距離エフェクトのサイズ確認</h1><p>ローカル専用。実際の冒険セーブは変更しません。1マス = 32px。</p>
+<label>攻撃 <select id="attack"><option value="player">プレイヤーの遠距離攻撃</option><option value="enemy">敵の属性弾（方向アニメあり）</option><option value="fallback">敵の属性弾（通常）</option><option value="laser">照準レーザーの着弾</option><option value="skill">ハンドガンのスキル</option></select></label>
+<label>向き <select id="direction"><option value="right">右</option><option value="down">下</option><option value="left">左</option><option value="up">上</option></select></label>
+<button id="play">再生</button><button id="freeze">弾を止めてサイズを見る</button><button id="suite">全5種類・4方向を検証</button>
+<output>読み込み中</output><iframe title="遠距離攻撃のゲーム画面"></iframe><pre></pre>
+<script type="module">
+import {MONSTER_DEFS} from '/src/data.ts';
+import {makeWeapon} from '/src/player.ts';
+import {directionVector} from '/src/weaponSkills.ts';
+if(location.hostname!=='localhost')throw Error('Local QA only');
+const frame=document.querySelector('iframe'),output=document.querySelector('output'),report=document.querySelector('pre');
+const g=()=>frame.contentWindow?.__game?.scene.getScene('GameScene');
+let ready=false,origin,latest={},tracking=false,hold=false,freezeStarted=0,seen=[],maxWidth=0,maxHeight=0;
+const saved=localStorage.getItem('chari-dungeon.run.v1');
+function sample(){const s=g();if(!tracking)return;for(const fx of s.children.list){if(fx.texture?.key!=='fx_bolt')continue;
+ maxWidth=Math.max(maxWidth,fx.displayWidth);maxHeight=Math.max(maxHeight,fx.displayHeight);
+ if(!seen.includes(fx))seen.push(fx);
+ if(hold){freezeStarted||=performance.now();if(performance.now()-freezeStarted>=250){hold=false;s.tweens.pauseAll();s.time.timeScale=0;latest={...latest,paused:true};}}
+}}
+function setup(type,dir){const s=g();s.tweens.resumeAll();s.time.timeScale=1;s.tweens.timeScale=1;
+ for(const e of s.enemies){e.sprite.destroy();e.shadow?.destroy();e.hpBar?.destroy();}s.enemies=[];
+ s.player.x=origin.x;s.player.y=origin.y;s.player.hp=s.player.hpMax=5000;s.player.shield=null;s.player.poisonTurns=0;s.player.weapon=makeWeapon(type==='skill'?'w_blackpowder_handgun':'w_bow_fire',[]);
+ s.placeSprite(s.playerSprite,origin.x,origin.y);s.setPlayerVisual(dir,'idle');s.skillChargeSteps=100;
+ const d=directionVector(dir),out=type==='player'||type==='skill';
+ const def=MONSTER_DEFS.find(m=>m.key===(out?'m_mush':type==='enemy'?'m_ember_drake':'m_eye'));
+ const e=s.addEnemy({...def,isBoss:false,isFloorBoss:false,hpMin:5000,hpMax:5000,atkMin:1,atkMax:1,element:'fire',gimmick:undefined},origin.x+d.x*(out?2:-2),origin.y+d.y*(out?2:-2),1);
+ e.hp=e.hpMax=5000;e.facing=dir;
+ if(type==='fallback'){e.frameAnimation=undefined;e.directionArt=undefined;}
+ s.updateVisibility();s.emitRefresh();return e;
+}
+async function run(type,dir,freeze=false){const s=g();if(s.busy||tracking)return;
+ const e=setup(type,dir),enemyBefore=e.hp,hpBefore=s.player.hp;seen=[];maxWidth=0;maxHeight=0;hold=freeze;freezeStarted=0;tracking=true;
+ latest={type,dir,running:true};s.tweens.timeScale=freeze?.25:1;s.time.timeScale=freeze?.25:1;
+ if(type==='player')await s.playerAttack(e,dir,true);
+ else if(type==='enemy'||type==='fallback')await s.enemyRanged(e);
+ else if(type==='laser'){e.def.gimmick='laser_lock';e.charging=true;e.chargeDir=directionVector(dir);s.handleMonsterGimmickTurn(e);}
+ else await s.useWeaponSkill();
+ await new Promise(resolve=>setTimeout(resolve,650));
+ if(latest.paused)return;
+ tracking=false;s.tweens.timeScale=1;s.time.timeScale=1;
+ latest={type,dir,directionalArt:!!e.directionArt,shots:seen.length,maxWidth,maxHeight,remaining:seen.filter(f=>f.active).length,damage:type==='player'||type==='skill'?enemyBefore-e.hp:hpBefore-s.player.hp};
+ latest.pass=seen.length>0&&maxWidth<=48.01&&maxHeight<=24.01&&latest.remaining===0&&latest.damage>0&&(type!=='enemy'||latest.directionalArt);
+ return {...latest};
+}
+document.querySelector('#play').onclick=()=>run(document.querySelector('#attack').value,document.querySelector('#direction').value);
+document.querySelector('#freeze').onclick=()=>run(document.querySelector('#attack').value,document.querySelector('#direction').value,true);
+document.querySelector('#suite').onclick=async()=>{const results=[];for(const type of ['player','enemy','fallback','laser','skill'])for(const dir of ['right','down','left','up']){results.push(await run(type,dir));}latest={allPass:results.every(r=>r?.pass),results};};
+setInterval(()=>{const s=g();if(!s?.playerSprite||!s.sys.isActive())return;
+ if(!ready){s.lightRadius=100;const room=s.dungeon.bossRoom;origin={x:room.cx-2,y:room.cy-2};s.clearTransformation();s.scene.get('UIScene').setOverlay('none');s.cameras.main.stopFollow();s.cameras.main.setZoom(2);s.cameras.main.centerOn((origin.x+.5)*32,(origin.y+.5)*32);setup('enemy','right');s.events.on('postupdate',sample);ready=true;}
+ const state={...latest,maxWidth,maxHeight,realSaveUntouched:localStorage.getItem('chari-dungeon.run.v1')===saved};report.textContent=JSON.stringify(state,null,2);
+ output.textContent=latest.allPass?'PASS：全20ケース、サイズ・ダメージ・消滅を確認':`弾の最大サイズ ${maxWidth.toFixed(1)} × ${maxHeight.toFixed(1)} px ／ ${latest.paused?'停止中（再確認はページ再読み込み）':tracking?'再生中':'準備完了'}`;
+},150);
+frame.src='/?qa-game&qa-floor=5&qa-boss&qa-field-arena&mobile=0';
+</script></html>
