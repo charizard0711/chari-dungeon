@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { buildQuestJournal, QuestCelebrations } from '../secretQuestUI';
+import { LegendaryAura } from '../legendaryAura';
 import { CATALOG_TABS, ITEM_CATALOG, catalogPage, type CatalogCategory, type CatalogEntry } from '../itemCatalog';
 import { hasWaterTerrain, WATER_TITLES } from '../waterTerrain';
 import { hasFinalDepthTerrain, FINAL_DEPTH_TITLES, FINAL_DEPTH_COLORS } from '../finalDepthTerrain';
@@ -29,6 +31,8 @@ const GACHA_PALETTES = {
 };
 
 export class UIScene extends Phaser.Scene {
+  secretRewardId: string | null = null;
+  private slotAuras: { aura: LegendaryAura; icon: Phaser.GameObjects.Image; key: string }[] = [];
   gs!: GameScene;
   logLines: { msg: string; type: string }[] = [];
 
@@ -43,7 +47,7 @@ export class UIScene extends Phaser.Scene {
   logTexts: Phaser.GameObjects.Text[] = []; // 固定8行（行ごとに色分け）
   itemContainer!: Phaser.GameObjects.Container;
   overlay!: Phaser.GameObjects.Container;
-  overlayMode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' | 'itemcatalog' | 'equipmentcatalog' | 'repair' = 'none';
+  overlayMode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' | 'itemcatalog' | 'equipmentcatalog' | 'repair' | 'quests' = 'none';
   repairKind: 'weapon' | 'shield' = 'weapon';
   pickSlot = 0; // 'pick'モードで開いている装備スロット（0武器/1服/2盾）
   gachaAnimating = false; // ガチャ演出中は再描画をブロック
@@ -88,6 +92,8 @@ export class UIScene extends Phaser.Scene {
   }
 
   create() {
+    this.secretRewardId = null;
+    this.slotAuras = [];
     this.overlayMode = 'none';
     this.gachaAnimating = false;
     this.gachaPool = 'weapon';
@@ -141,6 +147,13 @@ export class UIScene extends Phaser.Scene {
     const onFloor = () => this.refresh();
     const onEnemy = (info: any) => this.showEnemyInfo(info);
     gsEvents.on('refresh', onRefresh);
+    const celebrations = new QuestCelebrations(this, MAP_X + MAP_W / 2, MAP_Y + 77, MAP_W);
+    gsEvents.on('quest-notice', celebrations.push);
+    for (const slot of this.equipSlots) {
+      if (slot.kind !== 'weapon' && slot.kind !== 'shield') continue;
+      const aura = new LegendaryAura(this, slot.icon, slot.kind === 'weapon' ? 'sword' : 'shield');
+      this.slotAuras.push({ aura, icon: slot.icon, key: slot.kind === 'weapon' ? 'w_hero_sword' : 's_arcadia_guard' });
+    }
     gsEvents.on('log', onLog);
     gsEvents.on('floor', onFloor);
     gsEvents.on('enemyinfo', onEnemy);
@@ -158,6 +171,7 @@ export class UIScene extends Phaser.Scene {
     // シーン停止時にリスナーを解除（再起動時の多重登録・破棄済み参照アクセス防止）
     this.events.once('shutdown', () => {
       gsEvents.off('refresh', onRefresh);
+      gsEvents.off('quest-notice', celebrations.push);
       gsEvents.off('log', onLog);
       gsEvents.off('floor', onFloor);
       gsEvents.off('enemyinfo', onEnemy);
@@ -240,6 +254,7 @@ export class UIScene extends Phaser.Scene {
       { t: 'ガチャ', icon: 'ui_nav_gacha', f: () => this.setOverlay('gacha') },
       { t: 'モンスター図鑑', icon: 'ui_nav_codex', f: () => this.setOverlay('codex') },
       { t: '装備図鑑', icon: 'ui_nav_equipment_codex', f: () => this.setOverlay('equipmentcatalog') },
+      { t: '秘密クエスト', icon: 'ui_nav_quests', f: () => this.setOverlay('quests') },
       { t: '設定', icon: 'ui_nav_settings', f: () => this.showSettings() }
     ];
     let y = 84;
@@ -437,6 +452,7 @@ export class UIScene extends Phaser.Scene {
       { icon: 'ui_nav_gacha', label: 'ガチャ', f: () => this.setOverlay('gacha') },
       { icon: 'ui_nav_codex', label: '図鑑', f: () => this.setOverlay('codex') },
       { icon: 'ui_nav_equipment_codex', label: '装備図鑑', f: () => this.setOverlay('equipmentcatalog') },
+      { icon: 'ui_nav_quests', label: '秘密', f: () => this.setOverlay('quests') },
       { icon: 'ui_nav_settings', label: '設定', f: () => this.showSettings() }
     ];
     this.panel(8, 800, 374, 36);
@@ -446,10 +462,10 @@ export class UIScene extends Phaser.Scene {
       const g = this.add.graphics();
       const draw = (c: number) => { g.clear(); g.fillStyle(c, 1).fillRoundedRect(x, y, w, h, 6); };
       draw(0x25121e);
-      this.add.image(x + 14, y + h / 2, it.icon).setDisplaySize(24, 24);
-      this.add.text(x + 28, y + h / 2, it.label, {
-        fontFamily: '"Yu Gothic UI"', fontSize: it.label.length > 3 ? '7px' : '8px', color: '#dfe7f0'
-      }).setOrigin(0, 0.5);
+      this.add.image(x + w / 2, y + 10, it.icon).setDisplaySize(21, 21);
+      this.add.text(x + w / 2, y + 25, it.label, {
+        fontFamily: '"Yu Gothic UI"', fontSize: '8px', color: '#dfe7f0'
+      }).setOrigin(.5);
       const zone = this.add.zone(x, y, w, h).setOrigin(0).setInteractive({ useHandCursor: true });
       zone.on('pointerdown', () => { draw(0x264a48); Audio.playSe('click'); it.f(); });
       zone.on('pointerup', () => draw(0x25121e));
@@ -537,6 +553,7 @@ export class UIScene extends Phaser.Scene {
       void this.gs.useWeaponSkill();
     });
     this.refreshSkillButton();
+    for (const entry of this.slotAuras) entry.aura.enabled = entry.icon.texture.key === entry.key;
   }
 
   isSkillPointer(x: number, y: number) {
@@ -569,6 +586,7 @@ export class UIScene extends Phaser.Scene {
 
   update() {
     this.refreshSkillButton();
+    for (const entry of this.slotAuras) entry.aura.enabled = entry.icon.texture.key === entry.key;
     this.gs.showSkillRangePreview(this.skillHovered && !!this.skillButton?.visible);
     if (this.overlayMode !== 'none' || this.gs.gameEnded) this.releaseJoystick?.();
   }
@@ -697,6 +715,7 @@ export class UIScene extends Phaser.Scene {
 
   refresh() {
     this.refreshSkillButton();
+    for (const entry of this.slotAuras) entry.aura.enabled = entry.icon.texture.key === entry.key;
     const p = this.gs.player;
     this.fountainBadge?.setVisible(p.fountainBlessingFloor !== null);
     const th = this.gs.dungeon?.glacialArena
@@ -927,7 +946,7 @@ export class UIScene extends Phaser.Scene {
     this.rebuildOverlay();
   }
 
-  setOverlay(mode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' | 'itemcatalog' | 'equipmentcatalog' | 'repair') {
+  setOverlay(mode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' | 'itemcatalog' | 'equipmentcatalog' | 'repair' | 'quests') {
     if (this.gachaAnimating) return; // 演出中は切替禁止
     if (this.gs.pendingEquipment && mode !== 'equip') mode = 'equip';
     if (mode === 'equip' && this.overlayMode !== 'equip') this.equipScrollIndex = 0;
@@ -945,6 +964,7 @@ export class UIScene extends Phaser.Scene {
     this.overlayMode = mode;
     this.releaseJoystick?.();
     this.refreshSkillButton();
+    for (const entry of this.slotAuras) entry.aura.enabled = entry.icon.texture.key === entry.key;
     this.gs.clearMoveInput();
     this.hideTooltip();
     if (mode === 'none') { this.overlay.setVisible(false); return; }
@@ -1009,7 +1029,8 @@ export class UIScene extends Phaser.Scene {
   rebuildOverlay() {
     if (this.gachaAnimating) return; // 演出中に消さない
     this.overlay.removeAll(true);
-    const { x, y, w, h } = ['itemcatalog', 'equipmentcatalog'].includes(this.overlayMode) && !IS_MOBILE
+    const { x, y, w, h } = this.overlayMode === 'quests' && !IS_MOBILE ? { x: 230, y: 40, w: 820, h: 680 }
+      : ['itemcatalog', 'equipmentcatalog'].includes(this.overlayMode) && !IS_MOBILE
       ? { x: 180, y: 40, w: 920, h: 660 }
       : ['settings', 'shop', 'repair'].includes(this.overlayMode) && !IS_MOBILE
         ? { x: 200, y: 60, w: 680, h: 620 } : this.L.ov;
@@ -1023,6 +1044,7 @@ export class UIScene extends Phaser.Scene {
     const title =
       this.overlayMode === 'equip' ? (this.gs.pendingEquipment ? '装備上限：売却が必要' : '装備・売却') :
       this.overlayMode === 'inv' ? '所持品・装備' :
+      this.overlayMode === 'quests' ? '秘密クエスト' :
       this.overlayMode === 'settings' ? '設定' :
       this.overlayMode === 'itemcatalog' ? '全アイテム一覧' :
       this.overlayMode === 'equipmentcatalog' ? '装備図鑑' :
@@ -1047,6 +1069,7 @@ export class UIScene extends Phaser.Scene {
     this.overlay.add(cb);
 
     if (this.overlayMode === 'equip') this.buildEquipOverlay(x, y, w, h);
+    else if (this.overlayMode === 'quests') buildQuestJournal(this, x, y, w, h);
     else if (this.overlayMode === 'inv') this.buildUnifiedInventoryOverlay(x, y, w, h);
     else if (this.overlayMode === 'settings') this.buildSettingsOverlay(x, y, w, h);
     else if (['itemcatalog', 'equipmentcatalog'].includes(this.overlayMode)) this.buildItemCatalogOverlay(x, y, w, h);
@@ -1621,7 +1644,7 @@ export class UIScene extends Phaser.Scene {
       weaponPool ? '武器のみ排出  /  属性装備は約5%'
         : '通常抽選：盾80%・服と鎧20%（所持済みの服は盾へ）',
       weaponPool ? '特別抽選：覇天剣アルカディア+10  0.01%'
-        : '特別抽選：堕天盾アルカディア+10  0.01%',
+        : '特別抽選：堕天盾ルシファー+10  0.01%',
       weaponPool ? soldOut ? 'この階の武器は取得済み' : '武器は1階につき最大1本'
         : '武器を取得済みでも利用できます'
     ].join('\n'), {
@@ -2126,6 +2149,7 @@ export class UIScene extends Phaser.Scene {
       const icon = this.add.image(cx, cy, entry.textureKey);
       icon.setScale(size / Math.max(icon.width, icon.height));
       this.overlay.add(icon);
+      if (entry.key === 'w_hero_sword' || entry.key === 's_arcadia_guard') new LegendaryAura(this, icon, entry.key === 'w_hero_sword' ? 'sword' : 'shield');
     };
     if (this.catalogDetail) {
       const entry = this.catalogDetail;

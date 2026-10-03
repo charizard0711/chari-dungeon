@@ -10,6 +10,8 @@ let seed = 42;
 const seededMath = Object.create(Math);
 seededMath.random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
 function load(name) {
+  // Rendering animation has its own lifecycle test in qa-secret-adventure.mjs.
+  if (path.basename(name).replace(/\.ts$/, '') === 'legendaryAura') return { LegendaryAura: class { enabled = false; } };
   const file = path.resolve(root, name.endsWith('.ts') ? name : `${name}.ts`);
   if (cache.has(file)) return cache.get(file).exports;
   const module = { exports: {} }; cache.set(file, module);

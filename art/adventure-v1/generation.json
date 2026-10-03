@@ -1,0 +1,111 @@
+{
+  "tool": "Built-in image_gen",
+  "created": "2026-10-03",
+  "assets": [
+    {
+      "key": "w_secret_ember",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-36bcf523-a6ba-4a93-92bc-3447c9596dd4.png",
+      "target": "public/assets/adventure-v1/w_secret_ember.png",
+      "prompt": "Original premium dark-fantasy Japanese dungeon crawler game asset, meticulously hand-painted realistic fantasy illustration, polished readable silhouette at small game size, sharp intentional shapes, no text, no letters, no UI, no border, no background, isolated on true transparent alpha, generous transparent padding. An upright legendary longsword, blade points straight up, hilt centered at bottom. Obsidian and warm gold phoenix-shaped guard, luminous orange flame channel inside pale steel blade, ember feathers, exquisite compact ornament. Whole sword visible. Square canvas.",
+      "transparent": true
+    },
+    {
+      "key": "w_secret_tide",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-3581628f-0075-4177-b8da-58be2730f3ce.png",
+      "target": "public/assets/adventure-v1/w_secret_tide.png",
+      "prompt": "Original premium dark-fantasy Japanese dungeon crawler game asset, meticulously hand-painted realistic fantasy illustration, polished readable silhouette at small game size, sharp intentional shapes, no text, no letters, no UI, no border, no background, isolated on true transparent alpha, generous transparent padding. An upright elegant crescent recurve bow, silver and deep turquoise sea-serpent design, translucent aqua fins, visible taut bowstring with one thin luminous arrow pointing UP. Whole bow visible. Square canvas.",
+      "transparent": true
+    },
+    {
+      "key": "w_secret_storm",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-e737ef46-d96e-45b3-9953-b0d728c74f0a.png",
+      "target": "public/assets/adventure-v1/w_secret_storm.png",
+      "prompt": "Original premium dark-fantasy Japanese dungeon crawler game asset, meticulously hand-painted realistic fantasy illustration, polished readable silhouette at small game size, sharp intentional shapes, no text, no letters, no UI, no border, no background, isolated on true transparent alpha, generous transparent padding. A vertical thunder spear pointing straight UP, long dark blue metal shaft, forked silver lightning spearhead with bright amber electric core, gold rings. Exquisite celestial weapon. Whole spear visible. Square canvas.",
+      "transparent": true
+    },
+    {
+      "key": "w_secret_frost",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-2f42704c-eee6-44fe-9621-10fcdf617eeb.png",
+      "target": "public/assets/adventure-v1/w_secret_frost.png",
+      "prompt": "Original premium dark-fantasy Japanese dungeon crawler game asset, meticulously hand-painted realistic fantasy illustration, polished readable silhouette at small game size, sharp intentional shapes, no text, no letters, no UI, no border, no background, isolated on true transparent alpha, generous transparent padding. An upright ice assassin dagger, blade points straight UP, hilt centered bottom. Curved pale crystalline blade, midnight blue and silver raven-wing guard, icy blue small gem, elegant deadly precision. Whole weapon visible. Square canvas.",
+      "transparent": true
+    },
+    {
+      "key": "fx_arrow",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-8cd8f747-db43-4052-8573-02922d0aba2b.png",
+      "target": "public/assets/adventure-v1/fx_arrow.png",
+      "prompt": "Original premium dark-fantasy Japanese dungeon crawler game asset, meticulously hand-painted realistic fantasy illustration, polished readable silhouette at small game size, sharp intentional shapes, no text, no letters, no UI, no border, no background, isolated on true transparent alpha, generous transparent padding. ONE long narrow magical arrow in SIDE VIEW flying horizontally to the RIGHT. Clearly recognizable pointed bright silver arrowhead on right, thin teal light shaft, sharp feather fletching on left, fluid turquoise light trails stretching left. Pure projectile VFX, no bow. Wide canvas.",
+      "transparent": true
+    },
+    {
+      "key": "w_secret_solar",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-65636f58-caab-4dc1-b3b6-3e2825700618.png",
+      "target": "public/assets/adventure-v1/w_secret_solar.png",
+      "prompt": "Original premium dark-fantasy Japanese dungeon crawler game asset, meticulously hand-painted realistic fantasy illustration, polished readable silhouette at small game size, sharp intentional shapes, no text, no letters, no UI, no border, no background, isolated on true transparent alpha, generous transparent padding. An ornate fantasy flintlock pistol in clean SIDE VIEW, barrel points RIGHT, dark burgundy steel, gilded lion engraving, ember-orange magical chamber, realistic trigger guard and wooden grip. Beautiful readable silhouette. Whole weapon visible. Square canvas.",
+      "transparent": true
+    },
+    {
+      "key": "fx_bolt",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-95441aae-354d-4215-a6c5-546d22894e67.png",
+      "target": "public/assets/adventure-v1/fx_bolt.png",
+      "prompt": "Original premium dark-fantasy Japanese dungeon crawler game asset, meticulously hand-painted realistic fantasy illustration, polished readable silhouette at small game size, sharp intentional shapes, no text, no letters, no UI, no border, no background, isolated on true transparent alpha, generous transparent padding. ONE compact brilliant orange-gold firearm projectile travelling RIGHT, focused white-hot bullet shaped core at right and short tapered orange flame tail left with tiny golden sparks. Pure projectile VFX, highly readable. Wide canvas.",
+      "transparent": true
+    },
+    {
+      "key": "fx_beam",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-0ccff5a8-97b0-43f8-8625-cabab746adeb.png",
+      "target": "public/assets/adventure-v1/fx_beam.png",
+      "prompt": "Original premium dark-fantasy Japanese dungeon crawler game asset, meticulously hand-painted realistic fantasy illustration, polished readable silhouette at small game size, sharp intentional shapes, no text, no letters, no UI, no border, no background, isolated on true transparent alpha, generous transparent padding. ONE horizontal continuous concentrated magic beam pointing RIGHT, white bright central core with layered cyan and violet blue filaments, twisting thin helix lines around the core, sharply tapered right tip, subtle sparks. Pure energy VFX, transparent above and below, no weapon. Wide canvas.",
+      "transparent": true
+    },
+    {
+      "key": "fx_crescent",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-0a31bc24-2fc5-430c-b743-66a925da05bb.png",
+      "target": "public/assets/adventure-v1/fx_crescent.png",
+      "prompt": "Original premium dark-fantasy Japanese dungeon crawler game asset, meticulously hand-painted realistic fantasy illustration, polished readable silhouette at small game size, sharp intentional shapes, no text, no letters, no UI, no border, no background, isolated on true transparent alpha, generous transparent padding. ONE dynamic thick crescent sword slash, white-hot center and elegant teal-gold luminous edges, wide sweeping C-shaped blade of energy with tapered streaks and a few sparks. Pure combat VFX sprite, no actual sword. Square canvas. Transparent interior and exterior.",
+      "transparent": true
+    },
+    {
+      "key": "ui_nav_quests",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-a74f5197-a525-4574-990c-7e2ae799c854.png",
+      "target": "public/assets/adventure-v1/ui_nav_quests.png",
+      "prompt": "Original premium dark-fantasy Japanese dungeon crawler game asset, meticulously hand-painted realistic fantasy illustration, polished readable silhouette at small game size, sharp intentional shapes, no text, no letters, no UI, no border, no background, isolated on true transparent alpha, generous transparent padding. ONE mysterious rolled parchment scroll partly open, weathered ivory paper, ornate bronze small clasp, luminous amethyst wax seal shaped like an eye, two folded parchment tips. Elegant icon with clear parchment silhouette. Square canvas.",
+      "transparent": true
+    },
+    {
+      "key": "fx_impact",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-17705985-da74-402d-9636-196a65a275bb.png",
+      "target": "public/assets/adventure-v1/fx_impact.png",
+      "prompt": "Original premium dark-fantasy Japanese dungeon crawler game asset, meticulously hand-painted realistic fantasy illustration, polished readable silhouette at small game size, sharp intentional shapes, no text, no letters, no UI, no border, no background, isolated on true transparent alpha, generous transparent padding. ONE magical impact burst, tightly focused white central flash, jagged eight pointed rays in gold and turquoise, a thin incomplete shockwave ring, scattered small angular sparkling fragments. Pure combat VFX sprite. Square canvas, outer corners empty transparent.",
+      "transparent": true
+    },
+    {
+      "key": "quest_fragment",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-fd4033f7-7c43-4651-af68-00484dbf479a.png",
+      "target": "public/assets/adventure-v1/quest_fragment.png",
+      "prompt": "Original premium dark-fantasy Japanese dungeon crawler game asset, meticulously hand-painted realistic fantasy illustration, polished readable silhouette at small game size, sharp intentional shapes, no text, no letters, no UI, no border, no background, isolated on true transparent alpha, generous transparent padding. ONE torn triangular scrap of ancient ivory parchment with ragged edges, faint indecipherable golden runes, small violet ink star mark, gently curled corner. Recognizable paper fragment item icon. Square canvas.",
+      "transparent": true
+    },
+    {
+      "key": "quest_crest",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-3047e5fd-edac-4a39-bf41-e48a2cfccd6b.png",
+      "target": "public/assets/adventure-v1/quest_crest.png",
+      "prompt": "Original premium dark-fantasy Japanese dungeon crawler game asset, meticulously hand-painted realistic fantasy illustration, polished readable silhouette at small game size, sharp intentional shapes, no text, no letters, no UI, no border, no background, isolated on true transparent alpha, generous transparent padding. ONE extravagant unlocked quest seal emblem: a glowing faceted amethyst diamond at center encircled by open golden laurel branches, two fine small white feather wings and a broken bronze wax ring, tiny floating gold sparks. Symmetrical celebratory crest, clear transparent gaps between elements, no text. Square canvas.",
+      "transparent": true
+    },
+    {
+      "key": "fx_shadow",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-53705e43-37c1-4553-bc83-e8b6430c20b5.png",
+      "target": "public/assets/adventure-v1/fx_shadow.png",
+      "prompt": "Original premium dark-fantasy Japanese dungeon crawler game asset, meticulously hand-painted realistic fantasy illustration, polished readable silhouette at small game size, sharp intentional shapes, no text, no letters, no UI, no border, no background, isolated on true transparent alpha, generous transparent padding. ONE drifting cloud of dark violet smoke with soft charcoal wisps and a few deep purple luminous threads, a loosely circular ring with a TRANSPARENT CENTRAL HOLE so a shield underneath remains visible. Fallen angel darkness aura. Semi-transparent delicate smoke edges, low opacity, no shield itself. Square canvas.",
+      "transparent": true
+    },
+    {
+      "key": "ending_dawn",
+      "source": "C:\\Users\\masam\\.codex\\generated_images\\01a0ff8a-7309-7732-9503-59e0837bbdd0\\exec-1314df75-98fa-4cd9-816c-3484473f8137.png",
+      "target": "public/assets/adventure-v1/ending_dawn.png",
+      "prompt": "Create an original cinematic widescreen 16:9 dark fantasy game ending illustration, exquisite hand-painted art. The camera looks from inside the deepest ancient dungeon toward a monumental broken circular doorway, beyond it luminous dawn and distant mountain peaks. A shattered turquoise dungeon crystal floats in shards near the upper middle, dissolving into thousands of tiny warm gold lights. On the LOWER LEFT foreground stands a very small cloaked sword-bearing adventurer seen from behind, a quiet silhouette after victory. Beautiful carved dark basalt arches and worn gold inlay at edges, violets and midnight teal transitioning into a radiant warm peach sunrise. Upper center has breathtaking sky and negative space for an overlaid title. Lower right and bottom center dark enough for game result overlay. Huge depth, emotional serene triumph, painterly premium RPG key art. No text, no logo, no UI, no modern objects.",
+      "transparent": false
+    }
+  ]
+}

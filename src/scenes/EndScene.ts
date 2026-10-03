@@ -1,3 +1,4 @@
+import { presentVictory } from '../victoryPresentation';
 import Phaser from 'phaser';
 import { GAME_W, GAME_H } from '../main';
 import { Audio } from '../audio/manager';
@@ -24,75 +25,7 @@ export class EndScene extends Phaser.Scene {
 
   create(stats: EndStats) {
     if (!stats.cleared) { this.createDefeat(stats); return; }
-    const mobile = GAME_W < 700;
-    this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x0b0e14);
-
-    // パーティクル風の装飾
-    const g = this.add.graphics();
-    for (let i = 0; i < 80; i++) {
-      const c = stats.cleared ? [0xf5c542, 0x3fe0d0, 0xa06bff] : [0x555f70, 0x3a2450];
-      g.fillStyle(c[Math.floor(Math.random() * c.length)], 0.3 + Math.random() * 0.4);
-      g.fillRect(Math.random() * GAME_W, Math.random() * GAME_H, 3, 3);
-    }
-
-    const titleColor = stats.cleared ? '#f5c542' : '#ff6b6b';
-    const titleText = stats.cleared ? '🎉 ダンジョン制覇！ 🎉' : '力尽きた…';
-    const title = this.add.text(GAME_W / 2, mobile ? 102 : 130, titleText, {
-      fontFamily: '"Yu Gothic UI"', fontSize: mobile ? '34px' : '58px', color: titleColor, fontStyle: 'bold'
-    }).setOrigin(0.5).setWordWrapWidth(GAME_W - 32);
-    title.setStroke('#000000', mobile ? 5 : 8);
-    this.tweens.add({ targets: title, scale: 1.06, yoyo: true, repeat: -1, duration: 1000 });
-
-    if (stats.cleared) {
-      this.add.text(GAME_W / 2, mobile ? 160 : 195, 'チャリはダンジョンコアへ到達した！', {
-        fontFamily: '"Yu Gothic UI"', fontSize: mobile ? '16px' : '22px', color: '#3fe0d0'
-      }).setOrigin(0.5).setWordWrapWidth(GAME_W - 36);
-    } else {
-      this.add.text(GAME_W / 2, mobile ? 160 : 195, `${stats.floor}階でチャリは力尽きた…`, {
-        fontFamily: '"Yu Gothic UI"', fontSize: mobile ? '16px' : '22px', color: '#dfe7f0'
-      }).setOrigin(0.5).setWordWrapWidth(GAME_W - 36);
-    }
-
-    // スコアパネル
-    const px = mobile ? 18 : GAME_W / 2 - 260;
-    const py = mobile ? 210 : 250;
-    const pw = mobile ? GAME_W - 36 : 520;
-    const ph = mobile ? 380 : 300;
-    const panel = this.add.graphics();
-    panel.fillStyle(0x141a26, 0.96).fillRoundedRect(px, py, pw, ph, 12);
-    panel.lineStyle(3, 0x3fe0d0).strokeRoundedRect(px, py, pw, ph, 12);
-
-    const rows: [string, string][] = [
-      ['到達階層', `${stats.floor} F`],
-      ['最終レベル', `Lv. ${stats.level}`],
-      ['残りHP', `${stats.hp} / ${stats.hpMax}`],
-      ['所持ゴールド', `${stats.gold} G`],
-      ['総ターン数', `${stats.turns}`],
-      ['モンスター図鑑', `${stats.discovered} / ${stats.totalMonsters}`]
-    ];
-    let ry = py + (mobile ? 34 : 28);
-    for (const [k, v] of rows) {
-      this.add.text(px + (mobile ? 24 : 40), ry, k, { fontFamily: '"Yu Gothic UI"', fontSize: mobile ? '16px' : '19px', color: '#8a97ab' });
-      this.add.text(px + pw - (mobile ? 24 : 40), ry, v, { fontFamily: '"Yu Gothic UI"', fontSize: mobile ? '16px' : '19px', color: '#dfe7f0' }).setOrigin(1, 0);
-      ry += mobile ? 42 : 34;
-    }
-    // スコア大表示
-    this.add.text(px + pw / 2, py + ph - 54, '得点', { fontFamily: '"Yu Gothic UI"', fontSize: '18px', color: '#f5c542' }).setOrigin(0.5);
-    const scoreText = this.add.text(px + pw / 2, py + ph - 16, '0', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '40px', color: '#f5c542', fontStyle: 'bold'
-    }).setOrigin(0.5);
-    // スコアカウントアップ演出
-    const tmp = { v: 0 };
-    this.tweens.add({
-      targets: tmp, v: stats.score, duration: 1400, ease: 'Cubic.out',
-      onUpdate: () => scoreText.setText(Math.floor(tmp.v).toLocaleString())
-    });
-
-    // ボタン
-    this.makeButton(GAME_W / 2, mobile ? 670 : 610, '🔄 もう一度挑戦', () => this.scene.start('GameScene'));
-    this.makeButton(GAME_W / 2, mobile ? 742 : 680, '🏠 タイトルへ', () => this.scene.start('TitleScene'));
-
-    this.input.keyboard?.once('keydown-ENTER', () => this.scene.start('GameScene'));
+    presentVictory(this, stats, (x, y, label, primary, action) => this.defeatButton(x, y, label, primary, action));
   }
 
   private createDefeat(stats: EndStats) {

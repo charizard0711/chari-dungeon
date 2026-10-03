@@ -13,6 +13,8 @@ import { TILE } from '../textures';
 import { hasRuinTerrain, ruinTerrainKey, ruinFloorKey, ruinFloorFrame } from '../ruinTerrain';
 import { generateDungeon, generateBossArena, DungeonData, randomFloor, isWalkable, addDiamondTreasury, removeLegacyRoomDoors } from '../dungeon';
 import { rollTreasuryReward } from '../treasury';
+import { normalizeQuests, mergeQuests, recordQuestKill, claimQuest, readQuestJournal, writeQuestJournal, type SecretQuestProgress } from '../secretQuests';
+import { playPaintedSkill, paintedImpact, paintedVanish, skillImpactTime } from '../skillEffects';
 import { resolveShieldHit } from '../shieldEffects';
 import type { BossRoomZone, OptionalRoom, OptionalRoomKind, Room } from '../dungeon';
 import { getTheme, eraSuffix, MONSTER_DEFS, WEAPON_DEFS, makeItem, gradeColor, ITEM_DEFS, ELEMENT_INFO, monsterElement } from '../data';
@@ -63,7 +65,7 @@ const RUN_STATE_KEYS = [
   'shopPurchases', 'enhancementScrollDrops', 'reservedBossScroll', 'pendingEquipment',
   'secretDualUnlocked', 'itemCatalogUnlocked', 'playerRootTurns', 'itemSealTurns', 'playerGender',
   'playerArmor', 'lightRadius', 'shroomTurns', 'torchTurns', 'lanternTurns', 'invisTurns',
-  'transformation', 'penaltyFlags', 'skillChargeSteps'
+  'transformation', 'penaltyFlags', 'skillChargeSteps', 'secretQuests'
 ] as const;
 const ENEMY_STATE_KEYS = [
   'def', 'hp', 'hpMax', 'x', 'y', 'baseScale', 'midBossVisualMultiplier', 'slowToggle', 'freezeTurns', 'sealTurns', 'poisonTurns',
@@ -360,6 +362,7 @@ export class GameScene extends Phaser.Scene {
   playerRootTurns = 0;
   itemSealTurns = 0;
   skillChargeSteps = 100;
+  secretQuests: SecretQuestProgress = normalizeQuests();
   private skillRangePreview?: Phaser.GameObjects.Graphics;
   private skillRangePreviewKey = '';
 
@@ -421,6 +424,7 @@ export class GameScene extends Phaser.Scene {
     this.saveWarningShown = false;
     // 状態初期化
     this.player = new Player();
+    this.secretQuests = this.runSaveEnabled() ? readQuestJournal() : normalizeQuests();
     const qaParams = new URLSearchParams(location.search);
     const qaGender = qaParams.get('qa-gender');
     this.playerGender = location.hostname === 'localhost' && isPlayerGender(qaGender)
@@ -3394,22 +3398,22 @@ export class GameScene extends Phaser.Scene {
       this.setPlayerVisual(direction, 'atkWindup');
       if (weapon.key === 'w_hero_sword') await new Promise<void>(resolve => this.time.delayedCall(200, resolve));
       if (destination) {
-        this.effectFx(origin.x, origin.y, 'fx_magic', 1.35, 250, skill.color);
+        paintedVanish(this, origin);
         await this.tween(this.playerSprite, { alpha: .08 }, 90, 'Quad.easeIn');
         this.player.x = destination.x; this.player.y = destination.y;
         this.player.dir = plan.targets[0].facing;
         this.placeSprite(this.playerSprite, destination.x, destination.y);
         this.playerSprite.setAlpha(this.invisTurns > 0 ? .4 : 1);
         this.onEnterTile(destination.x, destination.y);
-        this.effectFx(destination.x, destination.y, 'fx_magic', 1.3, 250, skill.color);
+        paintedVanish(this, destination);
       }
       this.setPlayerVisual(this.player.dir, 'atk');
-      this.drawSkillEffect(weapon.weaponType, origin, direction, plan.tiles, skill.color);
+      this.drawSkillEffect(weapon.weaponType, destination ?? origin, direction, plan.tiles, skill.color);
       if (weapon.key === 'w_hero_sword') {
         const [dx,dy] = this.dirVec(direction);
         this.arcadiaSlashFx(origin.x + dx, origin.y + dy, direction);
       }
-      await new Promise<void>(resolve => this.time.delayedCall(destination ? 90 : weapon.weaponType === 'bow' ? 450 : weapon.weaponType === 'greatsword' ? 270 : weapon.weaponType === 'handgun' ? 10 : 150, resolve));
+      await new Promise<void>(resolve => this.time.delayedCall(skillImpactTime(weapon.weaponType), resolve));
       const shots = weapon.weaponType === 'handgun' ? 3 : 1;
       for (let shot = 0; shot < shots && !this.gameEnded; shot++) {
         for (const enemy of plan.targets) {
@@ -3423,7 +3427,7 @@ export class GameScene extends Phaser.Scene {
           this.afterPlayerHitGimmick(enemy, weapon.element);
           this.discoverMonster(enemy.def.key);
           this.hitFx(enemy.x, enemy.y);
-          this.effectFx(enemy.x, enemy.y, 'fx_slash', 1.2, 230, skill.color);
+          paintedImpact(this, enemy);
           this.flashSprite(enemy.sprite);
           this.log(`${skill.name}：${enemy.def.name}に${damage}ダメージ${result.crit ? '（会心）' : ''}`, result.crit ? 'special' : 'dmg');
           if (result.drain > 0) this.player.heal(result.drain);
@@ -3469,32 +3473,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawSkillEffect(type: Weapon['weaponType'], origin: Vec2, dir: Dir, tiles: Vec2[], color: number) {
-    if (type === 'dagger') { this.slashFx(this.player.x, this.player.y, color); return; }
-    const x = origin.x * TILE + TILE / 2, y = origin.y * TILE + TILE / 2;
-    const graphics = this.add.graphics().setDepth(24).setBlendMode(Phaser.BlendModes.ADD);
-    graphics.lineStyle(3, color, .75);
-    if (type === 'greatsword') {
-      graphics.strokeCircle(x, y, TILE * 1.35);
-      graphics.lineStyle(7, color, .22).strokeCircle(x, y, TILE * 1.25);
-    } else {
-      const d = directionVector(dir);
-      for (const tile of tiles) {
-        const tx = tile.x * TILE + TILE / 2, ty = tile.y * TILE + TILE / 2;
-        if (type === 'dual_sword' || type === 'twin_daggers') {
-          graphics.lineBetween(tx - 11, ty - 11, tx + 11, ty + 11);
-          graphics.lineBetween(tx - 11, ty + 11, tx + 11, ty - 11);
-        } else if (type === 'longsword') {
-          graphics.beginPath().arc(tx, ty, 15, Math.atan2(d.y, d.x) - 1.1, Math.atan2(d.y, d.x) + 1.1).strokePath();
-        } else {
-          graphics.lineBetween(tx - d.x * 13, ty - d.y * 13, tx + d.x * 13, ty + d.y * 13);
-        }
-      }
-      const last = tiles[tiles.length - 1];
-      if (last && type !== 'longsword') graphics.lineStyle(7, color, .17).lineBetween(x, y, last.x * TILE + TILE / 2, last.y * TILE + TILE / 2);
-    }
-    this.tweens.add({ targets: graphics, alpha: 0, duration: type === 'bow' ? 600 : 450, onComplete: () => graphics.destroy() });
+    playPaintedSkill(this, type, origin, dir, tiles, this.player.weapon?.key ?? 'w_soldier_blade', color);
   }
-
   async playerAct(dir: Dir) {
     if (this.busy || this.gameEnded) return;
     try {
@@ -4001,7 +3981,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   killEnemy(e: Enemy, scoreBonus: number, options: { quiet?: boolean; obliterate?: boolean } = {}) {
+    if (!this.enemies.includes(e)) return;
     const def = e.def;
+    this.advanceSecretQuests(e);
     const leveled = this.player.addExp(def.exp);
     this.player.gold += def.gold;
     this.addScore(def.score + scoreBonus + (def.isElite ? 60 : 0) + (def.isBoss ? 0 : 0));
@@ -4059,7 +4041,7 @@ export class GameScene extends Phaser.Scene {
     }
     if ((def.isBoss || def.isFloorBoss) && !def.isTreasureRabbit && Math.random() < ARCADIA_BOSS_DROP_RATE) {
       this.dropEquipment(e.x, e.y, 'shield', makeShield('s_arcadia_guard'));
-      this.log('黒い羽根が舞い、堕天盾アルカディア+10が現れた！', 'special');
+      this.log('黒い羽根が舞い、堕天盾ルシファー+10が現れた！', 'special');
     }
 
     this.enemyDefeatFx(e);
@@ -6251,6 +6233,36 @@ export class GameScene extends Phaser.Scene {
     return false;
   }
 
+  claimSecretQuest(id: string, weaponKey: string): boolean {
+    if (this.gameEnded || this.busy || this.pendingEquipment) return false;
+    if (!claimQuest(this.secretQuests, id, weaponKey)) return false;
+    const reward = makeWeapon(weaponKey, []);
+    this.receiveWeapon(reward, '秘密クエスト');
+    this.log(`秘密クエストの報酬：${weaponFullName(reward)}を獲得！`, 'special');
+    Audio.playSe('pickup');
+    this.emitRefresh();
+    this.saveRun();
+    return true;
+  }
+
+  private advanceSecretQuests(enemy: Enemy) {
+    const result = recordQuestKill(this.secretQuests, enemy.def.key);
+    if (result.fragment) {
+      this.log(`紙の切れ端を発見！ 手帳へ自動回収（${this.secretQuests.fragments}/5）`, 'special');
+      const scrap = this.add.image((enemy.x + .5) * TILE, (enemy.y + .5) * TILE, 'quest_fragment').setDisplaySize(26, 26).setDepth(26);
+      this.tweens.add({ targets: scrap, y: scrap.y - 30, angle: 15, duration: 600, ease: 'Cubic.out' });
+      this.tweens.add({ targets: scrap, alpha: 0, duration: 300, delay: 650, onComplete: () => scrap.destroy() });
+    }
+    if (result.revealed) {
+      this.log('5枚の切れ端がつながり、秘密クエストの封印が解けた！', 'special');
+      this.events.emit('quest-notice', { title: '秘密が、いま明かされる', detail: '5枚の切れ端を解読。秘密クエストが開放されました。' });
+    }
+    for (const quest of result.completed) {
+      this.log(`秘密クエスト達成「${quest.title}」！ メニューから報酬を選べます。`, 'special');
+      this.events.emit('quest-notice', { title: '秘密クエスト達成', detail: `「${quest.title}」\n新しい属性武器を1つ選べます。` });
+    }
+  }
+
   receiveShield(shield: Shield, source: string): boolean {
     if (this.player.shields.length < EQUIPMENT_LIMIT) {
       this.player.shields.push(shield);
@@ -6700,6 +6712,7 @@ export class GameScene extends Phaser.Scene {
     this.gameEnded = true;
     if (this.runSaveEnabled()) {
       writeCodexSave(this.discovered);
+      writeQuestJournal(this.secretQuests);
       clearRunSave();
     }
 
@@ -7527,7 +7540,9 @@ export class GameScene extends Phaser.Scene {
     if (this.restoringRun || this.busy || this.gameEnded || !this.playerSprite || !this.dungeon || this.player.hp <= 0) return;
     if (!this.runSaveEnabled()) return;
     this.savePending = false;
-    if (!writeRunSave(this.captureRun()) && !this.saveWarningShown) {
+    const saved = writeRunSave(this.captureRun());
+    const journalSaved = saved && writeQuestJournal(this.secretQuests);
+    if ((!saved || !journalSaved) && !this.saveWarningShown) {
       this.saveWarningShown = true;
       this.log('ブラウザに保存できません。保存データの設定・空き容量を確認してください。', 'sys');
     }
@@ -7540,11 +7555,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   private restoreRunState(snapshot: RunSnapshot) {
+    const journal = this.secretQuests;
     Object.assign(this, pickFields(snapshot.state, RUN_STATE_KEYS));
+    this.secretQuests = mergeQuests(journal, this.secretQuests);
     // Saves created before weapon skills remain readable.
     if (!Number.isInteger(this.skillChargeSteps) || this.skillChargeSteps < 0) this.skillChargeSteps = 100;
     this.skillChargeSteps = Math.min(100, this.skillChargeSteps);
     this.player = Object.assign(new Player(), snapshot.player);
+    for (const shield of this.player.shields) if (shield.key === 's_arcadia_guard') shield.name = '堕天盾ルシファー';
+    if (this.pendingEquipment?.item.key === 's_arcadia_guard') this.pendingEquipment.item.name = '堕天盾ルシファー';
     for (const weapon of this.player.weapons) {
       if (weapon.key === 'w_hero_sword') weapon.name = WEAPON_DEFS.find(def => def.key === weapon.key)!.name;
     }
@@ -7603,6 +7622,7 @@ export class GameScene extends Phaser.Scene {
       this.chests.push({ ...saved, sprite, glow, baseScale: sprite.scaleX });
     }
     for (const item of snapshot.ground) {
+      if (item.shield?.key === 's_arcadia_guard') item.shield.name = '堕天盾ルシファー';
       const equipment = item.weapon ?? item.shield ?? item.armor;
       const texture = item.kind === 'armor' ? armorTextureKey(item.armor!.key)
         : equipment?.key ?? (item.kind === 'coin' ? 'coin' : `i_${item.kind}`);

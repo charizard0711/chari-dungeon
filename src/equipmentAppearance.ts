@@ -12,10 +12,10 @@ const DIRECTIONAL_SHIELD_KEYS = new Set([
   's_flame_aegis', 's_tidal_aegis', 's_storm_aegis', 's_frost_aegis'
 ]);
 export const HELD_EQUIPMENT = [...WEAPON_DEFS, ...SHIELD_DEFS]
-  .filter(def => def.key !== 'w_hero_sword' && ('weaponType' in def || DIRECTIONAL_SHIELD_KEYS.has(def.key))).map(def => ({
+  .filter(def => def.key !== 'w_hero_sword' && !def.key.startsWith('w_secret_') && ('weaponType' in def || DIRECTIONAL_SHIELD_KEYS.has(def.key))).map(def => ({
   itemKey:def.key, textureKey:`held_${def.key}`, path:`assets/equipment/directional/${def.key}.png`
 }));
-export const HELD_EQUIPMENT_KEYS = new Set([...HELD_EQUIPMENT.map(art=>art.itemKey), 'w_hero_sword']);
+export const HELD_EQUIPMENT_KEYS = new Set([...HELD_EQUIPMENT.map(art=>art.itemKey), 'w_hero_sword', ...WEAPON_DEFS.filter(d => d.key.startsWith('w_secret_')).map(d => d.key)]);
 
 export function heldArtSize(type: WeaponType | 'shield') {
   return {dagger:16,longsword:23,lance:32,bow:25,handgun:18,greatsword:29,dual_sword:20,twin_daggers:18,shield:13}[type];

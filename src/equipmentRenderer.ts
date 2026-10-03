@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { LegendaryAura } from './legendaryAura';
 import { HELD_DIRECTION_FRAME, HELD_EQUIPMENT_KEYS, heldArtSize, heldGrip, heldHandPose } from './equipmentAppearance';
 import type { Dir, Shield, Weapon } from './types';
 import { playerAction } from './playerAnimation';
@@ -9,12 +10,18 @@ export class EquipmentRenderer {
   readonly weapon: Phaser.GameObjects.Image;
   readonly offhand: Phaser.GameObjects.Image;
   private heroGlow?: Phaser.FX.Glow;
+  private swordAura: LegendaryAura;
+  private shieldAura: LegendaryAura;
   constructor(private scene: Phaser.Scene) {
     this.weapon = scene.add.image(0,0,'w_soldier_blade').setVisible(false);
     this.offhand = scene.add.image(0,0,'s_iron_round').setVisible(false);
+    this.swordAura = new LegendaryAura(scene, this.weapon, 'sword');
+    this.shieldAura = new LegendaryAura(scene, this.offhand, 'shield');
   }
   update(body: Phaser.GameObjects.Image, weapon: Weapon | null, shield: Shield | null, dir: Dir, frame: PlayerVisualFrame, gender: PlayerGender, elapsed = 0, enabled = true) {
     const second = weapon?.dual ? weapon : shield;
+    this.swordAura.enabled = enabled && weapon?.key === 'w_hero_sword';
+    this.shieldAura.enabled = enabled && second?.key === 's_arcadia_guard';
     // PreFX clips weapons in the narrow, offset mobile viewport.
     // Attach PostFX only for Arcadia: inactive PostFX controllers still draw.
     const glowing = enabled && weapon?.key === 'w_hero_sword';
@@ -34,6 +41,9 @@ export class EquipmentRenderer {
       const artFrame = hasArt ? HELD_DIRECTION_FRAME[dir] : undefined;
       if (sprite.texture.key !== texture || (hasArt && String(sprite.frame.name) !== String(artFrame))) sprite.setTexture(texture,artFrame);
       const pose = heldHandPose(dir,frame,gender,offhand,elapsed,type,body.texture.key);
+      const paintedWeapon = item.key.startsWith('w_secret_');
+      if (paintedWeapon && type === 'bow') pose.angle = {up:0,right:Math.PI/2,down:Math.PI,left:-Math.PI/2}[dir];
+      if (paintedWeapon && type === 'handgun') pose.angle = {up:-Math.PI/2,right:0,down:Math.PI/2,left:0}[dir];
       if (item.key === 'w_hero_sword') {
         // Bring the front-facing and right-facing grip closer to the body.
         if (dir === 'right') { pose.x -= 7; pose.y -= 5; }
@@ -64,10 +74,10 @@ export class EquipmentRenderer {
       const dy = (pose.y - body.originY * 40) * body.scaleY * artScale;
       const cosine = Math.cos(body.rotation), sine = Math.sin(body.rotation);
       // Pin the actual center of Arcadia's handle to the per-frame hand anchor.
-      const [ox,oy] = item.key === 'w_hero_sword' ? [.5,.823] : hasArt ? heldGrip(type,dir) : [.5,.65];
+      const [ox,oy] = item.key === 'w_hero_sword' ? [.5,.823] : hasArt || paintedWeapon ? heldGrip(type,dir) : [.5,.65];
       const size = heldArtSize(type) * (item.key === 'w_hero_sword' ? 1.75 : 1) * Math.abs(body.scaleY) * artScale / .85;
       sprite.setVisible(true).setOrigin(ox,oy).setPosition(body.x + dx*cosine - dy*sine,body.y + dx*sine + dy*cosine)
-        .setDisplaySize(size,size).setRotation(body.rotation + pose.angle).setFlipX(!!weapon?.dual && offhand && (dir === 'down' || dir === 'up'))
+        .setDisplaySize(size,size).setRotation(body.rotation + pose.angle).setFlipX(paintedWeapon && type === 'handgun' ? dir === 'left' : !!weapon?.dual && offhand && (dir === 'down' || dir === 'up'))
         .setDepth(body.depth + pose.depth).setAlpha(body.alpha).clearTint();
     }
   }
