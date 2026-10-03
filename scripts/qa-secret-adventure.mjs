@@ -17,23 +17,44 @@ function load(name){
  vm.runInNewContext(`(function(require,module,exports){${js}\n})`,{console,Math,localStorage})(d=>load(d==='phaser'?d:path.resolve(path.dirname(file),d)),module,module.exports);return module.exports;
 }
 const q=load('secretQuests'),data=load('data'),player=load('player'),treasury=load('treasury');
+const allKills=Object.fromEntries(q.SECRET_QUESTS.map(quest=>[quest.id,quest.count]));
 let p=q.normalizeQuests();
 assert.equal(q.recordQuestKill(p,'other',()=>.05).fragment,false);
 assert.equal(q.recordQuestKill(p,'other',()=>.049999).fragment,true);
 assert.equal(p.fragments,1);
 for(let i=0;i<20;i++)q.recordQuestKill(p,'m_mush',()=>.99);
-assert.equal(p.kills.lantern,20);assert.equal(p.kills.owl,0);assert.equal(q.canClaimQuest(p,'lantern'),false);
+assert.equal(p.kills.lantern,20);assert.equal(p.kills.owl,0);assert.equal(q.canClaimQuest(p),false);
 for(let i=0;i<3;i++)assert.equal(q.recordQuestKill(p,'other',()=>0).revealed,false);
 const fifth=q.recordQuestKill(p,'other',()=>0);
 assert.equal(fifth.revealed,true);assert.equal(fifth.completed.length,1);assert.equal(fifth.completed[0].id,'lantern');
+assert.equal(fifth.rewardReady,false);assert.equal(q.completedQuestCount(p),1);
+assert.equal(q.claimQuest(p,q.SECRET_WEAPON_KEYS[0]),false,'one quest cannot award a weapon');
 assert.equal(q.recordQuestKill(p,'m_mush',()=>0).completed.length,0);assert.equal(p.fragments,5);assert.equal(p.kills.lantern,20);
-assert.equal(q.claimQuest(p,'lantern','w_hero_sword'),false);
-assert.equal(q.claimQuest(p,'lantern',q.SECRET_WEAPON_KEYS[0]),true);assert.equal(q.claimQuest(p,'lantern',q.SECRET_WEAPON_KEYS[1]),false);
-for(const quest of q.SECRET_QUESTS.slice(1)){for(let i=0;i<19;i++)q.recordQuestKill(p,quest.monster,()=>.99);assert.equal(q.canClaimQuest(p,quest.id),false);const r=q.recordQuestKill(p,quest.monster,()=>.99);assert.equal(r.completed[0].id,quest.id);assert.equal(q.canClaimQuest(p,quest.id),true);}
+for(const quest of q.SECRET_QUESTS.slice(1)){
+ for(let i=0;i<19;i++)q.recordQuestKill(p,quest.monster,()=>.99);
+ assert.equal(q.canClaimQuest(p),false);
+ assert.equal(q.claimQuest(p,q.SECRET_WEAPON_KEYS[0]),false,'even four complete quests plus 19 kills is insufficient');
+ const r=q.recordQuestKill(p,quest.monster,()=>.99);assert.equal(r.completed[0].id,quest.id);
+ assert.equal(r.rewardReady,quest.id==='eye');assert.equal(q.canClaimQuest(p),quest.id==='eye');
+}
+assert.equal(q.recordQuestKill(p,'m_eye',()=>0).rewardReady,false,'completion is announced once');
+assert.equal(q.claimQuest(p,'w_hero_sword'),false);
+assert.equal(q.claimQuest(p,q.SECRET_WEAPON_KEYS[0]),true);
+for(const key of q.SECRET_WEAPON_KEYS)assert.equal(q.claimQuest(p,key),false,'only one of the five weapons may be claimed');
+assert.equal(p.claimed.length,5,'v1 clients must see every individual reward as consumed');
+const concealed=q.normalizeQuests({fragments:4,kills:allKills});
+assert.equal(q.canClaimQuest(concealed),false,'all kills still require the five fragments');
+assert.equal(q.recordQuestKill(concealed,'other',()=>0).rewardReady,true,'reveal after all kills also unlocks reward');
 const clean=q.normalizeQuests({fragments:Infinity,kills:{lantern:-1,owl:500,eye:NaN},claimed:['lantern','lantern','fake'],announced:'invalid'});
 assert.equal(clean.fragments,0);assert.equal(clean.kills.owl,20);assert.equal(clean.kills.lantern,0);assert.equal(clean.claimed.length,1);assert.equal(clean.announced.length,0);
-q.writeQuestJournal(p);assert.equal(q.readQuestJournal().claimed[0],'lantern');
-const merged=q.mergeQuests(q.readQuestJournal(),{fragments:3,kills:{lantern:2}});assert.equal(merged.fragments,5);assert.equal(merged.kills.lantern,20);assert.equal(merged.claimed[0],'lantern');
+for(const quest of q.SECRET_QUESTS){
+ const old=q.normalizeQuests({fragments:5,kills:allKills,claimed:[quest.id]});
+ assert.equal(q.claimQuest(old,q.SECRET_WEAPON_KEYS[0]),false,'a legacy individual reward consumes the journal reward');
+ const merged=q.mergeQuests(q.normalizeQuests({fragments:5,kills:allKills}),old);
+ assert.equal(q.canClaimQuest(merged),false,'resume cannot erase a previous claim');
+}
+q.writeQuestJournal(p);assert.equal(q.readQuestJournal().claimed.length,5);assert.equal(q.canClaimQuest(q.readQuestJournal()),false);
+const merged=q.mergeQuests(q.readQuestJournal(),{fragments:3,kills:{lantern:2}});assert.equal(merged.fragments,5);assert.equal(merged.kills.lantern,20);assert.equal(merged.claimed.length,5);
 storage.set(q.QUEST_SAVE_KEY,'corrupt');assert.equal(q.readQuestJournal().fragments,0);
 localStorage.setItem=()=>{throw Error('quota');};assert.equal(q.writeQuestJournal(p),false);
 assert.equal(q.SECRET_WEAPON_KEYS.length,5);
@@ -47,12 +68,18 @@ const names=['claimSecretQuest','receiveWeapon'];
 const harnessSource='class Harness {'+cls.members.filter(m=>names.includes(m.name?.getText(ast))).map(m=>m.getText(ast)).join('\n')+'};globalThis.Harness=Harness;';
 const context={makeWeapon:player.makeWeapon,weaponFullName:player.weaponFullName,claimQuest:q.claimQuest,Audio:{playSe(){}},EQUIPMENT_LIMIT:12};
 vm.runInNewContext(ts.transpileModule(harnessSource,{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText,context);
-const h=new context.Harness();Object.assign(h,{secretQuests:q.normalizeQuests({fragments:5,kills:{lantern:20,owl:20}}),player:{weapons:[]},pendingEquipment:null,log(){},emitRefresh(){},saveRun(){this.saves=(this.saves||0)+1;},recordOwnedEquipment(){},showForcedEquipmentSale(){this.sale=true;}});
-assert.equal(h.claimSecretQuest('lantern',q.SECRET_WEAPON_KEYS[0]),true);assert.equal(h.player.weapons.length,1);assert.equal(h.claimSecretQuest('lantern',q.SECRET_WEAPON_KEYS[1]),false);assert.equal(h.saves,1);
+const h=new context.Harness();Object.assign(h,{secretQuests:q.normalizeQuests({fragments:5,kills:{lantern:20}}),player:{weapons:[]},pendingEquipment:null,log(){},emitRefresh(){},saveRun(){this.saves=(this.saves||0)+1;},recordOwnedEquipment(){},showForcedEquipmentSale(){this.sale=true;}});
+assert.equal(h.claimSecretQuest(q.SECRET_WEAPON_KEYS[0]),false);assert.equal(h.player.weapons.length,0);
+h.secretQuests=q.normalizeQuests({fragments:5,kills:allKills});
+assert.equal(h.claimSecretQuest(q.SECRET_WEAPON_KEYS[0]),true);assert.equal(h.player.weapons.length,1);
+assert.equal(h.claimSecretQuest(q.SECRET_WEAPON_KEYS[1]),false);assert.equal(h.saves,1);
+h.secretQuests=q.normalizeQuests({fragments:5,kills:allKills});
 h.player.weapons=Array.from({length:12},()=>player.makeWeapon('w_soldier_blade',[]));
-assert.equal(h.claimSecretQuest('owl',q.SECRET_WEAPON_KEYS[1]),true);assert.equal(h.player.weapons.length,12);assert.equal(h.pendingEquipment.item.key,q.SECRET_WEAPON_KEYS[1]);assert.equal(h.sale,true);
-assert.equal(h.claimSecretQuest('owl',q.SECRET_WEAPON_KEYS[2]),false);assert.equal(h.pendingEquipment.item.key,q.SECRET_WEAPON_KEYS[1]);
-h.pendingEquipment=null;h.busy=true;h.secretQuests=q.normalizeQuests({fragments:5,kills:{lantern:20}});assert.equal(h.claimSecretQuest('lantern',q.SECRET_WEAPON_KEYS[0]),false);assert.equal(h.secretQuests.claimed.length,0);
+assert.equal(h.claimSecretQuest(q.SECRET_WEAPON_KEYS[1]),true);assert.equal(h.player.weapons.length,12);assert.equal(h.pendingEquipment.item.key,q.SECRET_WEAPON_KEYS[1]);assert.equal(h.sale,true);
+assert.equal(h.claimSecretQuest(q.SECRET_WEAPON_KEYS[2]),false);assert.equal(h.pendingEquipment.item.key,q.SECRET_WEAPON_KEYS[1]);
+h.pendingEquipment=null;h.busy=true;h.secretQuests=q.normalizeQuests({fragments:5,kills:allKills});
+assert.equal(h.claimSecretQuest(q.SECRET_WEAPON_KEYS[0]),false);assert.equal(h.secretQuests.claimed.length,0);
+h.busy=false;h.gameEnded=true;assert.equal(h.claimSecretQuest(q.SECRET_WEAPON_KEYS[0]),false);
 
 // Exercise the actual aura update and cleanup against a tiny display-list double.
 class Sprite extends EventEmitter {
@@ -69,4 +96,4 @@ const aura=new LegendaryAura(scene,target,'sword');scene.events.emit('postupdate
 const shield=new LegendaryAura(scene,target,'shield');scene.events.emit('postupdate');const sizes=objects.slice(-3).map(o=>o.displayWidth);scene.time.now+=500;scene.events.emit('postupdate');assert.notDeepEqual(objects.slice(-3).map(o=>o.displayWidth),sizes);scene.events.emit('shutdown');assert.equal(scene.events.entries.length,0);
 for(const [key,rel]of Object.entries(load('adventureArt').ADVENTURE_ART)){const f=new URL('../public/'+rel,import.meta.url);assert.ok(fs.existsSync(f),key);assert.ok(fs.statSync(f).size>1000);}
 for(const art of load('equipmentAppearance').HELD_EQUIPMENT)assert.ok(fs.existsSync(new URL('../public/'+art.path,import.meta.url)),art.itemKey);
-console.log('PASS: exact 5% / five fragments / five 20-kill quests / one-time reward and full inventory / persistence and migration / 12,000 loot rolls / animated aura lifecycle / 15 image assets.');
+console.log('PASS: exact 5% / five fragments / all five 20-kill quests required / single journal reward and full inventory / persistence and migration / 12,000 loot rolls / animated aura lifecycle / 15 image assets.');

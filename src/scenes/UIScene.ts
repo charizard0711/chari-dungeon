@@ -32,7 +32,7 @@ const GACHA_PALETTES = {
 };
 
 export class UIScene extends Phaser.Scene {
-  secretRewardId: string | null = null;
+  secretRewardOpen = false;
   private slotAuras: { aura: LegendaryAura; icon: Phaser.GameObjects.Image; key: string }[] = [];
   gs!: GameScene;
   logLines: { msg: string; type: string }[] = [];
@@ -93,7 +93,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   create() {
-    this.secretRewardId = null;
+    this.secretRewardOpen = false;
     this.slotAuras = [];
     this.overlayMode = 'none';
     this.gachaAnimating = false;

@@ -25,24 +25,27 @@ export function mergeQuests(a?: Partial<SecretQuestProgress>, b?: Partial<Secret
     claimed: [...x.claimed, ...y.claimed], announced: [...x.announced, ...y.announced] });
 }
 export const questsRevealed = (p: SecretQuestProgress) => p.fragments >= QUEST_FRAGMENTS_REQUIRED;
-export function canClaimQuest(p: SecretQuestProgress, id: string) {
-  const quest = SECRET_QUESTS.find(q => q.id === id);
-  return !!quest && questsRevealed(p) && p.kills[id] >= quest.count && !p.claimed.includes(id);
+export const completedQuestCount = (p: SecretQuestProgress) => SECRET_QUESTS.filter(q => p.kills[q.id] >= q.count).length;
+export function canClaimQuest(p: SecretQuestProgress) {
+  // Any individual reward claimed in an older save also consumes the single journal reward.
+  return questsRevealed(p) && completedQuestCount(p) === SECRET_QUESTS.length && p.claimed.length === 0;
 }
 /** Call once per defeated enemy. Clues drop independently and collect into the journal. */
 export function recordQuestKill(p: SecretQuestProgress, monster: string, random = Math.random) {
   const wasRevealed = questsRevealed(p);
+  const wasRewardReady = canClaimQuest(p);
   for (const q of SECRET_QUESTS) if (q.monster === monster) p.kills[q.id] = Math.min(q.count, (p.kills[q.id] || 0) + 1);
   const fragment = !wasRevealed && random() < QUEST_FRAGMENT_RATE;
   if (fragment) p.fragments = Math.min(QUEST_FRAGMENTS_REQUIRED, p.fragments + 1);
   const revealed = !wasRevealed && questsRevealed(p);
-  const completed = SECRET_QUESTS.filter(q => canClaimQuest(p, q.id) && !p.announced.includes(q.id));
+  const completed = SECRET_QUESTS.filter(q => questsRevealed(p) && p.kills[q.id] >= q.count && !p.announced.includes(q.id));
   p.announced.push(...completed.map(q => q.id));
-  return { fragment, revealed, completed };
+  return { fragment, revealed, completed, rewardReady: !wasRewardReady && canClaimQuest(p) };
 }
-export function claimQuest(p: SecretQuestProgress, id: string, weaponKey: string) {
-  if (!canClaimQuest(p, id) || !(SECRET_WEAPON_KEYS as readonly string[]).includes(weaponKey)) return false;
-  p.claimed.push(id); return true;
+export function claimQuest(p: SecretQuestProgress, weaponKey: string) {
+  if (!canClaimQuest(p) || !(SECRET_WEAPON_KEYS as readonly string[]).includes(weaponKey)) return false;
+  // Preserve the v1 save format and prevent older clients from offering individual rewards.
+  p.claimed = SECRET_QUESTS.map(q => q.id); return true;
 }
 export const QUEST_SAVE_KEY = 'chari-secret-quests-v1';
 export function readQuestJournal(): SecretQuestProgress {

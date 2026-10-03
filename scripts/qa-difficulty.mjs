@@ -61,5 +61,15 @@ for(const mode of ['hard','master']){const waves=c.planDifficultyChallenge(mode,
  assert.equal(h.handleDifficultyBossTurn(boss),true);assert.equal(hits,1);assert.equal(boss.challengeWaves.length,mode==='master'?1:0);
  if(mode==='master'){assert.equal(boss.challengeWaves[0].turns,1);h.handleDifficultyBossTurn(boss);assert.equal(hits,2);assert.equal(boss.challengeWaves.length,0);}}
 const counts={weapons:data.WEAPON_DEFS.length,shields:data.SHIELD_DEFS.length};
+for(const mode of ['hard','master']){
+ const boss={def:{isBoss:true},x:1,y:1,challengeWaves:[],challengeTurn:mode==='hard'?2:1};
+ Object.assign(h,{difficulty:mode,player:{x:18,y:18},bossStates:new Map(),isInsideBossRoom:()=>true,
+ dungeon:{tiles:Array.from({length:20},()=>Array(20).fill('floor'))},bossObstacleAt:()=>null,enemyAt:()=>null,chestAt:()=>null,dungeonObjects:[],bossHazards:[]});
+ ctx.bodyDistance=()=>34;
+ assert.equal(h.handleDifficultyBossTurn(boss),true,'room edges do not disable difficulty follow-up attacks');
+ assert.ok(boss.challengeWaves.some(w=>w.tiles.some(p=>p.x===18&&p.y===18)));
+ boss.challengeWaves=[];h.isInsideBossRoom=()=>false;
+ assert.equal(h.handleDifficultyBossTurn(boss),false,'distant targets outside the room retain the range limit');
+}
 console.log('PASS: ordered persistent unlocks, corrupt/full storage, QA isolation, exact codes, stat scaling, idempotent switches, HP ratio, retained floor/items, gold/revive rules, bread 1% boundaries in every mode, safe timed boss waves and shield migration.');
 console.log(counts);

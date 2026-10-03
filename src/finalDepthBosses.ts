@@ -80,7 +80,7 @@ export function finalAttackPlan(floor: number, phase: number, phaseTwo: boolean,
   const refuge = neighbors(p).sort((a, b) => neighbors(b).length - neighbors(a).length)[0];
   return {
     waves: elements.map((element, i) => ({ element, tiles: pattern(element).filter(t => !refuge || t.x !== refuge.x || t.y !== refuge.y), turns: 2 + i })),
-    message: ultimate ? '万象終焉！ 五つの属性が数字の順に襲う。予告の外へ逃げ、技の後に反撃！' : `核が${elements.map(e => FINAL_ELEMENT_LABEL[e]).join('・')}に輝いた！ 属性マークと数字を見て回避しよう。`,
+    message: ultimate ? '万象終焉！ 五つの属性が数字の順に襲う。予告の外へ逃げ、技の後に反撃！' : `核が${elements.map(e => FINAL_ELEMENT_LABEL[e]).join('・')}に輝いた！ 床の色と数字を見て回避しよう。`,
     recovery: ultimate ? 3 : 2, ultimate
   };
 }

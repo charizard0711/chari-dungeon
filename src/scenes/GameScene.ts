@@ -15,7 +15,7 @@ import { TILE } from '../textures';
 import { hasRuinTerrain, ruinTerrainKey, ruinFloorKey, ruinFloorFrame } from '../ruinTerrain';
 import { generateDungeon, generateBossArena, DungeonData, randomFloor, isWalkable, addDiamondTreasury, removeLegacyRoomDoors } from '../dungeon';
 import { rollTreasuryReward } from '../treasury';
-import { normalizeQuests, mergeQuests, recordQuestKill, claimQuest, readQuestJournal, writeQuestJournal, type SecretQuestProgress } from '../secretQuests';
+import { normalizeQuests, mergeQuests, recordQuestKill, claimQuest, completedQuestCount, readQuestJournal, writeQuestJournal, type SecretQuestProgress } from '../secretQuests';
 import { playPaintedSkill, paintedImpact, paintedVanish, skillImpactTime } from '../skillEffects';
 import { resolveShieldHit } from '../shieldEffects';
 import type { BossRoomZone, OptionalRoom, OptionalRoomKind, Room } from '../dungeon';
@@ -1895,7 +1895,7 @@ export class GameScene extends Phaser.Scene {
       });
     }
     for (const pos of candidates) {
-      if (!this.validBossTile(pos.x, pos.y)) continue;
+      if (!this.validBossTile(pos.x, pos.y) || !this.isInsideBossCombatFrame(pos.x, pos.y)) continue;
       if (this.enemyAt(pos.x, pos.y) || this.player.x === pos.x && this.player.y === pos.y) continue;
       return pos;
     }
@@ -2072,7 +2072,8 @@ export class GameScene extends Phaser.Scene {
 
   validBossTile(x: number, y: number): boolean {
     const tile = this.dungeon.tiles[y]?.[x];
-    const insideGimmickArea = this.dungeon.bossRoom ? this.isInsideBossCombatFrame(x, y) : true;
+    // The body inset is for boss movement, not attacks: players can stand on the room rim.
+    const insideGimmickArea = this.dungeon.bossRoom ? this.isInsideBossRoom(x, y) : true;
     return insideGimmickArea && !!tile && isWalkable(tile)
       && tile !== 'pit' && tile !== 'stairs' && tile !== 'door' && tile !== 'roomDoor'
       && !this.dungeonObjectAt(x, y);
@@ -2205,7 +2206,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
     for (const pos of candidates) {
-      if (!this.validBossTile(pos.x, pos.y)) continue;
+      if (!this.validBossTile(pos.x, pos.y) || !this.isInsideBossCombatFrame(pos.x, pos.y)) continue;
       if (this.player.x === pos.x && this.player.y === pos.y) continue;
       if (this.enemyAt(pos.x, pos.y, e) || this.bossObstacleAt(pos.x, pos.y)) continue;
       return pos;
@@ -2270,7 +2271,7 @@ export class GameScene extends Phaser.Scene {
         // Overlapping waves are offset within a cell so every countdown remains readable.
         const index = markers.filter(m => m.x === marker.x && m.y === marker.y).length;
         marker.plate.setDepth(35).setFillStyle(ELEMENT_INFO[wave.element].color, .1);
-        marker.label.setText(FINAL_ELEMENT_LABEL[wave.element] + wave.turns).setFontSize('10px')
+        marker.label.setText(String(wave.turns)).setFontSize('10px')
           .setPosition(marker.plate.x + (index % 2 ? 7 : -7), marker.plate.y - 10 + Math.floor(index / 2) * 9).setDepth(36);
         markers.push(marker);
       }
@@ -2289,7 +2290,7 @@ export class GameScene extends Phaser.Scene {
     intent.markers = intent.markers.filter(m => m.turns > 1);
     for (const marker of intent.markers) {
       marker.turns--;
-      marker.label.setText(FINAL_ELEMENT_LABEL[marker.element!] + marker.turns);
+      marker.label.setText(String(marker.turns));
     }
     for (const marker of due) this.destroyBossWarningMarker(marker);
     const done = intent.markers.length === 0;
@@ -2529,7 +2530,8 @@ export class GameScene extends Phaser.Scene {
       return { handled: false };
     }
     const distance = Math.max(Math.abs(this.player.x - e.x), Math.abs(this.player.y - e.y));
-    if (distance > (state.kind === 'astral_dragon' ? 14 : 9)) return { handled: false };
+    // A boss must keep telegraphing throughout its room, including the far corners.
+    if (!room && distance > (state.kind === 'astral_dragon' ? 14 : 9)) return { handled: false };
     const intent = this.prepareBossIntent(e, state);
     if (!intent) return { handled: false };
     state.intent = intent;
@@ -2576,7 +2578,8 @@ export class GameScene extends Phaser.Scene {
     }
     const state = this.bossStates.get(enemy);
     if (state?.intent || state?.stunned || enemy.charging || enemy.stunnedTurns > 0 || this.playerRootTurns > 0 || this.invisTurns > 0) return false;
-    if (bodyDistance(enemy, bossBodyRadius(enemy.def), this.player) > 7) return false;
+    if (!this.isInsideBossRoom(this.player.x, this.player.y)
+      && bodyDistance(enemy, bossBodyRadius(enemy.def), this.player) > 7) return false;
     // Count available action turns; native boss telegraphs and recovery always take precedence.
     if (++enemy.challengeTurn % (this.difficulty === 'hard' ? 3 : 2)) return false;
     const validTile = (x: number, y: number) => isWalkable(this.dungeon.tiles[y]?.[x] ?? 'wall')
@@ -2815,7 +2818,9 @@ export class GameScene extends Phaser.Scene {
   resolveBullCharge(e: Enemy, state: BossRuntime, path: Vec2[]): Promise<void> | undefined {
     if (!path.length) return undefined;
     const hitIndex = path.findIndex((tile) => tile.x === this.player.x && tile.y === this.player.y);
-    const endIndex = hitIndex >= 0 ? hitIndex - 1 : path.length - 1;
+    let endIndex = hitIndex >= 0 ? hitIndex - 1 : path.length - 1;
+    // The impact reaches the rim, while the boss body still stops within its movement frame.
+    while (endIndex >= 0 && !this.isInsideBossCombatFrame(path[endIndex].x, path[endIndex].y)) endIndex--;
     const end = endIndex >= 0 ? path[endIndex] : { x: e.x, y: e.y };
     if (e.directionArt) {
       this.faceEnemyToward(e, end);
@@ -6317,9 +6322,9 @@ export class GameScene extends Phaser.Scene {
     return false;
   }
 
-  claimSecretQuest(id: string, weaponKey: string): boolean {
+  claimSecretQuest(weaponKey: string): boolean {
     if (this.gameEnded || this.busy || this.pendingEquipment) return false;
-    if (!claimQuest(this.secretQuests, id, weaponKey)) return false;
+    if (!claimQuest(this.secretQuests, weaponKey)) return false;
     const reward = makeWeapon(weaponKey, []);
     this.receiveWeapon(reward, '秘密クエスト');
     this.log(`秘密クエストの報酬：${weaponFullName(reward)}を獲得！`, 'special');
@@ -6342,8 +6347,13 @@ export class GameScene extends Phaser.Scene {
       this.events.emit('quest-notice', { title: '秘密が、いま明かされる', detail: '5枚の切れ端を解読。秘密クエストが開放されました。' });
     }
     for (const quest of result.completed) {
-      this.log(`秘密クエスト達成「${quest.title}」！ メニューから報酬を選べます。`, 'special');
-      this.events.emit('quest-notice', { title: '秘密クエスト達成', detail: `「${quest.title}」\n新しい属性武器を1つ選べます。` });
+      this.log(`秘密クエスト達成「${quest.title}」！（${completedQuestCount(this.secretQuests)}/5）`, 'special');
+    }
+    if (result.rewardReady) {
+      this.log('秘密クエストを5つすべて達成！ メニューから属性武器を1本選べます。', 'special');
+      this.events.emit('quest-notice', { title: '秘密クエスト 全達成', detail: '5つの依頼をすべて達成！\nメニューから属性武器を1本選べます。' });
+    } else if (result.completed.length) {
+      this.events.emit('quest-notice', { title: `秘密クエスト達成（${completedQuestCount(this.secretQuests)}/5）`, detail: this.secretQuests.claimed.length ? '達成を手帳に記録しました。' : '5つすべて達成すると、属性武器を1本選べます。' });
     }
   }
 

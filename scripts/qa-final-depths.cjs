@@ -15,8 +15,9 @@ const data=load('src/data.ts'),combat=load('src/combat.ts'),{Player}=load('src/p
 const source=fs.readFileSync(path.join(root,'src/scenes/GameScene.ts'),'utf8');
 const ast=ts.createSourceFile('GameScene.ts',source,ts.ScriptTarget.Latest,true);
 const scene=ast.statements.find(s=>ts.isClassDeclaration(s)&&s.name.text==='GameScene');
-const names=new Set(['spawnEnemies','enemyAt','passable','passableBodyCell','occupiedPositions','prepareFinalDepthIntent','resolveFinalDepthIntent','handleBossTurn','prepareBossIntent','resolveBossIntent','validBossTile','isInsideBossCombatFrame','damagePlayerFromBoss','floorHasGate']);
+const names=new Set(['spawnEnemies','enemyAt','passable','passableBodyCell','occupiedPositions','prepareFinalDepthIntent','resolveFinalDepthIntent','handleBossTurn','prepareBossIntent','resolveBossIntent','validBossTile','isInsideBossRoom','isInsideBossCombatFrame','damagePlayerFromBoss','floorHasGate']);
 for (const name of ['applyLongStay', 'spawnWanderer', 'doDescend']) names.add(name);
+for (const name of ['uniqueBossTiles', 'bossCrossTiles', 'bossArenaPosition', 'resolveBullCharge']) names.add(name);
 const methods=scene.members.filter(m=>names.has(m.name?.getText(ast)));
 assert.equal(methods.length,names.size);
 const js=ts.transpileModule('class Harness {'+methods.map(m=>m.getText(ast)).join('\n')+'}',{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText;
@@ -94,6 +95,29 @@ function canEscape(plan,start,valid){
  return true;
 }
 let plans=0;
+let rimCells=0;
+for(let floor=1;floor<=30;floor++)for(const dedicated of [false,true]){
+ const a=harness(floor,dedicated),room=a.dungeon.bossRoom;if(!room)continue;
+ for(let y=room.y;y<room.y+room.h;y++)for(let x=room.x;x<room.x+room.w;x++){
+  if(x!==room.x&&x!==room.x+room.w-1&&y!==room.y&&y!==room.y+room.h-1)continue;
+  const tile=a.dungeon.tiles[y]?.[x];if(!isWalkable(tile)||['pit','stairs','door','roomDoor'].includes(tile))continue;
+  assert.equal(a.validBossTile(x,y),true,`${floor}F rim (${x},${y}) must accept a telegraph`);
+  assert.ok(a.bossCrossTiles(x,y,2).some(p=>p.x===x&&p.y===y),'a player-centered attack must include the rim target');
+  if(!dedicated)assert.equal(a.isInsideBossCombatFrame(x,y),false,'the boss body still stays away from the outer wall');
+  rimCells++;
+ }
+ assert.equal(a.validBossTile(room.x-1,room.cy),false,'attacks remain inside the room');
+ const spawn=a.bossArenaPosition();if(spawn)assert.equal(a.isInsideBossCombatFrame(spawn.x,spawn.y),true,'boss spawns retain the body inset');
+}
+for(const floor of [5,15,25,30]){
+ const a=harness(floor),r=a.dungeon.bossRoom;
+ a.player={x:r.x,y:r.cy};const boss={x:r.x+r.w-2,y:r.cy,hp:100,hpMax:100,def:{name:'boss'}};
+ const state={kind:floor===30?'astral_dragon':'glacial_slam',phaseTwo:false,stunned:0,cooldown:0};
+ a.bossStates.set(boss,state);a.prepareBossIntent=()=>({markers:[]});
+ assert.equal(a.handleBossTurn(boss).handled,true,'distance must not disable telegraphs within the same room');
+ delete state.intent;a.player={x:r.x-1,y:r.cy};
+ assert.equal(a.handleBossTurn(boss).handled,false,'a player outside the boss room does not activate its telegraphs');
+}
 for(let floor=26;floor<=30;floor++){
  const a=harness(floor),room=a.dungeon.bossRoom,b={x:room.cx,y:room.cy-2};
  const valid=(x,y)=>a.validBossTile(x,y)&&!final.bodyContains(b,floor===30?1:0,{x,y});
@@ -110,13 +134,23 @@ for(let floor=26;floor<=30;floor++){
  }
 }
 (async()=>{
+ {
+  const a=harness(26,false),r=a.dungeon.bossRoom;
+  const boss={x:r.x+2,y:r.cy,def:{name:'bull'},sprite:{}},state={stunned:0};
+  const path=Array.from({length:r.w-3},(_,i)=>({x:r.x+3+i,y:r.cy}));
+  a.player={x:r.cx,y:r.y+1};a.cameras={main:{shake(){}}};a.tween=()=>Promise.resolve();
+  await a.resolveBullCharge(boss,state,path);
+  assert.equal(boss.x,r.x+r.w-2,'charge damage can extend to rim without putting boss body against the wall');
+  assert.equal(state.stunned,2);
+ }
  for(const floor of [26,27,28,29,30]){
   const a=harness(floor),room=a.dungeon.bossRoom,b={def:{...customFloorBoss(floor,'male'),isBoss:floor===30},x:room.cx,y:room.cy-2,hp:100,hpMax:100,alive:true};
   for(const phase of [0,1,4]){
    const state={kind:floor===30?'astral_dragon':'mid_final_depth',phase,phaseTwo:floor===30,cooldown:0,stunned:0,coreLabel:chain()};
    a.hits=[];const intent=a.prepareFinalDepthIntent(b,state);assert.ok(intent);
+   assert.ok(intent.markers.every(m=>m.label.text===String(m.turns)),'telegraphs show countdown numbers without element names');
    const original=[...intent.markers];let count=0,last;
-   while(intent.markers.length){last=a.resolveFinalDepthIntent(b,state,intent);await last.animation;assert.ok(++count<=7);}
+   while(intent.markers.length){last=a.resolveFinalDepthIntent(b,state,intent);await last.animation;assert.ok(++count<=7);assert.ok(intent.markers.every(m=>m.label.text===String(m.turns)));}
    assert.equal(last.done,true);assert.ok(original.every(m=>m.plate.destroyed&&m.label.destroyed));assert.ok(state.stunned>=1);
    assert.ok(a.hits.every(el=>elements.includes(el)||el==='thunder'));assert.ok(a.hits.length<=count);
    if(floor===30&&phase===4){assert.deepEqual([...new Set(original.map(m=>m.element))],final.FINAL_ELEMENTS);assert.equal(state.stunned,3);}
@@ -131,5 +165,5 @@ for(let floor=26;floor<=30;floor++){
   const expected=combat.computeEnemyAttack(p,boss.def,element).damage;
   H.prototype.damagePlayerFromBoss.call(a,boss,1,'test',element);assert.equal(a.lastDamage,expected);
  }}finally{Math.random=realRandom;}
- console.log('PASS: five new species, sparse spawns, final-only room, 3x3 collision and cover, '+plans+' escapable attack plans, timed elemental damage, phase two and recovery.');
+ console.log('PASS: '+rimCells+' attackable rim cells across all 30 floors, distant room telegraphs, numeric countdowns, five new species, 3x3 collision and cover, '+plans+' escapable attack plans, timed elemental damage, phase two and recovery.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
