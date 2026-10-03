@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ja"><meta charset="utf-8"><title>金扉の宝物庫・動作確認</title>
+<style>body{margin:12px;background:#102027;color:#eee;font:14px system-ui}h1{font-size:19px;margin:4px 0 10px}button{padding:8px;margin:0 5px 8px 0;cursor:pointer}iframe{display:block;width:100%;max-width:1280px;height:700px;border:1px solid #9b8053}output,pre{display:block;white-space:pre-wrap;margin:8px 0}output{color:#f0d28a}</style>
+<h1>金扉の宝物庫・動作確認（ローカル専用・冒険セーブには書き込みません）</h1>
+<nav><button id="floor1">1階・北に宝物庫</button><button id="floor5">5階・南に宝物庫</button><button id="floor30">30階・南に宝物庫</button><button id="boss15">15層ボスの影</button><button id="boss26">26層ボスの影</button></nav>
+<nav><button id="key">フロアキーを1個用意</button><button id="unlock">金扉を開ける操作</button><button id="inside">宝箱の手前へ</button><button id="loot">宝箱を開ける操作</button><button id="resume">セーブ内容を再読込</button><button id="full">武器所持数を上限にする</button></nav>
+<output>読み込み中</output><iframe title="宝物庫とボスのゲーム画面"></iframe><pre></pre>
+<script type="module">
+import { makeItem } from '/src/data.ts';
+import { makeWeapon } from '/src/player.ts';
+if(location.hostname!=='localhost')throw new Error('Local QA only');
+const frame=document.querySelector('iframe'),output=document.querySelector('output'),report=document.querySelector('pre');
+let ready=false,expectedFloor=5,bossMode=false,baselineGold=0,baselineWeapons=0,notice='';
+const game=()=>frame.contentWindow?.__game?.scene.getScene('GameScene');
+const treasury=gs=>gs.dungeon.optionalRooms.find(room=>room.kind==='diamond');
+function move(gs,x,y){gs.clearMoveInput();gs.scene.get('UIScene').setOverlay('none');gs.player.x=x;gs.player.y=y;gs.placeSprite(gs.playerSprite,x,y);gs.updateVisibility();gs.emitRefresh();}
+function overview(gs,r){const c=gs.cameras.main;c.stopFollow();c.setZoom(1.6);c.centerOn((r.cx+.5)*32,(r.cy+.5)*32);}
+function load(floor,boss=false){ready=false;expectedFloor=floor;bossMode=boss;notice='';output.textContent='読み込み中';frame.src=`/?qa-game&qa-floor=${floor}${boss?'&qa-field-arena'+(floor===15?'&qa-boss':''):'&qa-treasury&qa-boss-zone='+(floor===1?'south':'north')}`;}
+document.querySelector('#floor1').onclick=()=>load(1);
+document.querySelector('#floor5').onclick=()=>load(5);
+document.querySelector('#floor30').onclick=()=>load(30);
+document.querySelector('#boss15').onclick=()=>load(15,true);
+document.querySelector('#boss26').onclick=()=>load(26,true);
+document.querySelector('#key').onclick=()=>{const gs=game();gs.player.inventory.push(makeItem('floorkey'));gs.emitRefresh();notice='フロアキーを1個追加';};
+document.querySelector('#unlock').onclick=async()=>{const gs=game(),r=treasury(gs);if(!r)return;await gs.playerAct(r.entry.y<r.door.y?'up':'down');notice=r.opened?'金扉の解錠成功':'鍵がないため解錠しない';};
+document.querySelector('#inside').onclick=()=>{const gs=game(),r=treasury(gs);if(!r?.opened)return;move(gs,r.room.cx,r.room.cy+1);overview(gs,r.room);notice='7×7の宝物庫を表示';};
+document.querySelector('#loot').onclick=async()=>{const gs=game(),r=treasury(gs);if(!r?.opened)return;await gs.playerAct('up');notice='宝箱への通常操作完了';};
+document.querySelector('#full').onclick=()=>{const gs=game();while(gs.player.weapons.length<12)gs.player.weapons.push(makeWeapon('w_iron_dagger',[]));baselineWeapons=12;gs.emitRefresh();notice='武器12本。次の報酬は売却選択待ちになる';};
+document.querySelector('#resume').onclick=()=>{const gs=game(),saved=JSON.parse(JSON.stringify(gs.captureRun()));gs.buildFloor(saved.state.floor,saved.state.inBossRoom,saved);const r=treasury(gs);if(r)overview(gs,r.room);notice='実際のcaptureRun/buildFloorで再開。宝箱の開封・所持品を確認';};
+setInterval(()=>{
+ const gs=game();if(!gs?.playerSprite||!gs.sys.isActive()||gs.floor!==expectedFloor)return;
+ const r=treasury(gs);
+ if(!ready){
+   if(!bossMode&&r){gs.player.inventory=gs.player.inventory.filter(item=>item.kind!=='floorkey');move(gs,r.door.x,r.door.y+(r.entry.y<r.door.y?1:-1));overview(gs,{...r.room,cy:r.door.y});}
+   baselineGold=gs.player.gold;baselineWeapons=gs.player.weapons.length;ready=true;
+ }
+ const chest=gs.chests.filter(chest=>chest.diamond),bosses=gs.enemies.filter(enemy=>enemy.def.isBoss||enemy.def.isFloorBoss);
+ const data={floor:gs.floor,room:r?{width:r.room.w,height:r.room.h,side:r.room.cy<gs.dungeon.start.y?'north':'south',opened:r.opened}:null,
+   gold:gs.player.gold,goldGained:gs.player.gold-baselineGold,weaponCount:gs.player.weapons.length,weaponCountGained:gs.player.weapons.length-baselineWeapons,
+   keys:gs.player.inventory.filter(item=>item.kind==='floorkey').length,
+   diamondChests:chest.map(c=>({opened:c.opened,texture:c.sprite.texture.key,x:c.x,y:c.y})),
+   pendingWeapon:gs.pendingEquipment?.item,lastWeapon:gs.player.weapons.at(-1),
+   legacyDoors:gs.dungeon.optionalRooms.filter(room=>room.kind!=='diamond'&&gs.dungeon.tiles[room.door.y][room.door.x]==='roomDoor').length,
+   assets:['terrain_treasury_door','terrain_treasury_floor','terrain_treasury_wall','chest_diamond','chest_diamond_open'].every(key=>gs.textures.exists(key)),
+   bosses:bosses.map(e=>({key:e.def.key,tile:[e.x,e.y],shadow:[e.shadow.x,e.shadow.y],texture:e.shadow.texture.key,visible:e.shadow.visible,aligned:Math.abs(e.shadow.x-(e.x+.5)*32)<.01&&Math.abs(e.shadow.y-(e.y+.7)*32)<.01})),
+   recentLogs:gs.logHistory.slice(-3)};
+ const pass=data.assets&&data.legacyDoors===0&&(bossMode?data.bosses.length>0&&data.bosses.every(b=>b.aligned):!!r&&r.room.w===7&&r.room.h===7&&chest.length===1);
+ output.textContent=`${pass?'PASS':'FAIL'}：${gs.floor}階 ${notice} ｜ 鍵 ${data.keys}個 / 宝箱 ${chest.length}個 / 獲得 ${data.goldGained}G / 武器 +${data.weaponCountGained}本`;
+ report.textContent=JSON.stringify(data,null,2);
+},200);
+load(5);
+</script></html>

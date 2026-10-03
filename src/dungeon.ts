@@ -12,7 +12,7 @@ export interface Room {
 }
 
 export type DungeonBiome = 'ruins' | 'aqueduct' | 'frost' | 'magma' | 'storm' | 'void';
-export type OptionalRoomKind = 'ambush' | 'treasure' | 'shrine' | 'hazard';
+export type OptionalRoomKind = 'ambush' | 'treasure' | 'shrine' | 'hazard' | 'diamond';
 
 export interface OptionalRoom {
   room: Room;
@@ -575,6 +575,8 @@ function buildSpaciousDungeon(floor: number, forcedBossRoomZone?: BossRoomZone):
     carveWideCorridor(tiles, doorway.approach, { x: target.cx, y: target.cy });
     tiles[doorway.approach.y][doorway.approach.x] = 'floor';
     closeOptionalRoom(tiles, optional);
+    // Ordinary side rooms are now open passages; only the diamond treasury has a lock.
+    tiles[optional.door.y][optional.door.x] = 'floor';
     optionalRooms.push(optional);
   }
 
@@ -844,7 +846,61 @@ function removeUnreachableFloors(tiles: TileType[][], start: Vec2) {
   }
 }
 
-export function generateDungeon(floor: number, _forcedBossRoomZone?: BossRoomZone): DungeonData {
+export const TREASURY_CHANCE = 0.10;
+
+/** One roll per ordinary floor. Extend the outer edge so successful rolls never fail placement. */
+export function addDiamondTreasury(d: DungeonData, random = Math.random): DungeonData {
+  if (d.optionalRooms.some(room => room.kind === 'diamond') || random() >= TREASURY_CHANCE) return d;
+  const exitZone = d.bossRoomZone ?? (d.exitRoom && d.exitRoom.cy < d.start.y ? 'north' : 'south');
+  const north = exitZone === 'south' || (exitZone !== 'north' && random() < 0.5);
+  const targets = d.rooms.filter(room => room !== d.bossRoom && room !== d.exitRoom
+    && !d.optionalRooms.some(optional => optional.room === room) && room.w >= 7 && room.h >= 7);
+  const target = [...targets].sort((a, b) => north ? a.y - b.y : b.y + b.h - a.y - a.h)[0];
+  if (!target) throw new Error('A treasury needs a connected main room');
+  const extension = 11;
+  const oldHeight = d.h;
+  const extra = Array.from({ length: extension }, () => Array<TileType>(d.w).fill('wall'));
+  if (north) {
+    d.tiles.unshift(...extra);
+    // Several fields share Room/Vec2 instances. Shift each object exactly once.
+    const rooms = new Set([...d.rooms, d.exitRoom, d.lakeRoom, d.bossRoom,
+      ...d.optionalRooms.map(optional => optional.room)].filter((room): room is Room => !!room));
+    for (const room of rooms) { room.y += extension; room.cy += extension; }
+    const points = new Set([d.start, d.stairs, d.bossEntrance, d.bossEntry, d.bossCompass,
+      ...d.hazards, ...d.teleportPads, ...d.optionalRooms.flatMap(optional => [optional.door, optional.entry])]
+      .filter((point): point is Vec2 => !!point));
+    for (const point of points) point.y += extension;
+  } else d.tiles.push(...extra);
+  d.h += extension;
+  const room = roomAt(target.cx - 3, north ? 1 : oldHeight + 3, 7, 7);
+  const door = { x: room.cx, y: north ? room.y + room.h : room.y - 1 };
+  const entry = { x: room.cx, y: north ? room.y + room.h - 1 : room.y };
+  const approach = { x: room.cx, y: door.y + (north ? 1 : -1) };
+  carveThinCorridor(d.tiles, { x: target.cx, y: north ? target.y : target.y + target.h - 1 }, approach);
+  const optional: OptionalRoom = { room, door, entry, kind: 'diamond', opened: false };
+  closeOptionalRoom(d.tiles, optional);
+  d.rooms.push(room);
+  d.optionalRooms.push(optional);
+  return d;
+}
+
+/** Also upgrades old saves. Return rooms whose contents have not yet been revealed. */
+export function removeLegacyRoomDoors(d: DungeonData): OptionalRoom[] {
+  const pending: OptionalRoom[] = [];
+  for (const optional of d.optionalRooms) {
+    if (optional.kind === 'diamond') continue;
+    if (!optional.opened) pending.push(optional);
+    optional.opened = true;
+    if (d.tiles[optional.door.y][optional.door.x] === 'roomDoor') d.tiles[optional.door.y][optional.door.x] = 'floor';
+  }
+  return pending;
+}
+
+export function generateDungeon(floor: number, forcedBossRoomZone?: BossRoomZone): DungeonData {
+  return addDiamondTreasury(generateBaseDungeon(floor, forcedBossRoomZone));
+}
+
+function generateBaseDungeon(floor: number, _forcedBossRoomZone?: BossRoomZone): DungeonData {
   if (floor === 30) {
     const w = 25, h = 31;
     const tiles: TileType[][] = Array.from({ length: h }, () => Array<TileType>(w).fill('wall'));

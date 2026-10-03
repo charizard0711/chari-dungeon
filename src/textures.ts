@@ -680,6 +680,14 @@ function buildMiscTextures(scene: Phaser.Scene) {
     g.generateTexture('shadow', 32, 20);
     g.destroy();
   }
+  {
+    const g = scene.add.graphics();
+    g.fillStyle(0x03070b, 0.88).fillEllipse(16, 10, 29, 17);
+    g.lineStyle(1, 0xd5c7a4, 0.56).strokeEllipse(16, 10, 29, 17);
+    g.fillStyle(0x000000, 0.32).fillEllipse(16, 10, 20, 10);
+    g.generateTexture('boss_tile_shadow', 32, 20);
+    g.destroy();
+  }
 }
 
 export function buildAllTextures(scene: Phaser.Scene) {

@@ -28,7 +28,7 @@ function fixture(withKey = true) {
   tiles[2][1] = tiles[2][2] = 'floor';
   tiles[2][3] = 'roomDoor';
   for (let y = 1; y <= 3; y++) for (let x = 4; x <= 6; x++) tiles[y][x] = 'floor';
-  const optional = { room: { x: 4, y: 1, w: 3, h: 3, cx: 5, cy: 2 }, door: { x: 3, y: 2 }, entry: { x: 4, y: 2 }, kind: 'shrine', opened: false };
+  const optional = { room: { x: 4, y: 1, w: 3, h: 3, cx: 5, cy: 2 }, door: { x: 3, y: 2 }, entry: { x: 4, y: 2 }, kind: 'diamond', opened: false };
   Object.assign(h, {
     busy: false, gameEnded: false, inBossRoom: false, floor: 1, turn: 0, clickPathToken: 0, clickPathActive: false,
     player: { x: 2, y: 2, hp: 100, inventory: withKey ? [{ kind: 'floorkey' }, { kind: 'potion' }] : [{ kind: 'potion' }] },
@@ -39,7 +39,7 @@ function fixture(withKey = true) {
     isTileCurrentlyVisible: () => true, isInsideBossCombatFrame: () => true, isInsideBossRoom: () => false,
     dungeonObjectAt: () => undefined, enemyAt: () => undefined, bossObstacleAt: () => undefined, chestAt: () => undefined,
     dirVec: dir => ({ up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] })[dir],
-    effectFx() {}, setBoostTier() {}, setPlayerVisual() {}, applyTileVisual() {}, updateVisibility() {}, emitRefresh() {}, saveRun() {},
+    effectFx() {}, populateOptionalRoom() {}, setBoostTier() {}, setPlayerVisual() {}, applyTileVisual() {}, updateVisibility() {}, emitRefresh() {}, saveRun() {},
     log(message) { h.logs.push(message); }
   });
   return h;

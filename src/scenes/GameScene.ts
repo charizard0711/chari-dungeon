@@ -11,7 +11,8 @@ import { EquipmentRenderer } from '../equipmentRenderer';
 import { PlayerAnimation } from '../playerAnimation';
 import { TILE } from '../textures';
 import { hasRuinTerrain, ruinTerrainKey, ruinFloorKey, ruinFloorFrame } from '../ruinTerrain';
-import { generateDungeon, generateBossArena, DungeonData, randomFloor, isWalkable } from '../dungeon';
+import { generateDungeon, generateBossArena, DungeonData, randomFloor, isWalkable, addDiamondTreasury, removeLegacyRoomDoors } from '../dungeon';
+import { rollTreasuryReward } from '../treasury';
 import type { BossRoomZone, OptionalRoom, OptionalRoomKind, Room } from '../dungeon';
 import { getTheme, eraSuffix, MONSTER_DEFS, WEAPON_DEFS, makeItem, gradeColor, ITEM_DEFS, ELEMENT_INFO, monsterElement } from '../data';
 import type { Armor, Dir, Element, MonsterElement, EquipmentGrade, ItemKind, MonsterDef, Shield, TileType, Vec2, Weapon } from '../types';
@@ -73,6 +74,7 @@ const ENEMY_STATE_KEYS = [
 const MAP_ZOOM = 1.95;
 // アンチエイリアスとカメラ拡大で生じる細い隙間を隠すため、地形同士を少し重ねる。
 const TERRAIN_RENDER_SIZE = TILE + 2;
+const BOSS_GROUND_ORIGIN_Y = 0.84;
 const WALL_VISIBLE_TINT = 0xffffff;
 const BOSS_ROOM_FLOOR_TINT = 0xd6a85c;
 const WORLD_DEPTH_BASE = 10;
@@ -141,6 +143,7 @@ interface Chest {
   y: number;
   opened: boolean;
   rare: boolean;   // 赤い宝箱=レア（レアアイテム・大量ゴールド）
+  diamond?: boolean;
   sprite: Phaser.GameObjects.Image;
   glow?: Phaser.GameObjects.Image;
   phase: number;
@@ -866,6 +869,9 @@ export class GameScene extends Phaser.Scene {
     if (snapshot) this.restoreRunState(snapshot);
     this.dungeon = snapshot?.dungeon ?? (bossRoom ? generateBossArena(floor) : generateDungeon(floor, this.qaBossRoomZone));
     const d = this.dungeon;
+    if (!snapshot && !bossRoom && location.hostname === 'localhost'
+      && new URLSearchParams(location.search).has('qa-treasury')) addDiamondTreasury(d, () => 0);
+    const newlyOpenedSideRooms = removeLegacyRoomDoors(d);
 
     // explored初期化
     this.explored = [];
@@ -944,10 +950,15 @@ export class GameScene extends Phaser.Scene {
     // 敵配置
     if (snapshot) {
       this.restoreRunEntities(snapshot);
+      for (const room of newlyOpenedSideRooms) this.populateOptionalRoom(room);
     } else {
       if (!bossRoom) {
         this.spawnDungeonObjects(floor);
         this.spawnRoomProps(floor);
+        for (const room of newlyOpenedSideRooms) this.populateOptionalRoom(room);
+        for (const optional of d.optionalRooms.filter(room => room.kind === 'diamond')) {
+          this.spawnChestAt(optional.room.cx, optional.room.cy, true, true);
+        }
       }
       this.spawnEnemies(floor);
       if (!bossRoom) {
@@ -1099,6 +1110,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   tileVisual(t: TileType, era: number, x: number, y: number): TerrainVisual {
+    const treasury = this.dungeon.optionalRooms.find(optional => optional.kind === 'diamond'
+      && x >= optional.room.x - 1 && x <= optional.room.x + optional.room.w
+      && y >= optional.room.y - 1 && y <= optional.room.y + optional.room.h);
+    if (treasury) {
+      if (t === 'roomDoor') return { key: 'terrain_treasury_door', size: TILE * 1.25, depth: 4.2 };
+      if (t === 'floor') return { key: 'terrain_treasury_floor', size: TILE };
+      if (t === 'wall') return { key: 'terrain_treasury_wall', size: TILE };
+    }
     const entrance = this.dungeon?.bossEntrance;
     if (entrance && x === entrance.x && y === entrance.y && (t === 'floor' || t === 'door')) {
       return this.bossGateVisual();
@@ -1660,7 +1679,7 @@ export class GameScene extends Phaser.Scene {
     enemy.baseScale *= scale * enemy.midBossVisualMultiplier;
     enemy.sprite.setScale(enemy.baseScale);
     this.attachAura(enemy, bossBodyRadius(def) ? TILE * 3 : 36 * scale * enemy.midBossVisualMultiplier, tint);
-    if (bossBodyRadius(def)) enemy.shadow?.setDisplaySize(TILE * 3, TILE * 1.2);
+    this.updateEnemyShadow(enemy);
     this.registerBossGimmick(enemy, gimmick);
     this.log(message, 'dmg');
   }
@@ -1755,7 +1774,14 @@ export class GameScene extends Phaser.Scene {
     this.applyTileVisual(this.tileSprites[door.y][door.x], 'floor', getTheme(this.floor).era, door.x, door.y);
     this.effectFx(door.x, door.y, 'fx_magic', 1.35, 360, getTheme(this.floor).accent);
     Audio.playSe('seal');
+    this.populateOptionalRoom(optional);
+    this.log(optional.kind === 'diamond' ? '金扉の先に、ダイヤモンドの宝箱が輝いている！'
+      : '小部屋への道が開いた。', 'special');
+    this.updateVisibility();
+  }
 
+  populateOptionalRoom(optional: OptionalRoom) {
+    const { room } = optional;
     if (optional.kind === 'hazard') {
       const hazard: TileType = this.dungeon.biome === 'frost' ? 'cracked'
         : this.dungeon.biome === 'magma' ? 'lava'
@@ -1784,11 +1810,6 @@ export class GameScene extends Phaser.Scene {
         this.spawnChestAt(position.x, position.y, Math.random() < 0.22);
       }
     }
-    this.log(optional.kind === 'ambush' ? '扉の奥から敵の気配があふれ出した！'
-      : optional.kind === 'treasure' ? '隠された宝物庫を発見した！'
-        : optional.kind === 'shrine' ? '静かな祭壇の部屋を発見した。'
-          : '属性の力が満ちた部屋を発見した！', optional.kind === 'ambush' ? 'dmg' : 'special');
-    this.updateVisibility();
   }
 
   bossEntrancePosition(): Vec2 | null {
@@ -1904,8 +1925,9 @@ export class GameScene extends Phaser.Scene {
 
   addEnemy(def: MonsterDef, x: number, y: number, hpScale: number): Enemy {
     const e = new Enemy(def, x, y, hpScale);
-    e.shadow = this.add.image(0, 0, 'shadow').setDepth(9.5).setAlpha(0.6);
-    e.sprite = this.add.image(0, 0, def.key).setDepth(10).setOrigin(0.5, 0.6);
+    e.shadow = this.add.image(0, 0, def.isBoss || def.isFloorBoss ? 'boss_tile_shadow' : 'shadow').setDepth(9.5).setAlpha(0.6);
+    e.sprite = this.add.image(0, 0, def.key).setDepth(10)
+      .setOrigin(0.5, def.isBoss || def.isFloorBoss ? BOSS_GROUND_ORIGIN_Y : 0.6);
     const maxDim = def.isBoss || def.isFloorBoss ? 40
       : def.gimmick === 'mimic' ? 44
       : def.isTreasureRabbit ? 32
@@ -1940,13 +1962,12 @@ export class GameScene extends Phaser.Scene {
     e.baseScale = sc;
     if (e.directionArt) this.updateEnemyDirection(e);
     if (drawnAnimation) {
-      e.sprite.setOrigin(0.5, drawnAnimation.originY);
+      e.sprite.setOrigin(0.5, def.isBoss || def.isFloorBoss ? BOSS_GROUND_ORIGIN_Y : drawnAnimation.originY);
       this.setEnemyAnimation(e, 'idle');
     }
     e.bobPhase = Math.random() * Math.PI * 2;
     this.placeSprite(e.sprite, x, y);
-    e.shadow.setPosition(e.sprite.x, e.sprite.y + 11);
-    e.shadow.setDepth(e.sprite.depth - 0.22);
+    this.updateEnemyShadow(e);
     // 最終ボスは足元に特殊オーラ（中ボス/強ボスはspawnBossで付与）
     if (def.isBoss) this.attachAura(e, maxDim, 0x4fd0ff);
     else if (def.isTreasureRabbit) this.attachAura(e, maxDim, 0xffdc55);
@@ -1954,6 +1975,19 @@ export class GameScene extends Phaser.Scene {
     e.sprite.on('pointerdown', () => this.showEnemyInfo(e));
     this.enemies.push(e);
     return e;
+  }
+
+  updateEnemyShadow(e: Enemy) {
+    if (!e.shadow) return;
+    if (e.def.isBoss || e.def.isFloorBoss) {
+      // Anchor to the occupied cell, independently of oversized art, lunges and bobbing.
+      // Boss artwork is anchored at its feet so the shadow stays on the floor, not on its body.
+      e.shadow.setPosition((e.x + 0.5) * TILE, (e.y + 0.7) * TILE)
+        .setDisplaySize(TILE, TILE * 0.65).setAlpha(0.82)
+        .setDepth(e.sprite.depth - 0.1).setVisible(e.alive && e.sprite.visible);
+    } else {
+      e.shadow.setPosition(e.sprite.x, e.sprite.y + 11).setDepth(e.sprite.depth - 0.22);
+    }
   }
 
   revealMimic(e: Enemy, attacked = false) {
@@ -2839,19 +2873,19 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  spawnChestAt(x: number, y: number, rare: boolean) {
+  spawnChestAt(x: number, y: number, rare: boolean, diamond = false) {
     if (this.chestAt(x, y) || this.enemyAt(x, y) || this.dungeonObjectAt(x, y)) return;
-    const displaySize = rare ? 27 : 26;
-    const spr = this.add.image(0, 0, rare ? 'chest_rare' : 'chest_common')
+    const displaySize = diamond ? 34 : rare ? 27 : 26;
+    const spr = this.add.image(0, 0, diamond ? 'chest_diamond' : rare ? 'chest_rare' : 'chest_common')
       .setDepth(6).setOrigin(0.5, 0.62).setDisplaySize(displaySize, displaySize);
     const baseScale = spr.scaleX;
     this.placeSprite(spr, x, y);
     const glow = rare
       ? this.add.image(spr.x, spr.y - 4, 'glow').setDepth(spr.depth - 0.12).setBlendMode(Phaser.BlendModes.ADD)
-        .setTint(0xffca52).setDisplaySize(42, 42).setAlpha(0.34)
+        .setTint(diamond ? 0x9feeff : 0xffca52).setDisplaySize(42, 42).setAlpha(0.34)
       : undefined;
     this.chests.push({
-      x, y, opened: false, rare, sprite: spr, glow,
+      x, y, opened: false, rare, diamond, sprite: spr, glow,
       phase: Math.random() * Math.PI * 2, baseScale
     });
   }
@@ -2862,6 +2896,7 @@ export class GameScene extends Phaser.Scene {
       .map((optional) => optional.room));
     const lakeRoom = this.dungeon.lakeRoom;
     const fallbackRooms = Phaser.Utils.Array.Shuffle(this.dungeon.rooms.filter((room) => room.w >= 5 && room.h >= 5
+      && this.optionalRoomContaining(room.cx, room.cy)?.kind !== 'diamond'
       && room !== this.dungeon.bossRoom && room !== this.dungeon.exitRoom
       && !(this.dungeon.start.x >= room.x && this.dungeon.start.x < room.x + room.w
         && this.dungeon.start.y >= room.y && this.dungeon.start.y < room.y + room.h)));
@@ -2993,7 +3028,7 @@ export class GameScene extends Phaser.Scene {
   spawnRoomProps(floor: number) {
     const optionalByRoom = new Map(this.dungeon.optionalRooms.map((optional) => [optional.room, optional.kind]));
     const rooms = this.dungeon.rooms.filter((room) => room !== this.dungeon.bossRoom
-      && room !== this.dungeon.exitRoom && room !== this.dungeon.lakeRoom);
+      && room !== this.dungeon.exitRoom && room !== this.dungeon.lakeRoom && optionalByRoom.get(room) !== 'diamond');
     let breakableCount = 0;
     for (const room of Phaser.Utils.Array.Shuffle([...rooms])) {
       if (room.w < 5 || room.h < 5) continue;
@@ -5385,7 +5420,8 @@ export class GameScene extends Phaser.Scene {
 
     for (let y = 1; y < d.h - 1; y++) {
       for (let x = 1; x < d.w - 1; x++) {
-        if (d.tiles[y][x] !== 'floor' || reserved.has(`${x},${y}`) || insideBossRoom(x, y)) continue;
+        if (d.tiles[y][x] !== 'floor' || reserved.has(`${x},${y}`) || insideBossRoom(x, y)
+          || this.optionalRoomContaining(x, y)?.kind === 'diamond') continue;
         const room = this.roomContainingTile(x, y);
         const random = this.terrainDetailHash(floor + layout.seed, x, y, 11);
         const secondary = this.terrainDetailHash(floor + layout.seed, x, y, 29);
@@ -5577,6 +5613,16 @@ export class GameScene extends Phaser.Scene {
     }
 
     // 視界内の床に接する最初の壁面は表示する。壁の先の床へは視界を伝播させない。
+    const treasury = this.optionalRoomContaining(this.player.x, this.player.y);
+    if (treasury?.kind === 'diamond' && treasury.opened) {
+      const r = treasury.room;
+      for (let y = r.y - 1; y <= r.y + r.h; y++) {
+        for (let x = r.x - 1; x <= r.x + r.w; x++) {
+          visible[y][x] = true;
+          this.explored[y][x] = true;
+        }
+      }
+    }
     // 中ボス部屋と描き直した専用部屋では、入室後に床の縁と封印も見せる。
     if (playerInsideBossRoom && d.bossRoom && (d.glacialArena || d.volcanoArena || d.waterArena || d.thunderArena || d.finalDepthArena || !this.inBossRoom || this.floor === 5)) {
       for (let y = d.bossRoom.y; y < d.bossRoom.y + d.bossRoom.h; y++) {
@@ -5633,7 +5679,7 @@ export class GameScene extends Phaser.Scene {
         }
         if (visible[y][x]) {
           spr.setVisible(true);
-          spr.setTint(this.usesGlacialTerrain() || hasRuinTerrain(this.floor) || hasVolcanoTerrain(this.floor) || hasWaterTerrain(this.floor) || hasThunderTerrain(this.floor) || hasFinalDepthTerrain(this.floor) ? 0xffffff : isWall ? WALL_VISIBLE_TINT : isBossRoomFloor ? BOSS_ROOM_FLOOR_TINT : this.themeTileTint);
+          spr.setTint(spr.texture.key.startsWith('terrain_treasury_') || this.usesGlacialTerrain() || hasRuinTerrain(this.floor) || hasVolcanoTerrain(this.floor) || hasWaterTerrain(this.floor) || hasThunderTerrain(this.floor) || hasFinalDepthTerrain(this.floor) ? 0xffffff : isWall ? WALL_VISIBLE_TINT : isBossRoomFloor ? BOSS_ROOM_FLOOR_TINT : this.themeTileTint);
           if (previousState !== 'visible') {
             spr.setAlpha(.16);
             this.tweens.add({ targets: spr, alpha: 1, duration: 260, ease: 'Quad.easeOut' });
@@ -5745,8 +5791,9 @@ export class GameScene extends Phaser.Scene {
 
   // ============ 宝箱 ============
   openChest(c: Chest) {
+    if (c.opened) return;
     c.opened = true;
-    c.sprite.setTexture(c.rare ? 'chest_rare_open' : 'chest_common_open');
+    c.sprite.setTexture(c.diamond ? 'chest_diamond_open' : c.rare ? 'chest_rare_open' : 'chest_common_open');
     c.sprite.clearTint();
     c.glow?.setAlpha(c.rare ? 0.46 : 0.18);
     this.tweens.add({
@@ -5761,6 +5808,18 @@ export class GameScene extends Phaser.Scene {
     this.pickupBurst(c.sprite.x, c.sprite.y - 4, chestColor, c.rare ? 9 : 6);
     this.addScore(c.rare ? 120 : 40);
     Audio.playSe('chest');
+
+    if (c.diamond) {
+      const { gold, weapon } = rollTreasuryReward();
+      this.player.gold += gold;
+      this.addScore(gold);
+      this.log(`ダイヤモンドの宝箱！ ${gold}Gと${weaponFullName(weapon)}を発見！`, 'special');
+      this.receiveWeapon(weapon, 'ダイヤモンドの宝箱');
+      this.effectFx(c.x, c.y, 'fx_levelup', 2.0, 700, 0xa8efff);
+      this.emitRefresh();
+      this.saveRun();
+      return;
+    }
 
     if (c.rare) {
       // 金の宝箱：レア確定＋大量ゴールド
@@ -5884,13 +5943,13 @@ export class GameScene extends Phaser.Scene {
       case 'seal': this.useSeal(); break;
       case 'revive': this.log('復活のタネは倒れた時に自動で使われる。', 'sys'); Audio.playSe('deny'); consumed = false; passTurn = false; break;
       case 'floorkey': {
-        const room = this.dungeon.optionalRooms.find(optional => !optional.opened
+        const room = this.dungeon.optionalRooms.find(optional => optional.kind === 'diamond' && !optional.opened
           && Math.abs(optional.door.x - this.player.x) + Math.abs(optional.door.y - this.player.y) === 1);
         if (room) {
           this.openOptionalRoom(room);
-          this.log('フロアキーで扉を開けた。', 'item');
+          this.log('フロアキーで金扉を開けた。', 'item');
         } else {
-          this.log('隣接する鍵のかかった部屋の扉がない。', 'sys');
+          this.log('隣接する鍵のかかった金扉がない。', 'sys');
           Audio.playSe('deny'); consumed = false; passTurn = false;
         }
         break;
@@ -7129,11 +7188,7 @@ export class GameScene extends Phaser.Scene {
         const coreLabel = this.bossStates.get(e)?.coreLabel;
         coreLabel?.setPosition(e.sprite.x, e.sprite.y - TILE * 3.5).setVisible(e.sprite.visible);
       }
-      if (e.shadow) {
-        e.shadow.x = e.sprite.x;
-        e.shadow.y = e.sprite.y + 11;
-        e.shadow.setDepth(e.sprite.depth - 0.22);
-      }
+      this.updateEnemyShadow(e);
       if (e.aura) {
         e.aura.x = e.sprite.x;
         e.aura.y = e.sprite.y - 6;
@@ -7253,12 +7308,12 @@ export class GameScene extends Phaser.Scene {
     const pose = monsterDirectionPose(time, e.bobPhase, e.freezeTurns > 0, e.directionMotion);
     // Move the artwork relative to its anchor; never overwrite an in-flight tween.
     e.sprite.setDisplayOrigin(e.sprite.width * 0.5 - pose.x / e.baseScale,
-      e.sprite.height * (e.directionArt?.originY ?? .6) - pose.y / e.baseScale).setAngle(pose.angle);
+      e.sprite.height * (e.def.isBoss || e.def.isFloorBoss ? BOSS_GROUND_ORIGIN_Y : e.directionArt?.originY ?? .6) - pose.y / e.baseScale).setAngle(pose.angle);
   }
 
   updateEnemyDirection(e: Enemy) {
     if (!e.directionArt || !e.sprite.active) return;
-    e.sprite.setOrigin(.5, e.directionArt.originY ?? .6);
+    e.sprite.setOrigin(.5, e.def.isBoss || e.def.isFloorBoss ? BOSS_GROUND_ORIGIN_Y : e.directionArt.originY ?? .6);
     const frame = MONSTER_DIRECTION_FRAME[e.facing];
     if (e.sprite.texture.key !== e.directionArt.textureKey || Number(e.sprite.frame.name) !== frame) {
       e.sprite.setTexture(e.directionArt.textureKey, frame).setFlip(false, false).setAngle(0);
@@ -7545,15 +7600,15 @@ export class GameScene extends Phaser.Scene {
     }
     for (const saved of snapshot.chests) {
       // Open chests may now share their tile with a monster: render without collision checks.
-      const size = saved.rare ? 27 : 26;
-      const sprite = this.add.image(0, 0, saved.rare
+      const size = saved.diamond ? 34 : saved.rare ? 27 : 26;
+      const sprite = this.add.image(0, 0, saved.diamond ? saved.opened ? 'chest_diamond_open' : 'chest_diamond' : saved.rare
         ? saved.opened ? 'chest_rare_open' : 'chest_rare'
         : saved.opened ? 'chest_common_open' : 'chest_common')
         .setDepth(6).setOrigin(0.5, 0.62).setDisplaySize(size, size);
       this.placeSprite(sprite, saved.x, saved.y);
       const glow = saved.rare ? this.add.image(sprite.x, sprite.y - 4, 'glow')
         .setDepth(sprite.depth - .12).setBlendMode(Phaser.BlendModes.ADD)
-        .setTint(0xffca52).setDisplaySize(42, 42).setAlpha(saved.opened ? .46 : .34) : undefined;
+        .setTint(saved.diamond ? 0x9feeff : 0xffca52).setDisplaySize(42, 42).setAlpha(saved.opened ? .46 : .34) : undefined;
       this.chests.push({ ...saved, sprite, glow, baseScale: sprite.scaleX });
     }
     for (const item of snapshot.ground) {
