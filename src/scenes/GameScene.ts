@@ -6834,8 +6834,8 @@ export class GameScene extends Phaser.Scene {
     const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
     const target = { x: Math.floor(world.x / TILE), y: Math.floor(world.y / TILE) };
     const tile = this.dungeon.tiles[target.y]?.[target.x];
-    const bossDoorTarget = tile === 'door' && !this.inBossRoom;
-    if (!tile || (!isWalkable(tile) && !bossDoorTarget) || tile === 'pit'
+    const doorTarget = tile === 'roomDoor' || (tile === 'door' && !this.inBossRoom);
+    if (!tile || (!isWalkable(tile) && !doorTarget) || tile === 'pit'
       || (this.inBossRoom && !this.isInsideBossCombatFrame(target.x, target.y))) {
       Audio.playSe('deny');
       return;
@@ -6925,9 +6925,9 @@ export class GameScene extends Phaser.Scene {
         // Large fountains are interacted with at their nearest edge, even when their center is clicked.
         const isTarget = nx === targetX && ny === targetY
           || !!targetObject && this.dungeonObjectAt(nx, ny) === targetObject;
-        const bossDoorTarget = isTarget && tile === 'door' && !this.inBossRoom;
+        const doorTarget = isTarget && (tile === 'roomDoor' || (tile === 'door' && !this.inBossRoom));
         if (!this.isTileCurrentlyVisible(nx, ny)) continue;
-        if (!tile || (!isWalkable(tile) && !bossDoorTarget) || tile === 'pit') continue;
+        if (!tile || (!isWalkable(tile) && !doorTarget) || tile === 'pit') continue;
         if (this.inBossRoom && !this.isInsideBossCombatFrame(nx, ny)) continue;
         const path = [...cur.path, step.dir];
         if (!isTarget && this.enemyAt(nx, ny)) {
