@@ -207,7 +207,7 @@ export class TitleScene extends Phaser.Scene {
       for (const card of cards) {
         const selected = card.mode === this.selectedDifficulty, rule = DIFFICULTY_RULES[card.mode];
         card.bg.clear().fillStyle(0x070d17, .94).fillRoundedRect(card.x - width / 2, y - 30, width, 60, 7)
-          .lineStyle(selected ? 2 : 1, isDifficultyUnlocked(card.mode, progress) ? rule.color : 0x515762, selected ? 1 : .65)
+          .lineStyle(selected || card.mode !== 'normal' ? 2 : 1, rule.color, selected ? 1 : card.mode === 'normal' ? .65 : .9)
           .strokeRoundedRect(card.x - width / 2, y - 30, width, 60, 7);
         if (selected) card.bg.fillStyle(rule.color, .13).fillRoundedRect(card.x - width / 2 + 3, y - 27, width - 6, 54, 5);
       }
@@ -324,10 +324,12 @@ export class TitleScene extends Phaser.Scene {
       const background = this.add.graphics();
       const portrait = this.add.image(
         0,
-        compact ? -9 : -11,
+        -10,
         playerSheetKey(option.gender),
         playerFrameIndex('down', 'idle')
-      ).setScale(compact ? 1.62 : 1.78);
+      );
+      // The sprite includes transparent padding; keep the painted figure inside the card and above its label.
+      portrait.setScale(Math.min((cardW - 20) / portrait.width, compact ? .9 : 1));
       const label = this.add.text(0, cardH / 2 - 13, option.label, {
         fontFamily: FONT,
         fontSize: compact ? '13px' : '14px',
