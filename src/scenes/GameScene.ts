@@ -23,7 +23,7 @@ import { getTheme, eraSuffix, MONSTER_DEFS, WEAPON_DEFS, makeItem, gradeColor, I
 import type { Armor, Dir, Element, MonsterElement, EquipmentGrade, ItemKind, MonsterDef, Shield, TileType, Vec2, Weapon } from '../types';
 import {
   Player, rollWeaponByGrade, rollGlacialBossWeapon, rollVolcanicBossWeapon, rollShield, rollShieldByGrade,
-  weaponFullName, shieldFullName, makeWeapon, makeShield, refreshLegendaryEquipment
+  weaponFullName, weaponRarity, shieldFullName, makeWeapon, makeShield, refreshLegendaryEquipment
 } from '../player';
 import { Enemy } from '../enemy';
 import { customFloorBoss } from '../customFloorBosses';
@@ -129,7 +129,6 @@ const MILESTONE_BOSSES: Record<number, { key: string; name: string; tint: number
 };
 
 export interface GachaResult {
-  rank: 'SSS' | 'SS' | 'S' | 'A' | 'B' | 'C';
   color: number;
   name: string;
   texKey: string;
@@ -137,7 +136,7 @@ export interface GachaResult {
   elementColor?: number;
   tintIcon: boolean;
   category: '武器' | '服' | '盾';
-  grade: EquipmentGrade;
+  grade: EquipmentGrade | 'SS';
   elementName?: string;
   feature?: string;
 }
@@ -6488,7 +6487,7 @@ export class GameScene extends Phaser.Scene {
 
   // ============ ガチャ ============
   // 500Gで1回。武器と防具（盾・服）を別々に抽選する。
-  // 戻り値はUI演出用（rank/色/名前/アイコン）。ゴールド不足はnull。
+  // 戻り値は実際の装備の等級・色・名前・アイコン。ゴールド不足はnull。
   gachaPull(pool: GachaPool = 'weapon'): GachaResult | null {
     if (this.gameEnded || this.busy || this.pendingEquipment) return null;
     if (pool === 'weapon' && this.weaponWonThisFloor) {
@@ -6508,7 +6507,7 @@ export class GameScene extends Phaser.Scene {
     const arcadiaWon = pool === 'weapon' && legendaryWon;
     const arcadiaShieldWon = pool === 'armor' && legendaryWon;
 
-    // ランク抽選: SS 3% / S 12% / A 25% / B 35% / C 25%
+    // 内部の抽選区分。画面には入手した装備の等級だけを表示する。
     const forcedRank = location.hostname === 'localhost'
       ? new URLSearchParams(location.search).get('qa-gacha-rank')
       : null;
@@ -6516,19 +6515,16 @@ export class GameScene extends Phaser.Scene {
       ? new URLSearchParams(location.search).get('qa-gacha-category')
       : null;
     const r = Math.random();
-    const rank: GachaResult['rank'] =
+    const rank: 'SSS' | 'SS' | 'S' | 'A' | 'B' | 'C' =
       legendaryWon ? 'SSS' : forcedRank && ['SS', 'S', 'A', 'B', 'C'].includes(forcedRank)
         ? forcedRank as 'SS' | 'S' | 'A' | 'B' | 'C'
         : r < 0.03 ? 'SS' : r < 0.15 ? 'S' : r < 0.40 ? 'A' : r < 0.75 ? 'B' : 'C';
-
-    const RANK_COLOR: Record<string, number> = {
-      SSS: gradeColor('SSS'), SS: 0xffd700, S: 0xff5a5a, A: 0xa06bff, B: 0x4fb0ff, C: 0xb8c2cc
-    };
 
     const gradeByRank: Record<typeof rank, EquipmentGrade> = {
       SSS: 'SSS', SS: 'S', S: 'A', A: 'B', B: 'C', C: 'D'
     };
     const grade = gradeByRank[rank];
+    let equipmentGrade: GachaResult['grade'];
     let name = '';
     let texKey = '';
     let hasEffect = false;
@@ -6549,7 +6545,8 @@ export class GameScene extends Phaser.Scene {
       const armor = armorForGrade(grade);
       const item = makePlayerArmor(armor.key);
       this.receiveArmor(item, 'ガチャ');
-      name = rank === 'SS' ? `[SS] ${armor.name}` : armorFullName(item);
+      name = armorFullName(item);
+      equipmentGrade = item.grade;
       texKey = armorTextureKey(armor.key);
       category = '服';
       hasEffect = true;
@@ -6562,6 +6559,7 @@ export class GameScene extends Phaser.Scene {
       this.receiveWeapon(w, 'ガチャ');
       this.weaponWonThisFloor = true;
       name = weaponFullName(w);
+      equipmentGrade = weaponRarity(w);
       texKey = w.key;
       category = '武器';
       hasEffect = !!w.passive;
@@ -6574,6 +6572,7 @@ export class GameScene extends Phaser.Scene {
       else if (rank === 'S') s.plus = Math.max(s.plus, 1);
       this.receiveShield(s, 'ガチャ');
       name = shieldFullName(s);
+      equipmentGrade = s.grade;
       texKey = s.key;
       elementColor = s.element ? ELEMENT_INFO[s.element].color : undefined;
       hasEffect = !!s.passive;
@@ -6582,11 +6581,11 @@ export class GameScene extends Phaser.Scene {
       feature = s.passive?.name;
     }
 
-    this.log(`${pool === 'weapon' ? '武器' : '防具'}ガチャ【${rank}】${name}を引き当てた！`, rank === 'SSS' || rank === 'SS' || rank === 'S' ? 'special' : 'item');
+    this.log(`${pool === 'weapon' ? '武器' : '防具'}ガチャ：${name}を引き当てた！`, ['SSS', 'SS', 'S', 'A'].includes(equipmentGrade) ? 'special' : 'item');
     this.emitRefresh();
     return {
-      rank, color: RANK_COLOR[rank], name, texKey, hasEffect, elementColor, tintIcon,
-      category, grade, elementName, feature
+      color: equipmentGrade === 'SS' ? 0xffe48a : gradeColor(equipmentGrade), name, texKey, hasEffect, elementColor, tintIcon,
+      category, grade: equipmentGrade, elementName, feature
     };
   }
 

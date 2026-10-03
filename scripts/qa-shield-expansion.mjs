@@ -94,18 +94,36 @@ const js=ts.transpileModule(`class Harness{${methods.map(n=>method(n).getText(as
 const Harness=vm.runInNewContext(`${js}\nHarness`,globals);
 const prices=new Harness();assert.equal(prices.weaponSellPrice(player.makeWeapon('w_hero_sword',[])),580);
 assert.equal(prices.shieldSellPrice(makeShield('s_arcadia_guard')),474);
-function gacha(pool,roll) {
-  const h=new Harness();let calls=0;globals.Math.random=()=>calls++===0?roll:.999999;
+function gacha(pool,roll,qualityRoll=.999999,categoryRoll=.999999,ownsArmor=false) {
+  const h=new Harness();const rolls=[roll,qualityRoll,categoryRoll];let calls=0;globals.Math.random=()=>rolls[calls++]??.999999;
   Object.assign(h,{player:{gold:500},gameEnded:false,busy:false,pendingEquipment:null,weaponWonThisFloor:false,
-    ownsArmor:()=>false,receiveShield:s=>h.received=s,receiveWeapon:s=>h.received=s,receiveArmor:s=>h.received=s,log(){},emitRefresh(){}});
+    ownsArmor:()=>ownsArmor,receiveShield:s=>h.received=s,receiveWeapon:s=>h.received=s,receiveArmor:s=>h.received=s,log:text=>h.message=text,emitRefresh(){}});
   h.result=h.gachaPull(pool);return h;
 }
 for(const pool of ['weapon','armor']) {
   const win=gacha(pool,.000099999),lose=gacha(pool,.0001);
   assert.equal(win.received.key,pool==='weapon'?'w_hero_sword':'s_arcadia_guard');
-  assert.equal(win.received.plus,10);assert.equal(win.result.rank,'SSS');assert.equal(win.result.grade,'SSS');assert.equal(win.received.grade,'SSS');assert.equal(win.player.gold,0);
+  assert.equal(win.received.plus,10);assert.equal(win.result.grade,'SSS');assert.equal(win.received.grade,'SSS');assert.equal(win.player.gold,0);
   assert.notEqual(lose.received.key,win.received.key,'0.01% exclusive upper boundary');
 }
+// Every result, including armor and its duplicate fallback, reports the rarity of the received item.
+for(const [roll,expected] of [[0,'S'],[.029999,'S'],[.03,'A'],[.149999,'A'],[.15,'B'],[.399999,'B'],[.4,'C'],[.749999,'C'],[.75,'D'],[.999999,'D']]) {
+ for(const [pool,categoryRoll,owned] of [['weapon',.5,false],['armor',.5,false],['armor',.9,false],['armor',.9,true]]) {
+  const h=gacha(pool,.99,roll,categoryRoll,owned);
+  const display=h.result.category==='武器'?player.weaponRarity(h.received):h.received.grade;
+  assert.equal(h.received.grade,expected,'existing quality distribution is preserved');
+  assert.equal(h.result.grade,display);
+  assert.ok(h.result.name.startsWith(`[${display}]`));
+  assert.equal(h.result.color,display==='SS'?0xffe48a:data.gradeColor(display));
+  assert.ok(h.message.includes(h.result.name));assert.ok(!h.message.includes('【'),'no separate gacha rank in the log');
+  assert.ok(!('rank' in h.result),'UI receives only equipment rarity');
+ }
+}
+const regularWeaponRoll=globals.rollWeaponByGrade;
+globals.rollWeaponByGrade=()=>player.makeWeapon('w_dual_sword_fire',[]);
+const ssPrize=gacha('weapon',.99,0);
+assert.equal(ssPrize.result.grade,'SS');assert.match(ssPrize.result.name,/^\[SS\]/,'actual SS equipment retains its rarity');
+globals.rollWeaponByGrade=regularWeaponRoll;
 const bossBlocks=method('killEnemy').body.statements.filter(n=>ts.isIfStatement(n)&&n.expression.getText(ast).includes('ARCADIA_BOSS_DROP_RATE'));
 assert.equal(bossBlocks.length,2);
 const dropJS=ts.transpileModule(`function drops(def){const result=[];const e={x:1,y:1};const that={dropEquipment:(x,y,kind,item)=>result.push({kind,item}),log(){}};(function(){${bossBlocks.map(n=>n.getText(ast)).join('\n')}}).call(that);return result}`,{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText;
@@ -152,4 +170,4 @@ for(const d of SHIELD_DEFS.filter(d=>!load('equipmentAppearance').HELD_EQUIPMENT
 assert.match(catalog.ITEM_CATALOG.find(e=>e.key==='s_arcadia_guard').description,/防御力 \+26/);
 for(const key of ['w_hero_sword','s_arcadia_guard'])assert.match(catalog.ITEM_CATALOG.find(e=>e.key===key).summary,/^SSS \//);
 for(const asset of JSON.parse(fs.readFileSync(new URL('../art/shield-skill-expansion-v1/generation.json',import.meta.url))).assets)assert.ok(fs.existsSync(new URL('../'+asset.target,import.meta.url)));
-console.log('PASS: 24 shields, 20,000 regular draws, 15 new passives, save counters, combat/reflection, exact legendary boundaries, 4-direction legacy transformation, 22 assets and codex pagination.');
+console.log('PASS: 24 shields, 20,000 regular draws, 15 new passives, save counters, combat/reflection, exact legendary boundaries, equipment rarity across gacha categories and thresholds, 4-direction legacy transformation, 22 assets and codex pagination.');

@@ -1695,22 +1695,22 @@ export class UIScene extends Phaser.Scene {
   // ガチャ演出（宝箱召喚版）
   //  ①暗転→古の宝箱が空から落ちてきて着地（土煙＋振動）
   //  ②宝箱が震え、隙間からランク色の光が漏れて脈動
-  //  ③S/SS: 宝箱が宙に浮き「静寂」→白フラッシュ→光柱と共に爆発開封
-  //    A: 色フラッシュで開封 / B・C: ポンと開封
-  //  ④開いた宝箱から品物が飛び出し、回転光背＋ランク印がドン。SSは金吹雪
+  //  ③A以上: 宝箱が宙に浮き「静寂」→白フラッシュ→光柱と共に爆発開封
+  //    B: 色フラッシュで開封 / C・D: ポンと開封
+  //  ④開いた宝箱から品物が飛び出し、装備の等級を表示。S以上は金吹雪
   // ============================================================
   playGachaAnimation(result: GachaResult) {
     this.gachaAnimating = true;
     // モーダル（ガチャウィンドウ）の矩形。演出はすべてこの中で完結させる
     const { x: mx, y: my, w: mw, h: mh } = this.L.ov;
     const cx = mx + mw / 2, cy = Math.min(my + mh / 2 + 10, my + 320);
-    const supreme = result.rank === 'SSS' || result.rank === 'SS';
-    const high = supreme || result.rank === 'S';
-    const mid = result.rank === 'A';
-    const rankTitle: Record<GachaResult['rank'], string> = {
-      SSS: '至高遺物', SS: '神話遺物', S: '伝説遺物', A: '秘術遺物', B: '希少遺物', C: '遺物'
+    const supreme = result.grade === 'SSS' || result.grade === 'SS' || result.grade === 'S';
+    const high = supreme || result.grade === 'A';
+    const mid = result.grade === 'B';
+    const gradeTitle: Record<GachaResult['grade'], string> = {
+      SSS: '至高遺物', SS: '神話遺物', S: '伝説遺物', A: '秘術遺物', B: '希少遺物', C: '上質な遺物', D: '遺物'
     };
-    const starCount: Record<GachaResult['rank'], number> = { SSS: 6, SS: 5, S: 4, A: 3, B: 2, C: 1 };
+    const starCount: Record<GachaResult['grade'], number> = { SSS: 7, SS: 6, S: 5, A: 4, B: 3, C: 2, D: 1 };
     const objs: Phaser.GameObjects.GameObject[] = [];
     const timers: Phaser.Time.TimerEvent[] = [];
     // モーダル外にはみ出た描画はマスクで切り取る（Zoneはクリック判定なので除外）
@@ -1857,9 +1857,9 @@ export class UIScene extends Phaser.Scene {
       this.tweens.killTweensOf([chest, leak]);
       chest.setAngle(0).setTexture('chest_rare_open').setDisplaySize(104, 104);
       leak.setAlpha(0);
-      ritualTag.setText(`${rankTitle[result.rank]}　／　獲得`).setColor(colHex);
+      ritualTag.setText(`${gradeTitle[result.grade]}　／　獲得`).setColor(colHex);
       phaseText.setAlpha(0);
-      Audio.playSe(supreme ? 'levelup' : result.rank === 'S' ? 'kill' : 'chest');
+      Audio.playSe(supreme ? 'levelup' : result.grade === 'A' ? 'kill' : 'chest');
 
       // 開封の炸裂
       const burst = track(this.add.image(cx, chest.y - 10, 'fx_hit').setDepth(304).setScale(1.2)
@@ -1915,7 +1915,7 @@ export class UIScene extends Phaser.Scene {
       this.tweens.add({ targets: icon, y: itemY - 8, duration: 1100, yoyo: true, repeat: -1, delay: 600, ease: 'Sine.easeInOut' });
 
       // ランク印が上からドンと落ちてくる
-      const rankText = track(this.add.text(cx, itemY - 118, result.rank, {
+      const rankText = track(this.add.text(cx, itemY - 118, result.grade, {
         fontFamily: '"Yu Gothic UI"', fontSize: supreme ? '58px' : '48px', fontStyle: 'bold', color: colHex
       }).setOrigin(0.5).setStroke('#000000', 8).setShadow(0, 0, colHex, 16, true, true).setScale(3.2).setAlpha(0).setDepth(307));
       this.tweens.add({
@@ -1926,7 +1926,7 @@ export class UIScene extends Phaser.Scene {
         }
       });
 
-      const stars = track(this.add.text(cx, itemY - 76, '★'.repeat(starCount[result.rank]), {
+      const stars = track(this.add.text(cx, itemY - 76, '★'.repeat(starCount[result.grade]), {
         fontFamily: '"Yu Gothic UI"', fontSize: supreme ? '18px' : '15px',
         color: colHex, fontStyle: 'bold', letterSpacing: 5
       }).setOrigin(.5).setStroke('#000000', 4).setAlpha(0).setDepth(307));
@@ -1963,7 +1963,7 @@ export class UIScene extends Phaser.Scene {
       }).setOrigin(.5).setAlpha(0).setDepth(307));
       this.tweens.add({ targets: acquired, alpha: 1, duration: 350, delay: 650 });
 
-      // SS：金の紙吹雪が舞い続ける
+      // S以上：金の紙吹雪が舞い続ける
       if (supreme) {
         const confetti = () => {
           const colors = [0xffd700, 0xffe680, 0xf5a030, 0xfff0b0];

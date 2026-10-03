@@ -235,12 +235,16 @@ export function rollVolcanicBossWeapon(): Weapon {
   return makeWeapon(pool[Math.floor(Math.random() * pool.length)].key, []);
 }
 
+export function weaponRarity(w: Pick<Weapon, 'grade' | 'ss'>): EquipmentGrade | 'SS' {
+  return w.grade === 'SSS' ? 'SSS' : w.ss ? 'SS' : w.grade;
+}
+
 export function weaponFullName(w: Weapon): string {
   const plus = (w.plus ?? 0) > 0 ? `+${w.plus} ` : '';
   const magic = w.magics.length ? ` [${w.magics.map((m) => m.label).join('')}]` : '';
   const dual = w.dual ? '〔二刀〕' : '';
   const passive = w.passive ? `〈${w.passive.name}〉` : '';
-  return `[${w.grade === 'SSS' ? 'SSS' : w.ss ? 'SS' : w.grade}] ${plus}${w.name}${dual}${passive}${magic}`;
+  return `[${weaponRarity(w)}] ${plus}${w.name}${dual}${passive}${magic}`;
 }
 
 export function rollShield(floor: number): Shield {

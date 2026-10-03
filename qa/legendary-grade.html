@@ -30,7 +30,7 @@ document.querySelector('#verify').onclick=()=>{try{const s=g();ui().setOverlay('
  }
  s.pendingEquipment=null;s.player.gold=1000;s.weaponWonThisFloor=false;const random=frame.contentWindow.Math.random;
  try {frame.contentWindow.Math.random=()=>0;
-  for(const pool of ['weapon','armor']){const result=s.gachaPull(pool);check(result.grade==='SSS'&&result.rank==='SSS'&&result.name.startsWith('[SSS]'),'gacha display grade');rows.push('PASS: '+pool+'ガチャ / '+result.name);lastResult=result;}
+  for(const pool of ['weapon','armor']){const result=s.gachaPull(pool);check(result.grade==='SSS'&&result.name.startsWith('[SSS]'),'gacha display grade');rows.push('PASS: '+pool+'ガチャ / '+result.name);lastResult=result;}
  }finally{frame.contentWindow.Math.random=random;}
  check(localStorage.getItem('chari-dungeon.run.v1')===saved,'real save changed');rows.push('PASS: 実際の冒険セーブは変更なし');report.textContent=rows.join('\n');out.textContent='すべて PASS';
  s.emitRefresh();ui().setOverlay('equip');

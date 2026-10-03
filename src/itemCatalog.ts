@@ -1,6 +1,6 @@
 import { ELEMENT_INFO, ITEM_DEFS, SHIELD_DEFS, WEAPON_DEFS } from './data';
 import { armorTextureKey, PLAYER_ARMORS, PLAYER_ARMOR_DEFS } from './playerAppearance';
-import { makeShield } from './player';
+import { makeShield, weaponRarity } from './player';
 import type { Element, EquipmentGrade, WeaponType } from './types';
 
 export const ITEM_CATALOG_CODE = '19960711';
@@ -34,7 +34,7 @@ export const ITEM_CATALOG: readonly CatalogEntry[] = [
   ...WEAPON_DEFS.map((weapon): CatalogEntry => ({
     key: weapon.key, category: 'weapon', name: weapon.name, textureKey: weapon.key,
     grade: weapon.grade, element: weapon.element,
-    summary: `${weapon.grade === 'SSS' ? 'SSS' : weapon.ss ? 'SS' : weapon.grade} / ${WEAPON_NAMES[weapon.weaponType]} / ${affinity(weapon.element)}`,
+    summary: `${weaponRarity(weapon)} / ${WEAPON_NAMES[weapon.weaponType]} / ${affinity(weapon.element)}`,
     description: [
       `攻撃力 ${weapon.atkMin}〜${weapon.atkMax}　耐久 ${weapon.durMax}`,
       weapon.dual ? '二刀流：1ターンに2回攻撃。盾は装備できません。' : '',
