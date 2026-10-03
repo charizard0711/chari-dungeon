@@ -27,6 +27,7 @@ import {
 } from '../player';
 import { Enemy } from '../enemy';
 import { customFloorBoss } from '../customFloorBosses';
+import { strengthenLateBoss } from '../bossBalance';
 import { getMonsterAnimation, monsterAnimationFrame } from '../monsterAnimation';
 import type { MonsterAction } from '../monsterAnimation';
 import { AURELIUS_DIRECTIONS, DIRECTIONAL_MONSTERS, MONSTER_DIRECTION_FRAME, monsterDirectionPose } from '../monsterDirections';
@@ -1642,7 +1643,7 @@ export class GameScene extends Phaser.Scene {
       : this.inBossRoom
         ? `◆ 「${def.name}」が姿を現した！`
         : `◆ 重い扉の向こうから強い気配を感じる……。`;
-    this.placeFloorBoss(def, hasFinalDepthTerrain(floor) ? 1.55 : custom && !custom.isDragonType ? 1 : 1.32, spec.tint, message, this.midBossGimmick(base.key), fieldPlacement);
+    this.placeFloorBoss(strengthenLateBoss(def, floor), hasFinalDepthTerrain(floor) ? 1.55 : custom && !custom.isDragonType ? 1 : 1.32, spec.tint, message, this.midBossGimmick(base.key), fieldPlacement);
   }
 
   spawnMilestoneBoss(floor: number) {
@@ -1671,7 +1672,7 @@ export class GameScene extends Phaser.Scene {
     const label = floor % 10 === 0
       ? `★★ 強大な魔物「${def.name}」が立ちはだかった！`
       : `★ 「${def.name}」が行く手を阻んだ！`;
-    this.placeFloorBoss(def, spec.scale, spec.tint, label, this.milestoneGimmick(floor));
+    this.placeFloorBoss(strengthenLateBoss(def, floor), spec.scale, spec.tint, label, this.milestoneGimmick(floor));
   }
 
   placeFloorBoss(

@@ -11,14 +11,14 @@ export function customFloorBoss(floor: number, playerGender: PlayerGender): Mons
   if (floor === 17) return {
     key: 'm_phoenix', name: '火口のフェニックス',
     description: '金色の冠羽と長い尾羽を持つ不死鳥。炎の翼を広げ、予告マスへ紅蓮の火を降らせる。',
-    hp: 34, atkMin: 7, atkMax: 13, def: 5, exp: 9, gold: 10, score: 65,
+    hp: 58, atkMin: 14, atkMax: 24, def: 5, exp: 9, gold: 10, score: 65,
     minFloor: 17, maxFloor: 17, behavior: 'chase',
     element: 'fire', color: 0xff963c, isDragonType: false
   };
   if (floor === 18) return {
     key: 'm_unicorn', name: '熔角獣イグニコーン',
     description: '黒い火山岩の体に熔岩のたてがみを持つ一角獣。燃える角から一直線に灼熱を放つ。',
-    hp: 40, atkMin: 9, atkMax: 16, def: 6, exp: 12, gold: 13, score: 80,
+    hp: 58, atkMin: 14, atkMax: 25, def: 6, exp: 12, gold: 13, score: 80,
     minFloor: 18, maxFloor: 18, behavior: 'chase',
     element: 'fire', color: 0xff9946, isDragonType: false
   };
@@ -46,7 +46,7 @@ export function customFloorBoss(floor: number, playerGender: PlayerGender): Mons
   if (floor === 16) return {
     key: 'm_fallen_angel', name: '熔翼の堕天使',
     description: '熔岩に焼かれた黒い翼と黒曜石の鎧をまとう堕天使。炎の剣を携え、赤い予告マスへ転移して火炎を放つ。',
-    hp: 28, atkMin: 5, atkMax: 10, def: 4, exp: 7, gold: 8, score: 55,
+    hp: 58, atkMin: 14, atkMax: 23, def: 4, exp: 7, gold: 8, score: 55,
     minFloor: 16, maxFloor: 16, behavior: 'chase',
     element: 'fire', color: 0xff7846, isDragonType: false
   };

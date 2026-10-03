@@ -144,7 +144,7 @@ const constantNames = new Set(['MID_DRAGONS', 'MILESTONE_BOSSES', 'BOSS_HP_MULTI
 const declarations = ast.statements.filter(s => ts.isVariableStatement(s) && s.declarationList.declarations.some(d => constantNames.has(d.name.getText(ast))));
 const harnessCode = ts.transpileModule(declarations.map(d => d.getText(ast)).join('\n')
   + `\nclass Harness {${methods.map(m => m.getText(ast)).join('\n')}}`, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
-const Harness = vm.runInNewContext(harnessCode + '\nHarness', { ...load('src/finalDepthBosses.ts'), isWalkable, MONSTER_DEFS, customFloorBoss, monsterElement, ELEMENT_INFO, TILE: 32, Audio: { playSe() {} } });
+const Harness = vm.runInNewContext(harnessCode + '\nHarness', { ...load('src/finalDepthBosses.ts'), ...load('src/bossBalance.ts'), isWalkable, MONSTER_DEFS, customFloorBoss, monsterElement, ELEMENT_INFO, TILE: 32, Audio: { playSe() {} } });
 for (const phaseTwo of [false, true]) {
   const h = new Harness(), p = { x: iceArena.bossRoom.cx, y: iceArena.bossRoom.cy + 2 };
   const e = { x: p.x + 3, y: p.y - 2, def: customFloorBoss(15, 'male') };
