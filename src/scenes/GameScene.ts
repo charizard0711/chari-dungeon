@@ -23,7 +23,7 @@ import { getTheme, eraSuffix, MONSTER_DEFS, WEAPON_DEFS, makeItem, gradeColor, I
 import type { Armor, Dir, Element, MonsterElement, EquipmentGrade, ItemKind, MonsterDef, Shield, TileType, Vec2, Weapon } from '../types';
 import {
   Player, rollWeaponByGrade, rollGlacialBossWeapon, rollVolcanicBossWeapon, rollShield, rollShieldByGrade,
-  weaponFullName, shieldFullName, makeWeapon, makeShield
+  weaponFullName, shieldFullName, makeWeapon, makeShield, refreshLegendaryEquipment
 } from '../player';
 import { Enemy } from '../enemy';
 import { customFloorBoss } from '../customFloorBosses';
@@ -129,7 +129,7 @@ const MILESTONE_BOSSES: Record<number, { key: string; name: string; tint: number
 };
 
 export interface GachaResult {
-  rank: 'SS' | 'S' | 'A' | 'B' | 'C';
+  rank: 'SSS' | 'SS' | 'S' | 'A' | 'B' | 'C';
   color: number;
   name: string;
   texKey: string;
@@ -6516,17 +6516,17 @@ export class GameScene extends Phaser.Scene {
       ? new URLSearchParams(location.search).get('qa-gacha-category')
       : null;
     const r = Math.random();
-    const rank: 'SS' | 'S' | 'A' | 'B' | 'C' =
-      legendaryWon ? 'SS' : forcedRank && ['SS', 'S', 'A', 'B', 'C'].includes(forcedRank)
+    const rank: GachaResult['rank'] =
+      legendaryWon ? 'SSS' : forcedRank && ['SS', 'S', 'A', 'B', 'C'].includes(forcedRank)
         ? forcedRank as 'SS' | 'S' | 'A' | 'B' | 'C'
         : r < 0.03 ? 'SS' : r < 0.15 ? 'S' : r < 0.40 ? 'A' : r < 0.75 ? 'B' : 'C';
 
     const RANK_COLOR: Record<string, number> = {
-      SS: 0xffd700, S: 0xff5a5a, A: 0xa06bff, B: 0x4fb0ff, C: 0xb8c2cc
+      SSS: gradeColor('SSS'), SS: 0xffd700, S: 0xff5a5a, A: 0xa06bff, B: 0x4fb0ff, C: 0xb8c2cc
     };
 
     const gradeByRank: Record<typeof rank, EquipmentGrade> = {
-      SS: 'S', S: 'A', A: 'B', B: 'C', C: 'D'
+      SSS: 'SSS', SS: 'S', S: 'A', A: 'B', B: 'C', C: 'D'
     };
     const grade = gradeByRank[rank];
     let name = '';
@@ -6582,7 +6582,7 @@ export class GameScene extends Phaser.Scene {
       feature = s.passive?.name;
     }
 
-    this.log(`${pool === 'weapon' ? '武器' : '防具'}ガチャ【${rank}】${name}を引き当てた！`, rank === 'SS' || rank === 'S' ? 'special' : 'item');
+    this.log(`${pool === 'weapon' ? '武器' : '防具'}ガチャ【${rank}】${name}を引き当てた！`, rank === 'SSS' || rank === 'SS' || rank === 'S' ? 'special' : 'item');
     this.emitRefresh();
     return {
       rank, color: RANK_COLOR[rank], name, texKey, hasEffect, elementColor, tintIcon,
@@ -6671,7 +6671,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   equipmentSellBase(grade: EquipmentGrade): number {
-    return { D: 20, C: 45, B: 90, A: 160, S: 280 }[grade];
+    return { D: 20, C: 45, B: 90, A: 160, S: 280, SSS: 280 }[grade];
   }
 
   weaponSellPrice(weapon: Weapon): number {
@@ -6983,7 +6983,7 @@ export class GameScene extends Phaser.Scene {
       const plus = this.player.weapon?.plus ?? 0;
       const grade = this.player.weapon?.grade ?? 'D';
       const element = this.player.weapon?.element;
-      const highGrade = grade === 'A' || grade === 'S';
+      const highGrade = grade === 'A' || grade === 'S' || grade === 'SSS';
       if (plus > 0 || highGrade || element) {
         this.playerAura.setVisible(true)
           .setTint(this.player.weapon?.key === 'w_hero_sword' ? 0xffd35a : element ? ELEMENT_INFO[element].color : gradeColor(grade))
@@ -7696,11 +7696,8 @@ export class GameScene extends Phaser.Scene {
     if (!Number.isInteger(this.skillChargeSteps) || this.skillChargeSteps < 0) this.skillChargeSteps = 100;
     this.skillChargeSteps = Math.min(100, this.skillChargeSteps);
     this.player = Object.assign(new Player(), snapshot.player);
-    for (const shield of this.player.shields) if (shield.key === 's_arcadia_guard') shield.name = '漆黒の盾ルファルゼント';
-    if (this.pendingEquipment?.item.key === 's_arcadia_guard') this.pendingEquipment.item.name = '漆黒の盾ルファルゼント';
-    for (const weapon of this.player.weapons) {
-      if (weapon.key === 'w_hero_sword') weapon.name = WEAPON_DEFS.find(def => def.key === weapon.key)!.name;
-    }
+    for (const item of [...this.player.weapons, ...this.player.shields]) refreshLegendaryEquipment(item);
+    if (this.pendingEquipment) refreshLegendaryEquipment(this.pendingEquipment.item);
     this.player.weapon = this.player.weapons[snapshot.equipped.weapon] ?? null;
     this.player.shield = this.player.weapon?.dual || this.player.weapon?.weaponType === 'bow' ? null : this.player.shields[snapshot.equipped.shield] ?? null;
     this.player.armor = this.player.armors[snapshot.equipped.armor] ?? null;
@@ -7756,8 +7753,8 @@ export class GameScene extends Phaser.Scene {
       this.chests.push({ ...saved, sprite, glow, baseScale: sprite.scaleX });
     }
     for (const item of snapshot.ground) {
-      if (item.shield?.key === 's_arcadia_guard') item.shield.name = '漆黒の盾ルファルゼント';
       const equipment = item.weapon ?? item.shield ?? item.armor;
+      if (equipment) refreshLegendaryEquipment(equipment);
       const texture = item.kind === 'armor' ? armorTextureKey(item.armor!.key)
         : equipment?.key ?? (item.kind === 'coin' ? 'coin' : `i_${item.kind}`);
       const sprite = this.add.image(0, 0, texture).setDepth(5).setOrigin(.5, .6).setDisplaySize(equipment ? 24 : 22, equipment ? 24 : 22);

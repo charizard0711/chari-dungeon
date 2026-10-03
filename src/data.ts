@@ -30,7 +30,7 @@ export const WEAPON_DEFS: WeaponDef[] = [
     passive: { key: 'backstab', name: '凍夜の暗殺', description: '背後からの一撃を強化する' } },
   { key: 'w_secret_solar', name: '赫日銃レオニス', atkMin: 11, atkMax: 21, durMax: 170, minFloor: 1, rarity: 1, grade: 'S', weaponType: 'handgun', element: 'fire', initialPlus: 3, exclusiveLoot: true,
     passive: { key: 'quickdraw', name: '暁の早撃ち', description: '2マス先へ射撃・会心率+8%' } },
-  { key: 'w_hero_sword', name: '覇天剣アルカディア', atkMin: 16, atkMax: 30, durMax: 300, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'greatsword', initialPlus: 10, exclusiveLoot: true,
+  { key: 'w_hero_sword', name: '覇天剣アルカディア', atkMin: 16, atkMax: 30, durMax: 300, minFloor: 21, rarity: 1, grade: 'SSS', weaponType: 'greatsword', initialPlus: 10, exclusiveLoot: true,
     passive: { key: 'hero_heal', name: '英雄の祝福', description: '敵に攻撃を当てるとHPが10回復' } },
   // 属性は後付け抽選せず、武器の種類・名前・専用アートに固定する。
   { key: 'w_dagger_fire', name: '焔牙カグツチ', atkMin: 6, atkMax: 14, durMax: 120, minFloor: 1, rarity: 10, grade: 'D', weaponType: 'dagger', element: 'fire' },
@@ -222,7 +222,7 @@ export const SHIELD_DEFS: ShieldDef[] = [
     passive: { key: 'thunder_parry', name: '雷閃防御', description: '雷属性に強い。4回目ごとの攻撃を完全に無効化' } },
   { key: 's_glacier_guard', name: '氷皇盾アイスベルク', defBonus: 10, durMax: 145, minFloor: 21, rarity: 1, grade: 'S', element: 'ice',
     passive: { key: 'glacier_guard', name: '氷壁の重層', description: '氷属性に強い。12以上の攻撃ダメージを20%軽減' } },
-  { key: 's_arcadia_guard', name: '漆黒の盾ルファルゼント', defBonus: 16, durMax: 300, minFloor: 1, rarity: 1, grade: 'S', initialPlus: 10, exclusiveLoot: true,
+  { key: 's_arcadia_guard', name: '漆黒の盾ルファルゼント', defBonus: 16, durMax: 300, minFloor: 1, rarity: 1, grade: 'SSS', initialPlus: 10, exclusiveLoot: true,
     passive: { key: 'arcadia_guard', name: '堕天の裁き', description: '受けた攻撃ダメージの20%を反射。3回目ごとの攻撃を完全に無効化' } }
 ];
 
@@ -300,7 +300,7 @@ export function plusColorHex(plus: number): string {
 }
 
 export function gradeColor(grade: EquipmentGrade): number {
-  return { D: 0x9ba8b4, C: 0x61c78d, B: 0x56a8ff, A: 0xb57aff, S: 0xffc857 }[grade];
+  return { D: 0x9ba8b4, C: 0x61c78d, B: 0x56a8ff, A: 0xb57aff, S: 0xffc857, SSS: 0xff83d9 }[grade];
 }
 
 export function gradeColorHex(grade: EquipmentGrade): string {

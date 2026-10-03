@@ -35,6 +35,20 @@ for(let i=0;i<10000;i++) {
 }
 assert.equal(seen.size,23,'all regular shields can be obtained');
 assert.equal(makeShield('s_arcadia_guard').plus,10);
+const legendaryWeapon=player.makeWeapon('w_hero_sword',[]),legendaryShield=makeShield('s_arcadia_guard');
+assert.equal(legendaryWeapon.grade,'SSS');assert.equal(legendaryShield.grade,'SSS');
+assert.equal(legendaryWeapon.atkMin,16);assert.equal(legendaryWeapon.atkMax,30);
+assert.equal(legendaryShield.defBonus,16);assert.equal(legendaryShield.durMax,300);
+assert.ok(Number.isFinite(data.gradeColor('SSS')));
+assert.match(player.weaponFullName(legendaryWeapon),/^\[SSS\]/);assert.match(player.shieldFullName(legendaryShield),/^\[SSS\]/);
+for(const item of [legendaryWeapon,legendaryShield]) {
+  item.grade='S';item.name='old name';item.plus=17;item.dur=23;item.guardCounter=2;
+  player.refreshLegendaryEquipment(item);
+  assert.equal(item.grade,'SSS');assert.equal(item.plus,17);assert.equal(item.dur,23);assert.equal(item.guardCounter,2);
+  assert.notEqual(item.name,'old name');
+}
+const regularBefore=player.makeWeapon('w_iron_dagger',[]),regularCopy=JSON.stringify(regularBefore);
+player.refreshLegendaryEquipment(regularBefore);assert.equal(JSON.stringify(regularBefore),regularCopy);
 const context = {hp:80,hpMax:100};
 function hits(key,n=1,damage=20,ctx=context) {
   const s=makeShield(key);return Array.from({length:n},()=>resolveShieldHit(s,damage,ctx,()=>.99));
@@ -75,9 +89,11 @@ const globals={...data,...player,...balance,...load('playerAppearance'),...load(
   Math:Object.create(Math),console,location:{hostname:'example.com'},URLSearchParams,
   Audio:{playSe(){}}, BOSS_GROUND_ORIGIN_Y:.84,
   MILESTONE_BOSSES:{5:{scale:1.72,tint:0xffc96b}}};
-const methods=['gachaPull','resolveShieldDefense','damagePlayer','refreshTransformationVisual'];
+const methods=['gachaPull','resolveShieldDefense','damagePlayer','refreshTransformationVisual','equipmentSellBase','weaponSellPrice','shieldSellPrice'];
 const js=ts.transpileModule(`class Harness{${methods.map(n=>method(n).getText(ast)).join('\n')}}`,{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText;
 const Harness=vm.runInNewContext(`${js}\nHarness`,globals);
+const prices=new Harness();assert.equal(prices.weaponSellPrice(player.makeWeapon('w_hero_sword',[])),580);
+assert.equal(prices.shieldSellPrice(makeShield('s_arcadia_guard')),474);
 function gacha(pool,roll) {
   const h=new Harness();let calls=0;globals.Math.random=()=>calls++===0?roll:.999999;
   Object.assign(h,{player:{gold:500},gameEnded:false,busy:false,pendingEquipment:null,weaponWonThisFloor:false,
@@ -87,7 +103,7 @@ function gacha(pool,roll) {
 for(const pool of ['weapon','armor']) {
   const win=gacha(pool,.000099999),lose=gacha(pool,.0001);
   assert.equal(win.received.key,pool==='weapon'?'w_hero_sword':'s_arcadia_guard');
-  assert.equal(win.received.plus,10);assert.equal(win.result.rank,'SS');assert.equal(win.player.gold,0);
+  assert.equal(win.received.plus,10);assert.equal(win.result.rank,'SSS');assert.equal(win.result.grade,'SSS');assert.equal(win.received.grade,'SSS');assert.equal(win.player.gold,0);
   assert.notEqual(lose.received.key,win.received.key,'0.01% exclusive upper boundary');
 }
 const bossBlocks=method('killEnemy').body.statements.filter(n=>ts.isIfStatement(n)&&n.expression.getText(ast).includes('ARCADIA_BOSS_DROP_RATE'));
@@ -95,7 +111,7 @@ assert.equal(bossBlocks.length,2);
 const dropJS=ts.transpileModule(`function drops(def){const result=[];const e={x:1,y:1};const that={dropEquipment:(x,y,kind,item)=>result.push({kind,item}),log(){}};(function(){${bossBlocks.map(n=>n.getText(ast)).join('\n')}}).call(that);return result}`,{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText;
 const drop=vm.runInNewContext(`${dropJS}\ndrops`,globals);
 globals.Math.random=()=>.000999;
-for(const def of [{isBoss:true},{isFloorBoss:true}]) {const reward=drop(def);assert.equal(reward.length,2);assert.equal(reward[1].item.plus,10);}
+for(const def of [{isBoss:true},{isFloorBoss:true}]) {const reward=drop(def);assert.equal(reward.length,2);assert.equal(reward[1].item.plus,10);assert.ok(reward.every(r=>r.item.grade==='SSS'));}
 assert.equal(drop({}).length,0);assert.equal(drop({isBoss:true,isTreasureRabbit:true}).length,0);
 globals.Math.random=()=>.001;assert.equal(drop({isBoss:true}).length,0,'0.1% exclusive upper boundary');
 
@@ -134,5 +150,6 @@ for(const d of SHIELD_DEFS.filter(d=>!load('equipmentAppearance').HELD_EQUIPMENT
  assert.equal(renderer.offhand.visible,true);assert.equal(renderer.offhand.texture.key,d.key,'new shield painting must render in hand');
 }
 assert.match(catalog.ITEM_CATALOG.find(e=>e.key==='s_arcadia_guard').description,/防御力 \+26/);
+for(const key of ['w_hero_sword','s_arcadia_guard'])assert.match(catalog.ITEM_CATALOG.find(e=>e.key===key).summary,/^SSS \//);
 for(const asset of JSON.parse(fs.readFileSync(new URL('../art/shield-skill-expansion-v1/generation.json',import.meta.url))).assets)assert.ok(fs.existsSync(new URL('../'+asset.target,import.meta.url)));
 console.log('PASS: 24 shields, 20,000 regular draws, 15 new passives, save counters, combat/reflection, exact legendary boundaries, 4-direction legacy transformation, 22 assets and codex pagination.');

@@ -16,7 +16,7 @@ import { IS_MOBILE, MAP_X, MAP_Y, MAP_W, MAP_H } from '../layout';
 import { durabilityRisk } from '../combat';
 import { weaponFullName } from '../player';
 import { getTheme, MAGIC_DESC, MONSTER_DEFS, ITEM_DEFS, gradeColor, isRareItem, ELEMENT_INFO, monsterElement } from '../data';
-import type { Armor, MagicCode, ItemKind, Item, Dir, Weapon, Shield, Element } from '../types';
+import type { Armor, MagicCode, ItemKind, Item, Dir, Weapon, Shield, Element, EquipmentGrade } from '../types';
 import { shieldFullName } from '../player';
 import { Audio } from '../audio/manager';
 import { EQUIPMENT_LIMIT, SHOP_PRICES, type ShopItemKind } from '../balance';
@@ -766,7 +766,7 @@ export class UIScene extends Phaser.Scene {
 
     const w = p.weapon, a = p.armor, s = p.shield;
     const empty = { tex: null, sub: 'なし', plus: 0 };
-    const slotInfo: Record<'weapon' | 'armor' | 'shield', { tex: string | null; sub: string; plus: number; grade?: 'D' | 'C' | 'B' | 'A' | 'S'; element?: Element }> = {
+    const slotInfo: Record<'weapon' | 'armor' | 'shield', { tex: string | null; sub: string; plus: number; grade?: EquipmentGrade; element?: Element }> = {
       weapon: w ? { tex: w.key, sub: `攻${w.atkMin}-${w.atkMax}`, plus: w.plus, grade: w.grade, element: w.element } : empty,
       armor: a ? { tex: armorTextureKey(a.key), sub: `防+${a.defBonus + a.plus}`, plus: a.plus, grade: a.grade } : empty,
       shield: (w?.dual || w?.weaponType === 'bow')
@@ -780,7 +780,7 @@ export class UIScene extends Phaser.Scene {
       const rim = this.elementColor(info.element) ?? (info.grade ? gradeColor(info.grade) : this.theme.color);
       slot.bg.clear();
       slot.bg.fillStyle(0x0a1c20, has ? .96 : 0.5).fillRoundedRect(sx, sy, sw, sh, 10);
-      slot.bg.lineStyle(info.grade === 'S' ? 3 : info.grade === 'A' ? 2.5 : 1.5, rim, has ? 1 : 0.5).strokeRoundedRect(sx, sy, sw, sh, 8);
+      slot.bg.lineStyle(info.grade === 'SSS' ? 3.5 : info.grade === 'S' ? 3 : info.grade === 'A' ? 2.5 : 1.5, rim, has ? 1 : 0.5).strokeRoundedRect(sx, sy, sw, sh, 8);
       if (has) {
         slot.icon.setTexture(info.tex!).setDisplaySize(this.equipIconSize, this.equipIconSize).setVisible(true).setAlpha(1);
         slot.icon.clearTint();
@@ -1706,12 +1706,13 @@ export class UIScene extends Phaser.Scene {
     // モーダル（ガチャウィンドウ）の矩形。演出はすべてこの中で完結させる
     const { x: mx, y: my, w: mw, h: mh } = this.L.ov;
     const cx = mx + mw / 2, cy = Math.min(my + mh / 2 + 10, my + 320);
-    const high = result.rank === 'SS' || result.rank === 'S';
+    const supreme = result.rank === 'SSS' || result.rank === 'SS';
+    const high = supreme || result.rank === 'S';
     const mid = result.rank === 'A';
     const rankTitle: Record<GachaResult['rank'], string> = {
-      SS: '神話遺物', S: '伝説遺物', A: '秘術遺物', B: '希少遺物', C: '遺物'
+      SSS: '至高遺物', SS: '神話遺物', S: '伝説遺物', A: '秘術遺物', B: '希少遺物', C: '遺物'
     };
-    const starCount: Record<GachaResult['rank'], number> = { SS: 5, S: 4, A: 3, B: 2, C: 1 };
+    const starCount: Record<GachaResult['rank'], number> = { SSS: 6, SS: 5, S: 4, A: 3, B: 2, C: 1 };
     const objs: Phaser.GameObjects.GameObject[] = [];
     const timers: Phaser.Time.TimerEvent[] = [];
     // モーダル外にはみ出た描画はマスクで切り取る（Zoneはクリック判定なので除外）
@@ -1860,7 +1861,7 @@ export class UIScene extends Phaser.Scene {
       leak.setAlpha(0);
       ritualTag.setText(`${rankTitle[result.rank]}　／　獲得`).setColor(colHex);
       phaseText.setAlpha(0);
-      Audio.playSe(result.rank === 'SS' ? 'levelup' : result.rank === 'S' ? 'kill' : 'chest');
+      Audio.playSe(supreme ? 'levelup' : result.rank === 'S' ? 'kill' : 'chest');
 
       // 開封の炸裂
       const burst = track(this.add.image(cx, chest.y - 10, 'fx_hit').setDepth(304).setScale(1.2)
@@ -1917,7 +1918,7 @@ export class UIScene extends Phaser.Scene {
 
       // ランク印が上からドンと落ちてくる
       const rankText = track(this.add.text(cx, itemY - 118, result.rank, {
-        fontFamily: '"Yu Gothic UI"', fontSize: result.rank === 'SS' ? '58px' : '48px', fontStyle: 'bold', color: colHex
+        fontFamily: '"Yu Gothic UI"', fontSize: supreme ? '58px' : '48px', fontStyle: 'bold', color: colHex
       }).setOrigin(0.5).setStroke('#000000', 8).setShadow(0, 0, colHex, 16, true, true).setScale(3.2).setAlpha(0).setDepth(307));
       this.tweens.add({
         targets: rankText, scale: 1, alpha: 1, duration: 240, delay: 420, ease: 'Cubic.easeIn',
@@ -1928,7 +1929,7 @@ export class UIScene extends Phaser.Scene {
       });
 
       const stars = track(this.add.text(cx, itemY - 76, '★'.repeat(starCount[result.rank]), {
-        fontFamily: '"Yu Gothic UI"', fontSize: result.rank === 'SS' ? '18px' : '15px',
+        fontFamily: '"Yu Gothic UI"', fontSize: supreme ? '18px' : '15px',
         color: colHex, fontStyle: 'bold', letterSpacing: 5
       }).setOrigin(.5).setStroke('#000000', 4).setAlpha(0).setDepth(307));
       this.tweens.add({ targets: stars, alpha: 1, y: itemY - 82, duration: 360, delay: 540, ease: 'Back.easeOut' });
@@ -1965,7 +1966,7 @@ export class UIScene extends Phaser.Scene {
       this.tweens.add({ targets: acquired, alpha: 1, duration: 350, delay: 650 });
 
       // SS：金の紙吹雪が舞い続ける
-      if (result.rank === 'SS') {
+      if (supreme) {
         const confetti = () => {
           const colors = [0xffd700, 0xffe680, 0xf5a030, 0xfff0b0];
           const px = cx + (Math.random() * 380 - 190);

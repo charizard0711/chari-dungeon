@@ -34,7 +34,7 @@ export const ITEM_CATALOG: readonly CatalogEntry[] = [
   ...WEAPON_DEFS.map((weapon): CatalogEntry => ({
     key: weapon.key, category: 'weapon', name: weapon.name, textureKey: weapon.key,
     grade: weapon.grade, element: weapon.element,
-    summary: `${weapon.ss ? 'SS' : weapon.grade} / ${WEAPON_NAMES[weapon.weaponType]} / ${affinity(weapon.element)}`,
+    summary: `${weapon.grade === 'SSS' ? 'SSS' : weapon.ss ? 'SS' : weapon.grade} / ${WEAPON_NAMES[weapon.weaponType]} / ${affinity(weapon.element)}`,
     description: [
       `攻撃力 ${weapon.atkMin}〜${weapon.atkMax}　耐久 ${weapon.durMax}`,
       weapon.dual ? '二刀流：1ターンに2回攻撃。盾は装備できません。' : '',

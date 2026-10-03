@@ -138,7 +138,8 @@ export function makeWeapon(key: string, magics: Magic[]): Weapon {
 export function makeShield(key: string, gradeOverride?: EquipmentGrade): Shield {
   const def = SHIELD_DEFS.find((d) => d.key === key)!;
   const grade = gradeOverride ?? def.grade;
-  const gradeIndex = ['D', 'C', 'B', 'A', 'S'].indexOf(grade);
+  // SSS reclassifies the exclusive relic without changing its combat values.
+  const gradeIndex = { D: 0, C: 1, B: 2, A: 3, S: 4, SSS: 4 }[grade];
   const defBonus = Math.max(def.defBonus, 2 + gradeIndex * 2);
   const durMax = Math.max(def.durMax, 40 + gradeIndex * 15);
   return {
@@ -150,6 +151,13 @@ export function makeShield(key: string, gradeOverride?: EquipmentGrade): Shield 
 export function shieldFullName(s: Shield): string {
   const element = s.element ? `【${ELEMENT_INFO[s.element].name}】` : '';
   return `[${s.grade}] ${element}${(s.plus ?? 0) > 0 ? `+${s.plus} ` : ''}${s.name}`;
+}
+
+/** Refresh old saves in place, preserving enhancement, durability and passive counters. */
+export function refreshLegendaryEquipment(item: Pick<Weapon | Shield, 'key' | 'name' | 'grade'>): void {
+  const def = item.key === 'w_hero_sword' ? WEAPON_DEFS.find(d => d.key === item.key)
+    : item.key === 's_arcadia_guard' ? SHIELD_DEFS.find(d => d.key === item.key) : undefined;
+  if (def) { item.name = def.name; item.grade = def.grade; }
 }
 
 function addRandomLootTraits(weapon: Weapon): Weapon {
@@ -232,7 +240,7 @@ export function weaponFullName(w: Weapon): string {
   const magic = w.magics.length ? ` [${w.magics.map((m) => m.label).join('')}]` : '';
   const dual = w.dual ? '〔二刀〕' : '';
   const passive = w.passive ? `〈${w.passive.name}〉` : '';
-  return `[${w.ss ? 'SS' : w.grade}] ${plus}${w.name}${dual}${passive}${magic}`;
+  return `[${w.grade === 'SSS' ? 'SSS' : w.ss ? 'SS' : w.grade}] ${plus}${w.name}${dual}${passive}${magic}`;
 }
 
 export function rollShield(floor: number): Shield {

@@ -27,7 +27,7 @@ export interface Magic {
   label: string;
 }
 
-export type EquipmentGrade = 'D' | 'C' | 'B' | 'A' | 'S';
+export type EquipmentGrade = 'D' | 'C' | 'B' | 'A' | 'S' | 'SSS';
 
 export type Element = 'fire' | 'thunder' | 'water' | 'ice';
 // Dark is a monster affinity; equipment rolls retain the original four elements.

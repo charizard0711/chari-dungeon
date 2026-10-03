@@ -1,0 +1,41 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><title>SSS装備の確認</title>
+<style>body{margin:16px;background:#101923;color:#eee;font:14px system-ui}h1{font-size:22px}button{padding:10px;margin:3px;background:#322b3c;color:#ffe8f8;border:1px solid #d77fc0}iframe{display:block;width:1280px;max-width:100%;height:770px;border:1px solid #766071;margin-top:10px}output{display:block;padding:10px;color:#efb8e0}pre{white-space:pre-wrap}</style>
+<h1>SSS装備の確認</h1><p>ローカル専用。実際の冒険セーブには書き込みません。</p>
+<button id="verify">旧セーブ・保留品・床ドロップを検証</button><button id="weapon">アルカディアの図鑑</button><button id="shield">ルファルゼントの図鑑</button><button id="gacha">SSSのガチャ演出</button>
+<output>読み込み中</output><iframe title="SSS装備のゲーム画面"></iframe><pre></pre>
+<script type="module">
+import {makeWeapon,makeShield} from '/src/player.ts';
+import {ITEM_CATALOG} from '/src/itemCatalog.ts';
+if(location.hostname!=='localhost')throw Error('local QA only');
+const frame=document.querySelector('iframe'),out=document.querySelector('output'),report=document.querySelector('pre');
+const saved=localStorage.getItem('chari-dungeon.run.v1');let ready=false,lastResult;
+const g=()=>frame.contentWindow?.__game?.scene.getScene('GameScene'),ui=()=>g().scene.get('UIScene');
+const check=(ok,msg)=>{if(!ok)throw Error(msg);};
+const legacy=item=>({...item,grade:'S',plus:17,dur:23,guardCounter:2});
+function detail(key){g().discoveredEquipment.add(key);ui().setOverlay('equipmentcatalog');ui().selectCatalogItem(ITEM_CATALOG.find(e=>e.key===key));}
+document.querySelector('#weapon').onclick=()=>detail('w_hero_sword');document.querySelector('#shield').onclick=()=>detail('s_arcadia_guard');
+document.querySelector('#verify').onclick=()=>{try{const s=g();ui().setOverlay('none');const rows=[];
+ for(const pendingKind of ['weapon','shield']) {
+  const w=legacy(makeWeapon('w_hero_sword',[])),sh=legacy(makeShield('s_arcadia_guard'));
+  s.player.weapons=[w];s.player.shields=[sh];s.player.weapon=w;s.player.shield=sh;
+  s.pendingEquipment={kind:pendingKind,item:pendingKind==='weapon'?{...w}:{...sh},source:'QA'};
+  const snapshot=JSON.parse(JSON.stringify(s.captureRun()));snapshot.ground=[
+   {kind:'weapon',x:s.player.x+1,y:s.player.y,weapon:{...w}},
+   {kind:'shield',x:s.player.x-1,y:s.player.y,shield:{...sh}}
+  ];
+  s.buildFloor(snapshot.state.floor,snapshot.state.inBossRoom,snapshot);
+  const items=[s.player.weapon,s.player.shield,s.pendingEquipment.item,...s.ground.map(i=>i.weapon??i.shield)];
+  check(items.every(i=>i.grade==='SSS'&&i.plus===17&&i.dur===23&&i.guardCounter===2),'grade-only migration failed');
+  rows.push(`PASS: 所持品・装備中・保留${pendingKind}・床の2種類 → SSS / +17・耐久23・カウンター2を維持`);
+ }
+ s.pendingEquipment=null;s.player.gold=1000;s.weaponWonThisFloor=false;const random=frame.contentWindow.Math.random;
+ try {frame.contentWindow.Math.random=()=>0;
+  for(const pool of ['weapon','armor']){const result=s.gachaPull(pool);check(result.grade==='SSS'&&result.rank==='SSS'&&result.name.startsWith('[SSS]'),'gacha display grade');rows.push('PASS: '+pool+'ガチャ / '+result.name);lastResult=result;}
+ }finally{frame.contentWindow.Math.random=random;}
+ check(localStorage.getItem('chari-dungeon.run.v1')===saved,'real save changed');rows.push('PASS: 実際の冒険セーブは変更なし');report.textContent=rows.join('\n');out.textContent='すべて PASS';
+ s.emitRefresh();ui().setOverlay('equip');
+ }catch(e){out.textContent='FAIL';report.textContent=e.stack;}};
+document.querySelector('#gacha').onclick=()=>{if(!lastResult)return;ui().setOverlay('gacha');ui().playGachaAnimation(lastResult);};
+setInterval(()=>{if(ready||!g()?.playerSprite||!g().sys.isActive())return;ready=true;out.textContent='準備完了';},150);
+frame.src='/?qa-game&qa-silent&qa-gender=male&mobile=0';
+</script></html>
