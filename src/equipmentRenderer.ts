@@ -75,7 +75,7 @@ export class EquipmentRenderer {
       const cosine = Math.cos(body.rotation), sine = Math.sin(body.rotation);
       // Pin the actual center of Arcadia's handle to the per-frame hand anchor.
       const [ox,oy] = item.key === 'w_hero_sword' ? [.5,.823] : hasArt || paintedWeapon ? heldGrip(type,dir) : [.5,.65];
-      const size = heldArtSize(type) * (item.key === 'w_hero_sword' ? 1.5 : 1) * Math.abs(body.scaleY) * artScale / .85;
+      const size = heldArtSize(type) * (item.key === 'w_hero_sword' ? 1.35 : 1) * Math.abs(body.scaleY) * artScale / .85;
       sprite.setVisible(true).setOrigin(ox,oy).setPosition(body.x + dx*cosine - dy*sine,body.y + dx*sine + dy*cosine)
         .setDisplaySize(size,size).setRotation(body.rotation + pose.angle).setFlipX(paintedWeapon && type === 'handgun' ? dir === 'left' : !!weapon?.dual && offhand && (dir === 'down' || dir === 'up'))
         .setDepth(body.depth + pose.depth).setAlpha(body.alpha).clearTint();
