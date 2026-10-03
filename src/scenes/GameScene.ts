@@ -37,7 +37,7 @@ import { planSkill, weaponSkill, directionVector } from '../weaponSkills';
 import { Audio } from '../audio/manager';
 import { clearRunSave, pickFields, readRunSave, writeRunSave, type RunSnapshot } from '../runSave';
 import { bgmForFloor, elementAttackSe, weaponAttackSe } from '../audio/config';
-import { ARCADIA_GACHA_RATE, ARCADIA_BOSS_DROP_RATE, enhancementChance, EQUIPMENT_LIMIT, FLOOR_KEY_DROP_RATE, DYNAMITE_DROP_RATE, MYSTERY_BREAD_DROP_RATE, ITEM_SELL_PRICES, SCROLL_DROP_RATE, SHOP_PRICES, type ShopItemKind } from '../balance';
+import { ARCADIA_GACHA_RATE, ARCADIA_BOSS_DROP_RATE, enhancementChance, EQUIPMENT_LIMIT, FLOOR_KEY_DROP_RATE, DYNAMITE_DROP_RATE, DYNAMITE_RADIUS, MYSTERY_BREAD_DROP_RATE, ITEM_SELL_PRICES, SCROLL_DROP_RATE, SHOP_PRICES, type ShopItemKind } from '../balance';
 import { getFloorLayoutProfile } from '../floorLayout';
 import {
   armorForGrade,
@@ -373,6 +373,8 @@ export class GameScene extends Phaser.Scene {
   secretQuests: SecretQuestProgress = normalizeQuests();
   private skillRangePreview?: Phaser.GameObjects.Graphics;
   private skillRangePreviewKey = '';
+  private dynamiteRangePreview?: Phaser.GameObjects.Graphics;
+  private dynamiteRangePreviewKey = '';
 
   playerSprite!: Phaser.GameObjects.Image;
   playerShadow?: Phaser.GameObjects.Image; // 足元の影（接地感）
@@ -3434,6 +3436,38 @@ export class GameScene extends Phaser.Scene {
     return Math.max(0, 100 - this.skillChargeSteps);
   }
 
+  showDynamiteRangePreview(show: boolean) {
+    const ui = this.scene.get('UIScene') as { overlayMode?: string } | undefined;
+    if (!show || !this.player?.inventory.some(item => item.kind === 'dynamite')
+      || !this.dungeon || this.gameEnded || this.busy || ui?.overlayMode !== 'none') {
+      this.dynamiteRangePreview?.setVisible(false);
+      this.dynamiteRangePreviewKey = '';
+      return;
+    }
+    const tiles: Vec2[] = [];
+    // The explosion is a square and reaches across walls; match its real hit area.
+    for (let dy = -DYNAMITE_RADIUS; dy <= DYNAMITE_RADIUS; dy++) {
+      for (let dx = -DYNAMITE_RADIUS; dx <= DYNAMITE_RADIUS; dx++) {
+        const x = this.player.x + dx, y = this.player.y + dy;
+        if (this.dungeon.tiles[y]?.[x]) tiles.push({ x, y });
+      }
+    }
+    if (!this.dynamiteRangePreview?.active) {
+      this.dynamiteRangePreview = this.add.graphics().setDepth(2);
+      this.dynamiteRangePreviewKey = '';
+    }
+    this.dynamiteRangePreview.setVisible(true);
+    const key = tiles.map(tile => `${tile.x},${tile.y}`).join(';');
+    if (key === this.dynamiteRangePreviewKey) return;
+    this.dynamiteRangePreviewKey = key;
+    const g = this.dynamiteRangePreview.clear();
+    g.fillStyle(0xffa02d, .22).lineStyle(1.5, 0xffbd66, .9);
+    for (const tile of tiles) {
+      g.fillRect(tile.x * TILE + 2, tile.y * TILE + 2, TILE - 4, TILE - 4);
+      g.strokeRect(tile.x * TILE + 2, tile.y * TILE + 2, TILE - 4, TILE - 4);
+    }
+  }
+
   private skillTileBlocked(x: number, y: number) {
     const tile = this.dungeon.tiles[y]?.[x];
     const entrance = this.dungeon.bossEntrance;
@@ -6131,8 +6165,8 @@ export class GameScene extends Phaser.Scene {
     this.dynamiteExplosionFx(origin.x, origin.y);
     for (const enemy of [...this.enemies]) {
       const radius = bossBodyRadius(enemy.def);
-      if (!enemy.alive || Math.max(0, Math.abs(enemy.x-origin.x)-radius) > 2
-        || Math.max(0, Math.abs(enemy.y-origin.y)-radius) > 2) continue;
+      if (!enemy.alive || Math.max(0, Math.abs(enemy.x-origin.x)-radius) > DYNAMITE_RADIUS
+        || Math.max(0, Math.abs(enemy.y-origin.y)-radius) > DYNAMITE_RADIUS) continue;
       const boss = !!(enemy.def.isBoss || enemy.def.isFloorBoss);
       const damage = boss ? Math.max(1, Math.ceil(enemy.hpMax * .2)) : enemy.hp;
       enemy.hp -= damage;
@@ -6150,12 +6184,13 @@ export class GameScene extends Phaser.Scene {
     const cx = (x+.5)*TILE, cy = (y+.5)*TILE;
     this.cameras.main.shake(320, .012);
     const area = this.add.graphics().setDepth(2);
-    area.fillStyle(0xffa02d, .3).fillRect((x-2)*TILE, (y-2)*TILE, TILE*5, TILE*5);
+    area.fillStyle(0xffa02d, .3).fillRect((x-DYNAMITE_RADIUS)*TILE, (y-DYNAMITE_RADIUS)*TILE,
+      TILE*(DYNAMITE_RADIUS*2+1), TILE*(DYNAMITE_RADIUS*2+1));
     this.tweens.add({targets:area,alpha:0,duration:380,onComplete:()=>area.destroy()});
     const shock = this.add.graphics().setPosition(cx,cy).setDepth(24).setBlendMode(Phaser.BlendModes.ADD);
     shock.lineStyle(4,0xffcb72,.9).strokeCircle(0,0,TILE*.5);
     this.tweens.add({targets:shock,scale:5,alpha:0,duration:330,ease:'Quad.easeOut',onComplete:()=>shock.destroy()});
-    for (let dy=-2;dy<=2;dy++) for (let dx=-2;dx<=2;dx++) {
+    for (let dy=-DYNAMITE_RADIUS;dy<=DYNAMITE_RADIUS;dy++) for (let dx=-DYNAMITE_RADIUS;dx<=DYNAMITE_RADIUS;dx++) {
       const delay = Math.hypot(dx,dy)*24;
       const px=(x+dx+.5)*TILE, py=(y+dy+.5)*TILE;
       const fire = this.add.circle(px,py,TILE*.38,(dx+dy)%2 ? 0xff812b : 0xffd077,.8)
@@ -7527,6 +7562,7 @@ export class GameScene extends Phaser.Scene {
 
   clearMoveInput() {
     this.showSkillRangePreview(false);
+    this.showDynamiteRangePreview(false);
     this.events.emit('moveinputcleared');
     this.queuedMove = null;
     this.heldDir = null;

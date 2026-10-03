@@ -1,0 +1,24 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><title>ダイナマイトの範囲確認</title>
+<style>body{margin:16px;background:#101923;color:#eee1c4;font:14px system-ui}button{padding:8px 14px;margin:4px;background:#302a23;color:#ffe1a2;border:1px solid #997744}iframe{display:block;width:1120px;height:730px;max-width:100%;margin-top:12px;border:1px solid #997744}output{display:block;margin:10px 0;color:#b8d9b4}h1{font-size:22px}</style>
+<h1>ダイナマイトの範囲確認</h1><p>ローカル確認用。右下のダイナマイトにカーソルを合わせてください。冒険セーブは変更しません。</p>
+<button id="move">一歩移動</button><button id="menu">設定を開く</button><button id="close">探索へ</button><output>読み込み中</output><iframe title="ダイナマイトの範囲確認画面"></iframe>
+<script type="module">
+import {makeItem} from '/src/data.ts';
+if(location.hostname!=='localhost')throw Error('Local QA only');
+const frame=document.querySelector('iframe'),out=document.querySelector('output');let ready=false;
+const scene=()=>frame.contentWindow?.__game?.scene.getScene('GameScene');
+const hud=()=>frame.contentWindow?.__game?.scene.getScene('UIScene');
+frame.src='/?qa-game&qa-silent&qa-boss&qa-floor=5&qa-gender=male&mobile=0';
+document.querySelector('#move').onclick=()=>{const s=scene();if(ready)s.playerAct('right');};
+document.querySelector('#menu').onclick=()=>{if(ready)hud().setOverlay('settings');};
+document.querySelector('#close').onclick=()=>{if(ready)hud().setOverlay('none');};
+setInterval(()=>{
+ const s=scene(),u=hud();if(!s?.playerSprite||!s.sys.isActive()||!u?.itemContainer)return;
+ if(!ready){
+  const r=s.dungeon.bossRoom;s.player.x=r.cx;s.player.y=r.cy+3;s.player.inventory=[makeItem('dynamite'),makeItem('potion')];u.itemSlotKinds=[];
+  for(const e of s.enemies){e.hp=0;e.sprite.setVisible(false);e.shadow?.setVisible(false);e.aura?.setVisible(false);}
+  s.placeSprite(s.playerSprite,s.player.x,s.player.y);s.lightRadius=100;s.updateVisibility();s.emitRefresh();u.setOverlay('none');ready=true;
+ }
+ out.textContent=`準備完了｜範囲表示：${s.dynamiteRangePreview?.visible?'ON':'OFF'}｜ダイナマイト：${s.player.inventory.filter(i=>i.kind==='dynamite').length}個｜位置：${s.player.x},${s.player.y}｜メニュー：${u.overlayMode}`;
+},100);
+</script></html>

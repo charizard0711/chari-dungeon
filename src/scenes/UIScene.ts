@@ -48,6 +48,7 @@ export class UIScene extends Phaser.Scene {
   logTexts: Phaser.GameObjects.Text[] = []; // 固定8行（行ごとに色分け）
   itemContainer!: Phaser.GameObjects.Container;
   private itemSlotKinds: ItemKind[] = [];
+  private dynamiteHoverZone?: Phaser.GameObjects.Zone;
   overlay!: Phaser.GameObjects.Container;
   overlayMode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' | 'itemcatalog' | 'equipmentcatalog' | 'repair' | 'quests' = 'none';
   repairKind: 'weapon' | 'shield' = 'weapon';
@@ -97,6 +98,7 @@ export class UIScene extends Phaser.Scene {
 
   create() {
     this.itemSlotKinds = [];
+    this.dynamiteHoverZone = undefined;
     this.secretRewardOpen = false;
     this.slotAuras = [];
     this.overlayMode = 'none';
@@ -176,6 +178,8 @@ export class UIScene extends Phaser.Scene {
 
     // シーン停止時にリスナーを解除（再起動時の多重登録・破棄済み参照アクセス防止）
     this.events.once('shutdown', () => {
+      this.dynamiteHoverZone = undefined;
+      this.gs.showDynamiteRangePreview(false);
       gsEvents.off('refresh', onRefresh);
       gsEvents.off('quest-notice', celebrations.push);
       gsEvents.off('log', onLog);
@@ -595,7 +599,11 @@ export class UIScene extends Phaser.Scene {
   update() {
     this.refreshSkillButton();
     for (const entry of this.slotAuras) entry.aura.enabled = entry.icon.texture.key === entry.key;
-    this.gs.showSkillRangePreview(this.skillHovered && !!this.skillButton?.visible);
+    const pointer = this.input.activePointer;
+    const dynamiteHovered = !!this.dynamiteHoverZone?.active && this.input.isOver && !pointer.wasTouch
+      && this.dynamiteHoverZone.getBounds().contains(pointer.x, pointer.y);
+    this.gs.showSkillRangePreview(!dynamiteHovered && this.skillHovered && !!this.skillButton?.visible);
+    this.gs.showDynamiteRangePreview(dynamiteHovered);
     if (this.overlayMode !== 'none' || this.gs.gameEnded) this.releaseJoystick?.();
   }
 
@@ -839,6 +847,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   rebuildItems() {
+    this.dynamiteHoverZone = undefined;
     this.itemContainer.removeAll(true);
     const p = this.gs.player;
     const { x: startX, y: startY, cols } = this.L.items;
@@ -866,6 +875,7 @@ export class UIScene extends Phaser.Scene {
         this.itemContainer.add(cnt);
       }
       const zone = this.add.zone(cx, cy, 54, 54).setOrigin(0).setInteractive({ useHandCursor: true });
+      if (grp.kind === 'dynamite' && available) this.dynamiteHoverZone = zone;
       const cntSuffix = available ? grp.count > 1 ? ` ×${grp.count}` : '' : '（所持なし）';
       zone.on('pointerover', () => { if (available) drawBg(0x264a48, frameHover, rare ? 2.5 : 1.5); this.showTooltip((rare ? '★' : '') + grp.item.name + cntSuffix, grp.item.desc, cx + 27, cy); });
       zone.on('pointerout', () => { drawBg(available ? 0x25121e : 0x141a22, available ? frameCol : 0x303946, rare ? 2.5 : 1.5); this.hideTooltip(); });
