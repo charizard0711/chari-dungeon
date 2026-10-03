@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME_W, GAME_H } from '../main';
 import { Audio } from '../audio/manager';
 import { readRunSave } from '../runSave';
+import { DIFFICULTIES, DIFFICULTY_RULES, difficultyOf, isDifficultyUnlocked, readDifficultyProgress, selectDifficulty, type Difficulty } from '../difficulty';
 import {
   getSelectedGender,
   isPlayerGender,
@@ -15,12 +16,15 @@ const FONT = '"Yu Gothic UI", "Meiryo", sans-serif';
 
 export class TitleScene extends Phaser.Scene {
   private selectedGender: PlayerGender = getSelectedGender();
+  selectedDifficulty: Difficulty = 'normal';
 
   constructor() {
     super('TitleScene');
   }
 
   create() {
+    this.selectedDifficulty = readDifficultyProgress().selected;
+    document.body.dataset.difficulty = this.selectedDifficulty;
     // ローカルQAだけを無音にする。通常プレイのサウンド設定には影響させない。
     const qaParams = new URLSearchParams(location.search);
     const qaGender = qaParams.get('qa-gender');
@@ -44,7 +48,7 @@ export class TitleScene extends Phaser.Scene {
       starting = true;
       if (!(location.hostname === 'localhost' && isPlayerGender(qaGender))) setSelectedGender(this.selectedGender);
       this.cameras.main.fadeOut(180, 2, 7, 8);
-      this.time.delayedCall(190, () => this.scene.start('GameScene', { resume }));
+      this.time.delayedCall(190, () => this.scene.start('GameScene', { resume, difficulty: this.selectedDifficulty }));
     };
 
     let resumeDialog: Phaser.GameObjects.Container | undefined;
@@ -64,12 +68,12 @@ export class TitleScene extends Phaser.Scene {
         fontFamily: FONT, fontSize: '22px', color: '#ffe1a0', fontStyle: 'bold'
       }).setOrigin(.5);
       const state = savedRun.snapshot.state;
-      this.add.text(GAME_W / 2, y - 77, `${state.floor}${state.inBossRoom ? '.5' : ''}階 · レベル${savedRun.snapshot.player.level} · ${state.turn}ターン`, {
+      this.add.text(GAME_W / 2, y - 77, `${DIFFICULTY_RULES[difficultyOf(state.difficulty)].name} · ${state.floor}${state.inBossRoom ? '.5' : ''}階 · Lv.${savedRun.snapshot.player.level}`, {
         fontFamily: FONT, fontSize: '15px', color: '#d7c8b4'
       }).setOrigin(.5);
       this.makeButton(GAME_W / 2, y - 6, '続きから探索', () => startGame(true));
       let confirmNew = false;
-      const newGame = this.add.text(GAME_W / 2, y + 64, '最初から始める', {
+      const newGame = this.add.text(GAME_W / 2, y + 64, `${DIFFICULTY_RULES[this.selectedDifficulty].name}で最初から始める`, {
         fontFamily: FONT, fontSize: '16px', color: '#d3c5b8', padding: { x: 18, y: 12 }
       }).setOrigin(.5).setInteractive({ useHandCursor: true });
       newGame.on('pointerdown', () => {
@@ -107,9 +111,10 @@ export class TitleScene extends Phaser.Scene {
     this.textures.get('title_map_pixel_logo').setFilter(Phaser.Textures.FilterMode.NEAREST);
     const logo = this.add.image(cx, mobile ? 248 : GAME_H * .315, 'title_map_pixel_logo');
     logo.setScale(Math.min((mobile ? GAME_W - 42 : GAME_W * .55) / logo.width, (mobile ? 115 : 100) / logo.height));
-    this.createGenderSelector(mobile ? 468 : GAME_H * .615, mobile);
+    this.createGenderSelector(mobile ? 414 : 412, mobile);
+    this.createDifficultySelector(mobile ? 547 : 529, mobile);
     {
-      const y = GAME_H * .79, w = mobile ? GAME_W - 32 : GAME_W * .36, h = mobile ? 74 : GAME_H * .13;
+      const y = mobile ? GAME_H * .80 : 635, w = mobile ? GAME_W - 32 : GAME_W * .36, h = 68;
       this.add.text(cx, y, '探索', { fontFamily: FONT, fontSize: mobile ? '27px' : '34px', color: '#f6d688', fontStyle: 'bold' }).setOrigin(.5);
       const hover = this.add.graphics();
       const clear = () => hover.clear();
@@ -189,6 +194,39 @@ export class TitleScene extends Phaser.Scene {
       fontSize: '12px',
       color: '#91a6a7'
     }).setOrigin(0.5);
+  }
+
+  private createDifficultySelector(y: number, mobile: boolean) {
+    const progress = readDifficultyProgress();
+    const width = mobile ? 112 : 150, gap = mobile ? 8 : 12, cx = GAME_W / 2;
+    this.add.text(cx, y - 51, '難易度を選ぶ', { fontFamily: FONT, fontSize: '14px', color: '#e6d7b8', fontStyle: 'bold' }).setOrigin(.5).setStroke('#030711', 4);
+    const description = this.add.text(cx, y + 50, '', { fontFamily: FONT, fontSize: mobile ? '10px' : '12px', color: '#e0d6c3', align: 'center' }).setOrigin(.5).setStroke('#030711', 3);
+    const cards: { mode: Difficulty; bg: Phaser.GameObjects.Graphics; x: number }[] = [];
+    const refresh = () => {
+      for (const card of cards) {
+        const selected = card.mode === this.selectedDifficulty, rule = DIFFICULTY_RULES[card.mode];
+        card.bg.clear().fillStyle(0x070d17, .94).fillRoundedRect(card.x - width / 2, y - 30, width, 60, 7)
+          .lineStyle(selected ? 2 : 1, isDifficultyUnlocked(card.mode, progress) ? rule.color : 0x515762, selected ? 1 : .65)
+          .strokeRoundedRect(card.x - width / 2, y - 30, width, 60, 7);
+        if (selected) card.bg.fillStyle(rule.color, .13).fillRoundedRect(card.x - width / 2 + 3, y - 27, width - 6, 54, 5);
+      }
+      const mode = this.selectedDifficulty;
+      description.setText(mode === 'normal' ? progress.cleared.includes('normal') ? '踏破済み / ハードに挑戦できます' : '30階踏破でハードを解放' : mode === 'hard'
+        ? '敵HP ×1.25 / 攻撃 ×1.2 / 獲得G 70% / 復活1回'
+        : '敵HP ×1.5 / 攻撃 ×1.4 / 獲得G 50% / 復活なし');
+      document.body.dataset.difficulty = mode;
+    };
+    DIFFICULTIES.forEach((mode, index) => {
+      const x = cx + (index - 1) * (width + gap), unlocked = isDifficultyUnlocked(mode, progress), rule = DIFFICULTY_RULES[mode];
+      const bg = this.add.graphics(); cards.push({ mode, bg, x });
+      this.add.text(x, y - 10, rule.name, { fontFamily: FONT, fontSize: mobile ? '17px' : '20px', fontStyle: 'bold', color: unlocked ? rule.text : '#78808f' }).setOrigin(.5);
+      this.add.text(x, y + 16, progress.cleared.includes(mode) ? '★ CLEAR' : unlocked ? '挑戦可能' : `${mode === 'hard' ? 'ノーマル' : 'ハード'}クリアで解放`,
+        { fontFamily: FONT, fontSize: '10px', color: unlocked ? '#d5cbbb' : '#7c8492' }).setOrigin(.5);
+      if (unlocked) this.add.zone(x, y, width, 60).setName(`difficulty-${mode}`).setInteractive({ useHandCursor: true }).on('pointerdown', () => {
+        this.selectedDifficulty = mode; selectDifficulty(mode); Audio.playSe('click'); refresh();
+      });
+    });
+    refresh();
   }
 
   private createHelpOverlay() {

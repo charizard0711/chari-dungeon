@@ -1,0 +1,51 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><title>難易度・切替コードの確認</title>
+<style>body{margin:16px;background:#07121e;color:#e0e8f1;font:14px system-ui}h1{font-size:21px}button{padding:9px 14px;margin:3px;background:#18324b;color:#ffe1a0;border:1px solid #4b768d;border-radius:5px}iframe{display:block;border:1px solid #657381;width:1280px;max-width:100%;height:770px;margin-top:12px}iframe.mobile{width:390px;height:860px}output{display:block;padding:10px}pre{white-space:pre-wrap}</style>
+<h1>難易度・切替コードの確認</h1><p>ローカル専用。実際の冒険セーブとクリア履歴は変更しません。</p>
+<button id="suite">解放・コード・再開を検証</button><button id="hard">33333333 を入力</button><button id="master">44444444 を入力</button><button id="title">タイトル</button><button id="mobile">スマホ表示</button><button id="desktop">PC表示</button><button id="boss">追撃プレビュー</button><button id="beat">1ターン進める</button>
+<button id="selection">選択保存を検証</button><button id="restore-waves">追撃の再開を検証</button><output>読み込み中…</output><iframe title="難易度確認用ゲーム"></iframe><pre></pre>
+<script type="module">
+import {readDifficultyProgress,DIFFICULTY_SAVE_KEY} from '/src/difficulty.ts';
+if(location.hostname!=='localhost'||!location.search.includes('qa-difficulty-profile='))throw Error('QA profile required');
+const profile=new URLSearchParams(location.search).get('qa-difficulty-profile');
+const frame=document.querySelector('iframe'),out=document.querySelector('output'),report=document.querySelector('pre');
+const safeKeys=['chari-dungeon.run.v1','chari-dungeon.difficulty.v1','chari-secret-quests-v1'];
+const saved=safeKeys.map(k=>localStorage.getItem(k));
+const check=(v,msg)=>{if(!v)throw Error(msg);};
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const game=()=>frame.contentWindow?.__game;
+const g=()=>game()?.scene.getScene('GameScene');
+let phone=false,boss,lines=[];
+function status(){report.textContent=lines.join('\n');}
+function load(title=false){frame.classList.toggle('mobile',phone);frame.src=`/?qa-silent&qa-gender=male&qa-difficulty-profile=${profile}&mobile=${phone?1:0}${title?'':'&qa-game'}`;}
+async function until(test){for(let i=0;i<150;i++){if(test())return;await wait(100);}throw Error('game readiness timeout');}
+async function active(){await until(()=>game()?.scene.isActive('GameScene')&&g().player&&game().scene.isActive('UIScene'));}
+async function start(mode){game().scene.stop('EndScene');game().scene.stop('UIScene');game().scene.stop('GameScene');game().scene.start('GameScene',{difficulty:mode});await wait(350);await active();}
+async function code(value){await active();const s=g(),floor=s.floor,gold=s.player.gold;const ui=game().scene.getScene('UIScene');ui.setOverlay('settings');ui.editCode(value);ui.submitCode();await wait(150);
+ check(s.floor===floor&&s.player.gold===gold,'switch retained floor and gold');check(game().scene.getScene('UIScene').overlayMode==='none','code did not open item catalog');
+ out.textContent=`${s.difficulty} / ${value} / フレーム ${game().scene.getScene('UIScene').theme.panel}`;}
+async function run(){try{
+ lines=[];out.textContent='検証中…';localStorage.removeItem(`${DIFFICULTY_SAVE_KEY}.qa.${profile}`);await active();await start('master');check(g().difficulty==='normal','locked master must fall back to normal');
+ await code('33333333');check(g().difficulty==='hard','hard code');check(g().difficultyClearEligible===false,'mid-run unlock eligibility');const mob=g().enemies.find(e=>e.alive);const oldHp=mob?.hpMax;
+ await code('33333333');check(mob?.hpMax===oldHp,'same code must not stack stats');await code('44444444');check(g().difficulty==='master','master code');
+ g().revivesUsed=1;const snap=JSON.parse(JSON.stringify(g().captureRun())),before=snap.enemies.map(e=>e.state.hpMax);
+ g().buildFloor(snap.state.floor,snap.state.inBossRoom,snap);check(g().difficulty==='master'&&g().revivesUsed===1,'restore mode/revive');check(g().difficultyClearEligible===false,'restore switched-run flag');check(JSON.stringify(g().enemies.map(e=>e.hpMax))===JSON.stringify(before),'restore no double difficulty');lines.push('PASS: コード切替・HP二重補正なし・階/装備/復活回数/難易度の再開');
+ g().floor=30;g().gameOver(true);await until(()=>game().scene.isActive('EndScene'));check(readDifficultyProgress().cleared.length===0,'switched run must not unlock');
+ for(const mode of ['normal','hard','master']){await start(mode);check(g().difficulty===mode,'unlocked start '+mode);g().floor=30;g().gameOver(true);await until(()=>game().scene.isActive('EndScene'));check(readDifficultyProgress().cleared.includes(mode),'persisted clear '+mode);}
+ lines.push('PASS: ノーマル→ハード→マスターの順番・クリア保存・途中切替は解放対象外');
+ check(safeKeys.every((k,i)=>localStorage.getItem(k)===saved[i]),'real save changed');lines.push('PASS: 実際のセーブと解放履歴は変更なし');status();await start('hard');out.textContent='全項目 PASS — ハードの青フレーム';
+ }catch(e){lines.push('FAIL: '+e.stack);status();out.textContent='FAIL';}}
+document.querySelector('#suite').onclick=run;
+document.querySelector('#hard').onclick=()=>code('33333333');document.querySelector('#master').onclick=()=>code('44444444');
+document.querySelector('#title').onclick=()=>load(true);
+document.querySelector('#selection').onclick=async()=>{try{
+ await until(()=>game()?.scene.isActive('TitleScene'));
+ const title=game().scene.getScene('TitleScene');title.children.getByName('difficulty-hard').emit('pointerdown');check(title.selectedDifficulty==='hard','title selection');
+ check(readDifficultyProgress().selected==='hard','selection persisted');load(true);await wait(400);await until(()=>game()?.scene.isActive('TitleScene'));check(game().scene.getScene('TitleScene').selectedDifficulty==='hard','selection survived reload');
+ lines.push('PASS: タイトルのハード選択をリロード後も保持');status();await start('hard');out.textContent='選択保存 PASS / ハードで開始';
+ }catch(e){out.textContent='FAIL: '+e.message;}};
+document.querySelector('#restore-waves').onclick=()=>{try{const s=g();check(boss?.challengeWaves.length,'create preview first');const snap=JSON.parse(JSON.stringify(s.captureRun())),waves=JSON.stringify(boss.challengeWaves);s.buildFloor(snap.state.floor,snap.state.inBossRoom,snap);boss=s.enemies.find(e=>e.def.isFloorBoss||e.def.isBoss);check(JSON.stringify(boss.challengeWaves)===waves,'wave turns/tiles restored');check(s.difficultyWarnings.get(boss).length>0,'markers restored');out.textContent='追撃の再開 PASS';}catch(e){out.textContent='FAIL: '+e.message;}};
+document.querySelector('#mobile').onclick=()=>{phone=true;load(true);};document.querySelector('#desktop').onclick=()=>{phone=false;load();};
+document.querySelector('#boss').onclick=async()=>{await active();const s=g();if(s.difficulty==='normal')await code('33333333');s.buildFloor(5,true);boss=s.enemies.find(e=>e.def.isFloorBoss||e.def.isBoss);const p=s.dungeon.bossRoom;s.player.x=p.cx;s.player.y=p.y+p.h-3;s.placeSprite(s.playerSprite,s.player.x,s.player.y);s.updateVisibility();boss.challengeTurn=s.difficulty==='hard'?2:1;s.bossStates.get(boss).intent=undefined;s.bossStates.get(boss).stunned=0;s.handleDifficultyBossTurn(boss);out.textContent=`${s.difficulty}: ${boss.challengeWaves.length}段の予告`;};
+document.querySelector('#beat').onclick=()=>{if(boss){g().handleDifficultyBossTurn(boss);out.textContent=`残り${boss.challengeWaves.length}段`;}};
+load();await active();out.textContent='準備完了';
+</script></html>

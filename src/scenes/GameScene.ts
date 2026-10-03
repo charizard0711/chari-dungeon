@@ -6,7 +6,9 @@ import { FINAL_DEPTH_BOSSES, FINAL_ELEMENTS, FINAL_ELEMENT_LABEL, finalDepthMobC
 import { hasFinalDepthTerrain, finalDepthTerrainKey, finalDepthFloorFrame, finalDepthPropKinds, FINAL_DEPTH_COLORS, type FinalDepthPropKind, type FinalDepthPart } from '../finalDepthTerrain';
 import { hasThunderTerrain, thunderTerrainKey, thunderFloorFrame, THUNDER_PROP_KINDS, type ThunderPropKind, type ThunderPart } from '../thunderTerrain';
 import Phaser from 'phaser';
+import { DIFFICULTY_RULES, difficultyOf, difficultyGold, difficultyEnemy, difficultyFromCode, isDifficultyUnlocked, readDifficultyProgress, recordDifficultyClear, type Difficulty } from '../difficulty';
 import { awaitTween } from '../awaitTween';
+import { planDifficultyChallenge } from '../difficultyChallenge';
 import { EquipmentRenderer } from '../equipmentRenderer';
 import { PlayerAnimation } from '../playerAnimation';
 import { TILE } from '../textures';
@@ -60,6 +62,7 @@ import { MAP_X, MAP_Y, MAP_W, MAP_H } from '../layout';
 
 const ANIM = 116;
 const RUN_STATE_KEYS = [
+  'difficulty', 'revivesUsed', 'difficultyClearEligible',
   'floor', 'turn', 'floorTurn', 'score', 'floorStartHp', 'floorDamaged', 'floorBossDefeated',
   'inBossRoom', 'bossRewardClaimed', 'bossEntranceClosed', 'weaponWonThisFloor', 'reviveSeedSeen',
   'shopPurchases', 'enhancementScrollDrops', 'reservedBossScroll', 'pendingEquipment',
@@ -71,7 +74,7 @@ const ENEMY_STATE_KEYS = [
   'def', 'hp', 'hpMax', 'x', 'y', 'baseScale', 'midBossVisualMultiplier', 'slowToggle', 'freezeTurns', 'sealTurns', 'poisonTurns',
   'loopDir', 'lineDir', 'facing', 'moveSteps', 'stealthRevealed', 'gimmickCounter', 'gimmickPhase',
   'vulnerableTurns', 'guardOpenTurns', 'stunnedTurns', 'awakened', 'revived', 'regenBlockedTurns',
-  'summoned', 'cloneDepth', 'charging', 'chargeDir', 'plannedMove'
+  'summoned', 'cloneDepth', 'charging', 'chargeDir', 'plannedMove', 'challengeTurn', 'challengeWaves'
 ] as const;
 // 探索画面のズーム倍率（大きいほど拡大。1.0=等倍）
 const MAP_ZOOM = 1.95;
@@ -310,6 +313,9 @@ interface BossObstacle {
 }
 
 export class GameScene extends Phaser.Scene {
+  difficulty: Difficulty = 'normal';
+  difficultyClearEligible = true;
+  revivesUsed = 0;
   player!: Player;
   dungeon!: DungeonData;
   floor = 1;
@@ -346,6 +352,7 @@ export class GameScene extends Phaser.Scene {
   ground: GroundItem[] = [];
   ambientMotes: AmbientMote[] = [];
   bossStates = new Map<Enemy, BossRuntime>();
+  difficultyWarnings = new Map<Enemy, BossWarningMarker[]>();
   bossHazards: BossHazard[] = [];
   bossObstacles: BossObstacle[] = [];
   bossFloorDecor?: Phaser.GameObjects.Graphics;
@@ -417,8 +424,17 @@ export class GameScene extends Phaser.Scene {
     super('GameScene');
   }
 
-  create(data?: { resume?: boolean }) {
+  create(data?: { resume?: boolean; difficulty?: Difficulty }) {
     const resume = data?.resume ? readRunSave()?.snapshot : undefined;
+    const progress = readDifficultyProgress();
+    const requested = difficultyOf(resume?.state.difficulty ?? data?.difficulty ?? progress.selected);
+    const qaDifficulty = location.hostname === 'localhost' && new URLSearchParams(location.search).has('qa-game')
+      ? new URLSearchParams(location.search).get('qa-difficulty') : null;
+    this.difficulty = qaDifficulty ? difficultyOf(qaDifficulty)
+      : (resume || isDifficultyUnlocked(requested, progress)) ? requested : 'normal';
+    this.revivesUsed = 0;
+    document.body.dataset.difficulty = this.difficulty;
+    this.difficultyClearEligible = true;
     this.restoringRun = true;
     this.savePending = false;
     this.saveWarningShown = false;
@@ -519,6 +535,7 @@ export class GameScene extends Phaser.Scene {
     this.ground = [];
     this.ambientMotes = [];
     this.bossStates = new Map();
+    this.difficultyWarnings = new Map();
     this.bossHazards = [];
     this.bossObstacles = [];
     this.dungeonObjects = [];
@@ -1929,6 +1946,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   addEnemy(def: MonsterDef, x: number, y: number, hpScale: number): Enemy {
+    def = difficultyEnemy(def, this.difficulty);
     const e = new Enemy(def, x, y, hpScale);
     e.shadow = this.add.image(0, 0, def.isBoss || def.isFloorBoss ? 'boss_tile_shadow' : 'shadow').setDepth(9.5).setAlpha(0.6);
     e.sprite = this.add.image(0, 0, def.key).setDepth(10)
@@ -2026,6 +2044,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   clearBossMechanics() {
+    for (const enemy of this.difficultyWarnings.keys()) this.clearDifficultyWarnings(enemy);
     for (const state of this.bossStates.values()) {
       state.coreLabel?.destroy();
       for (const marker of state.intent?.markers ?? []) {
@@ -2516,6 +2535,64 @@ export class GameScene extends Phaser.Scene {
     if (!intent) return { handled: false };
     state.intent = intent;
     return { handled: true };
+  }
+
+  clearDifficultyWarnings(enemy: Enemy) {
+    for (const marker of this.difficultyWarnings.get(enemy) ?? []) this.destroyBossWarningMarker(marker);
+    this.difficultyWarnings.delete(enemy);
+  }
+
+  drawDifficultyWarnings(enemy: Enemy) {
+    this.clearDifficultyWarnings(enemy);
+    const markers: BossWarningMarker[] = [];
+    for (const wave of enemy.challengeWaves) {
+      const color = this.difficulty === 'hard' ? 0x58bfff : wave.turns === 1 ? 0xffc957 : 0xeb8eff;
+      const group = this.bossWarningMarkers(wave.tiles, color, this.player, 'primary', true);
+      for (const marker of group) {
+        marker.turns = wave.turns;
+        const overlap = markers.some(m => m.x === marker.x && m.y === marker.y);
+        marker.label.setText(String(wave.turns)).setFontSize('13px').setDepth(36);
+        marker.label.setPosition(marker.plate.x + (overlap ? 7 : -7), marker.plate.y);
+        marker.plate.setDepth(35);
+        const visible = !!this.visibleTiles[marker.y]?.[marker.x];
+        marker.plate.setVisible(visible); marker.label.setVisible(visible);
+      }
+      markers.push(...group);
+    }
+    this.difficultyWarnings.set(enemy, markers);
+  }
+
+  handleDifficultyBossTurn(enemy: Enemy): boolean {
+    if (this.difficulty === 'normal' || !(enemy.def.isBoss || enemy.def.isFloorBoss)) return false;
+    if (enemy.challengeWaves.length) {
+      const due = enemy.challengeWaves.filter(w => --w.turns === 0);
+      enemy.challengeWaves = enemy.challengeWaves.filter(w => w.turns > 0);
+      this.drawDifficultyWarnings(enemy);
+      const tiles = due.flatMap(w => w.tiles);
+      if (tiles.length) this.bossImpactFx(tiles, this.difficulty === 'hard' ? 'ice' : 'lightning');
+      if (this.invisTurns <= 0 && tiles.some(p => p.x === this.player.x && p.y === this.player.y)) {
+        this.damagePlayerFromBoss(enemy, 1, '試練の追撃！');
+      }
+      return true;
+    }
+    const state = this.bossStates.get(enemy);
+    if (state?.intent || state?.stunned || enemy.charging || enemy.stunnedTurns > 0 || this.playerRootTurns > 0 || this.invisTurns > 0) return false;
+    if (bodyDistance(enemy, bossBodyRadius(enemy.def), this.player) > 7) return false;
+    // Count available action turns; native boss telegraphs and recovery always take precedence.
+    if (++enemy.challengeTurn % (this.difficulty === 'hard' ? 3 : 2)) return false;
+    const validTile = (x: number, y: number) => isWalkable(this.dungeon.tiles[y]?.[x] ?? 'wall')
+      && this.dungeon.tiles[y]?.[x] !== 'pit' && !this.bossObstacleAt(x, y);
+    const canStand = (x: number, y: number) => validTile(x, y) && !this.enemyAt(x, y)
+      && !this.chestAt(x, y)
+      && !this.dungeonObjects.some(o => x >= o.x && x < o.x + o.w && y >= o.y && y < o.y + o.h)
+      && !this.bossHazards.some(h => h.x === x && h.y === y);
+    enemy.challengeWaves = planDifficultyChallenge(this.difficulty, this.player,
+      enemy.challengeTurn % 2 === 0, validTile, canStand);
+    if (!enemy.challengeWaves.length) return false;
+    this.drawDifficultyWarnings(enemy);
+    this.log(this.difficulty === 'hard' ? '試練の追撃！ 青い予告帯から1歩離れよう。'
+      : '二連の追撃！ 数字の順に攻撃が来る。1を避け、次は2の帯から離れよう。', 'dmg');
+    return true;
   }
 
   resolveBossIntent(
@@ -3209,7 +3286,7 @@ export class GameScene extends Phaser.Scene {
     if (roll < 0.32) {
       const gold = 12 + Math.floor(Math.random() * (20 + this.floor * 3));
       this.dropItem(object.x, object.y, 'coin', gold);
-      this.log(`${object.kind === 'jar' ? '壺' : '樽'}の中から${gold}Gがこぼれた！`, 'gold');
+      this.log(`${object.kind === 'jar' ? '壺' : '樽'}の中から${difficultyGold(gold, this.difficulty)}Gがこぼれた！`, 'gold');
     } else {
       const pool: ItemKind[] = object.kind === 'jar'
         ? ['potion', 'potion', 'torch', 'invis']
@@ -3772,9 +3849,9 @@ export class GameScene extends Phaser.Scene {
       }
       Audio.playSe('pickup');
     } else if (gi.kind === 'coin') {
-      this.player.gold += gi.value ?? 5;
-      this.addScore(Math.floor((gi.value ?? 5) / 2));
-      this.log(`コインを拾った (+${gi.value}G)`, 'gold');
+      const gold = this.awardGold(gi.value ?? 5);
+      this.addScore(Math.floor(gold / 2));
+      this.log(`コインを拾った (+${gold}G)`, 'gold');
       Audio.playSe('coin');
     } else {
       {
@@ -3985,9 +4062,9 @@ export class GameScene extends Phaser.Scene {
     const def = e.def;
     this.advanceSecretQuests(e);
     const leveled = this.player.addExp(def.exp);
-    this.player.gold += def.gold;
+    const gold = this.awardGold(def.gold);
     this.addScore(def.score + scoreBonus + (def.isElite ? 60 : 0) + (def.isBoss ? 0 : 0));
-    this.log(`${def.name}を倒した！ EXP+${def.exp} G+${def.gold}`, 'gold');
+    this.log(`${def.name}を倒した！ EXP+${def.exp} G+${gold}`, 'gold');
     if (!options.quiet) Audio.playSe('kill');
     if (leveled) { this.log(`レベルアップ！ Lv.${this.player.level} になった。`, 'special'); if (!options.quiet) Audio.playSe('levelup'); this.levelupFx(); }
     if (def.isTreasureRabbit) {
@@ -3997,7 +4074,7 @@ export class GameScene extends Phaser.Scene {
         const reward = makeWeapon(rewardDef.key, []);
         reward.plus = Math.max(3, reward.plus);
         this.dropEquipment(e.x, e.y, 'weapon', reward);
-        this.log(`福袋が弾けた！ 1000Gと属性付きSS武器 ${weaponFullName(reward)} を獲得！`, 'special');
+        this.log(`福袋が弾けた！ ${gold}Gと属性付きSS武器 ${weaponFullName(reward)} を獲得！`, 'special');
       }
     } else {
       // 通常MOB（エリート含む）の各ドロップ率を半減。ボスは従来の確率を維持する。
@@ -4041,10 +4118,12 @@ export class GameScene extends Phaser.Scene {
     }
     if ((def.isBoss || def.isFloorBoss) && !def.isTreasureRabbit && Math.random() < ARCADIA_BOSS_DROP_RATE) {
       this.dropEquipment(e.x, e.y, 'shield', makeShield('s_arcadia_guard'));
-      this.log('黒い羽根が舞い、堕天盾ルシファー+10が現れた！', 'special');
+      this.log('黒い羽根が舞い、漆黒の盾ルファルゼント+10が現れた！', 'special');
     }
 
     this.enemyDefeatFx(e);
+    this.clearDifficultyWarnings(e);
+    e.challengeWaves = [];
     const bossState = this.bossStates.get(e);
     if (bossState) {
       for (const marker of bossState.intent?.markers ?? []) {
@@ -4363,8 +4442,7 @@ export class GameScene extends Phaser.Scene {
 
   collectDropDirectly(kind: ItemKind | 'coin', value?: number) {
     if (kind === 'coin') {
-      const gold = value ?? 5;
-      this.player.gold += gold;
+      const gold = this.awardGold(value ?? 5);
       this.addScore(Math.floor(gold / 2));
       this.log(`届かない場所のコインを自動回収した (+${gold}G)`, 'gold');
       Audio.playSe('coin');
@@ -4420,7 +4498,8 @@ export class GameScene extends Phaser.Scene {
   handlePlayerDown() {
     // 復活のタネ所持で自動復活
     const idx = this.player.inventory.findIndex((i) => i.kind === 'revive');
-    if (idx >= 0) {
+    if (idx >= 0 && this.revivesUsed < DIFFICULTY_RULES[this.difficulty].revives) {
+      this.revivesUsed++;
       this.player.inventory.splice(idx, 1);
       this.player.hp = Math.floor(this.player.hpMax * 0.6);
       this.log('復活のタネが芽吹いた！ HPが回復して復活した。', 'special');
@@ -4805,6 +4884,7 @@ export class GameScene extends Phaser.Scene {
   async enemyTurn() {
     const anims: Promise<void>[] = [];
     for (const e of this.enemies) {
+      if (this.gameEnded) break;
       if (!e.alive) continue;
       const sealedRoom = this.optionalRoomContaining(e.x, e.y);
       if (sealedRoom && !sealedRoom.opened) continue;
@@ -4831,6 +4911,7 @@ export class GameScene extends Phaser.Scene {
         if (e.hp <= 0) { this.killEnemy(e, 0); continue; }
         this.drawEnemyHp(e);
       }
+      if (this.handleDifficultyBossTurn(e)) continue;
       const bossTurn = this.handleBossTurn(e);
       if (bossTurn.handled) {
         if (bossTurn.animation) anims.push(bossTurn.animation);
@@ -5741,6 +5822,10 @@ export class GameScene extends Phaser.Scene {
         marker.label.setVisible(v);
       }
     }
+    for (const markers of this.difficultyWarnings.values()) for (const marker of markers) {
+      marker.plate.setVisible(!!visible[marker.y]?.[marker.x]);
+      marker.label.setVisible(!!visible[marker.y]?.[marker.x]);
+    }
     for (const hazard of this.bossHazards) hazard.sprite.setVisible(!!visible[hazard.y]?.[hazard.x]);
     for (const obstacle of this.bossObstacles) {
       const v = !!visible[obstacle.y]?.[obstacle.x];
@@ -5823,8 +5908,7 @@ export class GameScene extends Phaser.Scene {
         }
       }
       // 大量ゴールド
-      const gold = 80 + Math.floor(Math.random() * this.floor * 20);
-      this.player.gold += gold;
+      const gold = this.awardGold(80 + Math.floor(Math.random() * this.floor * 20));
       this.addScore(gold);
       this.log(`さらに${gold}Gを入手！`, 'gold');
       this.effectFx(c.x, c.y, 'fx_levelup', 2.0, 700);
@@ -5854,8 +5938,7 @@ export class GameScene extends Phaser.Scene {
           this.log(`宝箱から「${makeItem(k).name}」を入手。`, 'item');
         }
       } else if (roll < 0.5) {
-        const gold = 40 + Math.floor(Math.random() * this.floor * 12);
-        this.player.gold += gold;
+        const gold = this.awardGold(40 + Math.floor(Math.random() * this.floor * 12));
         this.addScore(Math.floor(gold / 2));
         this.log(`宝箱から${gold}Gを入手！`, 'gold');
       } else {
@@ -6332,6 +6415,34 @@ export class GameScene extends Phaser.Scene {
   }
 
   redeemCode(code: string): boolean {
+    const mode = difficultyFromCode(code);
+    if (mode) {
+      if (this.busy || this.gameEnded) return false;
+      if (mode !== this.difficulty) {
+        this.difficulty = mode;
+        this.difficultyClearEligible = false;
+        for (const enemy of this.enemies) {
+          if (!enemy.alive) continue;
+          const next = difficultyEnemy(enemy.def, mode);
+          const ratio = enemy.hp / enemy.hpMax;
+          enemy.hpMax = Math.max(1, Math.round(enemy.hpMax * next.hp / enemy.def.hp));
+          enemy.hp = Math.max(1, Math.min(enemy.hpMax, Math.round(enemy.hpMax * ratio)));
+          enemy.def = next;
+          this.clearDifficultyWarnings(enemy);
+          enemy.challengeWaves = [];
+          enemy.challengeTurn = 0;
+          this.drawEnemyHp(enemy);
+        }
+      }
+      document.body.dataset.difficulty = mode;
+      this.log(`${DIFFICULTY_RULES[mode].name}へ切り替えました。現在の階・装備を引き継ぎます。`, 'special');
+      if (!this.difficultyClearEligible) this.log('途中で難易度を変更した冒険は、次の難易度の解放対象外です。', 'sys');
+      Audio.playSe('levelup');
+      this.saveRun();
+      // Rebuild every panel after the input handler has finished using its overlay.
+      this.time.delayedCall(0, () => { this.scene.stop('UIScene'); this.scene.launch('UIScene'); });
+      return true;
+    }
     if (code !== ITEM_CATALOG_CODE) {
       this.log('コードが違うようだ。', 'sys');
       Audio.playSe('deny');
@@ -6709,9 +6820,17 @@ export class GameScene extends Phaser.Scene {
     this.score += v;
   }
 
+  awardGold(amount: number): number {
+    const gold = difficultyGold(amount, this.difficulty);
+    this.player.gold += gold;
+    return gold;
+  }
+
   gameOver(cleared: boolean) {
     if (this.gameEnded) return;
     this.gameEnded = true;
+    for (const enemy of this.difficultyWarnings.keys()) this.clearDifficultyWarnings(enemy);
+    const difficultyResult = cleared && this.floor === 30 && this.difficultyClearEligible ? recordDifficultyClear(this.difficulty) : undefined;
     if (this.runSaveEnabled()) {
       writeCodexSave(this.discovered);
       writeQuestJournal(this.secretQuests);
@@ -6736,6 +6855,10 @@ export class GameScene extends Phaser.Scene {
 
     const stats = {
       cleared,
+      difficulty: this.difficulty,
+      difficultyChanged: !this.difficultyClearEligible,
+      unlockedDifficulty: difficultyResult?.unlocked,
+      difficultySaveFailed: !!difficultyResult && !difficultyResult.saved && this.runSaveEnabled(),
       playerGender: this.playerGender,
       floor: this.floor,
       level: this.player.level,
@@ -7564,13 +7687,17 @@ export class GameScene extends Phaser.Scene {
   private restoreRunState(snapshot: RunSnapshot) {
     const journal = this.secretQuests;
     Object.assign(this, pickFields(snapshot.state, RUN_STATE_KEYS));
+    this.difficulty = difficultyOf(snapshot.state.difficulty);
+    this.difficultyClearEligible = snapshot.state.difficultyClearEligible !== false;
+    this.revivesUsed = Number.isInteger(snapshot.state.revivesUsed) && snapshot.state.revivesUsed >= 0 ? snapshot.state.revivesUsed : 0;
+    document.body.dataset.difficulty = this.difficulty;
     this.secretQuests = mergeQuests(journal, this.secretQuests);
     // Saves created before weapon skills remain readable.
     if (!Number.isInteger(this.skillChargeSteps) || this.skillChargeSteps < 0) this.skillChargeSteps = 100;
     this.skillChargeSteps = Math.min(100, this.skillChargeSteps);
     this.player = Object.assign(new Player(), snapshot.player);
-    for (const shield of this.player.shields) if (shield.key === 's_arcadia_guard') shield.name = '堕天盾ルシファー';
-    if (this.pendingEquipment?.item.key === 's_arcadia_guard') this.pendingEquipment.item.name = '堕天盾ルシファー';
+    for (const shield of this.player.shields) if (shield.key === 's_arcadia_guard') shield.name = '漆黒の盾ルファルゼント';
+    if (this.pendingEquipment?.item.key === 's_arcadia_guard') this.pendingEquipment.item.name = '漆黒の盾ルファルゼント';
     for (const weapon of this.player.weapons) {
       if (weapon.key === 'w_hero_sword') weapon.name = WEAPON_DEFS.find(def => def.key === weapon.key)!.name;
     }
@@ -7629,7 +7756,7 @@ export class GameScene extends Phaser.Scene {
       this.chests.push({ ...saved, sprite, glow, baseScale: sprite.scaleX });
     }
     for (const item of snapshot.ground) {
-      if (item.shield?.key === 's_arcadia_guard') item.shield.name = '堕天盾ルシファー';
+      if (item.shield?.key === 's_arcadia_guard') item.shield.name = '漆黒の盾ルファルゼント';
       const equipment = item.weapon ?? item.shield ?? item.armor;
       const texture = item.kind === 'armor' ? armorTextureKey(item.armor!.key)
         : equipment?.key ?? (item.kind === 'coin' ? 'coin' : `i_${item.kind}`);
@@ -7671,12 +7798,14 @@ export class GameScene extends Phaser.Scene {
       this.bossObstacles.push({ ...obstacle, sprite });
     }
     this.playerSprite.setAlpha(this.invisTurns > 0 ? .4 : 1);
+    for (const enemy of this.enemies) if (enemy.challengeWaves.length) this.drawDifficultyWarnings(enemy);
     this.updatePlayerAura();
   }
 
   // UIScene起動前のログも保持し、UIScene側が起動時に復元できるようにする
   private playerFacingSavedLog(msg: string): string {
-    // Old browser saves retain their adventure history; refresh only obsolete room-size messages.
+    msg = msg.split('堕天盾ルシファー').join('漆黒の盾ルファルゼント').split('堕天盾アルカディア').join('漆黒の盾ルファルゼント');
+    // Old browser saves retain their adventure history; refresh obsolete display names.
     if (!msg.includes('10×10')) return msg;
     const arrival = msg.match(/(\d+)F「([^」]+)」に到達/);
     if (arrival) return `${arrival[1]}階「${arrival[2]}」に足を踏み入れた。出口へ続く道は、魔物の封印に閉ざされている。`;

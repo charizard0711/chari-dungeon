@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { Dir, MonsterDef, Vec2 } from './types';
 import type { MonsterAnimationState } from './monsterAnimation';
 import type { MonsterDirectionArt, MonsterDirectionMotion } from './monsterDirections';
+import type { ChallengeWave } from './difficultyChallenge';
 
 export class Enemy {
   def: MonsterDef;
@@ -43,6 +44,8 @@ export class Enemy {
   charging = false;
   chargeDir: { x: number; y: number } | null = null;
   plannedMove?: Vec2 | null;
+  challengeTurn = 0;
+  challengeWaves: ChallengeWave[] = [];
 
   constructor(def: MonsterDef, x: number, y: number, hpScale: number) {
     this.def = def;

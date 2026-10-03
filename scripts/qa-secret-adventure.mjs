@@ -39,7 +39,7 @@ localStorage.setItem=()=>{throw Error('quota');};assert.equal(q.writeQuestJourna
 assert.equal(q.SECRET_WEAPON_KEYS.length,5);
 for(const key of q.SECRET_WEAPON_KEYS){const w=player.makeWeapon(key,[]),d=data.WEAPON_DEFS.find(d=>d.key===key);assert.equal(w.plus,3);assert.equal(w.grade,'S');assert.ok(w.element&&w.passive);assert.equal(d.exclusiveLoot,true);}
 for(let i=0;i<3000;i++)for(const w of [player.rollWeaponByGrade('S'),player.rollGlacialBossWeapon(),player.rollVolcanicBossWeapon(),treasury.rollTreasuryReward().weapon])assert.ok(!q.SECRET_WEAPON_KEYS.includes(w.key),'quest rewards must not leak into ordinary loot');
-assert.equal(player.makeShield('s_arcadia_guard').name,'堕天盾ルシファー');
+assert.equal(player.makeShield('s_arcadia_guard').name,'漆黒の盾ルファルゼント');
 assert.equal(player.makeShield('s_arcadia_guard').plus,10);
 const source=fs.readFileSync(path.join(root,'scenes/GameScene.ts'),'utf8');
 const ast=ts.createSourceFile('GameScene.ts',source,ts.ScriptTarget.Latest,true),cls=ast.statements.find(s=>ts.isClassDeclaration(s)&&s.name.text==='GameScene');

@@ -40,4 +40,5 @@ export const SCROLL_DROP_RATE = 1 / 3;
 
 // Independent ordinary-MOB drop roll; already the final 2% probability.
 export const DYNAMITE_DROP_RATE = 0.02;
-export const MYSTERY_BREAD_DROP_RATE = 0.02;
+// Independent 1% roll in every difficulty; do not apply ordinary loot multipliers.
+export const MYSTERY_BREAD_DROP_RATE = 0.01;

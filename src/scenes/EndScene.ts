@@ -1,4 +1,5 @@
 import { presentVictory } from '../victoryPresentation';
+import { DIFFICULTY_RULES, difficultyOf, type Difficulty } from '../difficulty';
 import Phaser from 'phaser';
 import { GAME_W, GAME_H } from '../main';
 import { Audio } from '../audio/manager';
@@ -6,6 +7,10 @@ import { getSelectedGender, type PlayerGender } from '../playerAppearance';
 
 interface EndStats {
   cleared: boolean;
+  difficulty?: Difficulty;
+  unlockedDifficulty?: Difficulty;
+  difficultySaveFailed?: boolean;
+  difficultyChanged?: boolean;
   playerGender?: PlayerGender;
   floor: number;
   level: number;
@@ -56,7 +61,8 @@ export class EndScene extends Phaser.Scene {
       this.add.text(cx, y + 127, `所持金 ${stats.gold.toLocaleString()}G    総ターン数 ${stats.turns.toLocaleString()}    図鑑 ${stats.discovered} / ${stats.totalMonsters}`, detailFont).setOrigin(.5);
     }
     let leaving = false;
-    const leave = (scene: string) => { if (leaving) return; leaving = true; this.scene.start(scene); };
+    const leave = (scene: string) => { if (leaving) return; leaving = true; this.scene.start(scene, { difficulty: difficultyOf(stats.difficulty) }); };
+    this.add.text(cx, mobile ? 328 : 350, DIFFICULTY_RULES[difficultyOf(stats.difficulty)].name, {fontFamily:'"Yu Gothic UI"',fontSize:'14px',color:DIFFICULTY_RULES[difficultyOf(stats.difficulty)].text}).setOrigin(.5);
     this.defeatButton(mobile ? cx : cx - 166, mobile ? 658 : 640, 'もう一度挑戦', true, () => leave('GameScene'));
     this.defeatButton(mobile ? cx : cx + 166, mobile ? 734 : 640, 'タイトルへ', false, () => leave('TitleScene'));
     this.input.keyboard?.once('keydown-ENTER', () => leave('GameScene'));

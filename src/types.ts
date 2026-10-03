@@ -116,6 +116,8 @@ export interface Item {
 }
 
 export interface MonsterDef {
+  difficultyApplied?: 'normal' | 'hard' | 'master';
+  difficultyBase?: { hp: number; atkMin: number; atkMax: number };
   key: string;
   name: string;
   description?: string;

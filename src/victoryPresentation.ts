@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { GAME_W, GAME_H } from './layout';
+import { DIFFICULTY_RULES, difficultyOf, type Difficulty } from './difficulty';
 
-export interface VictoryStats { floor: number; level: number; gold: number; score: number; turns: number; hp: number; hpMax: number; discovered: number; totalMonsters: number }
+export interface VictoryStats { floor: number; level: number; gold: number; score: number; turns: number; hp: number; hpMax: number; discovered: number; totalMonsters: number; difficulty?: Difficulty; unlockedDifficulty?: Difficulty; difficultySaveFailed?: boolean; difficultyChanged?: boolean }
 export function presentVictory(scene: Phaser.Scene, stats: VictoryStats, button: (x: number, y: number, label: string, primary: boolean, action: () => void) => void) {
   const phone = GAME_W < 700, cx = GAME_W / 2;
   scene.add.rectangle(cx, GAME_H / 2, GAME_W, GAME_H, 0x090e17);
@@ -26,6 +27,13 @@ export function presentVictory(scene: Phaser.Scene, stats: VictoryStats, button:
   scene.tweens.add({targets:tag,alpha:1,duration:800,delay:450});
   scene.tweens.add({targets:title,alpha:1,y:phone?166:203,duration:1300,delay:550,ease:'Cubic.out'});
   scene.tweens.add({targets:subtitle,alpha:1,duration:1000,delay:1050});
+  const difficulty = difficultyOf(stats.difficulty), rule = DIFFICULTY_RULES[difficulty];
+  scene.add.text(cx, phone ? 282 : 332, `${rule.name}  CLEAR`, {fontFamily:'Georgia, serif',fontSize:phone?'18px':'23px',color:rule.text,fontStyle:'bold'}).setOrigin(.5).setStroke('#10121c',3);
+  const unlockText = stats.difficultyChanged ? '途中で難易度を変更したため、次の難易度は解放されません。'
+    : stats.difficultySaveFailed ? 'クリア記録を保存できませんでした。ブラウザの保存設定をご確認ください。'
+    : stats.unlockedDifficulty ? `${DIFFICULTY_RULES[stats.unlockedDifficulty].name}モード解放！ タイトルから挑戦できます。`
+    : difficulty === 'master' ? 'すべての試練を踏破した。' : 'クリアの記録を胸に、次の冒険へ。';
+  scene.add.text(cx, phone ? 326 : 373, unlockText, {fontFamily:'"Yu Gothic UI"',fontSize:phone?'12px':'16px',color:'#ffe5ad',align:'center',wordWrap:{width:phone?GAME_W-38:780}}).setOrigin(.5).setStroke('#10121c',3);
   const px = phone?18:220, py=phone?438:443, pw=phone?GAME_W-36:840, ph=phone?218:172;
   const group = scene.add.container(0,14).setAlpha(0);
   const panel = scene.add.graphics();
@@ -47,7 +55,7 @@ export function presentVictory(scene: Phaser.Scene, stats: VictoryStats, button:
   if(phone)label(cx,py+192,'この冒険の記憶は、あなたのもの。',11,'#bda886');
   scene.tweens.add({targets:group,y:0,alpha:1,duration:900,delay:1150,ease:'Cubic.out'});
   let leaving=false;
-  const leave=(key:string)=>{if(leaving)return;leaving=true;scene.scene.start(key);};
+  const leave=(key:string)=>{if(leaving)return;leaving=true;scene.scene.start(key,{difficulty});};
   button(phone?cx:cx-166,phone?709:666,'新たな冒険へ',true,()=>leave('GameScene'));
   button(phone?cx:cx+166,phone?776:666,'タイトルへ',false,()=>leave('TitleScene'));
   scene.add.text(cx,phone?826:719,'THANK YOU FOR PLAYING  ·  ちゃりだんじょん',{fontFamily:'Georgia, serif',fontSize:phone?'9px':'11px',color:'#b5a18c',letterSpacing:phone?1:2}).setOrigin(.5);

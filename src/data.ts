@@ -222,7 +222,7 @@ export const SHIELD_DEFS: ShieldDef[] = [
     passive: { key: 'thunder_parry', name: '雷閃防御', description: '雷属性に強い。4回目ごとの攻撃を完全に無効化' } },
   { key: 's_glacier_guard', name: '氷皇盾アイスベルク', defBonus: 10, durMax: 145, minFloor: 21, rarity: 1, grade: 'S', element: 'ice',
     passive: { key: 'glacier_guard', name: '氷壁の重層', description: '氷属性に強い。12以上の攻撃ダメージを20%軽減' } },
-  { key: 's_arcadia_guard', name: '堕天盾ルシファー', defBonus: 16, durMax: 300, minFloor: 1, rarity: 1, grade: 'S', initialPlus: 10, exclusiveLoot: true,
+  { key: 's_arcadia_guard', name: '漆黒の盾ルファルゼント', defBonus: 16, durMax: 300, minFloor: 1, rarity: 1, grade: 'S', initialPlus: 10, exclusiveLoot: true,
     passive: { key: 'arcadia_guard', name: '堕天の裁き', description: '受けた攻撃ダメージの20%を反射。3回目ごとの攻撃を完全に無効化' } }
 ];
 

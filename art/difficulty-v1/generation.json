@@ -1,0 +1,18 @@
+{
+  "tool": "image_gen",
+  "reference": "public/assets/ui/obsidian-v1/panel.webp",
+  "created": "2026-10-03",
+  "processing": "Resized generated 1536×1024 PNG to 768×512 without recoloring",
+  "variants": [
+    {
+      "mode": "hard",
+      "prompt": "Edit this supplied game UI panel texture as a HARD difficulty color variant for Chari Dungeon. The reference is the exact edit target. Keep the horizontal 3:2 rectangle, edge-to-edge frame, thin ornamental thorn/root filigree, corner gems and dragon carving at bottom-right, and the quiet dark empty center for readable game text. Keep all composition and line positions and dark center unchanged; only redesign/repaint the material palette: icy blue and silver metal, sapphire-blue jewels, deep midnight navy interior, cobalt-blue fabric in the lower-right, subtle blue rune glow. No red or brass remains. Refined cold dangerous mood. This asset is stretched into game log, menu, equipment and status panels, so keep detailed decoration confined to the outer 6% and lower-right corner. Sharp illustrated dark fantasy game art. No text, no letters, no icons in the center, no extra frame margins, no watermark. Opaque background.",
+      "asset": "public/assets/ui/difficulty-v1/hard.png"
+    },
+    {
+      "mode": "master",
+      "prompt": "Edit this supplied game UI panel texture as a MASTER difficulty color variant for Chari Dungeon. The reference is the exact edit target. Keep the horizontal 3:2 rectangle, edge-to-edge frame, thin ornamental thorn/root filigree, corner gems and dragon carving at bottom-right, and the quiet dark empty center for readable game text. Keep all composition and line positions and dark center unchanged; only redesign/repaint the material palette: luxurious bright polished gold metal, amber-gold jewels, deep near-black warm interior, dark charcoal fabric with gold embroidery in the lower-right, restrained radiant golden highlights. Crown-like authority, no red or blue accents. This asset is stretched into game log, menu, equipment and status panels, so keep detailed decoration confined to the outer 6% and lower-right corner. Sharp illustrated dark fantasy game art. No text, no letters, no icons in the center, no extra frame margins, no watermark. Opaque background.",
+      "asset": "public/assets/ui/difficulty-v1/master.png"
+    }
+  ]
+}

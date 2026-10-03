@@ -194,6 +194,8 @@ export class BootScene extends Phaser.Scene {
     this.load.image('defeat_male', 'assets/ui/defeat-v1/male.webp');
     this.load.image('defeat_female', 'assets/ui/defeat-v1/female.webp');
     this.load.image('ui_obsidian_panel', 'assets/ui/obsidian-v1/panel.webp');
+    this.load.image('ui_difficulty_hard', 'assets/ui/difficulty-v1/hard.png');
+    this.load.image('ui_difficulty_master', 'assets/ui/difficulty-v1/master.png');
     this.load.image('ui_obsidian_castle', 'assets/ui/obsidian-v1/loading.webp');
     this.add.text(GAME_W / 2, GAME_H / 2 - 35, 'ちゃりだんじょん', {
       fontFamily: '"Yu Gothic UI", "Meiryo", sans-serif', fontSize: '24px', color: '#ffe1a0'
