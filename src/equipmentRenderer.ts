@@ -44,12 +44,8 @@ export class EquipmentRenderer {
       if (sprite.texture.key !== texture || (hasArt && String(sprite.frame.name) !== String(artFrame))) sprite.setTexture(texture,artFrame);
       const pose = heldHandPose(dir,frame,gender,offhand,elapsed,type,body.texture.key);
       const paintedWeapon = item.key.startsWith('w_secret_') || item.key.startsWith('w_hw_');
-      if (paintedWeapon && !['bow','handgun','shield'].includes(type)) {
-        const facingAngle = {up:0,right:Math.PI/2,down:Math.PI,left:-Math.PI/2}[dir];
-        const action = playerAction(frame);
-        const progress = Math.min(1, Math.max(0, elapsed / (action === 'windup' ? 58 : 85)));
-        pose.angle = facingAngle + (action === 'windup' ? -.5*progress : action === 'attack' ? -.5+1.1*progress : 0);
-      }
+      // Painted melee art already has its blade upright. Keep the idle grip upright
+      // in every facing; heldHandPose supplies only the swing during an attack.
       if (paintedWeapon && type === 'bow') pose.angle = {up:0,right:Math.PI/2,down:Math.PI,left:-Math.PI/2}[dir];
       if (paintedWeapon && type === 'handgun') pose.angle = {up:-Math.PI/2,right:0,down:Math.PI/2,left:0}[dir];
       if (item.key === 'w_hero_sword') {
