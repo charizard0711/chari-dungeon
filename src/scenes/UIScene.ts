@@ -1035,6 +1035,10 @@ export class UIScene extends Phaser.Scene {
     this.enemyInfoTimer?.remove();
     this.enemyInfoTimer = undefined;
     this.enemyInfoHovered = !!info.hover;
+    if (info.concealed) {
+      this.enemyInfoText.setText('何かいるようだ…').setVisible(true);
+      return;
+    }
     const lines = [
       `【${info.name}】`,
       ...(info.description ? [info.description] : []),

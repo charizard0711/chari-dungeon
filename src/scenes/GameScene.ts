@@ -6257,7 +6257,10 @@ export class GameScene extends Phaser.Scene {
       e.aura?.setVisible(v);
       e.freezeFx?.setVisible(v);
       if (e.hpBar) e.hpBar.setVisible(v).setAlpha(1);
-      if (e.def.isDarkNinja) {
+      if (this.torchRevealsEnemy(e)) {
+        e.sprite.setAlpha(v ? 1 : 0);
+        e.shadow?.setAlpha(v ? .55 : 0);
+      } else if (e.def.isDarkNinja) {
         e.sprite.setAlpha(v ? (e.stealthRevealed ? 1 : .08) : 0);
         e.shadow?.setAlpha(v ? (e.stealthRevealed ? .55 : .08) : 0);
         if (e.hpBar) e.hpBar.setAlpha(e.stealthRevealed ? 1 : 0.08);
@@ -6484,7 +6487,7 @@ export class GameScene extends Phaser.Scene {
       case 'torch': {
         this.torchTurns = 10;
         this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.45, 460, 0xffa52f);
-        this.log('松明に火を灯した！ 10ターンの間、壁の向こうまで明るくなる。', 'item');
+        this.log('松明に火を灯した！ 10ターンの間、壁の向こうまで明るくなり、範囲内の隠れた敵も見える。', 'item');
         Audio.playSe('pickup');
         passTurn = false;
         break;
@@ -7974,18 +7977,23 @@ export class GameScene extends Phaser.Scene {
     e.hpBar.fillStyle(0x40ff70, 1); e.hpBar.fillRect(x, y, w * Math.max(0, e.hp / e.hpMax), 3);
   }
 
+  private torchRevealsEnemy(enemy: Enemy): boolean {
+    return this.torchTurns > 0 && this.isTileCurrentlyVisible(enemy.x, enemy.y)
+      && Math.max(Math.abs(enemy.x - this.player.x), Math.abs(enemy.y - this.player.y)) <= 10;
+  }
+
   private canClickEnemy(enemy: Enemy): boolean {
     if (!enemy.alive || !enemy.sprite?.active || !enemy.sprite.visible || enemy.sprite.alpha <= 0) return false;
-    if (enemy.def.isDarkNinja && !enemy.stealthRevealed) return false;
-    if (enemy.def.gimmick === 'burrow' && enemy.charging) return false;
+    if (enemy.def.isDarkNinja && !enemy.stealthRevealed && !this.torchRevealsEnemy(enemy)) return false;
+    if (enemy.def.gimmick === 'burrow' && enemy.charging && !this.torchRevealsEnemy(enemy)) return false;
     return true;
   }
 
   private canInspectEnemy(enemy: Enemy): boolean {
     if (!enemy.alive || !enemy.sprite?.active || !enemy.sprite.visible || enemy.sprite.alpha <= 0.1) return false;
-    if (enemy.def.isDarkNinja && !enemy.stealthRevealed) return false;
-    if (enemy.def.gimmick === 'burrow' && enemy.charging) return false;
-    return enemy.awakened || !['mimic', 'ambush', 'statue'].includes(enemy.def.gimmick ?? '');
+    if (enemy.def.isDarkNinja && !enemy.stealthRevealed && !this.torchRevealsEnemy(enemy)) return false;
+    if (enemy.def.gimmick === 'burrow' && enemy.charging && !this.torchRevealsEnemy(enemy)) return false;
+    return this.torchRevealsEnemy(enemy) || enemy.awakened || !['mimic', 'ambush', 'statue'].includes(enemy.def.gimmick ?? '');
   }
 
   private bindEnemyPointer(enemy: Enemy) {
@@ -8044,6 +8052,18 @@ export class GameScene extends Phaser.Scene {
         && (!target || enemy.sprite.depth >= target.sprite.depth)) target = enemy;
     }
     if (!target) {
+      const tile = { x: Math.floor(world.x / TILE), y: Math.floor(world.y / TILE) };
+      const hidden = this.enemies.find(enemy => enemy.alive && !this.canInspectEnemy(enemy)
+        && this.isTileCurrentlyVisible(enemy.x, enemy.y)
+        && bodyContains(enemy, bossBodyRadius(enemy.def), tile));
+      if (hidden) {
+        if (this.hoveredEnemy !== hidden || this.enemyHoverInfoKey !== 'hidden') {
+          this.hoveredEnemy = hidden;
+          this.enemyHoverInfoKey = 'hidden';
+          this.events.emit('enemyinfo', { hover: true, concealed: true });
+        }
+        return;
+      }
       this.clearEnemyHover();
       return;
     }
