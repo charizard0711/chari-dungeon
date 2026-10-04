@@ -4,7 +4,7 @@ import { WEAPON_DEFS, gradeColor } from '../data';
 import { DEFAULT_PLAYER_WEAPON_KEY } from '../player';
 import { readEquipmentCodexSave } from '../codexSave';
 import { readRunSave } from '../runSave';
-import { HALLOWEEN_TITLE, HALLOWEEN_FLOORS, HALLOWEEN_BOSSES } from '../halloweenContent';
+import { HALLOWEEN_TITLE } from '../halloweenContent';
 import { Audio } from '../audio/manager';
 
 const FONT = '"Yu Gothic UI", "Meiryo", sans-serif';
@@ -29,12 +29,7 @@ export class HalloweenScene extends Phaser.Scene {
     this.add.text(cx, mobile ? 30 : 36, 'HALLOWEEN', {fontFamily:FONT,fontSize:'13px',color:'#e9b85f',letterSpacing:4}).setOrigin(.5);
     this.add.text(cx, mobile ? 66 : 80, HALLOWEEN_TITLE, {fontFamily:'"Yu Mincho",serif',fontSize:mobile?'30px':'46px',color:'#ffdf99'}).setOrigin(.5);
     this.add.text(cx, mobile ? 107 : 126, '5層の新しい冒険 · レベル1からスタート', {fontFamily:FONT,fontSize:mobile?'12px':'16px',color:'#e8d5bd'}).setOrigin(.5);
-    const iconY = mobile ? 159 : 201, spacing = mobile ? 72 : 156;
-    HALLOWEEN_BOSSES.forEach((boss, i) => {
-      const x = cx + (i - 2) * spacing;
-      this.add.image(x, iconY, boss.key).setDisplaySize(mobile ? 49 : 78, mobile ? 49 : 78);
-      this.add.text(x, iconY + (mobile ? 38 : 56), `${i+1}F ${mobile ? ['庭園','墓地','書庫','回廊','玉座'][i] : HALLOWEEN_FLOORS[i]}`, {fontFamily:FONT,fontSize:mobile?'10px':'13px',color:'#e5caa6'}).setOrigin(.5);
-    });
+
     this.add.text(cx, mobile ? 240 : 300, '武器コレクションから1本選択', {fontFamily:FONT,fontSize:mobile?'20px':'24px',color:'#ffdc98',fontStyle:'bold'}).setOrigin(.5);
     this.add.text(cx, mobile ? 273 : 335, '入手済みの武器を新品で持ち込みます。強化・魔法は初期状態。', {fontFamily:FONT,fontSize:mobile?'10px':'14px',color:'#bcb0c4'}).setOrigin(.5);
     this.pageLabel = this.add.text(cx, mobile ? 504 : 535, '', {fontFamily:FONT,fontSize:'13px',color:'#c9b4cd'}).setOrigin(.5);

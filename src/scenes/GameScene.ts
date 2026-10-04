@@ -391,6 +391,7 @@ export class GameScene extends Phaser.Scene {
   private dynamiteRangePreview?: Phaser.GameObjects.Graphics;
   private dynamiteRangePreviewKey = '';
   private hoveredEnemy?: Enemy;
+  private cursorTile?: Phaser.GameObjects.Rectangle;
   private enemyHoverInfoKey = '';
 
   playerSprite!: Phaser.GameObjects.Image;
@@ -3914,7 +3915,7 @@ export class GameScene extends Phaser.Scene {
   private drawSkillEffect(type: Weapon['weaponType'], origin: Vec2, dir: Dir, tiles: Vec2[], color: number) {
     playPaintedSkill(this, type, origin, dir, tiles, this.player.weapon?.key ?? 'w_soldier_blade', color);
   }
-  async playerAct(dir: Dir) {
+  async playerAct(dir: Dir, options: { moveOnly?: boolean } = {}) {
     if (this.busy || this.gameEnded) return;
     try {
       this.player.dir = dir;
@@ -3968,6 +3969,7 @@ export class GameScene extends Phaser.Scene {
       // 敵がいれば攻撃
       const enemy = this.enemyAt(nx, ny);
       if (enemy) {
+        if (options.moveOnly) return;
         this.busy = true;
         await this.playerAttack(enemy, dir);
         await this.finishTurn();
@@ -3977,7 +3979,7 @@ export class GameScene extends Phaser.Scene {
       // 弓は3マス、ハンドガンは2マス先まで、向いている方向の最初の敵へ射撃する。
       const rangedDistance = this.player.weapon?.weaponType === 'bow' ? 3
         : this.player.weapon?.weaponType === 'handgun' ? 2 : 0;
-      if (rangedDistance > 0) {
+      if (rangedDistance > 0 && !options.moveOnly) {
         for (let distance = 2; distance <= rangedDistance; distance++) {
           const tx = this.player.x + dx * distance;
           const ty = this.player.y + dy * distance;
@@ -7554,6 +7556,10 @@ export class GameScene extends Phaser.Scene {
 
     const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
     const target = { x: Math.floor(world.x / TILE), y: Math.floor(world.y / TILE) };
+    const clickedEnemy = [...this.enemies].sort((a,b)=>b.sprite.depth-a.sprite.depth)
+      .find(e=>this.canInspectEnemy(e) && e.sprite.getBounds().contains(world.x,world.y))
+      ?? this.enemies.find(e=>this.canInspectEnemy(e) && e.x===target.x && e.y===target.y);
+    if (clickedEnemy) { target.x=clickedEnemy.x; target.y=clickedEnemy.y; }
     const tile = this.dungeon.tiles[target.y]?.[target.x];
     const doorTarget = tile === 'roomDoor' || (tile === 'door' && !this.inBossRoom);
     if (!tile || (!isWalkable(tile) && !doorTarget) || tile === 'pit'
@@ -7577,6 +7583,22 @@ export class GameScene extends Phaser.Scene {
     const maxActions = 24;
     try {
       while (token === this.clickPathToken && !this.gameEnded && !this.busy && actions < maxActions) {
+        if (clickedEnemy) {
+          if (!clickedEnemy.alive || !this.enemies.includes(clickedEnemy)) break;
+          target.x=clickedEnemy.x; target.y=clickedEnemy.y;
+          const dx=clickedEnemy.x-this.player.x,dy=clickedEnemy.y-this.player.y;
+          const reach=this.player.weapon?.weaponType==='bow'?3:this.player.weapon?.weaponType==='handgun'?2:0;
+          const adjacent=bodyDistance(clickedEnemy,bossBodyRadius(clickedEnemy.def),this.player)<=1;
+          const ranged=reach>0 && (dx===0||dy===0) && Math.abs(dx)+Math.abs(dy)<=reach
+            && this.lineOfSight(this.player.x,this.player.y,clickedEnemy.x,clickedEnemy.y);
+          if (adjacent || ranged) {
+            const dir: Dir=Math.abs(dx)>Math.abs(dy)?dx>0?'right':'left':dy>0?'down':'up';
+            this.busy=true;
+            try { await this.playerAttack(clickedEnemy,dir,ranged&&!adjacent); await this.finishTurn(); }
+            finally { this.busy=false; }
+            break;
+          }
+        }
         if (this.player.x === target.x && this.player.y === target.y) break;
         if (!this.isTileCurrentlyVisible(target.x, target.y)) break;
         let path = this.findClickPath(target.x, target.y);
@@ -7588,21 +7610,12 @@ export class GameScene extends Phaser.Scene {
         const nextY = this.player.y + dy;
         const bossCombat = this.enemies.some((enemy) => enemy.def.isFloorBoss && enemy.alive)
           && (this.inBossRoom || this.isInsideBossRoom(this.player.x, this.player.y));
-        let encounteredEnemy = !!this.enemyAt(nextX, nextY) || !!this.bossObstacleAt(nextX, nextY);
-        const rangedDistance = this.player.weapon?.weaponType === 'bow' ? 3
-          : this.player.weapon?.weaponType === 'handgun' ? 2 : 0;
-        if (!encounteredEnemy && rangedDistance > 0) {
-          for (let distance = 2; distance <= rangedDistance; distance++) {
-            if (this.enemyAt(this.player.x + dx * distance, this.player.y + dy * distance)) {
-              encounteredEnemy = true;
-              break;
-            }
-          }
-        }
+        if (this.enemyAt(nextX, nextY)) break;
+        const encounteredEnemy = !!this.bossObstacleAt(nextX, nextY);
         const hpBefore = this.player.hp;
         const positionBefore = `${this.player.x},${this.player.y}`;
         actions++;
-        await this.playerAct(dir);
+        await this.playerAct(dir, { moveOnly: true });
         const positionAfter = `${this.player.x},${this.player.y}`;
         // ボス戦は1タップ1行動。通常戦も攻撃・被弾・足止めが起きた時点で止める。
         if (bossCombat || encounteredEnemy || this.player.hp !== hpBefore || positionAfter === positionBefore) break;
@@ -7775,6 +7788,7 @@ export class GameScene extends Phaser.Scene {
     const ps = this.playerSprite;
     if (!ps) return;
     this.updateEmeraldGuardFx();
+    this.updateCursorTile();
     const entrance = this.dungeon?.bossEntrance;
     if (entrance) {
       const gate = this.tileSprites[entrance.y]?.[entrance.x];
@@ -7977,6 +7991,22 @@ export class GameScene extends Phaser.Scene {
     this.hoveredEnemy = undefined;
     this.enemyHoverInfoKey = '';
     this.events.emit('enemyhoverend');
+  }
+
+  private updateCursorTile() {
+    const pointer = this.input.activePointer;
+    const ui = this.scene.get('UIScene') as any;
+    if (!this.cursorTile?.active) this.cursorTile = this.add.rectangle(0, 0, TILE, TILE, 0xffffff, .12)
+      .setStrokeStyle(1, 0xffffff, .3).setDepth(34).setName('cursor-tile').setVisible(false);
+    if (!this.input.isOver || pointer.wasTouch || this.gameEnded || ui.overlayMode !== 'none'
+      || (ui as any).isSkillPointer?.(pointer.x, pointer.y)
+      || pointer.x < MAP_X || pointer.x >= MAP_X + MAP_W || pointer.y < MAP_Y || pointer.y >= MAP_Y + MAP_H) {
+      this.cursorTile.setVisible(false); return;
+    }
+    const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+    const x = Math.floor(world.x / TILE), y = Math.floor(world.y / TILE);
+    this.cursorTile.setPosition((x + .5) * TILE, (y + .5) * TILE)
+      .setVisible(!!this.dungeon.tiles[y]?.[x] && this.isTileCurrentlyVisible(x, y));
   }
 
   private updateEnemyHover() {
