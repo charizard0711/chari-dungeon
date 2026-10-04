@@ -102,7 +102,7 @@ def compose(index,spec,game_loop=False):
         audio=mix.master(.65)
         fade=int(SR*1.4);audio[-fade:]*=np.linspace(1,0,fade)[:,None]
         destination=OUT
-    path=destination/f'{key}.wav' 
+    path=destination/f'{key}.wav'
     with wave.open(str(path),'wb') as w:
         w.setnchannels(2);w.setsampwidth(2);w.setframerate(SR);w.writeframes((np.clip(audio,-1,1)*32767).astype('<i2').tobytes())
     rms=float(np.sqrt(np.mean(audio**2)));peak=float(np.max(np.abs(audio)))

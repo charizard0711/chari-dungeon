@@ -58,4 +58,3 @@ await page.screenshot({path:'outputs/qa-halloween/boss-gimmicks-blue.png'});asse
 fs.writeFileSync('outputs/qa-halloween/boss-gimmicks-results.json',JSON.stringify({pass:true,...results},null,2));console.log('PASS',results);
 }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1)});
-
