@@ -1875,8 +1875,8 @@ export class GameScene extends Phaser.Scene {
   isInsideBossCombatFrame(x: number, y: number): boolean {
     const room = this.dungeon?.bossRoom;
     if (!room) return true;
-    // N.5Fの専用アリーナは端まで開放する。中ボス部屋は大型ボスが外壁へ重ならないよう1マスだけ空ける。
-    const inset = this.inBossRoom ? 0 : 1;
+    // 通常マップは中ボス部屋も端まで使う。大型の当たり判定はpassableで別途確認する。
+    const inset = this.eventMode && !this.inBossRoom ? 1 : 0;
     return x >= room.x + inset && x < room.x + room.w - inset
       && y >= room.y + inset && y < room.y + room.h - inset;
   }

@@ -1768,7 +1768,11 @@ export class UIScene extends Phaser.Scene {
         fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#82dfcb'
       });
       const button = this.rowButton(x + w - 94, cy + 17, 74, restored ? '修復する' : '修復不要', restored > 0 && count > 0,
-        () => { if (this.gs.repairEquipment(this.repairKind, equipment)) this.setOverlay('inv'); }, restored > 0 && count > 0);
+        () => {
+          if (!this.gs.repairEquipment(this.repairKind, equipment)) return;
+          if (p.inventory.some(item => item.kind === 'repair')) this.rebuildOverlay();
+          else this.setOverlay('inv');
+        }, restored > 0 && count > 0);
       this.overlay.add([bg, ...icon, name, dur, button]);
     });
     const footerY = y + h - 42;
