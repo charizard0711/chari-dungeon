@@ -71,5 +71,5 @@ export function generateHalloweenDungeon(floor: number, pattern?: number, random
   const mapped=tiles.map((row,y)=>row.map((_,x)=>tiles[flipY?h-1-y:y][flipX?w-1-x:x]));
   const finalBoss=transformRoom(boss),exit=transform(stairs);
   mapped[exit.y][exit.x]='door';
-  return addDiamondTreasury({w,h,tiles:mapped,rooms:[...rooms.map(transformRoom),finalBoss],start:transform(start),stairs:exit,bossRoom:finalBoss,bossRoomZone:flipX?'west':'east',exitRoom:finalBoss,hazards:[],teleportPads:[],biome:'ruins',optionalRooms:[]}, random);
+  return addDiamondTreasury({w,h,tiles:mapped,rooms:[...rooms.map(transformRoom),finalBoss],start:transform(start),stairs:exit,bossRoom:finalBoss,bossCompass:transform({x:start.x,y:start.y-2}),bossRoomZone:flipX?'west':'east',exitRoom:finalBoss,hazards:[],teleportPads:[],biome:'ruins',optionalRooms:[]}, random);
 }

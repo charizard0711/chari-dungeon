@@ -445,7 +445,7 @@ export class GameScene extends Phaser.Scene {
     super('GameScene');
   }
 
-  create(data?: { resume?: boolean; difficulty?: Difficulty; eventMode?: 'halloween'; startingWeapon?: string }) {
+  create(data?: { resume?: boolean; difficulty?: Difficulty; eventMode?: 'halloween'; startingWeapon?: string; startingArmor?: PlayerArmor }) {
     this.eventMode = data?.eventMode === 'halloween' ? 'halloween' : null;
     this.emeraldGuardFx = undefined;
     this.emeraldGuardReadyTurn = 0;
@@ -485,7 +485,10 @@ export class GameScene extends Phaser.Scene {
     const qaArmor = qaParams.get('qa-armor');
     this.playerArmor = location.hostname === 'localhost' && isPlayerArmor(qaArmor)
       ? qaArmor
-      : DEFAULT_PLAYER_ARMOR;
+      : this.eventMode && isPlayerArmor(data?.startingArmor)
+        && (data.startingArmor === DEFAULT_PLAYER_ARMOR || readEquipmentCodexSave().has(armorTextureKey(data.startingArmor)))
+        && (!PLAYER_ARMOR_DEFS[data.startingArmor].gender || PLAYER_ARMOR_DEFS[data.startingArmor].gender === this.playerGender)
+        ? data.startingArmor : DEFAULT_PLAYER_ARMOR;
     const startingArmor = makePlayerArmor(this.playerArmor);
     this.player.armors = [startingArmor];
     this.player.armor = startingArmor;
@@ -930,6 +933,11 @@ export class GameScene extends Phaser.Scene {
 
     if (snapshot) this.restoreRunState(snapshot);
     this.dungeon = snapshot?.dungeon ?? (this.eventMode ? generateHalloweenDungeon(floor) : bossRoom ? generateBossArena(floor) : generateDungeon(floor, this.qaBossRoomZone));
+    if (this.eventMode && !this.dungeon.bossCompass) {
+      const start = this.dungeon.start;
+      const pos = {x:start.x, y:start.y-2};
+      if (this.dungeon.tiles[pos.y]?.[pos.x] === 'floor') this.dungeon.bossCompass = pos;
+    }
     const d = this.dungeon;
     if (!snapshot && !bossRoom && location.hostname === 'localhost'
       && new URLSearchParams(location.search).has('qa-treasury')) addDiamondTreasury(d, () => 0);
