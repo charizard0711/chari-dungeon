@@ -428,7 +428,7 @@ const SE_SPECS: Partial<Record<SeName, { len: number; segs: SeSeg[] }>> = {
 export async function renderSe(name: SeName): Promise<AudioBuffer> {
   // Skill WAVs are shipped with the game; fall back to the corresponding weapon sound if unavailable.
   const skillFallback: Partial<Record<SeName, SeName>> = {
-    skillDagger: 'weaponDagger', skillLongsword: 'weaponLongsword', skillLance: 'weaponLance',
+    weaponBreak: 'break', shieldBreak: 'break', skillDagger: 'weaponDagger', skillLongsword: 'weaponLongsword', skillLance: 'weaponLance',
     skillBow: 'weaponBow', skillHandgun: 'weaponHandgun', skillGreatsword: 'weaponGreatsword', skillDual: 'weaponDual'
   };
   const spec = SE_SPECS[name === 'dynamite' ? 'bomb' : skillFallback[name] ?? name]!;

@@ -77,6 +77,8 @@ export const SE_DEFS = {
   dynamite: { key: 'se_dynamite', path: 'assets/audio/se_dynamite.wav', volume: 0.68 },
   bomb:    { key: 'se_bomb',    path: 'assets/audio/se_bomb.mp3',    volume: 0.7 },  // 爆発
   warp:    { key: 'se_warp',    path: 'assets/audio/se_warp.mp3',    volume: 0.55 }, // ワープ
+  weaponBreak: { key: 'se_weapon_break', path: 'assets/audio/se_weapon_break.wav', volume: 0.65 },
+  shieldBreak: { key: 'se_shield_break', path: 'assets/audio/se_shield_break.wav', volume: 0.65 },
   break:   { key: 'se_break',   path: 'assets/audio/se_break.mp3',   volume: 0.65 }, // 装備破損
   seal:    { key: 'se_seal',    path: 'assets/audio/se_seal.mp3',    volume: 0.55 }, // 封印・魔法
   deny:    { key: 'se_deny',    path: 'assets/audio/se_deny.mp3',    volume: 0.4 }   // 不可・ブロック
@@ -85,7 +87,7 @@ export const SE_DEFS = {
 export type SeName = keyof typeof SE_DEFS;
 // Only packaged sounds are requested; the remaining effects use their synth definitions.
 export const FILE_SE_NAMES: readonly SeName[] = [
-  'dynamite', 'attack', 'weaponDagger', 'weaponLongsword', 'weaponLance', 'weaponBow',
+  'weaponBreak', 'shieldBreak', 'dynamite', 'attack', 'weaponDagger', 'weaponLongsword', 'weaponLance', 'weaponBow',
   'weaponHandgun', 'weaponGreatsword', 'weaponDual', 'skillDagger', 'skillLongsword',
   'skillLance', 'skillBow', 'skillHandgun', 'skillGreatsword', 'skillDual'
 ];

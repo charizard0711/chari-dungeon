@@ -1723,9 +1723,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   spawnMidBossDragon(floor: number, fieldPlacement: boolean) {
-    const custom = customFloorBoss(floor, this.playerGender);
-    const spec = custom ? { key: custom.key, name: custom.name, tint: custom.color }
-      : MID_DRAGONS[(floor - 1) % MID_DRAGONS.length];
+    const sourceFloor = floor % 5 === 0 ? Math.max(5, floor - 5) : floor;
+    const custom = customFloorBoss(sourceFloor, this.playerGender);
+    const previousMilestone = floor % 5 === 0 ? MILESTONE_BOSSES[sourceFloor] : undefined;
+    const spec = previousMilestone ?? (custom ? { key: custom.key, name: custom.name, tint: custom.color }
+      : MID_DRAGONS[(floor - 1) % MID_DRAGONS.length]);
     const base = custom ?? MONSTER_DEFS.find((m) => m.key === spec.key) ?? MONSTER_DEFS[0];
     const def: MonsterDef = {
       ...base,
@@ -3156,7 +3158,7 @@ export class GameScene extends Phaser.Scene {
     const broken = this.player.shield;
     if (!broken || broken.dur > 0) return;
     this.log(`${broken.name}は壊れて砕け散った！`, 'dmg');
-    Audio.playSe('break');
+    Audio.playSe('shieldBreak');
     this.player.shields = this.player.shields.filter((shield) => shield !== broken);
     this.player.shield = this.player.weapon?.dual || this.player.weapon?.weaponType === 'bow' ? null : this.player.shields[0] ?? null;
   }
@@ -3888,7 +3890,7 @@ export class GameScene extends Phaser.Scene {
       const wear = consumeWeaponDurability(weapon, maxDefense);
       if (wear.weaponRevived) this.log('武器のリペア効果が発動！ 壊れずに復活した。', 'special');
       if (wear.weaponBroke) {
-        this.log(`${weapon.name}は壊れて消滅した…`, 'dmg'); Audio.playSe('break');
+        this.log(`${weapon.name}は壊れて消滅した…`, 'dmg'); Audio.playSe('weaponBreak');
         this.player.weapons = this.player.weapons.filter(w => w !== weapon);
         this.player.weapon = this.player.weapons[0] ?? null;
         if ((this.player.weapon?.dual || this.player.weapon?.weaponType === 'bow')) this.player.shield = null;
@@ -4414,7 +4416,7 @@ export class GameScene extends Phaser.Scene {
       // 壊れた武器はその場で消滅し、持っている別の武器に持ち替える
       const bw = this.player.weapon!;
       this.log(`${bw.name}は壊れて消滅した…`, 'dmg');
-      Audio.playSe('break');
+      Audio.playSe('weaponBreak');
       this.player.weapons = this.player.weapons.filter((x) => x !== bw);
       this.player.weapon = this.player.weapons[0] ?? null;
       if ((this.player.weapon?.dual || this.player.weapon?.weaponType === 'bow') && this.player.shield) {
@@ -6776,7 +6778,7 @@ export class GameScene extends Phaser.Scene {
     } else {
       // 失敗 → 武器が燃えて消滅
       this.log(`強化失敗… ${w.name} は燃え尽きてしまった！`, 'dmg');
-      Audio.playSe('break');
+      Audio.playSe('weaponBreak');
       // 燃えるエフェクト（ヒットスパークを赤く）
       const fx = this.add.image(this.playerSprite.x, this.playerSprite.y - 8, 'fx_hit').setDepth(22).setTint(0xff5020).setScale(1.2);
       this.tweens.add({ targets: fx, alpha: 0, scale: 2.2, duration: 500, onComplete: () => fx.destroy() });
@@ -6802,7 +6804,7 @@ export class GameScene extends Phaser.Scene {
       this.effectFx(this.player.x, this.player.y, 'fx_levelup', 1.8, 650);
     } else {
       this.log(`盾の強化失敗… ${s.name} は砕けてしまった！`, 'dmg');
-      Audio.playSe('break');
+      Audio.playSe('shieldBreak');
       const fx = this.add.image(this.playerSprite.x, this.playerSprite.y - 8, 'fx_hit').setDepth(22).setTint(0xff5020).setScale(1.2);
       this.tweens.add({ targets: fx, alpha: 0, scale: 2.2, duration: 500, onComplete: () => fx.destroy() });
       this.cameras.main.shake(150, 0.006);
