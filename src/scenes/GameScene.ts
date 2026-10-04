@@ -1673,7 +1673,7 @@ export class GameScene extends Phaser.Scene {
   spawnHalloweenEnemies() {
     const arenaCells = this.bossRoomCells();
     const count = (11 + this.floor * 2) * 3;
-    const blocked = new Set([...this.occupiedPositions(), ...arenaCells].map(p => `${p.x},${p.y}`));
+    const blocked = new Set([...this.occupiedPositions(), ...arenaCells, ...this.halloweenDeadEnds()].map(p => `${p.x},${p.y}`));
     const candidates: Vec2[] = [];
     this.dungeon.tiles.forEach((row, y) => row.forEach((tile, x) => {
       if (tile === 'floor' && !blocked.has(`${x},${y}`) && this.distToPlayer(x, y) >= 5) candidates.push({ x, y });
@@ -1949,7 +1949,8 @@ export class GameScene extends Phaser.Scene {
 
   floorBgm(battle: boolean): BgmName {
     if (!this.eventMode) return this.inBossRoom ? 'boss' : battle ? 'midboss' : bgmForFloor(this.floor);
-    if (!battle) return 'halloweenMap';
+    const eventBattle = !this.floorBossDefeated && (battle || this.isInsideBossRoom(this.player.x, this.player.y));
+    if (!eventBattle) return 'halloweenMap';
     if (this.floor < 5) return 'halloweenMidboss';
     return this.enemies.some(e => e.alive && e.def.key === 'm_hw_golden_king') ? 'halloweenGolden' : 'halloweenBoss';
   }
@@ -3246,6 +3247,18 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private halloweenDeadEnds(): Vec2[] {
+    const ends: Vec2[] = [];
+    if (!this.eventMode) return ends;
+    const d = this.dungeon;
+    for (let y = 1; y < d.h - 1; y++) for (let x = 1; x < d.w - 1; x++) {
+      if (d.tiles[y][x] !== 'floor' || d.rooms.some(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h)) continue;
+      const exits = [[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dy]) => isWalkable(d.tiles[y+dy][x+dx])).length;
+      if (exits === 1) ends.push({x,y});
+    }
+    return ends;
+  }
+
   spawnChests(floor: number) {
     if (this.eventMode) {
       const rooms = this.dungeon.rooms.filter(r => r !== this.dungeon.bossRoom && !this.dungeon.optionalRooms.some(o=>o.room===r));
@@ -3254,13 +3267,7 @@ export class GameScene extends Phaser.Scene {
         const pos = candidates.find(p => !this.enemyAt(p.x,p.y) && !this.groundAt(p.x,p.y) && !this.dungeonObjectAt(p.x,p.y));
         if (pos) this.spawnChestAt(pos.x,pos.y,Math.random()<.2);
       }
-      const ends: Vec2[] = [];
-      for(let y=1;y<this.dungeon.h-1;y++)for(let x=1;x<this.dungeon.w-1;x++) {
-        if(this.dungeon.tiles[y][x]!=='floor'||this.dungeon.rooms.some(r=>x>=r.x&&x<r.x+r.w&&y>=r.y&&y<r.y+r.h)||this.distToPlayer(x,y)<5)continue;
-        const exits=[[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dy])=>this.dungeon.tiles[y+dy]?.[x+dx]!=='wall').length;
-        if(exits===1)ends.push({x,y});
-      }
-      for(let i=0;i<3&&ends.length;i++){const index=Math.floor(Math.random()*ends.length);const pos=ends.splice(index,1)[0];this.spawnChestAt(pos.x,pos.y,i===0);}
+      for (const pos of this.halloweenDeadEnds()) this.spawnChestAt(pos.x, pos.y, Math.random() < .1);
       return;
     }
 
@@ -6118,6 +6125,7 @@ export class GameScene extends Phaser.Scene {
     const shroomRadius = this.shroomTurns > 0 ? 7 : this.lightRadius;
     const radius = wallPiercingLight ? 10 : Math.max(this.lightRadius, shroomRadius);
     const playerInsideBossRoom = this.isInsideBossRoom(this.player.x, this.player.y);
+    if (this.eventMode && !this.gameEnded) Audio.playBgm(this.floorBgm(false));
     const bossRoomConcealed = !!d.bossRoom && !!d.bossEntry && !playerInsideBossRoom;
     const isConcealedBossCell = (x: number, y: number) => bossRoomConcealed && !!d.bossRoom
       && x >= d.bossRoom.x && x < d.bossRoom.x + d.bossRoom.w
@@ -7580,7 +7588,7 @@ export class GameScene extends Phaser.Scene {
     if (clickedEnemy) { target.x=clickedEnemy.x; target.y=clickedEnemy.y; }
     const tile = this.dungeon.tiles[target.y]?.[target.x];
     const doorTarget = tile === 'roomDoor' || (tile === 'door' && !this.inBossRoom);
-    if (!tile || (!isWalkable(tile) && !doorTarget) || tile === 'pit'
+    if (!tile || (!isWalkable(tile) && !doorTarget && !(clickedEnemy && tile === 'wall')) || tile === 'pit'
       || (this.inBossRoom && !this.isInsideBossCombatFrame(target.x, target.y))) {
       Audio.playSe('deny');
       return;
@@ -7683,7 +7691,7 @@ export class GameScene extends Phaser.Scene {
           || !!targetObject && this.dungeonObjectAt(nx, ny) === targetObject;
         const doorTarget = isTarget && (tile === 'roomDoor' || (tile === 'door' && !this.inBossRoom));
         if (!this.isTileCurrentlyVisible(nx, ny)) continue;
-        if (!tile || (!isWalkable(tile) && !doorTarget) || tile === 'pit') continue;
+        if (!tile || (!isWalkable(tile) && !doorTarget && !(isTarget && tile === 'wall' && this.enemyAt(nx, ny))) || tile === 'pit') continue;
         if (this.inBossRoom && !this.isInsideBossCombatFrame(nx, ny)) continue;
         const path = [...cur.path, step.dir];
         if (!isTarget && this.enemyAt(nx, ny)) {
