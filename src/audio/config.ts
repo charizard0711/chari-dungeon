@@ -16,7 +16,7 @@ export interface AudioDef {
 // ---- BGM ----
 export const BGM_DEFS = {
   // タイトル画面：明るく不思議なレトロBGM
-  title:    { key: 'bgm_title',    path: 'assets/audio/bgm_title.mp3',    volume: 0.5,  loop: true },
+  title:    { key: 'bgm_title',    path: 'assets/audio/title-celtic-v1/emerald-ruins.wav',    volume: 0.5,  loop: true },
   // 通常探索：1F〜30Fを通して「古樹と石環（ハープ版）」を流す
   floor01:  { key: 'bgm_floor01',  path: 'assets/audio/bgm_floors_01_02.mp3', volume: 0.5, loop: true },
   // 7x7中ボス部屋：入口封鎖から撃破まで「紅蓮ブースト」（184 BPM）
@@ -35,7 +35,7 @@ export const BGM_DEFS = {
 
 export type BgmName = keyof typeof BGM_DEFS;
 // 配置済みの圧縮BGM。タイトル・ジングルは未配置のため内蔵音を使う。
-export const FILE_BGM_NAMES: readonly BgmName[] = ['floor01', 'midboss', 'boss', 'halloweenMap', 'halloweenMidboss', 'halloweenBoss', 'halloweenGolden'];
+export const FILE_BGM_NAMES: readonly BgmName[] = ['title', 'floor01', 'midboss', 'boss', 'halloweenMap', 'halloweenMidboss', 'halloweenBoss', 'halloweenGolden'];
 
 // 階層 → BGMトラックのマッピング
 export function bgmForFloor(_floor: number): BgmName {

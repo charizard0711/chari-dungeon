@@ -6,6 +6,7 @@ import { FINAL_DEPTH_BOSSES, FINAL_ELEMENTS, FINAL_ELEMENT_LABEL, finalDepthMobC
 import { hasFinalDepthTerrain, finalDepthTerrainKey, finalDepthFloorFrame, finalDepthPropKinds, FINAL_DEPTH_COLORS, type FinalDepthPropKind, type FinalDepthPart } from '../finalDepthTerrain';
 import { hasThunderTerrain, thunderTerrainKey, thunderFloorFrame, THUNDER_PROP_KINDS, type ThunderPropKind, type ThunderPart } from '../thunderTerrain';
 import Phaser from 'phaser';
+import { presentGame } from '../menuPresentation';
 import { GOLDEN_KING, GOLDEN_SHIELD, HALLOWEEN_BOSSES, HALLOWEEN_MOBS, HALLOWEEN_RETAINERS, HALLOWEEN_WEAPONS, HALLOWEEN_SHIELDS, HALLOWEEN_FLOORS, HALLOWEEN_COLORS } from '../halloweenContent';
 import { generateHalloweenDungeon, halloweenDecorations } from '../halloweenDungeon';
 import { DIFFICULTY_RULES, difficultyOf, difficultyGold, difficultyEnemy, difficultyFromCode, isDifficultyUnlocked, readDifficultyProgress, recordDifficultyClear, type Difficulty } from '../difficulty';
@@ -446,6 +447,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(data?: { resume?: boolean; difficulty?: Difficulty; eventMode?: 'halloween'; startingWeapon?: string; startingArmor?: PlayerArmor }) {
+    presentGame(this);
     this.eventMode = data?.eventMode === 'halloween' ? 'halloween' : null;
     this.emeraldGuardFx = undefined;
     this.emeraldGuardReadyTurn = 0;

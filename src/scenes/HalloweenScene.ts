@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { presentMenu, menuBackdrop } from '../menuPresentation';
 import { GAME_W, GAME_H } from '../layout';
 import { WEAPON_DEFS, gradeColor } from '../data';
 import { DEFAULT_PLAYER_WEAPON_KEY } from '../player';
@@ -24,6 +25,7 @@ export class HalloweenScene extends Phaser.Scene {
   private leaving = false;
   constructor() { super('HalloweenScene'); }
   create() {
+    presentMenu(this);
     this.page = 0; this.leaving = false; this.selected = DEFAULT_PLAYER_WEAPON_KEY;
     const discovered = readEquipmentCodexSave();
     discovered.add(DEFAULT_PLAYER_WEAPON_KEY);
@@ -32,8 +34,7 @@ export class HalloweenScene extends Phaser.Scene {
     this.armorCollection = Object.values(PLAYER_ARMOR_DEFS).filter(a => (!a.gender || a.gender === getSelectedGender())
       && (a.key === DEFAULT_PLAYER_ARMOR || discovered.has(armorTextureKey(a.key)))).map(a => a.key);
     const mobile = GAME_W < 700, cx = GAME_W / 2;
-    const bg = this.add.image(cx, GAME_H / 2, 'hw_backdrop_1');
-    bg.setScale(Math.max(GAME_W / bg.width, GAME_H / bg.height));
+    menuBackdrop(this, 'hw_backdrop_1');
     this.add.rectangle(cx, GAME_H / 2, GAME_W, GAME_H, 0x100917, .85);
     this.add.text(cx, mobile ? 30 : 36, 'HALLOWEEN', {fontFamily:FONT,fontSize:'13px',color:'#e9b85f',letterSpacing:4}).setOrigin(.5);
     this.add.text(cx, mobile ? 66 : 80, HALLOWEEN_TITLE, {fontFamily:'"Yu Mincho",serif',fontSize:mobile?'30px':'46px',color:'#ffdf99'}).setOrigin(.5);
@@ -52,8 +53,8 @@ export class HalloweenScene extends Phaser.Scene {
     const saved = readRunSave(true);
     if (saved) this.button(cx, mobile ? 690 : 701, `イベントの続きから · ${saved.snapshot.state.floor}F`, () => this.start(true), mobile ? 342 : 420, 42);
     else this.add.text(cx, mobile ? 690 : 700, '通常の冒険と別に自動保存 · 専用装備10種類', {fontFamily:FONT,fontSize:'12px',color:'#b8a6bc'}).setOrigin(.5);
-    this.button(mobile ? cx : 95, mobile ? 766 : 710, 'タイトルへ', () => this.scene.start('TitleScene'), 160, 38);
-    const back = () => this.scene.start('TitleScene'), start = () => this.start(false);
+    this.button(mobile ? cx : 95, mobile ? 766 : 710, '冒険選択へ', () => this.scene.start('TitleScene', {menuStage:'mode'}), 160, 38);
+    const back = () => this.scene.start('TitleScene', {menuStage:'mode'}), start = () => this.start(false);
     this.input.keyboard?.on('keydown-ESC', back);
     this.input.keyboard?.on('keydown-ENTER', start);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {

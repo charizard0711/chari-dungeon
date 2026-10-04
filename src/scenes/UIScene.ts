@@ -2453,14 +2453,16 @@ export class UIScene extends Phaser.Scene {
 
   // ---- 設定オーバーレイ：BGMと効果音（システム音）を別々に調整 ----
   buildSettingsOverlay(x: number, y: number, w: number, h: number) {
-    if (this.gs.eventMode) {
-      this.overlay.add(this.rowButton(x + 20, y + h - 36, w - 40, 'イベントを保存してタイトルへ', true, () => {
-        if (this.gs.busy || this.gs.gameEnded) return;
-        if (!this.gs.saveRun()) return;
-        this.gs.scene.stop('UIScene');
-        this.gs.scene.start('TitleScene');
-      }));
-    }
+    const returnButton = this.rowButton(x + 20, y + h - 36, w - 40, '冒険を保存してスタート画面へ', true, () => {
+      if (this.gs.busy || this.gs.gameEnded) return;
+      this.gs.clearMoveInput();
+      this.gs.stopClickPath();
+      if (!this.gs.saveRun()) return;
+      this.gs.scene.stop('UIScene');
+      this.gs.scene.start('TitleScene');
+    });
+    returnButton.setName('settings-return-title');
+    this.overlay.add(returnButton);
     this.overlay.add(this.add.text(x + w - 166, y + 18, 'アクセス計測について', {
       fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#8de0e4', padding: { x: 4, y: 8 }
     }).setInteractive({ useHandCursor: true }).on('pointerdown', () => {

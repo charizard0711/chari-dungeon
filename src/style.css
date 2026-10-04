@@ -167,3 +167,21 @@ canvas {
   .loading-card h1 { font-size: 27px; }
 }
 @media (prefers-reduced-motion: reduce) { .loading-adventurer { animation: none; background-position: 0 0; } }
+
+body[data-presentation="menu"] #app { padding: 0; }
+body[data-presentation="menu"] #game-container {
+  width: 100vw !important; height: 100dvh !important;
+  border: 0; border-radius: 0; box-shadow: none;
+}
+body[data-presentation="menu"] #game-container::before,
+body[data-presentation="menu"] #game-container::after { display: none; }
+body[data-presentation="menu"] canvas { width: 100% !important; height: 100% !important; margin: 0 !important; }
+
+body[data-screen-size="large"] #app { padding: 0; }
+body[data-screen-size="large"] #game-container { width:100vw !important; height:100dvh !important; border:0; border-radius:0; box-shadow:none; }
+#screen-size-controls { position:fixed; right:12px; bottom:10px; z-index:1000; display:flex; align-items:center; gap:4px; padding:5px 7px; background:#0b202be8; border:1px solid #b4a57788; border-radius:6px; color:#cdd9d5; font-size:11px; }
+#screen-size-controls button { width:30px; height:27px; border:1px solid #53717b; border-radius:3px; background:#122c38; color:#cfdfdc; cursor:pointer; font-family:inherit; }
+#screen-size-controls button[aria-pressed="true"] { background:#d4c18c; color:#132731; border-color:#e7d9b1; }
+#screen-size-controls button:focus-visible { outline:2px solid #9ef0ff; outline-offset:2px; }
+
+

@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+
+import { presentMenu, menuBackdrop } from '../menuPresentation';
 import { GAME_W, GAME_H } from '../main';
 import { Audio } from '../audio/manager';
 import { readRunSave } from '../runSave';
@@ -17,12 +19,17 @@ const FONT = '"Yu Gothic UI", "Meiryo", sans-serif';
 export class TitleScene extends Phaser.Scene {
   private selectedGender: PlayerGender = getSelectedGender();
   selectedDifficulty: Difficulty = 'normal';
+  private titleAction?: () => void;
+  private titleBack?: () => void;
+  private initialStage: 'home' | 'mode' = 'home';
 
   constructor() {
     super('TitleScene');
   }
 
-  create() {
+  create(data?: { menuStage?: 'mode' }) {
+    this.initialStage = data?.menuStage ?? 'home';
+    presentMenu(this);
     this.selectedDifficulty = readDifficultyProgress().selected;
     document.body.dataset.difficulty = this.selectedDifficulty;
     // ローカルQAだけを無音にする。通常プレイのサウンド設定には影響させない。
@@ -86,23 +93,112 @@ export class TitleScene extends Phaser.Scene {
       const dialogChildren = this.children.list.filter(child => !previous.has(child));
       resumeDialog = this.add.container(0, 0, dialogChildren).setDepth(50);
     };
-    this.createArtworkTitle(requestExplore);
-    const eventButton = this.add.text(GAME_W / 2, GAME_H * .875, '🎃 ハロウィンイベント', {
-      fontFamily: FONT, fontSize: GAME_W < 700 ? '17px' : '20px', color: '#ffcf80', backgroundColor: '#281329e8', padding: { x: 26, y: 10 }, fontStyle: 'bold'
-    }).setName('halloween-event').setOrigin(.5).setInteractive({ useHandCursor: true });
-    eventButton.on('pointerdown', () => { if (!starting && !resumeDialog) { setSelectedGender(this.selectedGender); Audio.playSe('click'); this.scene.start('HalloweenScene'); } });
-    const exploreKey = (event: KeyboardEvent) => { event.preventDefault(); requestExplore(); };
+    this.createCinematicTitle(requestExplore, () => {
+      if (!starting && !resumeDialog) {
+        setSelectedGender(this.selectedGender); Audio.playSe('click'); this.scene.start('HalloweenScene');
+      }
+    });
+
+    const exploreKey = (event: KeyboardEvent) => { event.preventDefault(); if (!resumeDialog) this.titleAction?.(); };
     this.input.keyboard?.on('keydown-ENTER', exploreKey);
     this.input.keyboard?.on('keydown-SPACE', exploreKey);
-    this.input.keyboard?.on('keydown-ESC', closeResumeDialog);
+    const backKey = () => { if (resumeDialog) closeResumeDialog(); else this.titleBack?.(); };
+    this.input.keyboard?.on('keydown-ESC', backKey);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.input.keyboard?.off('keydown-ENTER', exploreKey);
       this.input.keyboard?.off('keydown-SPACE', exploreKey);
-      this.input.keyboard?.off('keydown-ESC', closeResumeDialog);
+      this.input.keyboard?.off('keydown-ESC', backKey);
     });
     if (location.hostname === 'localhost' && qaParams.has('qa-game')) {
       this.time.delayedCall(80, () => startGame(qaParams.has('qa-resume')));
     }
+  }
+
+  private createCinematicTitle(explore: () => void, event: () => void) {
+    const mobile = GAME_W < 700, cx = GAME_W / 2;
+    const bg = menuBackdrop(this, 'title_citadel_v1').setName('title-cinematic-background');
+
+    const blur = bg.postFX?.addBlur(0, 1, 1, .45);
+    if (blur) this.tweens.add({targets:blur,x:0,y:0,strength:0,duration:2400,ease:'Sine.inOut',onComplete:()=>{if(bg.active)bg.postFX.remove(blur)}});
+    const openingVeil=this.add.rectangle(cx,GAME_H/2,GAME_W*4,GAME_H*4,0xeaf8ff,.12);
+    this.tweens.add({targets:openingVeil,alpha:0,duration:2400,ease:'Sine.inOut',onComplete:()=>openingVeil.destroy()});
+    this.add.rectangle(cx,GAME_H/2,GAME_W,GAME_H,0x061014,mobile?.16:.04);
+    this.add.rectangle(cx,GAME_H-100,GAME_W,200,0x030b10,.20);
+    const logo = this.add.image(cx,mobile?280:260,'title_golden_crossed_swords').setName('title-logo');
+    this.textures.get('title_golden_crossed_swords').setFilter(Phaser.Textures.FilterMode.LINEAR);
+    for(let i=0;i<24;i++) {
+      const mote=this.add.circle(Math.random()*GAME_W,Math.random()*GAME_H,Math.random()*1.8+.6,0xffffff,.25+Math.random()*.4);
+      this.tweens.add({targets:mote,x:mote.x+18,y:mote.y-55,alpha:0,duration:5000+Math.random()*5000,repeat:-1,delay:Math.random()*4000});
+    }
+    for(let i=0;i<12;i++) {
+      const x=Math.random()*GAME_W,y=180+Math.random()*(GAME_H-250);
+      const glint=this.add.graphics().setPosition(x,y).setAlpha(0);
+      glint.fillStyle(0xffffff,.9).fillPoints([{x:0,y:-5},{x:1,y:-1},{x:5,y:0},{x:1,y:1},{x:0,y:5},{x:-1,y:1},{x:-5,y:0},{x:-1,y:-1}],true);
+      this.tweens.add({targets:glint,alpha:.65,y:y-20,duration:2200+Math.random()*1800,yoyo:true,repeat:-1,delay:Math.random()*4000,ease:'Sine.inOut'});
+    }
+    let panel: Phaser.GameObjects.Container | undefined;
+    const help=this.createHelpOverlay();
+    let stage:'home'|'mode'|'dungeon'|'event'='home';
+    const text=(x:number,y:number,label:string,size:number,color='#eee7d6')=>this.add.text(x,y,label,{fontFamily:FONT,fontSize:`${size}px`,color,align:'center',letterSpacing:1}).setOrigin(.5).setShadow(0,2,'#10232c',4,true,true);
+    const choice=(y:number,label:string,sub:string,name:string,action:()=>void)=>{
+      const width=mobile?GAME_W-44:520;
+      const plate=this.add.image(cx,y,'title-menu-frame').setDisplaySize(width,116);
+      const accent=this.add.rectangle(cx-width/2+2,y,3,32,0xe8d49c,.8);
+      const arrow=text(cx+width/2-26,y,'›',28,'#c5dace');
+      const line=text(cx,y,label,mobile?20:23);
+      text(cx,y+39,sub,mobile?10:12,'#a5b8ba');
+      this.add.zone(cx,y,width,70).setName(name).setInteractive({useHandCursor:true})
+        .on('pointerover',()=>{plate.setTint(0xc6f5ff);line.setColor('#ffe1a0');this.tweens.add({targets:[line,arrow],x:'+=5',duration:140});accent.setFillStyle(0x82ffff)})
+        .on('pointerout',()=>{plate.clearTint();line.setColor('#eee7d6');line.x=cx;arrow.x=cx+width/2-26;accent.setFillStyle(0xe8d49c)})
+        .on('pointerdown',()=>{Audio.playSe('click');action()});
+    };
+    const render=(next:typeof stage)=>{
+      stage=next;panel?.destroy(true);
+      const previous=new Set(this.children.list);
+      const home=stage==='home';
+      logo.setPosition(cx,home?(mobile?285:270):(mobile?130:120));
+      logo.setScale(Math.min((mobile?GAME_W-35:home?760:410)/logo.width,(home?mobile?260:350:170)/logo.height));
+      if(home) {
+        text(cx,mobile?454:464,'忘却の迷宮、その先へ。',mobile?13:17,'#c5d6d3');
+        this.add.rectangle(cx,mobile?589:580,mobile?240:300,74,0x10252c,.42).setStrokeStyle(1,0xe6d6a6,.55);
+        const prompt=text(cx,mobile?589:580,'START',mobile?28:32,'#fff0c7');
+        this.tweens.add({targets:prompt,alpha:.45,duration:1500,yoyo:true,repeat:-1});
+        this.add.rectangle(cx,mobile?625:618,mobile?180:240,1,0xd4bb79,.65);
+        this.add.zone(cx,mobile?589:580,300,90).setName('title-start').setInteractive({useHandCursor:true}).on('pointerdown',()=>render('mode'));
+        text(cx,mobile?656:658,'クリック / ENTER で冒険を始める',11,'#a9b9b8');
+        this.titleAction=()=>render('mode');this.titleBack=()=>{};
+      } else {
+        this.add.rectangle(cx,mobile?458:437,mobile?GAME_W-20:650,mobile?500:475,0x071b25,.72).setStrokeStyle(1,0xd6c798,.45);
+        text(cx,mobile?217:200,'◆  ADVENTURE  ◆',10,'#a8d7d9');
+        text(cx,mobile?250:234,stage==='mode'?'冒険を選ぶ':stage==='dungeon'?'ダンジョンへ':'季節の冒険へ',mobile?24:28,'#e8cf99');
+        text(cx,mobile?280:268,stage==='mode'?'あなたの次の物語は、どこから。':'冒険者を選び、出発しよう。',12,'#a5b8ba');
+        if(stage==='mode') {
+          choice(mobile?369:355,'ダンジョン','30階層の迷宮に挑む','title-dungeon',()=>render('dungeon'));
+          choice(mobile?468:454,'イベント','ハロウィン ─ 呪われた収穫城','halloween-event',()=>render('event'));
+          this.titleAction=()=>render('dungeon');
+        } else {
+          this.createGenderSelector(mobile?373:357,mobile);
+          if(stage==='dungeon') this.createDifficultySelector(mobile?534:510,mobile);
+          else text(cx,mobile?502:490,'5層の冒険 · 武器と服を選んでレベル1から',mobile?11:15,'#cdb996');
+          choice(mobile?638:613,stage==='dungeon'?'探索へ':'装備を選んで出発','',stage==='dungeon'?'title-explore':'title-event-prepare',stage==='dungeon'?explore:event);
+          this.titleAction=stage==='dungeon'?explore:event;
+        }
+        const backY=mobile?736:703;
+        const goBack=()=>render(stage==='mode'?'home':'mode');
+        this.add.image(cx,backY,'title-menu-frame').setDisplaySize(180,70);
+        text(cx,backY,'‹ 戻る',14,'#eee2bc');
+        this.add.zone(cx,backY,190,52).setName('title-back').setInteractive({useHandCursor:true}).on('pointerdown',goBack);
+        this.titleBack=goBack;
+      }
+      panel=this.add.container(0,0,this.children.list.filter(c=>!previous.has(c))).setName('title-menu-panel');
+      panel.setAlpha(0);this.tweens.add({targets:panel,alpha:1,duration:280,ease:'Sine.out'});
+    };
+    render(this.initialStage);
+    text(mobile?50:70,GAME_H-27,'遊び方',12,'#d6d1bc').setInteractive({useHandCursor:true}).on('pointerdown',()=>help.setVisible(true));
+    const sound=text(GAME_W-(mobile?45:70),GAME_H-27,'',12,'#d6d1bc').setInteractive({useHandCursor:true});
+    const refresh=()=>sound.setText(Audio.bgmOn||Audio.seOn?'音 ON':'音 OFF');
+    sound.on('pointerdown',()=>{const on=!(Audio.bgmOn||Audio.seOn);if(Audio.bgmOn!==on)Audio.toggleBgm();if(Audio.seOn!==on)Audio.toggleSe();refresh()});refresh();
+    text(cx,GAME_H-27,'CHARI DUNGEON',10,'#7e9696');
   }
 
   private createArtworkTitle(startGame: () => void) {
@@ -304,20 +400,21 @@ export class TitleScene extends Phaser.Scene {
 
     const refresh = () => {
       for (const card of cards) {
+        if (!card.container.active) continue;
         const selected = card.gender === this.selectedGender;
         card.background.clear();
-        card.background.fillStyle(selected ? 0x634626 : 0x10131b, .98)
+        card.background.fillStyle(selected ? 0x224b56 : 0x0b202a, .98)
           .fillRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 10);
-        card.background.lineStyle(selected ? 3 : 1, selected ? 0xffe6a5 : 0x8a7547, selected ? 1 : 0.6)
+        card.background.lineStyle(selected ? 3 : 1, selected ? 0x9ce4e6 : 0x729299, selected ? 1 : 0.6)
           .strokeRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 10);
         if (selected) {
-          card.background.fillStyle(0xf0cd80, 1)
+          card.background.fillStyle(0x16373e, 1)
             .fillRoundedRect(-cardW / 2 + 3, cardH / 2 - 26, cardW - 6, 23, 5);
         }
         const label = card.gender === 'male' ? '男性' : '女性';
         card.label.setText(selected ? `✓ ${label} 選択中` : label)
           .setFontSize(selected ? compact ? '11px' : '12px' : compact ? '13px' : '14px')
-          .setColor(selected ? '#241a0b' : '#c2b8a6');
+          .setColor(selected ? '#dffff2' : '#c2b8a6');
         card.portrait.setAlpha(selected ? 1 : 0.72);
         this.tweens.add({ targets: card.container, scale: selected ? 1.04 : 1, duration: 120, ease: 'Quad.easeOut' });
       }
@@ -362,6 +459,10 @@ export class TitleScene extends Phaser.Scene {
     const chooseFemale = () => choose('female');
     this.input.keyboard?.on('keydown-LEFT', chooseMale);
     this.input.keyboard?.on('keydown-RIGHT', chooseFemale);
+    cards[0]?.container.once(Phaser.GameObjects.Events.DESTROY, () => {
+      this.input.keyboard?.off('keydown-LEFT', chooseMale);
+      this.input.keyboard?.off('keydown-RIGHT', chooseFemale);
+    });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.input.keyboard?.off('keydown-LEFT', chooseMale);
       this.input.keyboard?.off('keydown-RIGHT', chooseFemale);
@@ -403,3 +504,6 @@ export class TitleScene extends Phaser.Scene {
     return container;
   }
 }
+
+
+
