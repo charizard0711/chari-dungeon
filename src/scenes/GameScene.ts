@@ -7559,6 +7559,13 @@ export class GameScene extends Phaser.Scene {
 
     const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
     const target = { x: Math.floor(world.x / TILE), y: Math.floor(world.y / TILE) };
+    const concealedEnemy = this.enemies.find(enemy => enemy.alive && !this.canClickEnemy(enemy)
+      && this.isTileCurrentlyVisible(enemy.x, enemy.y)
+      && bodyContains(enemy, bossBodyRadius(enemy.def), target));
+    if (concealedEnemy) {
+      this.log('何かいるようだ…', 'sys');
+      return;
+    }
     const explicitEnemy = clickedObjectsOrEnemy && !Array.isArray(clickedObjectsOrEnemy) ? clickedObjectsOrEnemy : undefined;
     // Art may cover several empty tiles. Only the enemy's occupied cells are attack targets.
     const ownsTarget = (enemy: Enemy) => this.canClickEnemy(enemy)
@@ -7619,7 +7626,11 @@ export class GameScene extends Phaser.Scene {
         const nextY = this.player.y + dy;
         const bossCombat = this.enemies.some((enemy) => enemy.def.isFloorBoss && enemy.alive)
           && (this.inBossRoom || this.isInsideBossRoom(this.player.x, this.player.y));
-        if (this.enemyAt(nextX, nextY)) break;
+        const blockingEnemy = this.enemyAt(nextX, nextY);
+        if (blockingEnemy) {
+          if (!this.canClickEnemy(blockingEnemy)) this.log('何かいるようだ…', 'sys');
+          break;
+        }
         const encounteredEnemy = !!this.bossObstacleAt(nextX, nextY);
         const hpBefore = this.player.hp;
         const positionBefore = `${this.player.x},${this.player.y}`;
@@ -8052,18 +8063,6 @@ export class GameScene extends Phaser.Scene {
         && (!target || enemy.sprite.depth >= target.sprite.depth)) target = enemy;
     }
     if (!target) {
-      const tile = { x: Math.floor(world.x / TILE), y: Math.floor(world.y / TILE) };
-      const hidden = this.enemies.find(enemy => enemy.alive && !this.canInspectEnemy(enemy)
-        && this.isTileCurrentlyVisible(enemy.x, enemy.y)
-        && bodyContains(enemy, bossBodyRadius(enemy.def), tile));
-      if (hidden) {
-        if (this.hoveredEnemy !== hidden || this.enemyHoverInfoKey !== 'hidden') {
-          this.hoveredEnemy = hidden;
-          this.enemyHoverInfoKey = 'hidden';
-          this.events.emit('enemyinfo', { hover: true, concealed: true });
-        }
-        return;
-      }
       this.clearEnemyHover();
       return;
     }
