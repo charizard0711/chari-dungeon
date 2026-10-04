@@ -7559,6 +7559,9 @@ export class GameScene extends Phaser.Scene {
     const clickedEnemy = [...this.enemies].sort((a,b)=>b.sprite.depth-a.sprite.depth)
       .find(e=>this.canInspectEnemy(e) && e.sprite.getBounds().contains(world.x,world.y))
       ?? this.enemies.find(e=>this.canInspectEnemy(e) && e.x===target.x && e.y===target.y);
+    const clickedChest = !clickedEnemy ? this.chests.find(c => !c.opened && c.sprite.active
+      && c.sprite.visible && c.sprite.alpha > .1 && c.sprite.getBounds().contains(world.x,world.y)) : undefined;
+    if (clickedChest) { target.x=clickedChest.x; target.y=clickedChest.y; }
     if (clickedEnemy) { target.x=clickedEnemy.x; target.y=clickedEnemy.y; }
     const tile = this.dungeon.tiles[target.y]?.[target.x];
     const doorTarget = tile === 'roomDoor' || (tile === 'door' && !this.inBossRoom);
