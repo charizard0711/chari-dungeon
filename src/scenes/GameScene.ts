@@ -7537,7 +7537,7 @@ export class GameScene extends Phaser.Scene {
 
   // 矢印キーのホールド処理：押した瞬間に1歩、押しっぱなしで歩き続ける
   // （スマホ用十字ボタンの touchDir も同じ仕組みで処理）
-  async handleMapClick(pointer: Phaser.Input.Pointer) {
+  async handleMapClick(pointer: Phaser.Input.Pointer, clickedObjectsOrEnemy?: Phaser.GameObjects.GameObject[] | Enemy) {
     if (pointer.button !== 0 || this.gameEnded) return;
     if (pointer.x < MAP_X || pointer.x >= MAP_X + MAP_W || pointer.y < MAP_Y || pointer.y >= MAP_Y + MAP_H) return;
     const ui = this.scene.get('UIScene') as any;
@@ -7556,9 +7556,10 @@ export class GameScene extends Phaser.Scene {
 
     const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
     const target = { x: Math.floor(world.x / TILE), y: Math.floor(world.y / TILE) };
-    const clickedEnemy = [...this.enemies].sort((a,b)=>b.sprite.depth-a.sprite.depth)
-      .find(e=>this.canInspectEnemy(e) && e.sprite.getBounds().contains(world.x,world.y))
-      ?? this.enemies.find(e=>this.canInspectEnemy(e) && e.x===target.x && e.y===target.y);
+    const explicitEnemy = clickedObjectsOrEnemy && !Array.isArray(clickedObjectsOrEnemy) ? clickedObjectsOrEnemy : undefined;
+    const clickedEnemy = explicitEnemy && this.canClickEnemy(explicitEnemy) ? explicitEnemy : [...this.enemies].sort((a,b)=>b.sprite.depth-a.sprite.depth)
+      .find(e=>this.canClickEnemy(e) && e.sprite.getBounds().contains(world.x,world.y))
+      ?? this.enemies.find(e=>this.canClickEnemy(e) && e.x===target.x && e.y===target.y);
     const clickedChest = !clickedEnemy ? this.chests.find(c => !c.opened && c.sprite.active
       && c.sprite.visible && c.sprite.alpha > .1 && c.sprite.getBounds().contains(world.x,world.y)) : undefined;
     if (clickedChest) { target.x=clickedChest.x; target.y=clickedChest.y; }
@@ -7971,6 +7972,13 @@ export class GameScene extends Phaser.Scene {
     e.hpBar.fillStyle(0x40ff70, 1); e.hpBar.fillRect(x, y, w * Math.max(0, e.hp / e.hpMax), 3);
   }
 
+  private canClickEnemy(enemy: Enemy): boolean {
+    if (!enemy.alive || !enemy.sprite?.active || !enemy.sprite.visible || enemy.sprite.alpha <= 0) return false;
+    if (enemy.def.isDarkNinja && !enemy.stealthRevealed) return false;
+    if (enemy.def.gimmick === 'burrow' && enemy.charging) return false;
+    return true;
+  }
+
   private canInspectEnemy(enemy: Enemy): boolean {
     if (!enemy.alive || !enemy.sprite?.active || !enemy.sprite.visible || enemy.sprite.alpha <= 0.1) return false;
     if (enemy.def.isDarkNinja && !enemy.stealthRevealed) return false;
@@ -7983,9 +7991,10 @@ export class GameScene extends Phaser.Scene {
     const input = enemy.sprite.input!;
     const contains = input.hitAreaCallback;
     // Keep Phaser's frame-aware bounds, but never expose a concealed enemy through the cursor.
-    input.hitAreaCallback = (area, x, y, sprite) => this.canInspectEnemy(enemy) && contains(area, x, y, sprite);
-    enemy.sprite.on('pointerdown', () => {
+    input.hitAreaCallback = (area, x, y, sprite) => this.canClickEnemy(enemy) && contains(area, x, y, sprite);
+    enemy.sprite.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (this.canInspectEnemy(enemy)) this.showEnemyInfo(enemy);
+      if (this.canClickEnemy(enemy)) void this.handleMapClick(pointer, enemy);
     });
   }
 
