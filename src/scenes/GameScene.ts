@@ -6649,7 +6649,7 @@ export class GameScene extends Phaser.Scene {
       const radius = bossBodyRadius(enemy.def);
       if (!enemy.alive || Math.max(0, Math.abs(enemy.x-origin.x)-radius) > DYNAMITE_RADIUS
         || Math.max(0, Math.abs(enemy.y-origin.y)-radius) > DYNAMITE_RADIUS) continue;
-      const boss = !!(enemy.def.isBoss || enemy.def.isFloorBoss);
+      const boss = !!(enemy.def.isBoss || enemy.def.isFloorBoss || enemy.def.isHalloweenRetainer);
       const damage = boss ? Math.max(1, Math.ceil(enemy.hpMax * .2)) : enemy.hp;
       enemy.hp -= damage;
       this.discoverMonster(enemy.def.key);
