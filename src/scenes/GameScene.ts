@@ -7557,9 +7557,11 @@ export class GameScene extends Phaser.Scene {
     const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
     const target = { x: Math.floor(world.x / TILE), y: Math.floor(world.y / TILE) };
     const explicitEnemy = clickedObjectsOrEnemy && !Array.isArray(clickedObjectsOrEnemy) ? clickedObjectsOrEnemy : undefined;
-    const clickedEnemy = explicitEnemy && this.canClickEnemy(explicitEnemy) ? explicitEnemy : [...this.enemies].sort((a,b)=>b.sprite.depth-a.sprite.depth)
-      .find(e=>this.canClickEnemy(e) && e.sprite.getBounds().contains(world.x,world.y))
-      ?? this.enemies.find(e=>this.canClickEnemy(e) && e.x===target.x && e.y===target.y);
+    // Art may cover several empty tiles. Only the enemy's occupied cells are attack targets.
+    const ownsTarget = (enemy: Enemy) => this.canClickEnemy(enemy)
+      && bodyContains(enemy, bossBodyRadius(enemy.def), target);
+    const clickedEnemy = explicitEnemy && ownsTarget(explicitEnemy) ? explicitEnemy
+      : this.enemies.find(ownsTarget);
     const clickedChest = !clickedEnemy ? this.chests.find(c => !c.opened && c.sprite.active
       && c.sprite.visible && c.sprite.alpha > .1 && c.sprite.getBounds().contains(world.x,world.y)) : undefined;
     if (clickedChest) { target.x=clickedChest.x; target.y=clickedChest.y; }
