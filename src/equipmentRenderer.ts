@@ -46,6 +46,7 @@ export class EquipmentRenderer {
       const paintedWeapon = item.key.startsWith('w_secret_') || item.key.startsWith('w_hw_');
       // Painted melee art already has its blade upright. Keep the idle grip upright
       // in every facing; heldHandPose supplies only the swing during an attack.
+      if (item.key === 'w_hw_coffin') pose.angle += Math.PI;
       if (paintedWeapon && type === 'bow') pose.angle = {up:0,right:Math.PI/2,down:Math.PI,left:-Math.PI/2}[dir];
       if (paintedWeapon && type === 'handgun') pose.angle = {up:-Math.PI/2,right:0,down:Math.PI/2,left:0}[dir];
       if (item.key === 'w_hero_sword') {
@@ -78,7 +79,7 @@ export class EquipmentRenderer {
       const dy = (pose.y - body.originY * 40) * body.scaleY * artScale;
       const cosine = Math.cos(body.rotation), sine = Math.sin(body.rotation);
       // Pin the actual center of Arcadia's handle to the per-frame hand anchor.
-      const [ox,oy] = item.key === 'w_hero_sword' ? [.5,.823] : hasArt || paintedWeapon ? heldGrip(type,dir) : [.5,.65];
+      const [ox,oy] = item.key === 'w_hw_coffin' ? [.5,.16] : item.key === 'w_hero_sword' ? [.5,.823] : hasArt || paintedWeapon ? heldGrip(type,dir) : [.5,.65];
       const size = heldArtSize(type) * (item.key === 's_hw_emerald' ? 1.2 : item.key === 'w_hero_sword' ? 1.35 : 1) * Math.abs(body.scaleY) * artScale / .85;
       sprite.setVisible(true).setOrigin(ox,oy).setPosition(body.x + dx*cosine - dy*sine,body.y + dx*sine + dy*cosine)
         .setDisplaySize(size,size).setRotation(body.rotation + pose.angle).setFlipX(paintedWeapon && type === 'handgun' ? dir === 'left' : !!weapon?.dual && offhand && (dir === 'down' || dir === 'up'))
