@@ -1,0 +1,54 @@
+[
+  {
+    "id": "map_01",
+    "group": "マップ",
+    "title": "真夜中のお菓子迷路",
+    "bpm": 92,
+    "meter": 4,
+    "description": "オルゴールと弦のつま弾き。かわいさの奥に不気味さ。",
+    "recommended": true,
+    "duration": 41.74,
+    "rms": 0.1069,
+    "peak": 0.65,
+    "url": "../assets/audio/halloween-candidates-v1/map_01.wav"
+  },
+  {
+    "id": "mid_01",
+    "group": "中ボス",
+    "title": "パンプキン・ナイト・マーチ",
+    "bpm": 132,
+    "meter": 4,
+    "description": "小太鼓と弦、金管。カボチャ騎士の行進。",
+    "recommended": true,
+    "duration": 29.09,
+    "rms": 0.1308,
+    "peak": 0.65,
+    "url": "../assets/audio/halloween-candidates-v1/mid_01.wav"
+  },
+  {
+    "id": "boss_01",
+    "group": "ラスボス",
+    "title": "呪われた収穫王の玉座",
+    "bpm": 112,
+    "meter": 4,
+    "description": "重いオルガンと合唱。探索の旋律が王の決戦へ。",
+    "recommended": true,
+    "duration": 34.29,
+    "rms": 0.1338,
+    "peak": 0.65,
+    "url": "../assets/audio/halloween-candidates-v1/boss_01.wav"
+  },
+  {
+    "id": "gold_01",
+    "group": "特殊金ボス",
+    "title": "黄金の収穫祭 ― 王の覚醒",
+    "bpm": 152,
+    "meter": 4,
+    "description": "王の旋律を鐘と合唱で拡張。黄金の決戦。",
+    "recommended": true,
+    "duration": 25.26,
+    "rms": 0.14,
+    "peak": 0.65,
+    "url": "../assets/audio/halloween-candidates-v1/gold_01.wav"
+  }
+]

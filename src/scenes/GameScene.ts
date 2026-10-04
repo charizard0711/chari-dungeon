@@ -6,6 +6,8 @@ import { FINAL_DEPTH_BOSSES, FINAL_ELEMENTS, FINAL_ELEMENT_LABEL, finalDepthMobC
 import { hasFinalDepthTerrain, finalDepthTerrainKey, finalDepthFloorFrame, finalDepthPropKinds, FINAL_DEPTH_COLORS, type FinalDepthPropKind, type FinalDepthPart } from '../finalDepthTerrain';
 import { hasThunderTerrain, thunderTerrainKey, thunderFloorFrame, THUNDER_PROP_KINDS, type ThunderPropKind, type ThunderPart } from '../thunderTerrain';
 import Phaser from 'phaser';
+import { GOLDEN_KING, GOLDEN_SHIELD, HALLOWEEN_BOSSES, HALLOWEEN_MOBS, HALLOWEEN_RETAINERS, HALLOWEEN_WEAPONS, HALLOWEEN_SHIELDS, HALLOWEEN_FLOORS, HALLOWEEN_COLORS } from '../halloweenContent';
+import { generateHalloweenDungeon, halloweenDecorations } from '../halloweenDungeon';
 import { DIFFICULTY_RULES, difficultyOf, difficultyGold, difficultyEnemy, difficultyFromCode, isDifficultyUnlocked, readDifficultyProgress, recordDifficultyClear, type Difficulty } from '../difficulty';
 import { awaitTween } from '../awaitTween';
 import { planDifficultyChallenge } from '../difficultyChallenge';
@@ -22,7 +24,7 @@ import type { BossRoomZone, OptionalRoom, OptionalRoomKind, Room } from '../dung
 import { getTheme, eraSuffix, MONSTER_DEFS, WEAPON_DEFS, makeItem, gradeColor, ITEM_DEFS, ELEMENT_INFO, monsterElement } from '../data';
 import type { Armor, Dir, Element, MonsterElement, EquipmentGrade, ItemKind, MonsterDef, Shield, TileType, Vec2, Weapon } from '../types';
 import {
-  Player, rollWeaponByGrade, rollGlacialBossWeapon, rollVolcanicBossWeapon, rollShield, rollShieldByGrade,
+  Player, rollWeapon, rollWeaponByGrade, rollGlacialBossWeapon, rollVolcanicBossWeapon, rollShield, rollShieldByGrade,
   weaponFullName, weaponRarity, shieldFullName, makeWeapon, makeShield, refreshLegendaryEquipment
 } from '../player';
 import { Enemy } from '../enemy';
@@ -36,7 +38,7 @@ import { computePlayerAttack, computeEnemyAttack, consumeWeaponDurability } from
 import { planSkill, weaponSkill, directionVector } from '../weaponSkills';
 import { Audio } from '../audio/manager';
 import { clearRunSave, pickFields, readRunSave, writeRunSave, type RunSnapshot } from '../runSave';
-import { bgmForFloor, elementAttackSe, weaponAttackSe } from '../audio/config';
+import { type BgmName, bgmForFloor, elementAttackSe, weaponAttackSe } from '../audio/config';
 import { ARCADIA_GACHA_RATE, ARCADIA_BOSS_DROP_RATE, enhancementChance, EQUIPMENT_LIMIT, FLOOR_KEY_DROP_RATE, DYNAMITE_DROP_RATE, DYNAMITE_RADIUS, MYSTERY_BREAD_DROP_RATE, ITEM_SELL_PRICES, SCROLL_DROP_RATE, SHOP_PRICES, type ShopItemKind } from '../balance';
 import { getFloorLayoutProfile } from '../floorLayout';
 import {
@@ -64,10 +66,10 @@ import { MAP_X, MAP_Y, MAP_W, MAP_H } from '../layout';
 
 const ANIM = 116;
 const RUN_STATE_KEYS = [
-  'difficulty', 'revivesUsed', 'difficultyClearEligible',
+  'emeraldGuardReadyTurn', 'emeraldGuardUntil', 'emeraldGuardArmed', 'eventMode', 'eventStartingWeapon', 'difficulty', 'revivesUsed', 'difficultyClearEligible',
   'floor', 'turn', 'floorTurn', 'score', 'floorStartHp', 'floorDamaged', 'floorBossDefeated',
   'inBossRoom', 'bossRewardClaimed', 'bossEntranceClosed', 'weaponWonThisFloor', 'reviveSeedSeen',
-  'shopPurchases', 'enhancementScrollDrops', 'reservedBossScroll', 'pendingEquipment',
+  'floorPotionDrops', 'shopPurchases', 'enhancementScrollDrops', 'reservedBossScroll', 'pendingEquipment',
   'secretDualUnlocked', 'itemCatalogUnlocked', 'playerRootTurns', 'itemSealTurns', 'playerGender',
   'playerArmor', 'lightRadius', 'shroomTurns', 'torchTurns', 'lanternTurns', 'invisTurns',
   'transformation', 'penaltyFlags', 'skillChargeSteps', 'secretQuests'
@@ -75,7 +77,7 @@ const RUN_STATE_KEYS = [
 const ENEMY_STATE_KEYS = [
   'def', 'hp', 'hpMax', 'x', 'y', 'baseScale', 'midBossVisualMultiplier', 'slowToggle', 'freezeTurns', 'sealTurns', 'poisonTurns',
   'loopDir', 'lineDir', 'facing', 'moveSteps', 'stealthRevealed', 'gimmickCounter', 'gimmickPhase',
-  'vulnerableTurns', 'guardOpenTurns', 'stunnedTurns', 'awakened', 'revived', 'regenBlockedTurns',
+  'emedralStunUntil', 'emedralAffected', 'emedralWeakUntil', 'vulnerableTurns', 'guardOpenTurns', 'stunnedTurns', 'awakened', 'revived', 'regenBlockedTurns',
   'summoned', 'cloneDepth', 'charging', 'chargeDir', 'plannedMove', 'challengeTurn', 'challengeWaves'
 ] as const;
 // 探索画面のズーム倍率（大きいほど拡大。1.0=等倍）
@@ -212,7 +214,7 @@ interface TerrainDetailVisual {
 }
 
 type HealingDungeonObjectKind = 'fountain';
-type RoomPropKind = 'barrel' | 'jar' | 'crates' | 'weaponRack' | 'mapTable' | 'cookingPot' | 'minecart' | 'bonePile'
+type RoomPropKind = 'hw_pumpkins' | 'hw_grave' | 'hw_lantern' | 'hw_cauldron' | 'hw_books' | 'hw_armor' | 'hw_coffin' | 'hw_throne' | 'hw_tree' | 'hw_barrel' | 'barrel' | 'jar' | 'crates' | 'weaponRack' | 'mapTable' | 'cookingPot' | 'minecart' | 'bonePile'
   | 'iceCrystal' | 'iceObelisk' | 'snowBoulder' | 'iceAltar' | 'ruinRelic' | 'ruinRubble' | VolcanoPropKind | WaterPropKind | ThunderPropKind | FinalDepthPropKind;
 type DungeonObjectKind = HealingDungeonObjectKind | RoomPropKind;
 
@@ -256,6 +258,7 @@ interface TerrainVisual {
 }
 
 type BossGimmickKind =
+  | 'mid_hw_pumpkin' | 'mid_hw_ghost' | 'mid_hw_witch' | 'mid_hw_knight' | 'hw_king'
   | 'mid_fire' | 'mid_frost' | 'mid_storm' | 'mid_void' | 'mid_bone' | 'mid_poison'
   | 'mid_magic' | 'mid_rival' | 'mid_ember_shift' | 'mid_magma_lance' | 'mid_ember_bone' | 'magma_breath'
   | 'mid_thunder_jaw' | 'mid_thunder_shell' | 'mid_thunder_engine' | 'mid_thunder_ring' | 'thunder_king' | 'thunder_charge'
@@ -293,6 +296,11 @@ interface BossRuntime {
   phase: number;
   stunned: number;
   phaseTwo: boolean;
+  halloweenStarted?: boolean;
+  halloweenTurn?: number;
+  castDamage?: number;
+  goldenSafe?: Vec2[];
+  goldenRitual?: boolean;
   intent?: BossIntent;
   coreLabel?: Phaser.GameObjects.Text;
 }
@@ -319,9 +327,16 @@ export class GameScene extends Phaser.Scene {
   revivesUsed = 0;
   player!: Player;
   dungeon!: DungeonData;
+  eventMode: 'halloween' | null = null;
+  emeraldGuardFx?: Phaser.GameObjects.Container;
+  emeraldGuardReadyTurn = 0;
+  emeraldGuardUntil = 0;
+  emeraldGuardArmed = true;
+  eventStartingWeapon = 'w_iron_dagger';
   floor = 1;
   turn = 0;
   floorTurn = 0;
+  floorPotionDrops = 0;
   score = 0;
   floorStartHp = 100;
   floorDamaged = false;
@@ -429,8 +444,13 @@ export class GameScene extends Phaser.Scene {
     super('GameScene');
   }
 
-  create(data?: { resume?: boolean; difficulty?: Difficulty }) {
-    const resume = data?.resume ? readRunSave()?.snapshot : undefined;
+  create(data?: { resume?: boolean; difficulty?: Difficulty; eventMode?: 'halloween'; startingWeapon?: string }) {
+    this.eventMode = data?.eventMode === 'halloween' ? 'halloween' : null;
+    this.emeraldGuardFx = undefined;
+    this.emeraldGuardReadyTurn = 0;
+    this.emeraldGuardUntil = 0; this.emeraldGuardArmed = true;
+    this.eventStartingWeapon = data?.startingWeapon ?? 'w_iron_dagger';
+    const resume = data?.resume ? readRunSave(this.eventMode === 'halloween')?.snapshot : undefined;
     const progress = readDifficultyProgress();
     const requested = difficultyOf(resume?.state.difficulty ?? data?.difficulty ?? progress.selected);
     const qaDifficulty = location.hostname === 'localhost' && new URLSearchParams(location.search).has('qa-game')
@@ -445,7 +465,16 @@ export class GameScene extends Phaser.Scene {
     this.saveWarningShown = false;
     // 状態初期化
     this.player = new Player();
-    this.secretQuests = this.runSaveEnabled() ? readQuestJournal() : normalizeQuests();
+    if (this.eventMode) {
+      const owned = readEquipmentCodexSave(); owned.add('w_iron_dagger');
+      const key = owned.has(this.eventStartingWeapon) && WEAPON_DEFS.some(w => w.key === this.eventStartingWeapon) ? this.eventStartingWeapon : 'w_iron_dagger';
+      this.eventStartingWeapon = key;
+      this.player.weapon = makeWeapon(key, []);
+      this.player.weapons = [this.player.weapon];
+      this.player.inventory.push(makeItem('repair'));
+      this.player.inventory.push(makeItem('torch'));
+    }
+    this.secretQuests = this.runSaveEnabled() && !this.eventMode ? readQuestJournal() : normalizeQuests();
     const qaParams = new URLSearchParams(location.search);
     const qaGender = qaParams.get('qa-gender');
     this.playerGender = location.hostname === 'localhost' && isPlayerGender(qaGender)
@@ -460,7 +489,7 @@ export class GameScene extends Phaser.Scene {
     this.player.armors = [startingArmor];
     this.player.armor = startingArmor;
     const qaFloor = location.hostname === 'localhost' ? Number(qaParams.get('qa-floor')) : 1;
-    const startFloor = Number.isInteger(qaFloor) && qaFloor >= 1 && qaFloor <= 30 ? qaFloor : 1;
+    const startFloor = Number.isInteger(qaFloor) && qaFloor >= 1 && qaFloor <= (this.eventMode ? 5 : 30) ? qaFloor : 1;
     this.qaBossMode = location.hostname === 'localhost' && qaParams.has('qa-boss');
     const qaZone = qaParams.get('qa-boss-zone') as BossRoomZone | null;
     this.qaBossRoomZone = location.hostname === 'localhost' && qaZone && ['north', 'south', 'east', 'west', 'center'].includes(qaZone)
@@ -500,6 +529,7 @@ export class GameScene extends Phaser.Scene {
     this.openedOptionalRooms = new Set();
     this.weaponWonThisFloor = false;
     this.reviveSeedSeen = false;
+    this.floorPotionDrops = 0;
     this.shopPurchases = { potion: 0, repair: 0, slime_scroll: 0, boss5_scroll: 0 };
     this.enhancementScrollDrops = { stone: false, shieldstone: false };
     this.reservedBossScroll = null;
@@ -828,7 +858,7 @@ export class GameScene extends Phaser.Scene {
     this.floor = floor;
     this.inBossRoom = bossRoom;
     this.enhancementScrollDrops = { stone: false, shieldstone: false };
-    const mapHasBoss = bossRoom || (floor !== 5 && floor !== 30);
+    const mapHasBoss = !!this.eventMode || bossRoom || (floor !== 5 && floor !== 30);
     this.reservedBossScroll = mapHasBoss ? (Math.random() < 0.5 ? 'stone' : 'shieldstone') : null;
     if (!bossRoom) {
       this.floorTurn = 0;
@@ -843,7 +873,8 @@ export class GameScene extends Phaser.Scene {
       this.itemSealTurns = 0;
       this.bossRewardClaimed = false;
       this.weaponWonThisFloor = false;
-      this.shopPurchases = { potion: 0, repair: 0, slime_scroll: 0, boss5_scroll: 0 };
+      this.floorPotionDrops = 0;
+    this.shopPurchases = { potion: 0, repair: 0, slime_scroll: 0, boss5_scroll: 0 };
     } else {
       // フィールド中ボスの任意報酬と、強ボス部屋の必須報酬は別扱い。
       this.bossRewardClaimed = false;
@@ -897,7 +928,7 @@ export class GameScene extends Phaser.Scene {
     this.ambientMotes = [];
 
     if (snapshot) this.restoreRunState(snapshot);
-    this.dungeon = snapshot?.dungeon ?? (bossRoom ? generateBossArena(floor) : generateDungeon(floor, this.qaBossRoomZone));
+    this.dungeon = snapshot?.dungeon ?? (this.eventMode ? generateHalloweenDungeon(floor) : bossRoom ? generateBossArena(floor) : generateDungeon(floor, this.qaBossRoomZone));
     const d = this.dungeon;
     if (!snapshot && !bossRoom && location.hostname === 'localhost'
       && new URLSearchParams(location.search).has('qa-treasury')) addDiamondTreasury(d, () => 0);
@@ -922,6 +953,11 @@ export class GameScene extends Phaser.Scene {
       for (let x = 0; x < d.w; x++) {
         const t = d.tiles[y][x];
         const visual = this.tileVisual(t, theme.era, x, y);
+        if (this.eventMode && (t === 'stairs' || t === 'door')) {
+          const sprite = this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, `hw_floor_${floor}`, (x % 4) + (y % 4) * 4)
+            .setDisplaySize(TERRAIN_RENDER_SIZE, TERRAIN_RENDER_SIZE).setDepth(-.1).setVisible(false);
+          this.terrainDetails.push({x, y, wall:false, underlay:true, alpha:1, sprite});
+        }
         if ((hasRuinTerrain(floor) || hasVolcanoTerrain(floor) || hasWaterTerrain(floor) || hasThunderTerrain(floor) || hasFinalDepthTerrain(floor)) && (t === 'stairs' || t === 'door' || t === 'roomDoor'
           || visual.key.startsWith('terrain_boss_gate') || visual.key.startsWith('terrain_boss_entry'))) {
           const base = hasFinalDepthTerrain(floor) ? this.finalDepthFloorVisual(x, y) : hasThunderTerrain(floor) ? this.thunderFloorVisual(x, y) : hasWaterTerrain(floor) ? this.waterFloorVisual(x, y) : hasVolcanoTerrain(floor) ? this.volcanoFloorVisual(x, y) : this.ruinFloorVisual(x, y);
@@ -939,7 +975,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.createWallFacades(theme.era);
     this.createTerrainDetails(floor);
-    this.createBossRoomVisuals(theme.era, theme.accent);
+    if (!this.eventMode) this.createBossRoomVisuals(theme.era, theme.accent);
     this.spawnAmbientMotes(floor);
     this.spawnTeleportPads();
     this.spawnBossCompass();
@@ -983,8 +1019,8 @@ export class GameScene extends Phaser.Scene {
       for (const room of newlyOpenedSideRooms) this.populateOptionalRoom(room);
     } else {
       if (!bossRoom) {
-        this.spawnDungeonObjects(floor);
-        this.spawnRoomProps(floor);
+        if (this.eventMode) this.spawnHalloweenProps();
+        else { this.spawnDungeonObjects(floor); this.spawnRoomProps(floor); }
         for (const room of newlyOpenedSideRooms) this.populateOptionalRoom(room);
         for (const optional of d.optionalRooms.filter(room => room.kind === 'diamond')) {
           this.spawnChestAt(optional.room.cx, optional.room.cy, true, true);
@@ -1062,7 +1098,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.updateVisibility();
-    const floorIntro = bossRoom
+    const floorIntro = this.eventMode ? `🎃 ${floor} / 5層「${HALLOWEEN_FLOORS[floor - 1]}」。番人を倒すと階段が開く。` : bossRoom
       ? `重い扉の先で、強大な魔物が待ち構えている。`
       : floor % 5 === 0
           ? `${floor}階「${getTheme(floor).name}」に足を踏み入れた。奥の赤い階段から、強大な魔物の気配が漂っている。`
@@ -1074,7 +1110,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.events.emit('floor', floor);
     // BGMは2階ごとに切り替わる。
-    Audio.playBgm(bossRoom ? 'boss' : this.bossEntranceClosed ? 'midboss' : bgmForFloor(floor));
+    Audio.playBgm(this.floorBgm(bossRoom || this.bossEntranceClosed));
     this.savePending = true;
   }
 
@@ -1096,6 +1132,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   createWallFacades(era: number) {
+    if (this.eventMode) return;
     if (this.usesGlacialTerrain() || hasRuinTerrain(this.floor) || hasVolcanoTerrain(this.floor) || hasWaterTerrain(this.floor) || hasThunderTerrain(this.floor) || hasFinalDepthTerrain(this.floor)) return;
     const d = this.dungeon;
     const texture = `terrain_wall_facade_${era}`;
@@ -1140,6 +1177,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   tileVisual(t: TileType, era: number, x: number, y: number): TerrainVisual {
+    if (this.eventMode) {
+      const treasury = this.dungeon.optionalRooms.find(o=>o.kind==='diamond' && x>=o.room.x-1 && x<=o.room.x+o.room.w && y>=o.room.y-1 && y<=o.room.y+o.room.h);
+      if (treasury) {
+        if (t === 'roomDoor') return {key:'terrain_treasury_door',size:TILE*1.25,depth:4.2};
+        if (t === 'wall') return {key:'terrain_treasury_wall',size:TILE+2};
+        if (t === 'floor') return {key:'terrain_treasury_floor',size:TILE+2};
+      }
+      if (t === 'stairs') return { key: 'hw_stairs', size: TILE * 1.7, depth: 3 };
+      if (t === 'door') return { key: 'hw_gate', size: TILE * 1.65, depth: 3 };
+      if (t === 'wall') return { key: 'hw_wall', size: TILE + 2, flipX: (x + y) % 2 === 0 };
+      return { key: `hw_floor_${this.floor}`, frame:(x % 4) + (y % 4) * 4, size: TILE + 2 };
+    }
     const treasury = this.dungeon.optionalRooms.find(optional => optional.kind === 'diamond'
       && x >= optional.room.x - 1 && x <= optional.room.x + optional.room.w
       && y >= optional.room.y - 1 && y <= optional.room.y + optional.room.h);
@@ -1570,6 +1619,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   spawnEnemies(floor: number) {
+    if (this.eventMode) { this.spawnHalloweenEnemies(); return; }
     const pool = MONSTER_DEFS.filter((m) =>
       m.minFloor <= floor && floor <= m.maxFloor && !m.isBoss && !m.isTreasureRabbit
     );
@@ -1607,6 +1657,54 @@ export class GameScene extends Phaser.Scene {
     if (floor !== 5 && floor !== 30) this.spawnMidBossDragon(floor, !this.dungeon.bossRoom);
   }
 
+  spawnHalloweenProps() {
+    for (const prop of halloweenDecorations(this.dungeon, this.floor)) {
+      this.addDungeonObject(prop.key as RoomPropKind, prop.x, prop.y, 1, 1);
+    }
+    // Breakable pumpkin barrels reward exploration while room centers stay clear.
+    for (const r of this.dungeon.rooms.filter(r => r !== this.dungeon.bossRoom && !this.dungeon.optionalRooms.some(o=>o.room===r))) {
+      this.addDungeonObject('hw_barrel', r.x + 2, r.y + r.h - 2, 1, 1, true);
+    }
+    const rest = this.dungeon.rooms[3];
+    this.addDungeonObject('fountain', rest.cx, rest.cy - 1, 1, 1);
+  }
+
+  spawnHalloweenEnemies() {
+    const arenaCells = this.bossRoomCells();
+    const count = (11 + this.floor * 2) * 3;
+    const blocked = new Set([...this.occupiedPositions(), ...arenaCells].map(p => `${p.x},${p.y}`));
+    const candidates: Vec2[] = [];
+    this.dungeon.tiles.forEach((row, y) => row.forEach((tile, x) => {
+      if (tile === 'floor' && !blocked.has(`${x},${y}`) && this.distToPlayer(x, y) >= 5) candidates.push({ x, y });
+    }));
+    for (let i = 0; i < count && candidates.length; i++) {
+      const pos = candidates.splice(Math.floor(Math.random() * candidates.length), 1)[0];
+      const available = this.floor === 1 ? HALLOWEEN_MOBS.slice(0, 2) : this.floor === 2 ? HALLOWEEN_MOBS.slice(0, 3) : HALLOWEEN_MOBS;
+      const source = available[i % available.length];
+      const def = { ...source, hp: Math.floor(source.hp * (1 + (this.floor - 1) * .25)), atkMin: source.atkMin + this.floor - 1, atkMax: source.atkMax + this.floor - 1 };
+      this.addEnemy(def, pos.x, pos.y, 1);
+    }
+    const source = this.floor === 5 && Math.random() < .01 ? GOLDEN_KING : HALLOWEEN_BOSSES[this.floor - 1];
+    const def = { ...source, isFloorBoss: true, isElite: true, bossTint: 0xffffff };
+    const gimmicks: BossGimmickKind[] = ['mid_hw_pumpkin', 'mid_hw_ghost', 'mid_hw_witch', 'mid_hw_knight', 'hw_king'];
+    this.placeFloorBoss(def, this.floor === 5 ? 3.3 : 2.8, HALLOWEEN_COLORS[this.floor - 1], `🎃 ${def.name}が城の奥で待っている。`, gimmicks[this.floor - 1]);
+    const retainer = HALLOWEEN_RETAINERS[this.floor - 1];
+    const roomCells = this.bossRoomCells();
+    const center = roomCells.reduce((sum, p) => ({ x: sum.x + p.x / roomCells.length, y: sum.y + p.y / roomCells.length }), { x: 0, y: 0 });
+    const positions = roomCells.filter(p => this.dungeon.tiles[p.y]?.[p.x] === 'floor'
+      && !this.occupiedPositions().some(o => o.x === p.x && o.y === p.y)
+      && this.distToPlayer(p.x, p.y) >= 3);
+    positions.sort((a, b) => Math.abs(a.y - center.y - 3) - Math.abs(b.y - center.y - 3));
+    for (let i = 0; i < 3 && positions.length; i++) {
+      const targetX = center.x + (i - 1) * 3;
+      const index = positions.reduce((best, p, n) =>
+        Math.abs(p.x - targetX) + Math.abs(p.y - center.y - 3) * 3
+        < Math.abs(positions[best].x - targetX) + Math.abs(positions[best].y - center.y - 3) * 3 ? n : best, 0);
+      const pos = positions.splice(index, 1)[0];
+      this.addEnemy({ ...retainer }, pos.x, pos.y, 1);
+    }
+  }
+
   maybeSpawnTreasureRabbit(floor: number) {
     const def = MONSTER_DEFS.find((monster) => monster.isTreasureRabbit);
     if (!def || floor < def.minFloor || floor > def.maxFloor) return;
@@ -1620,7 +1718,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   floorHasGate(floor: number): boolean {
-    return floor % 5 === 0;
+    return !this.eventMode && floor % 5 === 0;
   }
 
   spawnMidBossDragon(floor: number, fieldPlacement: boolean) {
@@ -1846,6 +1944,13 @@ export class GameScene extends Phaser.Scene {
     return this.dungeon?.bossEntrance ? { ...this.dungeon.bossEntrance } : null;
   }
 
+  floorBgm(battle: boolean): BgmName {
+    if (!this.eventMode) return this.inBossRoom ? 'boss' : battle ? 'midboss' : bgmForFloor(this.floor);
+    if (!battle) return 'halloweenMap';
+    if (this.floor < 5) return 'halloweenMidboss';
+    return this.enemies.some(e => e.alive && e.def.key === 'm_hw_golden_king') ? 'halloweenGolden' : 'halloweenBoss';
+  }
+
   setBossEntranceClosed(closed: boolean, announce = true) {
     const entrance = this.bossEntrancePosition();
     if (!entrance || this.bossEntranceClosed === closed) return;
@@ -1860,7 +1965,7 @@ export class GameScene extends Phaser.Scene {
     const entrySprite = entry ? this.tileSprites[entry.y]?.[entry.x] : undefined;
     if (entry && entrySprite) this.applyTileVisual(entrySprite, this.dungeon.tiles[entry.y][entry.x], era, entry.x, entry.y);
     if (!this.inBossRoom) {
-      Audio.playBgm(closed ? 'midboss' : bgmForFloor(this.floor));
+      Audio.playBgm(this.floorBgm(closed));
     }
     if (!announce) return;
     this.effectFx(entrance.x, entrance.y, 'fx_magic', 1.45, 420, closed ? 0xff8a5b : 0x58d9d1);
@@ -1970,7 +2075,8 @@ export class GameScene extends Phaser.Scene {
     const drawnAnimation = animation && this.textures.exists(animation.motionKey)
       && this.textures.exists(animation.attackKey) ? animation : undefined;
     const tex = this.textures.get(def.key).getSourceImage();
-    const sc = maxDim / (e.directionArt?.artSize ?? drawnAnimation?.artSize ?? Math.max(tex.width, tex.height));
+    const eventSize = this.eventMode && def.key.startsWith('m_hw_') && !def.isFloorBoss ? 1.7 : 1;
+    const sc = maxDim * eventSize / (e.directionArt?.artSize ?? drawnAnimation?.artSize ?? Math.max(tex.width, tex.height));
     e.sprite.setScale(sc);
     if (def.bossTint && def.bossTint !== drawnAnimation?.baseTint) e.sprite.setTint(def.bossTint);
     if (def.isDarkNinja) {
@@ -2340,6 +2446,69 @@ export class GameScene extends Phaser.Scene {
     let kind = state.kind;
 
     switch (state.kind) {
+      case 'mid_hw_pumpkin': {
+        for (const bomb of this.halloweenObjects(e, 'bomb')) this.destroyHalloweenObject(bomb, false);
+        const targets = [{x:p.x-2,y:p.y}, {x:p.x+2,y:p.y}, {x:p.x,y:p.y-2}];
+        for (const target of targets) {
+          const bomb = this.spawnHalloweenObject(e, 'bomb', target);
+          if (bomb) tiles.push(...this.bossCrossTiles(bomb.x,bomb.y,1));
+        }
+        if (e.hp <= e.hpMax*.5) { secondary = this.bossRoomLine(true,p.y); tertiary = this.bossRoomLine(false,p.x); }
+        message = '爆弾カボチャが3個出現！ 2ターンで爆発。壊して逃げ場所を作ろう！';
+        break;
+      }
+      case 'mid_hw_ghost': {
+        const lanterns = this.halloweenObjects(e, 'lantern');
+        if (lanterns.length) {
+          const lantern = lanterns[(state.phase++) % lanterns.length];
+          tiles = this.bossRoomLine(state.phase % 2 === 0, state.phase % 2 === 0 ? lantern.y : lantern.x);
+          message = '鬼火ランタンが冷気を溜めた！ 予告帯を避け、ランタンを壊そう。';
+        } else {
+          destination = this.findBossDestination(e) ?? undefined;
+          if (!destination) return null;
+          tiles = this.bossAreaTiles(destination.x,destination.y,1);
+          message = '墓守が霧へ消えた！ 青い鬼火の場所へ転移する。';
+        }
+        break;
+      }
+      case 'mid_hw_witch':
+        state.castDamage = 0;
+        tiles = this.bossAreaTiles(p.x,p.y,2).filter((_,i)=>i%2===0);
+        message = '魔女が大魔法を詠唱！ 本物へ最大HPの8%分のダメージ、またはスタンで中断できる！';
+        break;
+      case 'mid_hw_knight': {
+        const horizontal = Math.abs(p.x-e.x)>=Math.abs(p.y-e.y);
+        tiles = this.bossRoomLine(horizontal,horizontal?e.y:e.x);
+        const path = tiles.filter(t => horizontal ? (t.x-e.x)*Math.sign(p.x-e.x)>0 : (t.y-e.y)*Math.sign(p.y-e.y)>0);
+        path.sort((a,b)=>Math.abs(b.x-e.x)+Math.abs(b.y-e.y)-Math.abs(a.x-e.x)-Math.abs(a.y-e.y));
+        destination = path.find(t=>this.canBossRelocate(e,t));
+        const end = destination ?? e;
+        secondary = this.bossRoomLine(!horizontal,horizontal?end.x:end.y);
+        tertiary = this.bossAreaTiles(end.x,end.y,1);
+        this.faceEnemyToward(e,p);
+        message = '突進→振り返り斬り→薙ぎ払い！ 数字の順に避けよう。正面は硬いが、大技後は2ターン弱体化！';
+        break;
+      }
+      case 'hw_king': {
+        state.phase++;
+        state.goldenRitual = e.def.key === 'm_hw_golden_king' && state.phase % 2 === 1;
+        if (state.goldenRitual) {
+          if (!this.enemies.some(m=>m.def.isHalloweenRetainer)) {
+            const guard=HALLOWEEN_RETAINERS[4];
+            for(const target of [{x:e.x-3,y:e.y+3},{x:e.x+3,y:e.y+3},{x:e.x,y:e.y+4}]) {
+              const pos=this.bossRoomCells().find(t=>this.isInsideBossRoom(t.x,t.y)&&this.dungeon.tiles[t.y]?.[t.x]==='floor'&&!this.enemyAt(t.x,t.y)&&!this.dungeonObjectAt(t.x,t.y)&&Math.abs(t.x-target.x)+Math.abs(t.y-target.y)<=2&&!(t.x===p.x&&t.y===p.y));
+              if(pos)this.addEnemy({...guard},pos.x,pos.y,1);
+            }
+          }
+          tiles=this.bossRoomCells().filter(t=>this.isInsideBossRoom(t.x,t.y)&&this.dungeon.tiles[t.y]?.[t.x]==='floor');
+          message='黄金の収穫祭！ 3ターン後に大爆発。近衛兵を倒した跡の安全地帯へ避難！';
+        } else {
+          tiles=this.bossCrossTiles(p.x,p.y,state.phaseTwo?2:1);
+          if(state.phaseTwo)secondary=this.bossAreaTiles(e.x,e.y,2).filter(t=>t.x!==e.x||t.y!==e.y);
+          message=state.phaseTwo?'収穫王が覚醒！ 鬼火と茨の二重攻撃。茨は攻撃で切り払える！':'収穫王が王笏を掲げた！ 鬼火の予告から離れよう。';
+        }
+        break;
+      }
       case 'mid_thunder_jaw':
       case 'mid_thunder_shell': {
         const reach = state.kind === 'mid_thunder_jaw' ? 3 : 4;
@@ -2478,7 +2647,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (!tiles.length && !secondary.length && !tertiary.length) return null;
-    const simultaneous = kind === 'bull_charge' || kind === 'thunder_charge' || kind.startsWith('mid_thunder_') || kind === 'thunder_king';
+    const simultaneous = kind.includes('hw_') || kind === 'bull_charge' || kind === 'thunder_charge' || kind.startsWith('mid_thunder_') || kind === 'thunder_king';
     const markers = [
       ...this.bossWarningMarkers(
         tiles,
@@ -2490,6 +2659,13 @@ export class GameScene extends Phaser.Scene {
       ...this.bossWarningMarkers(secondary, this.bossImpactColor(this.bossImpactKind(state.kind, 'secondary')), p, 'secondary'),
       ...this.bossWarningMarkers(tertiary, this.bossImpactColor(this.bossImpactKind(state.kind, 'tertiary')), p, 'tertiary')
     ];
+    if (kind.includes('hw_')) for (const marker of markers) {
+      marker.turns = kind === 'mid_hw_pumpkin' ? (marker.channel === 'primary' ? 2 : marker.channel === 'secondary' ? 3 : 4)
+        : kind === 'mid_hw_knight' ? (marker.channel === 'primary' ? 1 : marker.channel === 'secondary' ? 2 : 3)
+        : kind === 'mid_hw_witch' ? 2 : state.goldenRitual ? 3 : 1;
+      marker.label.setText(String(marker.turns));
+      if(state.goldenRitual) { marker.plate.setFillStyle(0xffd34e,.26).setStrokeStyle(1,0xffe7a0,.9); marker.label.setColor('#ffe798'); }
+    }
     if (kind === 'mid_thunder_ring') for (const marker of markers) {
       marker.turns = marker.channel === 'primary' ? 2 : 1;
       marker.label.setText(String(marker.turns));
@@ -2506,11 +2682,89 @@ export class GameScene extends Phaser.Scene {
     return { kind, tiles, secondary, tertiary, destination, markers, triggered: false };
   }
 
+  halloweenObjects(owner: Enemy, role?: MonsterDef['halloweenObject']) {
+    return this.enemies.filter(e => e.alive && e.def.halloweenOwner === owner.def.key && (!role || e.def.halloweenObject === role));
+  }
+
+  spawnHalloweenObject(owner: Enemy, role: NonNullable<MonsterDef['halloweenObject']>, desired: Vec2): Enemy | undefined {
+    const spots = this.bossRoomCells().filter(p => this.isInsideBossRoom(p.x, p.y)
+      && this.dungeon.tiles[p.y]?.[p.x] === 'floor' && !this.enemyAt(p.x, p.y)
+      && !(p.x === this.player.x && p.y === this.player.y) && !this.dungeonObjectAt(p.x, p.y) && !this.chestAt(p.x, p.y));
+    spots.sort((a, b) => Math.abs(a.x-desired.x)+Math.abs(a.y-desired.y)-Math.abs(b.x-desired.x)-Math.abs(b.y-desired.y));
+    const pos = spots[0]; if (!pos) return;
+    const keys = { bomb: 'hw_pumpkins', lantern: 'hw_lantern', decoy: 'm_hw_witch', heart: 'hw_tree' };
+    const names = { bomb: '爆弾カボチャ', lantern: '鬼火ランタン', decoy: '魔女の分身', heart: '茨の心臓' };
+    const hp = role === 'bomb' || role === 'decoy' ? 12 : role === 'lantern' ? 25 : 40;
+    const object = this.addEnemy({ ...owner.def, key: keys[role], name: names[role], hp, def: 0,
+      atkMin: 0, atkMax: 0, exp: 0, gold: 0, score: 0, isElite: false, isFloorBoss: false,
+      isBoss: false, element: null, halloweenObject: role, halloweenOwner: owner.def.key }, pos.x, pos.y, 1);
+    object.baseScale *= role === 'decoy' ? 2.8 : 1.4; object.sprite.setScale(object.baseScale);
+    if (role === 'heart') object.sprite.setTint(0xa5ff80);
+    if (role === 'decoy') object.sprite.setAlpha(.82);
+    this.drawEnemyHp(object); return object;
+  }
+
+  destroyHalloweenObject(object: Enemy, attacked: boolean) {
+    const owner = this.enemies.find(e => e.def.isFloorBoss && e.def.key === object.def.halloweenOwner);
+    const state = owner && this.bossStates.get(owner);
+    if (attacked && object.def.halloweenObject === 'bomb' && state?.intent) {
+      for (const marker of [...state.intent.markers]) if (marker.channel === 'primary' && Math.abs(marker.x-object.x)+Math.abs(marker.y-object.y) <= 1
+        && !this.halloweenObjects(owner!, 'bomb').some(b=>b!==object && Math.abs(marker.x-b.x)+Math.abs(marker.y-b.y)<=1)) {
+        this.destroyBossWarningMarker(marker); state.intent.markers = state.intent.markers.filter(m => m !== marker);
+      }
+    }
+    if (attacked && object.def.halloweenObject === 'decoy') { this.addBossHazards([{x:object.x,y:object.y}], 'poison', 3); this.log('分身が崩れ、毒の魔法陣が残った！', 'dmg'); }
+    object.hp = 0; this.destroyEnemyFreezeFx(object); object.sprite.destroy(); object.shadow?.destroy(); object.hpBar?.destroy();
+    this.enemies = this.enemies.filter(e => e !== object);
+    if (attacked) {
+      this.effectFx(object.x, object.y, 'fx_magic', 1.2, 400, 0x98ffd7);
+      this.log(`${object.def.name}を破壊！`, 'special');
+      if (owner && state && object.def.halloweenObject === 'lantern' && !this.halloweenObjects(owner, 'lantern').length) {
+        this.interruptHalloweenCast(owner, state); state.stunned = 2; owner.sprite.setAlpha(1);
+        this.log('鬼火が消え、墓守が姿を現した！ 2ターン反撃できる。', 'special');
+      }
+    }
+  }
+
+  interruptHalloweenCast(e: Enemy, state: BossRuntime) {
+    for (const marker of state.intent?.markers ?? []) this.destroyBossWarningMarker(marker);
+    state.intent = undefined; state.castDamage = 0; state.stunned = 1; state.cooldown = 2;
+    for (const bomb of this.halloweenObjects(e, 'bomb')) this.destroyHalloweenObject(bomb, false);
+    state.goldenRitual = false;
+    this.log(`${e.def.name}の詠唱を中断した！`, 'special');
+  }
+
+  tickHalloweenBoss(e: Enemy, state: BossRuntime) {
+    if (!state.halloweenStarted) {
+      state.halloweenStarted = true; const r = this.dungeon.bossRoom!;
+      if (state.kind === 'mid_hw_ghost' || state.kind === 'hw_king') {
+        const role = state.kind === 'mid_hw_ghost' ? 'lantern' : 'heart';
+        this.spawnHalloweenObject(e, role, { x:r.cx-3, y:r.cy-3 });
+        this.spawnHalloweenObject(e, role, { x:r.cx+3, y:r.cy-3 });
+        this.log(role === 'lantern' ? '鬼火ランタンが墓守を守る！ ランタンを壊そう。' : '茨の心臓が王を回復させる！ 心臓を先に壊そう。', 'special');
+      }
+      if (state.kind === 'mid_hw_witch') {
+        this.spawnHalloweenObject(e, 'decoy', { x:e.x-3, y:e.y });
+        this.spawnHalloweenObject(e, 'decoy', { x:e.x+3, y:e.y });
+        this.effectFx(e.x, e.y, 'fx_magic', 1.8, 1500, 0x56ff88);
+        e.sprite.setTint(0x9cffad); this.log('魔女が分裂！ 緑の炎をまとう本物を狙おう。', 'special');
+      }
+    }
+    if(state.kind === 'mid_hw_witch') this.effectFx(e.x,e.y,'fx_magic',1.4,600,0x56ff88);
+    state.halloweenTurn = (state.halloweenTurn ?? 0) + 1;
+    if (state.kind === 'hw_king' && state.halloweenTurn % 4 === 0 && this.halloweenObjects(e, 'heart').length) {
+      const heal = Math.ceil(e.hpMax * .04 * this.halloweenObjects(e, 'heart').length);
+      e.hp = Math.min(e.hpMax, e.hp + heal); this.drawEnemyHp(e); this.effectFx(e.x,e.y,'fx_magic',2,500,0x7eff9a);
+      this.log(`茨の心臓が王のHPを${heal}回復！`, 'special');
+    }
+  }
+
   handleBossTurn(e: Enemy): { handled: boolean; animation?: Promise<void> } {
     const state = this.bossStates.get(e);
     if (!state) return { handled: false };
+    if (state.kind.includes('hw_') && this.isInsideBossRoom(this.player.x, this.player.y)) this.tickHalloweenBoss(e, state);
 
-    if (!state.phaseTwo && e.hp <= e.hpMax * 0.5 && !state.kind.startsWith('mid_')) {
+    if (!state.phaseTwo && e.hp <= e.hpMax * 0.5 && (!state.kind.startsWith('mid_') || state.kind.includes('hw_'))) {
       state.phaseTwo = true;
       state.cooldown = Math.min(state.cooldown, 1);
       this.effectFx(e.x, e.y, 'fx_levelup', 2.2, 700, e.def.bossTint ?? 0xff7050);
@@ -2615,6 +2869,11 @@ export class GameScene extends Phaser.Scene {
     state: BossRuntime,
     intent: BossIntent
   ): { done: boolean; animation?: Promise<void> } {
+    if (state.goldenRitual) {
+      for (const marker of [...intent.markers]) if ((state.goldenSafe ?? []).some(p=>Math.abs(p.x-marker.x)+Math.abs(p.y-marker.y)<=1)) {
+        this.destroyBossWarningMarker(marker); intent.markers=intent.markers.filter(m=>m!==marker);
+      }
+    }
     if (intent.kind === 'mid_final_depth' || intent.kind === 'astral_dragon') return this.resolveFinalDepthIntent(e, state, intent);
     const due = intent.markers.filter((marker) => marker.turns <= 1);
     const remaining = intent.markers.filter((marker) => marker.turns > 1);
@@ -2639,6 +2898,27 @@ export class GameScene extends Phaser.Scene {
       this.bossImpactFx(tertiary, this.bossImpactKind(intent.kind, 'tertiary'));
 
       switch (intent.kind) {
+        case 'mid_hw_pumpkin':
+        case 'mid_hw_ghost':
+        case 'mid_hw_witch':
+        case 'mid_hw_knight':
+        case 'hw_king':
+          if (firstWave && intent.destination) this.teleportBoss(e, intent.destination);
+          if (onTiles(primary) || onTiles(secondary) || onTiles(tertiary)) this.damagePlayerFromBoss(e, state.goldenRitual ? 1.7 : intent.kind === 'hw_king' ? .9 : .9, `${e.def.name}のハロウィンの一撃！`);
+          if (intent.kind === 'mid_hw_pumpkin' && primary.length) for (const bomb of this.halloweenObjects(e, 'bomb')) this.destroyHalloweenObject(bomb, false);
+          if (intent.kind === 'mid_hw_witch') {
+            this.addBossHazards(primary, 'poison', 3);
+            if (firstWave && this.enemies.filter(m => m.summoned).length < 3) this.summonGimmickMonsters(e, 'm_hw_bat', 1);
+          }
+          if (intent.kind === 'hw_king' && !state.goldenRitual) { this.addBossHazards(primary,'fire',2); this.addBossHazards(secondary,'slow',6); }
+          if (intent.kind === 'mid_hw_witch' && finalWave) {
+            const decoys=this.halloweenObjects(e,'decoy'); const decoy=decoys[state.phase++ % Math.max(1,decoys.length)];
+            if(decoy) { const old={x:e.x,y:e.y};this.teleportBoss(e,{x:decoy.x,y:decoy.y});decoy.x=old.x;decoy.y=old.y;this.placeSprite(decoy.sprite,old.x,old.y); }
+            e.sprite.setTint(0x9cffad);this.effectFx(e.x,e.y,'fx_magic',1.8,1200,0x56ff88);
+          }
+          if (finalWave) { state.stunned = intent.kind === 'mid_hw_knight' || state.goldenRitual ? 2 : 1;
+            if(state.goldenRitual)this.log('黄金装甲が割れた！ 2ターン、王へのダメージ1.5倍！','special');state.goldenRitual=false; }
+          break;
         case 'mid_magic':
           if (onTiles(primary)) this.damagePlayerFromBoss(e, 0.7, '無属性の魔力衝撃！');
           break;
@@ -2723,6 +3003,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   bossImpactKind(kind: BossGimmickKind, channel: BossStrikeChannel): BossImpactKind {
+    if (kind === 'mid_hw_ghost') return 'ice';
+    if (kind === 'mid_hw_witch') return 'poison';
+    if (kind === 'mid_hw_knight' || kind === 'mid_hw_pumpkin') return 'fire';
+    if (kind === 'hw_king') return channel === 'primary' ? 'fire' : 'void';
     if (kind.startsWith('mid_thunder_') || kind === 'thunder_king' || kind === 'thunder_charge') return 'lightning';
     if (kind === 'mid_ember_shift' || kind === 'mid_magma_lance' || kind === 'mid_ember_bone' || kind === 'magma_breath') return 'fire';
     if (kind === 'mid_magic') return 'magic';
@@ -2859,7 +3143,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   damagePlayerFromBoss(e: Enemy, factor: number, label: string, element?: MonsterElement) {
-    const result = computeEnemyAttack(this.player, e.def, element);
+    const result = this.computeIncomingAttack(e, element);
     const damage = Math.max(1, Math.floor(result.damage * factor));
     Audio.playSe(elementAttackSe(element ?? monsterElement(e.def)));
     this.damagePlayer(damage, label, e);
@@ -2960,6 +3244,23 @@ export class GameScene extends Phaser.Scene {
   }
 
   spawnChests(floor: number) {
+    if (this.eventMode) {
+      const rooms = this.dungeon.rooms.filter(r => r !== this.dungeon.bossRoom && !this.dungeon.optionalRooms.some(o=>o.room===r));
+      for (const r of rooms.slice(1)) {
+        const candidates = [{x:r.cx,y:r.cy},{x:r.cx-1,y:r.cy},{x:r.cx+1,y:r.cy}];
+        const pos = candidates.find(p => !this.enemyAt(p.x,p.y) && !this.groundAt(p.x,p.y) && !this.dungeonObjectAt(p.x,p.y));
+        if (pos) this.spawnChestAt(pos.x,pos.y,Math.random()<.2);
+      }
+      const ends: Vec2[] = [];
+      for(let y=1;y<this.dungeon.h-1;y++)for(let x=1;x<this.dungeon.w-1;x++) {
+        if(this.dungeon.tiles[y][x]!=='floor'||this.dungeon.rooms.some(r=>x>=r.x&&x<r.x+r.w&&y>=r.y&&y<r.y+r.h)||this.distToPlayer(x,y)<5)continue;
+        const exits=[[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dy])=>this.dungeon.tiles[y+dy]?.[x+dx]!=='wall').length;
+        if(exits===1)ends.push({x,y});
+      }
+      for(let i=0;i<3&&ends.length;i++){const index=Math.floor(Math.random()*ends.length);const pos=ends.splice(index,1)[0];this.spawnChestAt(pos.x,pos.y,i===0);}
+      return;
+    }
+
     // 各マップに宝箱を4個追加。従来分を含め、1Fは4個・2F以降は5～6個になる。
     const existingCount = floor === 1 ? 0 : (Math.random() < 0.75 ? 1 : 2);
     const n = existingCount + 4;
@@ -2975,7 +3276,7 @@ export class GameScene extends Phaser.Scene {
   spawnChestAt(x: number, y: number, rare: boolean, diamond = false) {
     if (this.chestAt(x, y) || this.enemyAt(x, y) || this.dungeonObjectAt(x, y)) return;
     const displaySize = diamond ? 34 : rare ? 27 : 26;
-    const spr = this.add.image(0, 0, diamond ? 'chest_diamond' : rare ? 'chest_rare' : 'chest_common')
+    const spr = this.add.image(0, 0, diamond ? 'chest_diamond' : this.eventMode ? 'hw_chest' : rare ? 'chest_rare' : 'chest_common')
       .setDepth(6).setOrigin(0.5, 0.62).setDisplaySize(displaySize, displaySize);
     const baseScale = spr.scaleX;
     this.placeSprite(spr, x, y);
@@ -3011,6 +3312,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   roomPropTexture(kind: RoomPropKind) {
+    if (kind.startsWith('hw_')) return kind;
     if (kind.startsWith('finalProp')) return finalDepthTerrainKey(this.floor, `prop-${kind.slice(-1)}` as FinalDepthPart);
     if (kind.startsWith('thunderProp')) return thunderTerrainKey(this.floor, `prop-${kind.slice(-1)}` as ThunderPart);
     if (kind.startsWith('waterProp')) return waterTerrainKey(this.floor, `prop-${kind.slice(-1)}` as WaterPart);
@@ -3027,6 +3329,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   roomPropRenderTiles(kind: RoomPropKind) {
+    if (kind.startsWith('hw_')) return kind === 'hw_throne' || kind === 'hw_tree' ? 1.85 : 1.4;
     if (kind.startsWith('finalProp')) return 1.25;
     if (kind.startsWith('thunderProp')) return kind === 'thunderProp1' ? 1.3 : 1.15;
     if (kind.startsWith('waterProp')) return kind === 'waterProp2' ? 1.4 : 1.2;
@@ -3213,8 +3516,8 @@ export class GameScene extends Phaser.Scene {
 
   addDungeonObject(kind: DungeonObjectKind, centerX: number, centerY: number, w: number, h: number, breakable = false) {
     const isHealing = kind === 'fountain';
-    const texture = kind === 'fountain' ? 'terrain_healing_fountain' : this.roomPropTexture(kind);
-    const renderTiles = kind === 'fountain' ? 3 : this.roomPropRenderTiles(kind);
+    const texture = kind === 'fountain' ? this.eventMode ? 'hw_candy' : 'terrain_healing_fountain' : this.roomPropTexture(kind);
+    const renderTiles = kind === 'fountain' ? this.eventMode ? 1.5 : 3 : this.roomPropRenderTiles(kind);
     const worldX = centerX * TILE + TILE / 2;
     const worldY = centerY * TILE + TILE / 2;
     const sprite = this.add.image(worldX, worldY, texture)
@@ -3225,7 +3528,7 @@ export class GameScene extends Phaser.Scene {
     let waterFx: Phaser.GameObjects.Container | undefined;
     let waterDrops: { sprite: Phaser.GameObjects.Rectangle; x: number; phase: number }[] | undefined;
     let waterRipples: { sprite: Phaser.GameObjects.Rectangle; phase: number }[] | undefined;
-    if (kind === 'fountain') {
+    if (kind === 'fountain' && !this.eventMode) {
       this.textures.get(texture).setFilter(Phaser.Textures.FilterMode.NEAREST);
       waterDrops = [
         { sprite: this.add.rectangle(-2, -16, 2, 7, 0xd8ffff, 0.92), x: -2, phase: 0 },
@@ -3258,7 +3561,7 @@ export class GameScene extends Phaser.Scene {
 
   useHealingObject(object: DungeonObject) {
     if (object.used) {
-      this.log('噴水の魔力は失われている。', 'sys');
+      this.log(this.eventMode ? 'お菓子かごは空っぽになっている。' : '噴水の魔力は失われている。', 'sys');
       Audio.playSe('deny');
       return;
     }
@@ -3273,8 +3576,8 @@ export class GameScene extends Phaser.Scene {
     this.effectFx(object.x, object.y, 'fx_magic', 1.8, 720, 0x62f7e8);
     this.healFx();
     Audio.playSe('heal');
-    this.log(`古代の噴水で体力が全回復した。${healed > 0 ? `（+${healed}）` : ''}`, 'item');
-    if (blessingAvailable) this.log('噴水の加護：この階のボス討伐まで攻撃・防御が1.1倍！', 'special');
+    this.log(`${this.eventMode ? '魔法のお菓子で' : '古代の噴水で'}体力が全回復した。${healed > 0 ? `（+${healed}）` : ''}`, 'item');
+    if (blessingAvailable) this.log(`${this.eventMode ? '収穫の祝福' : '噴水の加護'}：この階のボス討伐まで攻撃・防御が1.1倍！`, 'special');
     this.emitRefresh();
   }
 
@@ -3318,6 +3621,15 @@ export class GameScene extends Phaser.Scene {
 
   inspectRoomProp(object: DungeonObject) {
     const message: Partial<Record<DungeonObjectKind, string>> = {
+      hw_pumpkins: 'カボチャの灯りが、城へ続く道を照らしている。',
+      hw_grave: '墓石には「お菓子を忘れずに」と刻まれている。',
+      hw_lantern: '鬼火のランタン。青白い炎が静かに揺れている。',
+      hw_cauldron: '魔女の釜から紫色の煙が立ちのぼる。',
+      hw_books: '呪いの料理本が並ぶ。ページの間からコウモリの羽がのぞく。',
+      hw_armor: '首のない鎧。奥の番人と同じ紋章が刻まれている。',
+      hw_coffin: '黒い棺。中から小さな笑い声が聞こえる。',
+      hw_throne: '収穫王の玉座。金色の茨とカボチャの紋章に覆われている。',
+      hw_tree: '古い木の枝が、まるで指のように城を指している。',
       crates: '固く縛られた物資箱だ。鍵も蓋の隙間も見当たらない。',
       weaponRack: '使い古された武器が並ぶ。今使えるものはなさそうだ。',
       mapTable: '古い探索図だ。歩いた場所が書き足されている。',
@@ -3548,6 +3860,7 @@ export class GameScene extends Phaser.Scene {
             consumeDurability: false, multiplier: skill.multiplier,
             hits: weapon.dual ? 2 : 1, defenseIgnore: weapon.weaponType === 'lance' ? .5 : 0
           });
+          this.applyEmedralHit(enemy, weapon);
           const damage = this.playerDamageAgainstGimmick(enemy, result.damage);
           enemy.hp -= damage;
           this.afterPlayerHitGimmick(enemy, weapon.element);
@@ -3645,6 +3958,13 @@ export class GameScene extends Phaser.Scene {
         return;
       }
 
+      const thorn = this.bossHazards.find(h => h.kind === 'slow' && h.x === nx && h.y === ny);
+      if (this.eventMode && thorn && !this.enemyAt(nx, ny)) {
+        this.busy = true; this.setPlayerVisual(dir, 'atk');
+        for (const h of [...this.bossHazards]) if (h.kind === 'slow' && h.x === nx && h.y === ny) { h.sprite.destroy(); this.bossHazards = this.bossHazards.filter(o => o !== h); }
+        this.slashFx(nx, ny, 0x87ffc0); this.log('茨を切り払い、足場を作った！', 'special');
+        await this.finishTurn(); this.setPlayerVisual(dir, 'idle'); this.busy = false; return;
+      }
       // 敵がいれば攻撃
       const enemy = this.enemyAt(nx, ny);
       if (enemy) {
@@ -3689,14 +4009,16 @@ export class GameScene extends Phaser.Scene {
         const optional = this.optionalRoomAtDoor(nx, ny);
         if (optional) {
           this.setPlayerVisual(dir, 'idle');
-          const keyIndex = this.player.inventory.findIndex(item => item.kind === 'floorkey');
+          const keyKind = this.eventMode ? 'candykey' : 'floorkey';
+          const keyName = ITEM_DEFS[keyKind].name;
+          const keyIndex = this.player.inventory.findIndex(item => item.kind === keyKind);
           if (keyIndex < 0) {
-            this.log('鍵のかかった扉だ。フロアキーが1個必要。', 'sys');
+            this.log(`鍵のかかった扉だ。${keyName}が1個必要。`, 'sys');
             Audio.playSe('deny');
           } else {
             this.player.inventory.splice(keyIndex, 1);
             this.openOptionalRoom(optional);
-            this.log('フロアキーを1個使って扉を開けた。', 'item');
+            this.log(`${keyName}を1個使って金扉を開けた。`, 'item');
             this.emitRefresh();
           }
           return;
@@ -3934,6 +4256,19 @@ export class GameScene extends Phaser.Scene {
   playerDamageAgainstGimmick(e: Enemy, baseDamage: number): number {
     let factor = 1;
     const side = this.attackSide(e);
+    const boss = this.bossStates.get(e);
+    if (boss?.kind === 'mid_hw_ghost' && this.halloweenObjects(e, 'lantern').length) factor *= .5;
+    if (boss?.kind === 'mid_hw_knight') {
+      const [dx, dy] = this.dirVec(e.facing);
+      if (boss.stunned > 0) factor *= 1.5;
+      else if ((this.player.x - e.x) * dx + (this.player.y - e.y) * dy > 0) factor *= .5;
+    }
+    if (boss?.kind === 'hw_king' && e.def.key === 'm_hw_golden_king' && boss.stunned > 0) factor *= 1.5;
+    const dealt = Math.max(1, Math.floor(baseDamage * factor));
+    if (boss?.kind === 'mid_hw_witch' && boss.intent) {
+      boss.castDamage = (boss.castDamage ?? 0) + dealt;
+      if (boss.castDamage >= Math.ceil(e.hpMax * .08)) this.interruptHalloweenCast(e, boss);
+    }
     switch (e.def.gimmick) {
       case 'phase':
         if (e.vulnerableTurns <= 0) factor *= 0.35;
@@ -4041,6 +4376,7 @@ export class GameScene extends Phaser.Scene {
       attackingWeapon.specialCounter = (attackingWeapon.specialCounter ?? 0) + 1;
       knockbackReady = attackingWeapon.specialCounter % 3 === 0;
     }
+    this.applyEmedralHit(e, attackingWeapon);
     const dealtDamage = this.playerDamageAgainstGimmick(e, res.damage);
     e.hp -= dealtDamage;
     this.afterPlayerHitGimmick(e, weaponElement);
@@ -4106,10 +4442,31 @@ export class GameScene extends Phaser.Scene {
     this.emitRefresh();
   }
 
+  applyEmedralHit(e: Enemy, weapon: Weapon | null) {
+    if (weapon?.passive?.key === 'emedral') {
+      weapon.specialCounter = (weapon.specialCounter ?? 0) + 1;
+      if (weapon.specialCounter % 2 === 0 && !e.emedralAffected) {
+        e.emedralAffected = true; e.emedralWeakUntil = this.turn + 5;
+        e.stunnedTurns = Math.max(e.stunnedTurns, 1);
+        e.emedralStunUntil = this.turn + 1;
+        this.createPaintedFreeze(e, true);
+        const boss = this.bossStates.get(e);
+        if (boss?.kind.includes('hw_') && boss.intent) this.interruptHalloweenCast(e, boss);
+        this.log(`氷翠の封縛！ ${e.def.name}を1ターンスタン、5ターン攻撃力30%低下！`, 'special');
+      }
+    }
+  }
+
   killEnemy(e: Enemy, scoreBonus: number, options: { quiet?: boolean; obliterate?: boolean } = {}) {
     if (!this.enemies.includes(e)) return;
     const def = e.def;
-    this.advanceSecretQuests(e);
+    if (def.halloweenObject) { this.destroyHalloweenObject(e, true); return; }
+    if (def.isHalloweenRetainer) {
+      const king = this.enemies.find(b => b.def.key === 'm_hw_golden_king' && b.alive);
+      const state = king && this.bossStates.get(king);
+      if (state) { (state.goldenSafe ??= []).push({ x: e.x, y: e.y }); this.effectFx(e.x, e.y, 'fx_magic', 1.7, 800, 0x78ffe0); this.log('近衛兵の跡に黄金爆発の安全地帯が生まれた！', 'special'); }
+    }
+    if (!this.eventMode) this.advanceSecretQuests(e);
     const leveled = this.player.addExp(def.exp);
     const gold = this.awardGold(def.gold);
     this.addScore(def.score + scoreBonus + (def.isElite ? 60 : 0) + (def.isBoss ? 0 : 0));
@@ -4147,7 +4504,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    if (!def.isBoss && !def.isFloorBoss && !def.isTreasureRabbit && Math.random() < FLOOR_KEY_DROP_RATE) {
+    if (!this.eventMode && !def.isBoss && !def.isFloorBoss && !def.isTreasureRabbit && Math.random() < FLOOR_KEY_DROP_RATE) {
       this.dropItem(e.x, e.y, 'floorkey');
     }
 
@@ -4161,11 +4518,19 @@ export class GameScene extends Phaser.Scene {
       this.log('ふしぎパンがこぼれ落ちた！', 'special');
     }
 
-    if ((def.isBoss || def.isFloorBoss) && !def.isTreasureRabbit && Math.random() < ARCADIA_BOSS_DROP_RATE) {
+    if (this.eventMode) {
+      if (Math.random() < .01) this.dropItem(e.x,e.y,'candykey');
+      if (!def.isFloorBoss && Math.random() < .10) {
+        if (Math.random() < .5) this.dropEquipment(e.x,e.y,'weapon',rollWeapon(this.floor*4));
+        else this.dropEquipment(e.x,e.y,'shield',rollShield(this.floor*4));
+      }
+    }
+
+    if (!this.eventMode && (def.isBoss || def.isFloorBoss) && !def.isTreasureRabbit && Math.random() < ARCADIA_BOSS_DROP_RATE) {
       this.dropEquipment(e.x, e.y, 'weapon', makeWeapon('w_hero_sword', []));
       this.log('まばゆい光の中から、覇天剣アルカディアが現れた！', 'special');
     }
-    if ((def.isBoss || def.isFloorBoss) && !def.isTreasureRabbit && Math.random() < ARCADIA_BOSS_DROP_RATE) {
+    if (!this.eventMode && (def.isBoss || def.isFloorBoss) && !def.isTreasureRabbit && Math.random() < ARCADIA_BOSS_DROP_RATE) {
       this.dropEquipment(e.x, e.y, 'shield', makeShield('s_arcadia_guard'));
       this.log('黒い羽根が舞い、漆黒の盾ルファルゼント+10が現れた！', 'special');
     }
@@ -4190,6 +4555,7 @@ export class GameScene extends Phaser.Scene {
     this.resolveMonsterDeathGimmick(e, options.obliterate);
 
     if (def.isFloorBoss) {
+      for (const object of [...this.enemies]) if (object.def.halloweenOwner === def.key) this.destroyHalloweenObject(object, false);
       const guaranteedScroll = this.dropGuaranteedBossScroll(e.x, e.y);
       this.log(`倒れた魔物のそばに、${ITEM_DEFS[guaranteedScroll].name}が残されていた。`, 'special');
       this.unlockFloorGate(def.name, { x: e.x, y: e.y });
@@ -4200,48 +4566,29 @@ export class GameScene extends Phaser.Scene {
     e.freezeTurns = Math.max(e.freezeTurns, turns);
     this.destroyEnemyFreezeFx(e);
 
-    const crystal = this.add.graphics();
-    crystal.fillStyle(0x5bdcff, 0.32);
-    crystal.lineStyle(2, 0xcaffff, 0.92);
-    const shell = [
-      new Phaser.Geom.Point(-15, 10), new Phaser.Geom.Point(-12, -10),
-      new Phaser.Geom.Point(-5, -19), new Phaser.Geom.Point(2, -15),
-      new Phaser.Geom.Point(10, -20), new Phaser.Geom.Point(15, -7),
-      new Phaser.Geom.Point(14, 13), new Phaser.Geom.Point(4, 18),
-      new Phaser.Geom.Point(-8, 16)
-    ];
-    crystal.fillPoints(shell, true).strokePoints(shell, true);
-    crystal.fillStyle(0xd9fbff, 0.65)
-      .fillTriangle(-13, 9, -8, -16, -3, 13)
-      .fillTriangle(2, 15, 8, -18, 13, 10);
-    crystal.lineStyle(1.5, 0xffffff, 0.72)
-      .lineBetween(-8, -8, 7, 10)
-      .lineBetween(6, -13, -3, 14);
+    this.createPaintedFreeze(e, false);
+    this.log(`${e.def.name}が氷像になった！ ${e.freezeTurns}ターン行動不能。`, 'special');
+  }
 
-    const snow = this.add.text(0, -5, '❄', {
-      fontFamily: 'Arial', fontSize: '19px', color: '#ffffff',
-      stroke: '#2188a8', strokeThickness: 3
-    }).setOrigin(0.5);
-    const label = this.add.text(0, -27, String(e.freezeTurns), {
-      fontFamily: 'Arial Black', fontSize: '14px', color: '#eaffff',
-      stroke: '#075272', strokeThickness: 4, fontStyle: 'bold'
-    }).setName('freeze-turn').setOrigin(0.5);
-    const fx = this.add.container(e.sprite.x, e.sprite.y - 3, [crystal, snow, label])
-      .setDepth(e.sprite.depth + 0.35);
+  createPaintedFreeze(e: Enemy, stun: boolean) {
+    this.destroyEnemyFreezeFx(e);
+    const size = Math.max(TILE * 1.6, Math.min(TILE * 4.2, e.sprite.displayHeight * 1.3));
+    const ice = this.add.image(0, -size * .08, 'fx_hw_freeze').setDisplaySize(size, size).setAlpha(.85).setName('painted-ice');
+    const mist = this.add.image(0, -size * .02, 'fx_hw_aura_b').setDisplaySize(size * 1.15, size * 1.1).setAlpha(.35).setName('painted-frost');
+    const label = this.add.text(0, -size * .47, `${stun ? 'スタン' : '氷結'} ${stun ? 1 : e.freezeTurns}`, {
+      fontFamily: 'Meiryo', fontSize: '12px', color: '#eaffff', stroke: '#073343', strokeThickness: 4, fontStyle: 'bold'
+    }).setName('freeze-turn').setOrigin(.5);
+    const fx = this.add.container(e.sprite.x, e.sprite.y - 3, [mist, ice, label]).setName(stun ? 'emedral-stun' : 'painted-freeze').setDepth(e.sprite.depth + .35).setVisible(e.sprite.visible);
     e.freezeFx = fx;
-    e.sprite.setTint(0x9beeff);
-    this.time.delayedCall(105, () => {
-      if (e.alive && e.freezeTurns > 0 && e.sprite.active) e.sprite.setTint(0x9beeff);
-    });
-    this.tweens.add({ targets: crystal, alpha: 0.58, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    this.tweens.add({ targets: snow, angle: 90, scale: 1.15, duration: 780, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    this.pickupBurst(e.sprite.x, e.sprite.y - 4, 0x9ceeff, 10);
-    this.log(`${e.def.name}が氷像になった！ 2ターン行動不能。`, 'special');
+    this.tweens.add({targets:ice,alpha:.65,duration:650,yoyo:true,repeat:-1,ease:'Sine.easeInOut'});
+    this.tweens.add({targets:mist,y:-size*.14,alpha:.16,duration:950,yoyo:true,repeat:-1,ease:'Sine.easeInOut'});
+    this.tweens.add({targets:ice,scaleX:ice.scaleX*1.09,scaleY:ice.scaleY*1.09,duration:160,yoyo:true});
   }
 
   updateEnemyFreezeFx(e: Enemy) {
+    const stun = e.freezeFx?.name === 'emedral-stun';
     const label = e.freezeFx?.getByName('freeze-turn') as Phaser.GameObjects.Text | null;
-    label?.setText(String(Math.max(0, e.freezeTurns)));
+    label?.setText(`${stun ? 'スタン' : '氷結'} ${stun ? Math.min(1, Math.max(0, e.emedralStunUntil - this.turn + 1)) : Math.max(0, e.freezeTurns)}`);
   }
 
   destroyEnemyFreezeFx(e: Enemy) {
@@ -4269,7 +4616,7 @@ export class GameScene extends Phaser.Scene {
     this.refreshBossCompassVisual();
     Audio.playSe('seal');
     this.setBossEntranceClosed(false);
-    this.dropBossRewards(defeatedAt);
+    this.dropBossRewards(defeatedAt, bossName);
     const stairs = this.dungeon.stairs;
     if (this.inBossRoom || !this.floorHasGate(this.floor)) {
       const dungeon = this.dungeon;
@@ -4278,7 +4625,7 @@ export class GameScene extends Phaser.Scene {
         this.tweens.add({ targets: sprite, displayWidth: 8, displayHeight: 8, alpha: 0, duration: 240, ease: 'Back.easeIn', onComplete: () => {
           if (!sprite.active || this.dungeon !== dungeon) return;
           this.applyTileVisual(sprite, 'stairs', getTheme(this.floor).era, stairs.x, stairs.y);
-          const targetSize = TILE + 10;
+          const targetSize = this.eventMode ? TILE * 1.7 : TILE + 10;
           sprite.setDisplaySize(8, 8).setAlpha(0);
           this.tweens.add({ targets: sprite, displayWidth: targetSize, displayHeight: targetSize, alpha: 1, duration: 360, ease: 'Back.easeOut' });
         } });
@@ -4352,7 +4699,27 @@ export class GameScene extends Phaser.Scene {
     return true;
   }
 
-  dropBossRewards(defeatedAt?: Vec2) {
+  dropBossRewards(defeatedAt?: Vec2, bossName?: string) {
+    if (this.eventMode) {
+      const origin = defeatedAt ?? this.dungeon.stairs;
+      const goldenDrops = bossName === GOLDEN_KING.name ? {weapon:Math.random()<.1,shield:Math.random()<.1} : null;
+      const costumeWon = this.floor === 5 && Math.random() < .05;
+      const grade: EquipmentGrade = this.floor >= 5 ? 'S' : this.floor >= 3 ? 'A' : this.floor >= 2 ? 'B' : 'C';
+      this.dropEquipment(origin.x,origin.y,'weapon',rollWeaponByGrade(grade));
+      this.dropEquipment(origin.x,origin.y,'shield',rollShieldByGrade(grade));
+      if (costumeWon) this.dropEquipment(origin.x,origin.y,'armor',makePlayerArmor(this.playerGender === 'male' ? 'pumpkin_male' : 'pumpkin_female'));
+      if (bossName === GOLDEN_KING.name) {
+        if (goldenDrops?.weapon) this.dropEquipment(origin.x, origin.y, 'weapon', makeWeapon('w_hw_emedral', []));
+        if (goldenDrops?.shield) this.dropEquipment(origin.x, origin.y, 'shield', makeShield(GOLDEN_SHIELD.key));
+      }
+      this.dropItem(origin.x, origin.y, 'repair');
+      this.dropItem(origin.x, origin.y, 'potion');
+      this.bossRewardClaimed = true;
+      const {x,y} = this.dungeon.stairs; this.dungeon.tiles[y][x] = 'stairs';
+      this.applyTileVisual(this.tileSprites[y][x], 'stairs', 1, x, y);
+      this.log('🎃 魔物の装備が残された！ 拾ってから、カボチャ灯りの階段へ進もう。', 'special');
+      return;
+    }
     const room = this.dungeon.bossRoom;
     const origin = defeatedAt ?? (room ? { x: room.cx, y: room.cy } : { ...this.dungeon.stairs });
 
@@ -4469,7 +4836,18 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  claimFloorPotion(): boolean {
+    if (this.floorPotionDrops >= 1) return false;
+    this.floorPotionDrops++; return true;
+  }
+
+  grantChestConsumable(kind: ItemKind): boolean {
+    if (kind === 'potion' && !this.claimFloorPotion()) return false;
+    this.player.inventory.push(makeItem(kind)); return true;
+  }
+
   dropItem(x: number, y: number, kind: ItemKind | 'coin', value?: number) {
+    if (kind === 'potion' && !this.claimFloorPotion()) return;
     const pos = this.findGroundDropPosition(x, y);
     if (!pos) {
       this.collectDropDirectly(kind, value);
@@ -4503,7 +4881,22 @@ export class GameScene extends Phaser.Scene {
     Audio.playSe('pickup');
   }
 
+  emeraldGuardActive() { return this.player.shield?.key === 's_hw_emerald' && this.turn < this.emeraldGuardUntil; }
+
+  computeIncomingAttack(e: Enemy, element?: MonsterElement) {
+    if (this.emeraldGuardActive()) return { damage: 0, shieldBroke: false };
+    return computeEnemyAttack(this.player, this.enemyAttackDefinition(e), element);
+  }
+
+  enemyAttackDefinition(e: Enemy): MonsterDef {
+    return e.emedralWeakUntil >= this.turn && e.emedralAffected
+      ? { ...e.def, atkMin: Math.max(1, Math.floor(e.def.atkMin * .7)), atkMax: Math.max(1, Math.floor(e.def.atkMax * .7)) } : e.def;
+  }
+
   damagePlayer(dmg: number, reason: string, attacker?: Enemy) {
+    if (this.player.hp > this.player.hpMax * .2) this.emeraldGuardArmed = true;
+    if (this.player.shield?.key === 's_hw_emerald' && this.player.hp <= this.player.hpMax * .2 && this.emeraldGuardArmed) this.activateEmeraldGuard();
+    if (this.emeraldGuardActive()) { this.updateEmeraldGuardFx(); return; }
     const shieldResult = this.resolveShieldDefense(dmg, attacker);
     dmg = shieldResult.damage;
 
@@ -4534,7 +4927,35 @@ export class GameScene extends Phaser.Scene {
       else this.drawEnemyHp(attacker);
     }
 
+    if (this.player.shield?.key === 's_hw_emerald' && this.player.hp > 0 && this.player.hp <= this.player.hpMax * .2 && this.emeraldGuardArmed) this.activateEmeraldGuard();
     if (this.player.hp <= 0) this.handlePlayerDown();
+  }
+
+  activateEmeraldGuard() {
+    if (this.turn < this.emeraldGuardReadyTurn) return;
+    this.emeraldGuardReadyTurn = this.turn + 100;
+    this.emeraldGuardArmed = false; this.emeraldGuardUntil = this.turn + 3;
+    this.updateEmeraldGuardFx();
+    this.log('氷翠の王域！ 3ターンの無敵結界が発動！', 'special');
+  }
+
+  updateEmeraldGuardFx() {
+    if (!this.playerSprite) return;
+    if (!this.emeraldGuardActive() || this.gameEnded) {
+      if (this.emeraldGuardFx?.active) { for (const c of this.emeraldGuardFx.getAll()) this.tweens.killTweensOf(c); this.emeraldGuardFx.destroy(true); }
+      this.emeraldGuardFx = undefined; return;
+    }
+    if (!this.emeraldGuardFx?.active) {
+      const shell = this.add.image(0, -8, 'fx_hw_barrier').setDisplaySize(TILE * 2.35, TILE * 2.35).setAlpha(.75).setName('painted-barrier');
+      const mist = this.add.image(0, -10, 'fx_hw_aura_a').setDisplaySize(TILE * 2.6, TILE * 2.6).setAlpha(.4);
+      const label = this.add.text(0, -TILE * 1.25, '', {fontFamily:'Meiryo',fontSize:'12px',color:'#d1fff1',stroke:'#073343',strokeThickness:4,fontStyle:'bold'}).setOrigin(.5).setName('guard-turn');
+      this.emeraldGuardFx = this.add.container(0, 0, [mist, shell, label]).setName('emerald-guard-fx');
+      this.tweens.add({targets:shell,alpha:.5,duration:700,yoyo:true,repeat:-1,ease:'Sine.easeInOut'});
+      this.tweens.add({targets:mist,y:-17,alpha:.17,duration:1100,yoyo:true,repeat:-1,ease:'Sine.easeInOut'});
+    }
+    const ps = this.playerSprite, fx = this.emeraldGuardFx;
+    fx.setPosition(ps.x, ps.y).setDepth(ps.depth + .4).setVisible(ps.visible);
+    (fx.getByName('guard-turn') as Phaser.GameObjects.Text).setText(`無敵 ${this.emeraldGuardUntil - this.turn}`);
   }
 
   resolveShieldDefense(damage: number, attacker?: Enemy): { damage: number; heal: number; reflect: number; message?: string } {
@@ -4607,6 +5028,7 @@ export class GameScene extends Phaser.Scene {
   // ============ 敵ターン ============
   async finishTurn() {
     this.turn++;
+    if (this.player.hp > this.player.hpMax * .2) this.emeraldGuardArmed = true;
     this.floorTurn++;
     // Player status duration follows player turns, not the number/type of active enemies.
     if (this.playerRootTurns > 0) this.playerRootTurns--;
@@ -4655,6 +5077,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   applyLongStay() {
+    if (this.eventMode) return;
     if (this.inBossRoom && hasFinalDepthTerrain(this.floor)) return;
     const f = this.floorTurn;
     if (f >= 100 && !this.penaltyFlags.p100) { this.penaltyFlags.p100 = true; this.log('空気が重くなってきた…（長居注意）', 'sys'); }
@@ -4694,7 +5117,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   summonGimmickMonsters(e: Enemy, key: string, count: number) {
-    const base = MONSTER_DEFS.find((monster) => monster.key === key);
+    const base = (this.eventMode ? HALLOWEEN_MOBS : MONSTER_DEFS).find((monster) => monster.key === key);
     if (!base) return;
     const spots = Phaser.Utils.Array.Shuffle([
       { x: e.x + 1, y: e.y }, { x: e.x - 1, y: e.y },
@@ -4715,6 +5138,7 @@ export class GameScene extends Phaser.Scene {
       };
       const minion = this.addEnemy(minionDef, spot.x, spot.y, 1);
       minion.cloneDepth = 1;
+      minion.summoned = true;
       this.effectFx(spot.x, spot.y, 'fx_magic', 1.1, 320, e.def.color);
       spawned++;
     }
@@ -4934,7 +5358,12 @@ export class GameScene extends Phaser.Scene {
     const anims: Promise<void>[] = [];
     for (const e of this.enemies) {
       if (this.gameEnded) break;
-      if (!e.alive) continue;
+      if (!e.alive || e.def.halloweenObject) continue;
+      if (e.def.isHalloweenRetainer && this.floor === 5) {
+        const king = this.enemies.find(m => m.def.isFloorBoss);
+        const royalState = king && this.bossStates.get(king);
+        if (royalState?.phaseTwo && (royalState.intent || (royalState.halloweenTurn ?? 0) % 2 === 0)) continue;
+      }
       const sealedRoom = this.optionalRoomContaining(e.x, e.y);
       if (sealedRoom && !sealedRoom.opened) continue;
       // 3歩目に現れた闇忍者は、プレイヤーが1回行動したら再び闇へ溶ける。
@@ -4944,7 +5373,9 @@ export class GameScene extends Phaser.Scene {
         e.shadow?.setAlpha(0.08);
         e.hpBar?.setAlpha(0.08);
       }
-      if (e.def.isFloorBoss && this.dungeon.bossRoom && !this.isInsideBossRoom(this.player.x, this.player.y)) continue;
+      if ((e.def.isFloorBoss || e.def.isHalloweenRetainer) && this.dungeon.bossRoom && !this.isInsideBossRoom(this.player.x, this.player.y)) continue;
+      // Stun also suspends boss intents; the per-target immunity survives saves.
+      if (e.stunnedTurns > 0) { e.stunnedTurns--; continue; }
       // 状態異常
       if (e.freezeTurns > 0) {
         e.freezeTurns--;
@@ -4984,7 +5415,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   enemyAct(e: Enemy): Promise<void> | null {
-    if (e.def.isFloorBoss && this.dungeon.bossRoom && !this.isInsideBossRoom(this.player.x, this.player.y)) return null;
+    if (e.def.halloweenObject) return null;
+    if ((e.def.isFloorBoss || e.def.isHalloweenRetainer) && this.dungeon.bossRoom && !this.isInsideBossRoom(this.player.x, this.player.y)) return null;
     const dxp = this.player.x - e.x;
     const dyp = this.player.y - e.y;
     const dist = bodyDistance(e, bossBodyRadius(e.def), this.player);
@@ -5174,7 +5606,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   afterEnemyHitGimmick(e: Enemy, damage: number, ranged: boolean) {
-    if (!e.alive || !e.sprite.active) return;
+    if (!e.alive || !e.sprite.active || this.emeraldGuardActive()) return;
     if (e.def.gimmick === 'mud_bind') {
       this.playerRootTurns = Math.max(this.playerRootTurns, 1);
       this.log('泥が足に絡み、次の移動が止まる！', 'dmg');
@@ -5217,7 +5649,7 @@ export class GameScene extends Phaser.Scene {
 
   enemyAttack(e: Enemy): Promise<void> {
     const profile = this.enemyAttackProfile(e);
-    const res = computeEnemyAttack(this.player, e.def, profile.element);
+    const res = this.computeIncomingAttack(e, profile.element);
     const damage = Math.max(1, Math.floor(res.damage * profile.factor));
     const enemyElement = profile.element;
     const enemyElementInfo = enemyElement ? ELEMENT_INFO[enemyElement] : { name: '無', color: 0xc7c5d0 };
@@ -5276,7 +5708,7 @@ export class GameScene extends Phaser.Scene {
         await this.tween(bolt, { x: this.playerSprite.x, y: this.playerSprite.y }, this.currentTurnAnimDuration(180));
         bolt.destroy();
         if (!e.alive || this.gameEnded) return;
-        const res = computeEnemyAttack(this.player, e.def, profile.element);
+        const res = this.computeIncomingAttack(e, profile.element);
         const damage = Math.max(1, Math.floor(res.damage * profile.factor));
         this.damagePlayer(damage, `${e.def.name}の${profile.label}${enemyElementInfo.name}属性遠距離攻撃！`, e);
         this.afterEnemyHitGimmick(e, damage, true);
@@ -5303,7 +5735,7 @@ export class GameScene extends Phaser.Scene {
         if (!e.alive || !e.sprite.active || this.gameEnded) return;
         e.animating = false;
         e.sprite.setScale(e.baseScale);
-        const res = computeEnemyAttack(this.player, e.def, profile.element);
+        const res = this.computeIncomingAttack(e, profile.element);
         const damage = Math.max(1, Math.floor(res.damage * profile.factor));
         this.damagePlayer(damage, `${e.def.name}の${profile.label}${enemyElementInfo.name}属性遠距離攻撃！`, e);
         this.afterEnemyHitGimmick(e, damage, true);
@@ -5320,6 +5752,7 @@ export class GameScene extends Phaser.Scene {
   passableBodyCell(e: Enemy, x: number, y: number): boolean {
     const t = this.dungeon.tiles[y]?.[x];
     if (!t) return false;
+    if (e.def.isHalloweenRetainer && !this.isInsideBossRoom(x, y)) return false;
     if (hasFinalDepthTerrain(this.floor) && !this.inBossRoom && !e.def.isFloorBoss && this.dungeon.bossRoom && this.isInsideBossCombatFrame(x, y)) return false;
     if (this.inBossRoom && !this.isInsideBossCombatFrame(x, y)) return false;
     if (e.def.isFloorBoss && this.dungeon.bossRoom && !this.isInsideBossCombatFrame(x, y)) return false;
@@ -5481,6 +5914,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   createTerrainDetails(floor: number) {
+    if (this.eventMode) return;
     // Painted floors already contain wear; keep their broad quiet surfaces readable.
     if (this.inBossRoom || hasRuinTerrain(floor) || hasVolcanoTerrain(floor) || hasWaterTerrain(floor) || hasThunderTerrain(floor) || hasFinalDepthTerrain(floor)) return;
     const d = this.dungeon;
@@ -5775,7 +6209,7 @@ export class GameScene extends Phaser.Scene {
         }
         if (visible[y][x]) {
           spr.setVisible(true);
-          spr.setTint(spr.texture.key.startsWith('terrain_treasury_') || this.usesGlacialTerrain() || hasRuinTerrain(this.floor) || hasVolcanoTerrain(this.floor) || hasWaterTerrain(this.floor) || hasThunderTerrain(this.floor) || hasFinalDepthTerrain(this.floor) ? 0xffffff : isWall ? WALL_VISIBLE_TINT : isBossRoomFloor ? BOSS_ROOM_FLOOR_TINT : this.themeTileTint);
+          spr.setTint(this.eventMode || spr.texture.key.startsWith('terrain_treasury_') || this.usesGlacialTerrain() || hasRuinTerrain(this.floor) || hasVolcanoTerrain(this.floor) || hasWaterTerrain(this.floor) || hasThunderTerrain(this.floor) || hasFinalDepthTerrain(this.floor) ? 0xffffff : isWall ? WALL_VISIBLE_TINT : isBossRoomFloor ? BOSS_ROOM_FLOOR_TINT : this.themeTileTint);
           if (previousState !== 'visible') {
             spr.setAlpha(.16);
             this.tweens.add({ targets: spr, alpha: 1, duration: 260, ease: 'Quad.easeOut' });
@@ -5892,8 +6326,9 @@ export class GameScene extends Phaser.Scene {
   // ============ 宝箱 ============
   openChest(c: Chest) {
     if (c.opened) return;
+    if (c.diamond && this.optionalRoomContaining(c.x,c.y)?.opened === false) { this.log('金扉を開けてから宝箱を開封しよう。','sys');return; }
     c.opened = true;
-    c.sprite.setTexture(c.diamond ? 'chest_diamond_open' : c.rare ? 'chest_rare_open' : 'chest_common_open');
+    c.sprite.setTexture(c.diamond ? 'chest_diamond_open' : this.eventMode ? 'hw_chest_open' : c.rare ? 'chest_rare_open' : 'chest_common_open');
     c.sprite.clearTint();
     c.glow?.setAlpha(c.rare ? 0.46 : 0.18);
     this.tweens.add({
@@ -5908,6 +6343,28 @@ export class GameScene extends Phaser.Scene {
     this.pickupBurst(c.sprite.x, c.sprite.y - 4, chestColor, c.rare ? 9 : 6);
     this.addScore(c.rare ? 120 : 40);
     Audio.playSe('chest');
+
+    if (this.eventMode && c.diamond) {
+      const pool = HALLOWEEN_WEAPONS.filter(w=>w.grade!=='SSS');
+      const weapon = makeWeapon(pool[Math.floor(Math.random()*pool.length)].key,[]);
+      this.log(`ダイヤモンドの宝箱！ ${weaponFullName(weapon)}を発見！`, 'special');
+      this.receiveWeapon(weapon,'収穫城のダイヤモンド宝箱');
+      this.effectFx(c.x,c.y,'fx_levelup',2,700,0xa8efff);this.emitRefresh();return;
+    }
+    if (this.eventMode) {
+      if (Math.random() < .3) {
+        if (Math.random() < .5) this.receiveWeapon(rollWeapon(this.floor*4),'収穫城の宝箱');
+        else this.receiveShield(rollShield(this.floor*4),'収穫城の宝箱');
+      }
+      const rewards: string[] = [];
+      if (this.grantChestConsumable('potion')) rewards.push('回復ポーション');
+      const bonus = c.rare ? 'repair' : Math.random() < .5 ? 'torch' : 'potion';
+      if (this.grantChestConsumable(bonus)) rewards.push(ITEM_DEFS[bonus].name);
+      const gold = this.awardGold(15 + this.floor * 5);
+      this.log(`🎃 収穫城の宝箱！ ${rewards.length ? rewards.join("と") + "、" : ""}${gold}Gを見つけた。`, 'item');
+      this.emitRefresh();
+      return;
+    }
 
     if (c.diamond) {
       const { gold, weapon } = rollTreasuryReward();
@@ -5934,8 +6391,7 @@ export class GameScene extends Phaser.Scene {
         const scroll = this.grantRegularEnhancementScroll();
         if (scroll) this.log(`レア！ ${ITEM_DEFS[scroll].name}が入っていた！`, 'special');
         else {
-          this.player.inventory.push(makeItem('potion'));
-          this.log('このマップの強化スクロールは出現済み。代わりに回復ポーションが入っていた。', 'item');
+          if (this.grantChestConsumable('potion')) this.log('このマップの強化スクロールは出現済み。代わりに回復ポーションが入っていた。', 'item');
         }
       } else if (rr < 0.50) {
         const s = rollShield(Math.max(8, this.floor));
@@ -5947,8 +6403,7 @@ export class GameScene extends Phaser.Scene {
           const armor = makePlayerArmor(def.key);
           if (this.receiveArmor(armor, '金の宝箱')) this.log(`さらに「${armor.name}」も入っていた！`, 'item');
         } else {
-          this.player.inventory.push(makeItem('potion'));
-          this.log('入手できる新しい服がないため、代わりに回復ポーションが入っていた。', 'item');
+          if (this.grantChestConsumable('potion')) this.log('入手できる新しい服がないため、代わりに回復ポーションが入っていた。', 'item');
         }
       } else {
         const scroll = this.grantRegularEnhancementScroll();
@@ -5978,15 +6433,13 @@ export class GameScene extends Phaser.Scene {
             const armor = makePlayerArmor(def.key);
             if (this.receiveArmor(armor, '宝箱')) this.log(`宝箱から「${armor.name}」を発見！`, 'item');
           } else {
-            this.player.inventory.push(makeItem('potion'));
-            this.log('入手できる新しい服がないため、宝箱から回復ポーションを入手。', 'item');
+            if (this.grantChestConsumable('potion')) this.log('入手できる新しい服がないため、宝箱から回復ポーションを入手。', 'item');
           }
         } else {
           const consumableKinds: ItemKind[] = ['potion', 'torch', 'warp', 'invis'];
           const regularScroll = Math.random() < SCROLL_DROP_RATE ? this.grantRegularEnhancementScroll() : null;
           const k = regularScroll ?? consumableKinds[Math.floor(Math.random() * consumableKinds.length)];
-          if (!regularScroll) this.player.inventory.push(makeItem(k));
-          this.log(`宝箱から「${makeItem(k).name}」を入手。`, 'item');
+          if (regularScroll || this.grantChestConsumable(k)) this.log(`宝箱から「${makeItem(k).name}」を入手。`, 'item');
         }
       } else if (roll < 0.5) {
         const gold = this.awardGold(40 + Math.floor(Math.random() * this.floor * 12));
@@ -6040,12 +6493,14 @@ export class GameScene extends Phaser.Scene {
       case 'warp': consumed = this.useWarp(); passTurn = false; break;
       case 'seal': this.useSeal(); break;
       case 'revive': this.log('復活のタネは倒れた時に自動で使われる。', 'sys'); Audio.playSe('deny'); consumed = false; passTurn = false; break;
+      case 'candykey':
       case 'floorkey': {
+        if ((item.kind === 'candykey') !== !!this.eventMode) { this.log('このダンジョンの金扉には使えないカギだ。','sys');consumed=false;passTurn=false;break; }
         const room = this.dungeon.optionalRooms.find(optional => optional.kind === 'diamond' && !optional.opened
           && Math.abs(optional.door.x - this.player.x) + Math.abs(optional.door.y - this.player.y) === 1);
         if (room) {
           this.openOptionalRoom(room);
-          this.log('フロアキーで金扉を開けた。', 'item');
+          this.log(`${item.name}で金扉を開けた。`, 'item');
         } else {
           this.log('隣接する鍵のかかった金扉がない。', 'sys');
           Audio.playSe('deny'); consumed = false; passTurn = false;
@@ -6428,7 +6883,7 @@ export class GameScene extends Phaser.Scene {
 
   availableArmorDefs(maxFloor: number) {
     return Object.values(PLAYER_ARMOR_DEFS)
-      .filter((armor) => armor.minFloor <= maxFloor && !this.ownsArmor(armor.key));
+      .filter((armor) => !armor.exclusiveLoot && armor.minFloor <= maxFloor && !this.ownsArmor(armor.key));
   }
 
   receiveArmor(armor: Armor, source: string): boolean {
@@ -6614,7 +7069,8 @@ export class GameScene extends Phaser.Scene {
       elementName = '無属性';
       feature = `防御力 +${armor.defBonus}`;
     } else if (prizeCategory === 'weapon') {
-      const w = arcadiaWon ? makeWeapon('w_hero_sword', []) : rollWeaponByGrade(grade);
+      const eventPool = HALLOWEEN_WEAPONS.filter(w=>w.grade!=='SSS');
+      const w = arcadiaWon ? makeWeapon('w_hero_sword', []) : this.eventMode && Math.random()<.05 ? makeWeapon(eventPool[Math.floor(Math.random()*eventPool.length)].key,[]) : rollWeaponByGrade(grade);
       if (rank === 'SS') w.plus = Math.max(w.plus, 3);
       else if (rank === 'S') w.plus = Math.max(w.plus, 1);
       this.receiveWeapon(w, 'ガチャ');
@@ -6628,7 +7084,8 @@ export class GameScene extends Phaser.Scene {
       elementName = w.element ? `${ELEMENT_INFO[w.element].name}属性` : '無属性';
       feature = w.passive?.name ?? (w.magics.length ? `魔法刻印 ${w.magics.map((magic) => magic.label).join('')}` : undefined);
     } else {
-      const s = arcadiaShieldWon ? makeShield('s_arcadia_guard') : rollShieldByGrade(grade);
+      const eventPool = HALLOWEEN_SHIELDS.filter(s=>s.grade!=='SSS');
+      const s = arcadiaShieldWon ? makeShield('s_arcadia_guard') : this.eventMode && Math.random()<.05 ? makeShield(eventPool[Math.floor(Math.random()*eventPool.length)].key) : rollShieldByGrade(grade);
       if (rank === 'SS') s.plus = Math.max(s.plus, 2);
       else if (rank === 'S') s.plus = Math.max(s.plus, 1);
       this.receiveShield(s, 'ガチャ');
@@ -6698,6 +7155,8 @@ export class GameScene extends Phaser.Scene {
   equipArmor(index: number) {
     const armor = this.player.armors[index];
     if (!armor || !isPlayerArmor(armor.key)) return;
+    const gender = PLAYER_ARMOR_DEFS[armor.key].gender;
+    if (gender && gender !== this.playerGender) { this.log('このかぼちゃ服は性別が異なるため着用できない。','sys');return; }
     this.player.armor = armor;
     this.playerArmor = armor.key;
     if (this.playerSprite) this.setPlayerVisual(this.player.dir, 'idle');
@@ -6707,6 +7166,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   // 装備切替（UIから）
+  unequipEquipment(kind: 'weapon' | 'shield') {
+    const equipment = this.player[kind];
+    if (!equipment) return;
+    this.player[kind] = null;
+    this.log(`${kind === 'weapon' ? weaponFullName(equipment as Weapon) : equipment.name}を外した。`, 'sys');
+    Audio.playSe('pickup'); this.updatePlayerAura(); this.updateEmeraldGuardFx(); this.emitRefresh();
+    this.saveRun();
+  }
+
   equipWeapon(i: number) {
     const w = this.player.weapons[i];
     if (!w) return;
@@ -6857,7 +7325,7 @@ export class GameScene extends Phaser.Scene {
     this.log(msg, 'gold');
     Audio.playSe('stairs');
 
-    if (this.floor >= 30) {
+    if (this.floor >= (this.eventMode ? 5 : 30)) {
       this.gameOver(true);
       return;
     }
@@ -6890,18 +7358,18 @@ export class GameScene extends Phaser.Scene {
     if (this.gameEnded) return;
     this.gameEnded = true;
     for (const enemy of this.difficultyWarnings.keys()) this.clearDifficultyWarnings(enemy);
-    const difficultyResult = cleared && this.floor === 30 && this.difficultyClearEligible ? recordDifficultyClear(this.difficulty) : undefined;
+    const difficultyResult = cleared && !this.eventMode && this.floor === 30 && this.difficultyClearEligible ? recordDifficultyClear(this.difficulty) : undefined;
     if (this.runSaveEnabled()) {
       writeCodexSave(this.discovered);
-      writeQuestJournal(this.secretQuests);
-      clearRunSave();
+      if (!this.eventMode) writeQuestJournal(this.secretQuests);
+      clearRunSave(this.eventMode === 'halloween');
     }
 
     if (cleared) {
       this.addScore(3000);
       this.addScore(this.player.hp * 5);
       this.addScore(this.player.inventory.length * 30);
-      this.log('★30Fを制覇！ ダンジョンコアに到達した！★', 'special');
+      this.log(this.eventMode ? '★呪われた収穫城・全5層を制覇！★' : '★30Fを制覇！ ダンジョンコアに到達した！★', 'special');
       Audio.playBgm('clear'); // 勝利ジングル
     } else {
       this.log('チャリは力尽きた…', 'dmg');
@@ -6915,6 +7383,8 @@ export class GameScene extends Phaser.Scene {
 
     const stats = {
       cleared,
+      eventMode: this.eventMode,
+      eventStartingWeapon: this.eventStartingWeapon,
       difficulty: this.difficulty,
       difficultyChanged: !this.difficultyClearEligible,
       unlockedDifficulty: difficultyResult?.unlocked,
@@ -7304,6 +7774,7 @@ export class GameScene extends Phaser.Scene {
     if (this.savePending && !this.busy) this.saveRun();
     const ps = this.playerSprite;
     if (!ps) return;
+    this.updateEmeraldGuardFx();
     const entrance = this.dungeon?.bossEntrance;
     if (entrance) {
       const gate = this.tileSprites[entrance.y]?.[entrance.x];
@@ -7387,7 +7858,9 @@ export class GameScene extends Phaser.Scene {
         e.aura.y = e.sprite.y - 6;
         e.aura.setDepth(e.sprite.depth - 0.16);
       }
+      if (e.freezeFx?.name === 'emedral-stun' && (e.emedralStunUntil < this.turn || !e.alive)) this.destroyEnemyFreezeFx(e);
       if (e.freezeFx) {
+        this.updateEnemyFreezeFx(e);
         e.freezeFx.setPosition(e.sprite.x, e.sprite.y - 3).setDepth(e.sprite.depth + 0.35);
       }
       e.hpBar?.setPosition(e.sprite.x, e.sprite.y).setDepth(e.sprite.depth + 0.45);
@@ -7788,15 +8261,16 @@ export class GameScene extends Phaser.Scene {
   }
 
   saveRun() {
-    if (this.restoringRun || this.busy || this.gameEnded || !this.playerSprite || !this.dungeon || this.player.hp <= 0) return;
-    if (!this.runSaveEnabled()) return;
+    if (this.restoringRun || this.busy || this.gameEnded || !this.playerSprite || !this.dungeon || this.player.hp <= 0) return false;
+    if (!this.runSaveEnabled()) return false;
     this.savePending = false;
     const saved = writeRunSave(this.captureRun());
-    const journalSaved = saved && writeQuestJournal(this.secretQuests);
+    const journalSaved = saved && (this.eventMode ? true : writeQuestJournal(this.secretQuests));
     if ((!saved || !journalSaved) && !this.saveWarningShown) {
       this.saveWarningShown = true;
       this.log('ブラウザに保存できません。保存データの設定・空き容量を確認してください。', 'sys');
     }
+    return saved && journalSaved;
   }
 
   private runSaveEnabled() {
@@ -7808,6 +8282,11 @@ export class GameScene extends Phaser.Scene {
   private restoreRunState(snapshot: RunSnapshot) {
     const journal = this.secretQuests;
     Object.assign(this, pickFields(snapshot.state, RUN_STATE_KEYS));
+    this.eventMode = snapshot.state.eventMode ?? null;
+    this.emeraldGuardUntil = snapshot.state.emeraldGuardUntil ?? 0;
+    this.emeraldGuardReadyTurn = snapshot.state.emeraldGuardReadyTurn ?? (this.emeraldGuardUntil > 0 ? this.emeraldGuardUntil + 97 : 0);
+    this.emeraldGuardArmed = snapshot.state.emeraldGuardArmed ?? true;
+    this.eventStartingWeapon = snapshot.state.eventStartingWeapon ?? 'w_iron_dagger';
     this.difficulty = difficultyOf(snapshot.state.difficulty);
     this.difficultyClearEligible = snapshot.state.difficultyClearEligible !== false;
     this.revivesUsed = Number.isInteger(snapshot.state.revivesUsed) && snapshot.state.revivesUsed >= 0 ? snapshot.state.revivesUsed : 0;
@@ -7861,12 +8340,13 @@ export class GameScene extends Phaser.Scene {
       if (saved.visual.aura && !e.aura) this.attachAura(e, 40 * midBossMultiplier, e.def.bossTint ?? 0xffa755);
       this.updateEnemyDirection(e);
       if (e.freezeTurns > 0) this.freezeEnemy(e, e.freezeTurns);
+      else if (e.emedralStunUntil >= this.turn) this.createPaintedFreeze(e, true);
       this.drawEnemyHp(e);
     }
     for (const saved of snapshot.chests) {
       // Open chests may now share their tile with a monster: render without collision checks.
       const size = saved.diamond ? 34 : saved.rare ? 27 : 26;
-      const sprite = this.add.image(0, 0, saved.diamond ? saved.opened ? 'chest_diamond_open' : 'chest_diamond' : saved.rare
+      const sprite = this.add.image(0, 0, saved.diamond ? saved.opened ? 'chest_diamond_open' : 'chest_diamond' : this.eventMode ? saved.opened ? 'hw_chest_open' : 'hw_chest' : saved.rare
         ? saved.opened ? 'chest_rare_open' : 'chest_rare'
         : saved.opened ? 'chest_common_open' : 'chest_common')
         .setDepth(6).setOrigin(0.5, 0.62).setDisplaySize(size, size);

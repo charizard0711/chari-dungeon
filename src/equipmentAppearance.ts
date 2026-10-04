@@ -29,7 +29,7 @@ export function heldGrip(type: WeaponType | 'shield', dir: Dir): [number, number
 
 /** Hand coordinates in a normalized 40-unit art space, shared by all armor sets. */
 export function heldHandPose(dir: Dir, frame: PlayerVisualFrame, gender: PlayerGender, offhand: boolean, elapsed: number, type: WeaponType | 'shield', bodyTexture?: string) {
-  const anchors = PLAYER_HAND_ANCHORS[bodyTexture ?? ''] ?? PLAYER_HAND_ANCHORS[`player_${gender}_leather`];
+  const anchors = PLAYER_HAND_ANCHORS[bodyTexture ?? ''] ?? (bodyTexture?.includes('pumpkin_') ? PLAYER_HAND_ANCHORS[`player_${gender}_arcane`] : undefined) ?? PLAYER_HAND_ANCHORS[`player_${gender}_leather`];
   const [wx,wy,sx,sy] = anchors[playerFrameIndex(dir,frame)];
   const action = playerAction(frame);
   const attack = action === 'attack' || action === 'windup';

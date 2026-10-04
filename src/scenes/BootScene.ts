@@ -17,6 +17,7 @@ import { GAME_W, GAME_H } from '../layout';
 import { SKILL_ICON_ART } from '../skillArt';
 import { ADVENTURE_ART } from '../adventureArt';
 import { DURABILITY_WARNING_ART } from '../durabilityWarnings';
+import { HALLOWEEN_ART } from '../halloweenContent';
 
 const EXPANSION_MONSTER_KEYS = [
   'm_deep_kraken', 'm_valzeon', 'm_selene', 'm_abyss_lord', 'm_astravein',
@@ -112,7 +113,9 @@ const UI_ART = {
   armor_chain: 'assets/ui/generated/armor-chain.png',
   armor_plate: 'assets/ui/generated/armor-plate.png',
   armor_arcane: 'assets/ui/generated/armor-arcane.png',
-  armor_dragon: 'assets/ui/generated/armor-dragon.png'
+  armor_dragon: 'assets/ui/generated/armor-dragon.png',
+  armor_pumpkin_male: 'assets/characters/halloween-v1/armor_pumpkin_male.png',
+  armor_pumpkin_female: 'assets/characters/halloween-v1/armor_pumpkin_female.png'
 } as const;
 
 const ORIGINAL_ITEM_ART = {
@@ -189,6 +192,10 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload() {
+    for (const [key, path] of Object.entries(HALLOWEEN_ART)) {
+      if (key.startsWith('hw_floor_')) this.load.spritesheet(key, path, { frameWidth: 32, frameHeight: 32 });
+      else this.load.image(key, path);
+    }
     this.loadingStage = '画像';
     this.load.image('title_map_background', 'assets/ui/map-title-v1/background.webp');
     this.load.image('title_golden_crossed_swords', 'assets/ui/brand-v1/golden-crossed-swords.png');

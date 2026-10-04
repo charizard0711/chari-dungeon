@@ -538,6 +538,7 @@ function buildItemTextures(scene: Phaser.Scene) {
     bomb: (g) => { px(g, 6, 8, 12, 12, 0x202028); px(g, 12, 3, 2, 5, 0x8a6a4a); px(g, 12, 2, 3, 2, 0xf5a020); px(g, 9, 12, 3, 3, 0x4a4a55); },
     warp: (g) => { px(g, 8, 4, 8, 12, 0xf5c542); px(g, 6, 16, 12, 3, 0xd0a020); px(g, 11, 6, 2, 8, 0x4fd0e0); },
     revive: (g) => { px(g, 11, 8, 2, 12, 0x8a5a2a); px(g, 6, 4, 5, 5, 0x6fae2a); px(g, 13, 4, 5, 5, 0x6fae2a); px(g, 10, 2, 4, 4, 0x9fdf3a); },
+    candykey: (g) => { g.lineStyle(3, 0xffb647); g.strokeCircle(8, 8, 4); px(g, 9, 10, 3, 10, 0xffb647); px(g, 12, 16, 4, 3, 0xffb647); },
     floorkey: (g) => { g.lineStyle(3, 0x4fd0e0); g.strokeCircle(8, 8, 4); px(g, 9, 10, 3, 10, 0x4fd0e0); px(g, 12, 16, 4, 3, 0x4fd0e0); },
     seal: (g) => { px(g, 5, 4, 14, 16, 0x2a2450); px(g, 7, 6, 10, 12, 0x4a3a7a); px(g, 10, 9, 4, 4, 0xa06bff); },
     // 武器強化スクロール：赤い羊皮紙＋剣のルーン

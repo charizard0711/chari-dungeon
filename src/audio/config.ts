@@ -23,6 +23,10 @@ export const BGM_DEFS = {
   midboss:  { key: 'bgm_midboss',  path: 'assets/audio/bgm_midboss_crimson_boost.mp3', volume: 0.16, loop: true },
   // 5階ごとの大ボス部屋：氷晶大聖堂（チェレスタ＋弦楽＋控えめな合唱）
   boss:     { key: 'bgm_boss',     path: 'assets/audio/bgm_boss.mp3', volume: 0.46, loop: true },
+  halloweenMap: { key: 'bgm_halloween_map', path: 'assets/audio/halloween-v1/map_01.wav', volume: 0.46, loop: true },
+  halloweenMidboss: { key: 'bgm_halloween_midboss', path: 'assets/audio/halloween-v1/mid_01.wav', volume: 0.40, loop: true },
+  halloweenBoss: { key: 'bgm_halloween_boss', path: 'assets/audio/halloween-v1/boss_01.wav', volume: 0.42, loop: true },
+  halloweenGolden: { key: 'bgm_halloween_golden', path: 'assets/audio/halloween-v1/gold_01.wav', volume: 0.42, loop: true },
   // クリア：短い勝利ジングル
   clear:    { key: 'bgm_clear',    path: 'assets/audio/bgm_clear.mp3',    volume: 0.6,  loop: false },
   // ゲームオーバー：短い敗北ジングル
@@ -31,7 +35,7 @@ export const BGM_DEFS = {
 
 export type BgmName = keyof typeof BGM_DEFS;
 // 配置済みの圧縮BGM。タイトル・ジングルは未配置のため内蔵音を使う。
-export const FILE_BGM_NAMES: readonly BgmName[] = ['floor01', 'midboss', 'boss'];
+export const FILE_BGM_NAMES: readonly BgmName[] = ['floor01', 'midboss', 'boss', 'halloweenMap', 'halloweenMidboss', 'halloweenBoss', 'halloweenGolden'];
 
 // 階層 → BGMトラックのマッピング
 export function bgmForFloor(_floor: number): BgmName {

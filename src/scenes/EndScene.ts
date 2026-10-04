@@ -6,6 +6,8 @@ import { Audio } from '../audio/manager';
 import { getSelectedGender, type PlayerGender } from '../playerAppearance';
 
 interface EndStats {
+  eventMode?: 'halloween' | null;
+  eventStartingWeapon?: string;
   cleared: boolean;
   difficulty?: Difficulty;
   unlockedDifficulty?: Difficulty;
@@ -29,8 +31,24 @@ export class EndScene extends Phaser.Scene {
   }
 
   create(stats: EndStats) {
+    if (stats.eventMode === 'halloween') { this.createHalloweenResult(stats); return; }
     if (!stats.cleared) { this.createDefeat(stats); return; }
     presentVictory(this, stats, (x, y, label, primary, action) => this.defeatButton(x, y, label, primary, action));
+  }
+
+  private createHalloweenResult(stats: EndStats) {
+    const cx = GAME_W / 2, mobile = GAME_W < 700;
+    const bg = this.add.image(cx, GAME_H/2, `hw_backdrop_${stats.floor}`);
+    bg.setScale(Math.max(GAME_W/bg.width, GAME_H/bg.height));
+    this.add.rectangle(cx,GAME_H/2,GAME_W,GAME_H,0x10091b,.82);
+    this.add.text(cx,90,'呪われた収穫城',{fontFamily:'"Yu Mincho",serif',fontSize:mobile?'30px':'42px',color:'#ffda91'}).setOrigin(.5);
+    this.add.image(cx,245,stats.cleared?'m_hw_king':'m_hw_pumpkin_lord').setDisplaySize(190,190);
+    this.add.text(cx,390,stats.cleared?'ハロウィンイベント踏破！':'収穫城で力尽きた…',{fontFamily:'"Yu Gothic UI"',fontSize:mobile?'23px':'32px',color:'#ffe4a9',fontStyle:'bold'}).setOrigin(.5);
+    this.add.text(cx,466,`${stats.floor} / 5層 · Lv.${stats.level}\n得点 ${stats.score.toLocaleString()} · ${stats.turns}ターン\n入手した専用装備はコレクションに記録されます。`,{fontFamily:'"Yu Gothic UI"',fontSize:mobile?'13px':'17px',color:'#dfcce6',align:'center',lineSpacing:10}).setOrigin(.5);
+    let leaving=false;
+    const leave=(scene:string)=>{if(leaving)return;leaving=true;this.scene.start(scene);};
+    this.defeatButton(cx,610,'武器を選んでもう一度',true,()=>leave('HalloweenScene'));
+    this.defeatButton(cx,690,'タイトルへ',false,()=>leave('TitleScene'));
   }
 
   private createDefeat(stats: EndStats) {

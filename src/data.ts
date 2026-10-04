@@ -1,4 +1,5 @@
 import type { Weapon, Shield, Item, ItemKind, MonsterDef, MagicCode, EquipmentGrade, Element, MonsterElement, WeaponType, WeaponPassive, ShieldPassive } from './types';
+import { HALLOWEEN_WEAPONS, HALLOWEEN_SHIELDS, HALLOWEEN_MONSTERS } from './halloweenContent';
 
 // ===== 武器定義 =====
 export interface WeaponDef {
@@ -109,7 +110,8 @@ export const WEAPON_DEFS: WeaponDef[] = [
     key: 'w_grand_breaker', name: '破城大剣グランバスター', atkMin: 14, atkMax: 29, durMax: 225,
     minFloor: 21, rarity: 1, grade: 'S', weaponType: 'greatsword',
     passive: { key: 'knockback', name: '三撃破砕', description: '3回目の攻撃ごとに敵を1マス押し戻す' }
-  }
+  },
+  ...HALLOWEEN_WEAPONS
 ];
 
 export const ELEMENT_INFO: Record<MonsterElement, { name: string; color: number; weakTo?: Element }> = {
@@ -223,7 +225,8 @@ export const SHIELD_DEFS: ShieldDef[] = [
   { key: 's_glacier_guard', name: '氷皇盾アイスベルク', defBonus: 10, durMax: 145, minFloor: 21, rarity: 1, grade: 'S', element: 'ice',
     passive: { key: 'glacier_guard', name: '氷壁の重層', description: '氷属性に強い。12以上の攻撃ダメージを20%軽減' } },
   { key: 's_arcadia_guard', name: '漆黒の盾ルファルゼント', defBonus: 16, durMax: 300, minFloor: 1, rarity: 1, grade: 'SSS', initialPlus: 10, exclusiveLoot: true,
-    passive: { key: 'arcadia_guard', name: '堕天の裁き', description: '受けた攻撃ダメージの20%を反射。3回目ごとの攻撃を完全に無効化' } }
+    passive: { key: 'arcadia_guard', name: '堕天の裁き', description: '受けた攻撃ダメージの20%を反射。3回目ごとの攻撃を完全に無効化' } },
+  ...HALLOWEEN_SHIELDS
 ];
 
 // ===== マジック定義 =====
@@ -269,6 +272,7 @@ export const ITEM_DEFS: Record<ItemKind, Omit<Item, 'kind'>> = {
   bomb:    { name: 'ボムナッツ', desc: '周囲の敵に範囲ダメージ', textureKey: 'i_bomb' },
   warp:    { name: 'リコールベル', desc: '今いる階のスタート位置へ戻る', textureKey: 'i_warp' },
   revive:  { name: '復活のタネ', desc: '倒れた時に一度だけ復活', textureKey: 'i_revive' },
+  candykey: { name: 'お菓子のカギ', desc: '収穫城の金扉を開ける。敵から1%で入手。1回で1個消費', textureKey: 'i_candykey' },
   floorkey:{ name: 'フロアキー', desc: '豪華な宝物庫の金扉を開ける。1回で1個消費' , textureKey: 'i_floorkey' },
   seal:    { name: '封印の魔導書', desc: '周囲の敵を数ターン止める', textureKey: 'i_seal' },
   stone:   { name: '武器強化スクロール', desc: '装備中の武器を強化。成功率90%から強化ごとに10%低下（最低30%）', textureKey: 'i_stone' },
@@ -280,7 +284,7 @@ export const ITEM_DEFS: Record<ItemKind, Omit<Item, 'kind'>> = {
 };
 
 // レアアイテム（所持欄で赤枠になる）
-const RARE_ITEMS = new Set<ItemKind>(['revive', 'slime_scroll', 'boss5_scroll', 'dynamite', 'mystery_bread', 'floorkey']);
+const RARE_ITEMS = new Set<ItemKind>(['revive', 'slime_scroll', 'boss5_scroll', 'dynamite', 'mystery_bread', 'floorkey', 'candykey']);
 export function isRareItem(kind: ItemKind): boolean {
   return RARE_ITEMS.has(kind);
 }
@@ -625,14 +629,14 @@ const MONSTER_DEFS_RAW: MonsterDef[] = [
   }
 ];
 
-export const MONSTER_DEFS: MonsterDef[] = MONSTER_DEFS_RAW.map((monster) => ({
+export const MONSTER_DEFS: MonsterDef[] = [...MONSTER_DEFS_RAW.map((monster) => ({
   ...monster,
   element: MONSTER_ELEMENTS[monster.key],
   gimmick: MONSTER_GIMMICKS[monster.key]?.kind,
   gimmickText: MONSTER_GIMMICKS[monster.key]?.text,
   description: [monster.description, MONSTER_GIMMICKS[monster.key]?.text ? `【特性】${MONSTER_GIMMICKS[monster.key].text}` : '']
     .filter(Boolean).join(' ')
-}));
+})), ...HALLOWEEN_MONSTERS];
 
 // ===== 階層テーマ（2フロアごとに名前・見た目が変わる）=====
 export interface FloorTheme {

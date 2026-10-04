@@ -87,6 +87,10 @@ export class TitleScene extends Phaser.Scene {
       resumeDialog = this.add.container(0, 0, dialogChildren).setDepth(50);
     };
     this.createArtworkTitle(requestExplore);
+    const eventButton = this.add.text(GAME_W / 2, GAME_H * .875, '🎃 ハロウィンイベント', {
+      fontFamily: FONT, fontSize: GAME_W < 700 ? '17px' : '20px', color: '#ffcf80', backgroundColor: '#281329e8', padding: { x: 26, y: 10 }, fontStyle: 'bold'
+    }).setName('halloween-event').setOrigin(.5).setInteractive({ useHandCursor: true });
+    eventButton.on('pointerdown', () => { if (!starting && !resumeDialog) { setSelectedGender(this.selectedGender); Audio.playSe('click'); this.scene.start('HalloweenScene'); } });
     const exploreKey = (event: KeyboardEvent) => { event.preventDefault(); requestExplore(); };
     this.input.keyboard?.on('keydown-ENTER', exploreKey);
     this.input.keyboard?.on('keydown-SPACE', exploreKey);

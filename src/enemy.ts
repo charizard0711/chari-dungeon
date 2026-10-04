@@ -35,6 +35,9 @@ export class Enemy {
   gimmickPhase = 0;
   vulnerableTurns = 0;
   guardOpenTurns = 0;
+  emedralStunUntil = -1;
+  emedralAffected = false;
+  emedralWeakUntil = 0;
   stunnedTurns = 0;
   awakened = false;
   revived = false;

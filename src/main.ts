@@ -4,6 +4,7 @@ import { TitleScene } from './scenes/TitleScene';
 import { GameScene } from './scenes/GameScene';
 import { UIScene } from './scenes/UIScene';
 import { EndScene } from './scenes/EndScene';
+import { HalloweenScene } from './scenes/HalloweenScene';
 
 import { GAME_W, GAME_H } from './layout';
 export { GAME_W, GAME_H };
@@ -23,7 +24,7 @@ const config: Phaser.Types.Core.GameConfig = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
   },
-  scene: [BootScene, TitleScene, GameScene, UIScene, EndScene]
+  scene: [BootScene, TitleScene, HalloweenScene, GameScene, UIScene, EndScene]
 };
 
 const game = new Phaser.Game(config);

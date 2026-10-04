@@ -1,6 +1,7 @@
 import type { GameScene } from './scenes/GameScene';
 
 export const RUN_SAVE_KEY = 'chari-dungeon.run.v1';
+export const HALLOWEEN_RUN_SAVE_KEY = 'chari-dungeon.halloween.run.v1';
 export type RunSnapshot = ReturnType<GameScene['captureRun']>;
 export interface RunSave { version: 1; savedAt: number; snapshot: RunSnapshot }
 
@@ -8,13 +9,14 @@ export function pickFields<T, K extends keyof T>(value: T, keys: readonly K[]): 
   return Object.fromEntries(keys.map(key => [key, value[key]])) as Pick<T, K>;
 }
 
-export function readRunSave(): RunSave | null {
+export function readRunSave(halloween = false): RunSave | null {
   try {
-    const raw = localStorage.getItem(RUN_SAVE_KEY);
+    const raw = localStorage.getItem(halloween ? HALLOWEEN_RUN_SAVE_KEY : RUN_SAVE_KEY);
     if (!raw) return null;
     const save = JSON.parse(raw) as RunSave;
     const s = save?.snapshot;
     const d = s?.dungeon;
+    if (halloween ? s?.state.eventMode !== 'halloween' || s.state.floor > 5 : s?.state.eventMode === 'halloween') return null;
     if (save.version !== 1 || !Number.isFinite(save.savedAt) || !s || !d
       || !Number.isInteger(s.state.floor) || s.state.floor < 1 || s.state.floor > 30
       || !Number.isInteger(d.w) || !Number.isInteger(d.h) || d.w < 1 || d.h < 1 || d.w > 200 || d.h > 200
@@ -44,11 +46,11 @@ export function readRunSave(): RunSave | null {
 
 export function writeRunSave(snapshot: RunSnapshot): boolean {
   try {
-    localStorage.setItem(RUN_SAVE_KEY, JSON.stringify({ version: 1, savedAt: Date.now(), snapshot } satisfies RunSave));
+    localStorage.setItem(snapshot.state.eventMode === 'halloween' ? HALLOWEEN_RUN_SAVE_KEY : RUN_SAVE_KEY, JSON.stringify({ version: 1, savedAt: Date.now(), snapshot } satisfies RunSave));
     return true;
   } catch { return false; }
 }
 
-export function clearRunSave(): boolean {
-  try { localStorage.removeItem(RUN_SAVE_KEY); return true; } catch { return false; }
+export function clearRunSave(halloween = false): boolean {
+  try { localStorage.removeItem(halloween ? HALLOWEEN_RUN_SAVE_KEY : RUN_SAVE_KEY); return true; } catch { return false; }
 }

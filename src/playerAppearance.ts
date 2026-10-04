@@ -3,7 +3,7 @@ import type { Armor, Dir, EquipmentGrade } from './types';
 export const PLAYER_GENDERS = ['male', 'female'] as const;
 export type PlayerGender = typeof PLAYER_GENDERS[number];
 
-export const PLAYER_ARMORS = ['leather', 'chain', 'plate', 'arcane', 'dragon'] as const;
+export const PLAYER_ARMORS = ['leather', 'chain', 'plate', 'arcane', 'dragon', 'pumpkin_male', 'pumpkin_female'] as const;
 export type PlayerArmor = typeof PLAYER_ARMORS[number];
 
 export const PLAYER_VISUAL_FRAMES = [
@@ -23,6 +23,8 @@ export interface PlayerArmorDef {
   grade: EquipmentGrade;
   defBonus: number;
   minFloor: number;
+  exclusiveLoot?: boolean;
+  gender?: PlayerGender;
 }
 
 export const PLAYER_ARMOR_DEFS: Record<PlayerArmor, PlayerArmorDef> = {
@@ -30,6 +32,8 @@ export const PLAYER_ARMOR_DEFS: Record<PlayerArmor, PlayerArmorDef> = {
   chain: { key: 'chain', name: '鎖帷子', grade: 'C', defBonus: 3, minFloor: 5 },
   plate: { key: 'plate', name: '騎士の板金鎧', grade: 'B', defBonus: 5, minFloor: 10 },
   arcane: { key: 'arcane', name: '秘術装甲', grade: 'A', defBonus: 8, minFloor: 17 },
+  pumpkin_male: { key: 'pumpkin_male', name: 'かぼちゃの騎士服（男）', grade: 'A', defBonus: 8, minFloor: 1, exclusiveLoot: true, gender: 'male' },
+  pumpkin_female: { key: 'pumpkin_female', name: 'かぼちゃの魔女服（女）', grade: 'A', defBonus: 8, minFloor: 1, exclusiveLoot: true, gender: 'female' },
   dragon: { key: 'dragon', name: '竜鱗神鎧', grade: 'S', defBonus: 12, minFloor: 24 }
 };
 
@@ -37,11 +41,11 @@ const GENDER_STORAGE_KEY = 'chari-dungeon:player-gender';
 const DIR_ROW: Record<Dir, number> = { down: 0, left: 1, right: 2, up: 3 };
 
 export const PLAYER_SHEETS = PLAYER_GENDERS.flatMap((gender) =>
-  PLAYER_ARMORS.map((armor) => ({
+  PLAYER_ARMORS.filter(armor=>!PLAYER_ARMOR_DEFS[armor].gender || PLAYER_ARMOR_DEFS[armor].gender===gender).map((armor) => ({
     gender,
     armor,
     key: playerSheetKey(gender, armor),
-    path: `assets/characters/player-painted-v1/${gender}-${armor}.png`
+    path: armor.startsWith('pumpkin_') ? `assets/characters/halloween-v1/${gender}-${armor}.png` : `assets/characters/player-painted-v1/${gender}-${armor}.png`
   }))
 );
 
@@ -54,7 +58,7 @@ export function isPlayerArmor(value: unknown): value is PlayerArmor {
 }
 
 export function armorForGrade(grade: EquipmentGrade): PlayerArmorDef {
-  return Object.values(PLAYER_ARMOR_DEFS).find((armor) => armor.grade === grade)
+  return Object.values(PLAYER_ARMOR_DEFS).find((armor) => armor.grade === grade && !armor.exclusiveLoot)
     ?? PLAYER_ARMOR_DEFS[DEFAULT_PLAYER_ARMOR];
 }
 
@@ -96,7 +100,8 @@ export function setSelectedGender(gender: PlayerGender) {
 }
 
 export function playerSheetKey(gender: PlayerGender, armor: PlayerArmor = DEFAULT_PLAYER_ARMOR): string {
-  return `player_${gender}_${armor}`;
+  const selected = armor.startsWith('pumpkin_') ? `pumpkin_${gender}` : armor;
+  return `player_${gender}_${selected}`;
 }
 
 export function playerFrameIndex(dir: Dir, frame: PlayerVisualFrame): number {

@@ -10,6 +10,7 @@ export const ITEM_SELL_PRICES: Record<ItemKind, number> = {
   mystery_bread: 100,
   warp: 20,
   revive: 150,
+  candykey: 30,
   floorkey: 30,
   seal: 60,
   stone: 75,

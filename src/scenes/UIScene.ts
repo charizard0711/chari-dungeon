@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { HALLOWEEN_FLOORS } from '../halloweenContent';
 import { DIFFICULTY_RULES, difficultyFromCode } from '../difficulty';
 import { buildQuestJournal, QuestCelebrations } from '../secretQuestUI';
 import { LegendaryAura } from '../legendaryAura';
@@ -35,6 +36,7 @@ const GACHA_PALETTES = {
 };
 
 export class UIScene extends Phaser.Scene {
+  private halloweenArrival?: Phaser.GameObjects.Container;
   secretRewardOpen = false;
   private slotAuras: { aura: LegendaryAura; icon: Phaser.GameObjects.Image; key: string }[] = [];
   gs!: GameScene;
@@ -160,7 +162,7 @@ export class UIScene extends Phaser.Scene {
     const gsEvents = this.gs.events;
     const onRefresh = () => this.refresh();
     const onLog = (d: any) => this.addLog(d.msg, d.type);
-    const onFloor = () => this.refresh();
+    const onFloor = () => { this.refresh(); this.showHalloweenArrival(); };
     const onEnemy = (info: any) => this.showEnemyInfo(info);
     const onEnemyHoverEnd = () => { if (this.enemyInfoHovered) this.hideEnemyInfo(); };
     gsEvents.on('refresh', onRefresh);
@@ -206,6 +208,7 @@ export class UIScene extends Phaser.Scene {
     });
 
     this.refresh();
+    this.showHalloweenArrival();
 
     // ローカル表示確認用。例: ?mobile=1&qa-game&qa-overlay=settings
     if (location.hostname === 'localhost') {
@@ -225,7 +228,23 @@ export class UIScene extends Phaser.Scene {
     }
   }
 
-  get theme() { return DIFFICULTY_RULES[this.gs.difficulty]; }
+  private showHalloweenArrival() {
+    this.halloweenArrival?.destroy(true);
+    this.halloweenArrival = undefined;
+    if (!this.gs.eventMode) return;
+    const width = MAP_W - 24, height = IS_MOBILE ? 110 : 150;
+    const cx = MAP_X + MAP_W / 2, cy = MAP_Y + height / 2 + 12;
+    const art = this.add.image(cx,cy,`hw_backdrop_${this.gs.floor}`).setDisplaySize(width,height);
+    const shade = this.add.rectangle(cx,cy,width,height,0x140b1f,.55).setStrokeStyle(1,0xdda663);
+    const title = this.add.text(cx,cy-9,`${this.gs.floor}F · ${HALLOWEEN_FLOORS[this.gs.floor-1]}`,{fontFamily:'"Yu Mincho",serif',fontSize:IS_MOBILE?'22px':'30px',color:'#ffe1a1'}).setOrigin(.5);
+    const hint = this.add.text(cx,cy+27,'番人を倒して、次の層へ',{fontFamily:'"Yu Gothic UI"',fontSize:'12px',color:'#e7d4eb'}).setOrigin(.5);
+    const card = this.add.container(0,0,[art,shade,title,hint]).setDepth(85);
+    this.halloweenArrival = card;
+    // A brief, non-blocking postcard uses each floor's bespoke environment painting.
+    this.tweens.add({targets:card,alpha:0,delay:1500,duration:500,onComplete:()=>{card.destroy(true);if(this.halloweenArrival===card)this.halloweenArrival=undefined;}});
+  }
+
+  get theme() { return this.gs.eventMode ? { ...DIFFICULTY_RULES.hard, name:'ハロウィン' } : DIFFICULTY_RULES[this.gs.difficulty]; }
 
   // ============ フレーム ============
   panel(x: number, y: number, w: number, h: number, title?: string) {
@@ -581,7 +600,7 @@ export class UIScene extends Phaser.Scene {
       void this.gs.useWeaponSkill();
     });
     this.refreshSkillButton();
-    for (const entry of this.slotAuras) entry.aura.enabled = entry.icon.texture.key === entry.key;
+    for (const entry of this.slotAuras) { entry.aura.emerald = ['w_hw_emedral', 's_hw_emerald'].includes(entry.icon.texture.key); entry.aura.enabled = entry.icon.texture.key === entry.key || entry.aura.emerald; }
   }
 
   isSkillPointer(x: number, y: number) {
@@ -615,7 +634,7 @@ export class UIScene extends Phaser.Scene {
   update() {
     this.refreshSkillButton();
     this.durabilityWarnings?.update(this.gs.player, this.time.now, this.overlayMode === 'none' && !this.gs.gameEnded);
-    for (const entry of this.slotAuras) entry.aura.enabled = entry.icon.texture.key === entry.key;
+    for (const entry of this.slotAuras) { entry.aura.emerald = ['w_hw_emedral', 's_hw_emerald'].includes(entry.icon.texture.key); entry.aura.enabled = entry.icon.texture.key === entry.key || entry.aura.emerald; }
     const pointer = this.input.activePointer;
     const dynamiteHovered = !!this.dynamiteHoverZone?.active && this.input.isOver && !pointer.wasTouch
       && this.dynamiteHoverZone.getBounds().contains(pointer.x, pointer.y);
@@ -782,7 +801,7 @@ export class UIScene extends Phaser.Scene {
       fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#b9fff5', fontStyle: 'bold'
     });
     const zone = this.add.zone(0, 0, 122, 30).setOrigin(0).setInteractive({ useHandCursor: true });
-    const show = () => this.showTooltip('噴水の加護',
+    const show = () => this.showTooltip(this.gs.eventMode ? '収穫の祝福' : '噴水の加護',
       `${this.gs.floor}階のボス討伐まで、攻撃力・防御力が1.1倍。\n重ねて使っても倍率は増えません。`, x, y + 34);
     zone.on('pointerover', show);
     zone.on('pointerout', () => this.hideTooltip());
@@ -795,7 +814,7 @@ export class UIScene extends Phaser.Scene {
 
   refresh() {
     this.refreshSkillButton();
-    for (const entry of this.slotAuras) entry.aura.enabled = entry.icon.texture.key === entry.key;
+    for (const entry of this.slotAuras) { entry.aura.emerald = ['w_hw_emedral', 's_hw_emerald'].includes(entry.icon.texture.key); entry.aura.enabled = entry.icon.texture.key === entry.key || entry.aura.emerald; }
     const p = this.gs.player;
     this.fountainBadge?.setVisible(p.fountainBlessingFloor !== null);
     const th = this.gs.dungeon?.glacialArena
@@ -822,7 +841,7 @@ export class UIScene extends Phaser.Scene {
         : !this.gs.floorBossDefeated
           ? 'ボス封印'
           : this.gs.floorHasGate(this.gs.floor) ? 'ボス階段' : '階段解放';
-    this.topText.setText(IS_MOBILE
+    this.topText.setText(this.gs.eventMode ? `🎃 ${this.gs.floor} / 5層 · ${HALLOWEEN_FLOORS[this.gs.floor - 1]} · ${gate}` : IS_MOBILE
       ? `${this.theme.name}  ${floorLabel}  ${gate}${boost}`
       : `${floorLabel} / 30階  ${th.name}   ${gate}   得点 ${this.gs.score}   ${this.gs.turn}ターン${boost}`);
 
@@ -1072,7 +1091,7 @@ export class UIScene extends Phaser.Scene {
     this.overlayMode = mode;
     this.releaseJoystick?.();
     this.refreshSkillButton();
-    for (const entry of this.slotAuras) entry.aura.enabled = entry.icon.texture.key === entry.key;
+    for (const entry of this.slotAuras) { entry.aura.emerald = ['w_hw_emedral', 's_hw_emerald'].includes(entry.icon.texture.key); entry.aura.enabled = entry.icon.texture.key === entry.key || entry.aura.emerald; }
     this.gs.clearMoveInput();
     this.hideTooltip();
     this.hideEnemyInfo();
@@ -1223,7 +1242,8 @@ export class UIScene extends Phaser.Scene {
     const p = this.gs.player;
     const owned = this.pickSlot === 0 ? p.weapons : this.pickSlot === 1 ? p.armors : p.shields;
     const shieldBlocked = this.pickSlot === 2 && (p.weapon?.dual || p.weapon?.weaponType === 'bow');
-    const noticeHeight = shieldBlocked ? 48 : 0;
+    const removeHeight = this.pickSlot === 1 ? 0 : 38;
+    const noticeHeight = (shieldBlocked ? 48 : 0) + removeHeight;
     const rowsPerPage = Math.max(1, Math.floor((h - 52 - noticeHeight - 58) / 38));
     this.pickPageCount = Math.max(1, Math.ceil(owned.length / rowsPerPage));
     this.pickPageIndex = Phaser.Math.Clamp(this.pickPageIndex, 0, this.pickPageCount - 1);
@@ -1238,6 +1258,14 @@ export class UIScene extends Phaser.Scene {
     this.overlay.add(this.rowButton(x + w - 100, footerY, 80, '次へ ›', false,
       () => this.turnPickPage(1), this.pickPageIndex < this.pickPageCount - 1));
     let cy = y + 52;
+    if (this.pickSlot !== 1) {
+      const kind = this.pickSlot === 0 ? 'weapon' : 'shield';
+      const equipped = !!p[kind];
+      const remove = this.rowButton(x + 20, cy, w - 40,
+        kind === 'weapon' ? '武器を外す（素手）' : '盾を外す', false,
+        () => this.gs.unequipEquipment(kind), equipped);
+      remove.setName(`unequip-${kind}`); this.overlay.add(remove); cy += removeHeight;
+    }
     const empty = (msg: string) => {
       this.overlay.add(this.add.text(x + 20, cy, msg, { fontFamily: '"Yu Gothic UI"', fontSize: '14px', color: '#8a97ab' }));
     };
@@ -1655,7 +1683,7 @@ export class UIScene extends Phaser.Scene {
       const element = monsterElement(m);
       const weakTo = element ? ELEMENT_INFO[element].weakTo : undefined;
       const affinity = element ? `${ELEMENT_INFO[element].name}${weakTo ? `/弱${ELEMENT_INFO[weakTo].name}` : '/弱点なし'}` : '無属性';
-      this.overlay.add(this.add.text(px + 29, py + 15, found ? `${affinity} 体力${m.hp} 攻${m.atkMin}-${m.atkMax}` : `???  ${m.minFloor}-${m.maxFloor}階`, {
+      this.overlay.add(this.add.text(px + 29, py + 15, found ? `${affinity} 体力${m.hp} 攻${m.atkMin}-${m.atkMax}` : m.key.startsWith('m_hw_') ? '???  ハロウィンイベント' : `???  ${m.minFloor}-${m.maxFloor}階`, {
         fontFamily: '"Yu Gothic UI"', fontSize: '8px', color: found ? '#8fc8d7' : '#465264'
       }));
       const trait = found ? (m.gimmickText ?? '固有効果なし') : '効果 ???';
@@ -2339,7 +2367,7 @@ export class UIScene extends Phaser.Scene {
       const icon = this.add.image(cx, cy, entry.textureKey);
       icon.setScale(size / Math.max(icon.width, icon.height));
       this.overlay.add(icon);
-      if (entry.key === 'w_hero_sword' || entry.key === 's_arcadia_guard') new LegendaryAura(this, icon, entry.key === 'w_hero_sword' ? 'sword' : 'shield');
+      if (['w_hero_sword', 's_arcadia_guard', 'w_hw_emedral', 's_hw_emerald'].includes(entry.key)) { const aura = new LegendaryAura(this, icon, entry.key.startsWith('w_') ? 'sword' : 'shield'); aura.emerald = entry.key.startsWith('w_hw_') || entry.key.startsWith('s_hw_'); }
     };
     if (this.catalogDetail) {
       const entry = this.catalogDetail;
@@ -2417,6 +2445,14 @@ export class UIScene extends Phaser.Scene {
 
   // ---- 設定オーバーレイ：BGMと効果音（システム音）を別々に調整 ----
   buildSettingsOverlay(x: number, y: number, w: number, h: number) {
+    if (this.gs.eventMode) {
+      this.overlay.add(this.rowButton(x + 20, y + h - 36, w - 40, 'イベントを保存してタイトルへ', true, () => {
+        if (this.gs.busy || this.gs.gameEnded) return;
+        if (!this.gs.saveRun()) return;
+        this.gs.scene.stop('UIScene');
+        this.gs.scene.start('TitleScene');
+      }));
+    }
     this.overlay.add(this.add.text(x + w - 166, y + 18, 'アクセス計測について', {
       fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#8de0e4', padding: { x: 4, y: 8 }
     }).setInteractive({ useHandCursor: true }).on('pointerdown', () => {

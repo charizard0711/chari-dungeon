@@ -12,14 +12,17 @@ export class LegendaryAura {
   private back: Phaser.GameObjects.Graphics;
   private front: Phaser.GameObjects.Graphics;
   private smoke: Phaser.GameObjects.Image[] = [];
+  private painted: Phaser.GameObjects.Image[] = [];
   private disposed = false;
   enabled = true;
+  emerald = false;
   constructor(private scene: Phaser.Scene, private target: Phaser.GameObjects.Image, private kind: LegendaryAuraKind) {
     this.back = scene.add.graphics(); this.front = scene.add.graphics();
     if (kind === 'shield') this.smoke = Array.from({length: 3}, () => scene.add.image(0, 0, 'fx_shadow'));
+    this.painted = Array.from({length: 3}, (_, i) => scene.add.image(0, 0, i % 2 ? 'fx_hw_aura_b' : 'fx_hw_aura_a').setVisible(false));
     const parent = target.parentContainer;
     if (parent) {
-      parent.addAt([this.back, ...this.smoke], parent.getIndex(target));
+      parent.addAt([this.back, ...this.smoke, ...this.painted], parent.getIndex(target));
       parent.addAt(this.front, parent.getIndex(target) + 1);
     }
     scene.events.on(Phaser.Scenes.Events.POST_UPDATE, this.draw, this);
@@ -31,12 +34,26 @@ export class LegendaryAura {
     const s = this.target, visible = this.enabled && s.active && s.visible && s.alpha > 0;
     this.back.clear().setVisible(visible); this.front.clear().setVisible(visible);
     for (const cloud of this.smoke) cloud.setVisible(visible);
+    for (const cloud of this.painted) cloud.setVisible(visible && this.emerald);
     if (!visible) return;
     const now = this.scene.time.now, w = s.displayWidth, h = s.displayHeight;
     for (const [g, offset] of [[this.back, -.001], [this.front, .001]] as const) {
       g.setPosition(s.x, s.y).setRotation(s.rotation).setDepth(s.depth + offset).setAlpha(s.alpha);
     }
-    if (this.kind === 'sword') {
+    if (this.emerald) {
+      this.smoke.forEach(cloud => cloud.setVisible(false));
+      const cx = (.5 - s.originX) * w, cy = (.5 - s.originY) * h;
+      this.painted.forEach((cloud, i) => {
+        const phase = (now / 2600 + i / 3) % 1;
+        const bow = this.kind === 'sword';
+        const drift = phase * h * (bow ? .045 : .15);
+        const dx = cx + Math.sin(now / 950 + i * 2) * w * .035, dy = cy - drift;
+        cloud.setPosition(s.x + dx * Math.cos(s.rotation) - dy * Math.sin(s.rotation), s.y + dx * Math.sin(s.rotation) + dy * Math.cos(s.rotation))
+          .setDisplaySize(w * (bow ? .50 + phase * .06 : 1.03 + phase * .25), h * (bow ? .85 + phase * .06 : 1.03 + phase * .20))
+          .setRotation(s.rotation + Math.sin(now / 1800 + i) * .09).setFlipX(i === 1)
+          .setAlpha(Math.sin(phase * Math.PI) * .60 * s.alpha).setDepth(s.depth - .002 - i * .001);
+      });
+    } else if (this.kind === 'sword') {
       for (let strand = 0; strand < 2; strand++) {
         for (let i = 1; i <= 64; i++) {
           const a = spiralPoint((i - 1) / 64, now, strand), b = spiralPoint(i / 64, now, strand);
@@ -65,6 +82,6 @@ export class LegendaryAura {
     this.scene.events.off(Phaser.Scenes.Events.POST_UPDATE, this.draw, this);
     this.scene.events.off(Phaser.Scenes.Events.SHUTDOWN, this.destroy, this);
     this.target.off(Phaser.GameObjects.Events.DESTROY, this.destroy, this);
-    this.back.destroy(); this.front.destroy(); this.smoke.forEach(s => s.destroy());
+    this.back.destroy(); this.front.destroy(); this.smoke.forEach(s => s.destroy()); this.painted.forEach(s => s.destroy());
   }
 }

@@ -35,7 +35,7 @@ export type MonsterElement = Element | 'dark';
 export type WeaponType = 'dagger' | 'longsword' | 'lance' | 'bow' | 'handgun' | 'greatsword' | 'dual_sword' | 'twin_daggers';
 
 export interface WeaponPassive {
-  key: 'backstab' | 'sturdy' | 'pierce' | 'eagle_eye' | 'quickdraw' | 'heavy_strike' | 'twin_edge' | 'blood_edge' | 'knockback' | 'hero_heal';
+  key: 'backstab' | 'sturdy' | 'pierce' | 'eagle_eye' | 'quickdraw' | 'heavy_strike' | 'twin_edge' | 'blood_edge' | 'knockback' | 'hero_heal' | 'emedral';
   name: string;
   description: string;
 }
@@ -63,7 +63,7 @@ export interface ShieldPassive {
   key: 'brace' | 'mirror' | 'thorns' | 'perfect_guard' | 'recovery' | 'element_guard'
     | 'oak_guard' | 'scout_guard' | 'flat_guard' | 'pilgrim_heal' | 'duelist_parry'
     | 'neutral_guard' | 'sun_guard' | 'moon_guard' | 'requiem_guard' | 'prism_guard'
-    | 'ember_retort' | 'pearl_mend' | 'thunder_parry' | 'glacier_guard' | 'arcadia_guard';
+    | 'ember_retort' | 'pearl_mend' | 'thunder_parry' | 'glacier_guard' | 'arcadia_guard' | 'emerald_guard';
   name: string;
   description: string;
 }
@@ -99,6 +99,7 @@ export type ItemKind =
   | 'dynamite'    // ダイナマイト（周囲5×5、通常敵即死・ボス最大HP20%）
   | 'warp'        // リコールベル（現在の階の開始地点へ戻る）
   | 'revive'      // 復活のタネ
+  | 'candykey'
   | 'floorkey'    // フロアキー
   | 'seal'        // 封印の魔導書
   | 'stone'       // 武器強化スクロール＝横の強化（保存互換のためIDは維持）
@@ -136,6 +137,9 @@ export interface MonsterDef {
   isElite?: boolean;
   isBoss?: boolean;
   isFloorBoss?: boolean;
+  isHalloweenRetainer?: boolean;
+  halloweenObject?: 'bomb' | 'lantern' | 'decoy' | 'heart';
+  halloweenOwner?: string;
   isDragonType?: boolean; // DK特効対象
   isDarkNinja?: boolean;  // 通常は透明で、3歩ごとに姿を見せる
   isTreasureRabbit?: boolean; // 攻撃せず逃げ続けるレア報酬モンスター

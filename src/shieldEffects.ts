@@ -16,6 +16,7 @@ export function resolveShieldHit(shield: Shield | null, damage: number, context:
   switch (key) {
     case 'brace': if (damage >= 10) reduce(.2); break;
     case 'mirror': if (random() < .15) { adjusted = 0; message = `${shield.name}が攻撃を映し、完全に無効化！`; } break;
+    case 'emerald_guard': reflect = Math.floor(damage * .2); break;
     case 'thorns': reflect = Math.max(1, Math.floor(damage * .25)); break;
     case 'perfect_guard': blockEvery(5); break;
     case 'recovery': if (count % 4 === 0) heal = 6; break;
