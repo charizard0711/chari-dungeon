@@ -73,6 +73,35 @@ body[data-difficulty="master"] #game-container { border-color: #f1c355aa; box-sh
   position: relative;
 }
 
+#screen-size-controls {
+  position: fixed;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  right: 16px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid #c4974c99;
+  border-radius: 9px;
+  background: #100b12ed;
+  color: #f4e3ba;
+  font-size: 13px;
+}
+#screen-size-controls button {
+  min-width: 36px;
+  padding: 5px 9px;
+  border: 1px solid #c4974c88;
+  border-radius: 5px;
+  background: #211824;
+  color: #f4e3ba;
+  cursor: pointer;
+}
+#screen-size-controls button[aria-pressed="true"] {
+  background: #c4974c;
+  color: #160e08;
+}
+
 #game-container {
   position: relative;
   overflow: hidden;

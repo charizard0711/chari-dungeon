@@ -24,6 +24,7 @@ const results=await page.evaluate(async()=>{
   g.clearBossMechanics();g.dungeonObjects=[];g.chests=[];g.bossObstacles=[];g.dungeon.bossRoom=undefined;
   for(let y=7;y<=14;y++)for(let x=7;x<=20;x++)g.dungeon.tiles[y][x]='floor';
   g.player.x=10;g.player.y=10;g.player.dir='right';g.playerRootTurns=0;g.skillChargeSteps=100;g.turn=0;g.busy=false;
+  g.timeStopTurns=0;g.lanceSkillTurns=0;g.refreshTimeStopEffect();
   g.player.hp=g.player.hpMax=10000;g.player.poisonTurns=0;g.gameEnded=false;
   const def=WEAPON_DEFS.find(d=>d.weaponType===type);g.player.weapon=makeWeapon(def.key,[]);g.player.weapons=[g.player.weapon];
   g.placeSprite(g.playerSprite,10,10);
@@ -31,24 +32,26 @@ const results=await page.evaluate(async()=>{
  };
  for(const [type,positions,hit] of [
  ['longsword',[[11,10],[11,9],[11,11],[9,10]],[true,true,true,false]],
- ['lance',[[11,10],[12,10],[13,10],[14,10]],[true,true,true,false]],
+ ['lance',[[11,10],[12,10],[13,10],[14,10]],[true,false,false,false]],
  ['bow',[[17,10],[18,10]],[true,false]],
  ['handgun',[[12,10],[13,10]],[true,false]],
  ['dual_sword',[[11,10],[13,10],[15,10],[16,10]],[true,true,true,false]],
- ['greatsword',[[11,10],[9,9],[12,12]],[true,true,false]],
- ['dagger',[[12,10],[13,10]],[true,false]]]){
+ ['greatsword',[[11,10],[9,9],[12,12]],[true,true,false]]]){
   const es=setup(type,positions);const dur=g.player.weapon.dur;
   check(await g.useWeaponSkill(),type+' cast completes');
   check(es.every((e,i)=>(e.hp<10000)===hit[i]),type+' correct targets');
   check(g.turn===1&&g.skillStepsRemaining===100,type+' costs one turn and empties charge');
   check(g.player.weapon.dur===dur-2,type+' durability charged once');
-  if(type==='dagger')check(g.player.x===12&&g.player.y===9,'dagger behind enemy');
   if(type==='greatsword')check(es[0].x===12,'greatsword knockback');
   g.player.weapon=makeWeapon(WEAPON_DEFS.find(d=>d.weaponType==='bow').key,[]);
   check(!(await g.useWeaponSkill())&&g.turn===1,'switching weapon preserves cooldown');
  }
- const es=setup('dagger',[[12,10]]);g.dungeon.tiles[9][12]='wall';
- check(!(await g.useWeaponSkill())&&g.turn===0&&g.skillChargeSteps===100,'blocked dagger destination consumes nothing');
+ const es=setup('dagger',[[11,10],[12,10]]);
+ check(await g.useWeaponSkill(),'time stop starts');
+ check(g.timeStopTurns===3&&es.every(e=>e.hp===10000),'time stop does not attack');
+ await g.playerAct('right');check(g.player.x===13&&g.timeStopTurns===2&&g.turn===1,'pass two enemies in one turn');
+ await g.playerAct('right');await g.playerAct('right');
+ check(g.timeStopTurns===0&&g.turn===3&&es.every(e=>e.hp===10000),'three free movement turns then resume');
  setup('dual_sword',[[15,10]]);g.dungeon.tiles[10][13]='wall';
  check(await g.useWeaponSkill(),'empty cast allowed behind wall');check(g.turn===1&&g.skillChargeSteps===0,'empty cast spends charge');
  setup('dual_sword',[[15,10]]);await g.useWeaponSkill();g.saveRun();

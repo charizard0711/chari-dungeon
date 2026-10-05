@@ -19,7 +19,7 @@ import { hasRuinTerrain, ruinTerrainKey, ruinFloorKey, ruinFloorFrame } from '..
 import { generateDungeon, generateBossArena, DungeonData, randomFloor, isWalkable, addDiamondTreasury, removeLegacyRoomDoors } from '../dungeon';
 import { rollTreasuryReward } from '../treasury';
 import { normalizeQuests, mergeQuests, recordQuestKill, claimQuest, completedQuestCount, readQuestJournal, writeQuestJournal, SECRET_QUESTS, type SecretQuestProgress } from '../secretQuests';
-import { playPaintedSkill, paintedImpact, paintedVanish, skillImpactTime } from '../skillEffects';
+import { playPaintedSkill, paintedImpact, paintedVanish, paintedStun, skillImpactTime } from '../skillEffects';
 import { resolveShieldHit } from '../shieldEffects';
 import type { BossRoomZone, OptionalRoom, OptionalRoomKind, Room } from '../dungeon';
 import { getTheme, eraSuffix, MONSTER_DEFS, NORMAL_MONSTER_DEFS, WEAPON_DEFS, makeItem, gradeColor, ITEM_DEFS, ELEMENT_INFO, monsterElement } from '../data';
@@ -37,7 +37,7 @@ import type { MonsterAction } from '../monsterAnimation';
 import { AURELIUS_DIRECTIONS, DIRECTIONAL_MONSTERS, MONSTER_DIRECTION_FRAME, monsterDirectionPose } from '../monsterDirections';
 import { computePlayerAttack, computeEnemyAttack, consumeWeaponDurability } from '../combat';
 import { appendJournal, type DamageEntry, type AdventureEntry } from '../damageJournal';
-import { planSkill, weaponSkill, directionVector } from '../weaponSkills';
+import { planSkill, weaponSkill, directionVector, timeStopDestination } from '../weaponSkills';
 import { Audio } from '../audio/manager';
 import { clearRunSave, pickFields, readRunSave, writeRunSave, type RunSnapshot } from '../runSave';
 import { type BgmName, bgmForFloor, elementAttackSe, weaponAttackSe } from '../audio/config';
@@ -74,12 +74,12 @@ const RUN_STATE_KEYS = [
   'floorPotionDrops', 'shopPurchases', 'enhancementScrollDrops', 'enhancementScrollClaimedBlocks', 'reservedBossScroll', 'pendingEquipment',
   'secretDualUnlocked', 'itemCatalogUnlocked', 'playerRootTurns', 'itemSealTurns', 'playerGender',
   'playerArmor', 'lightRadius', 'shroomTurns', 'torchTurns', 'lanternTurns', 'invisTurns',
-  'transformation', 'penaltyFlags', 'skillChargeSteps', 'secretQuests'
+  'transformation', 'penaltyFlags', 'skillChargeSteps', 'timeStopTurns', 'lanceSkillTurns', 'secretQuests'
 ] as const;
 const ENEMY_STATE_KEYS = [
   'def', 'hp', 'hpMax', 'x', 'y', 'baseScale', 'midBossVisualMultiplier', 'slowToggle', 'freezeTurns', 'sealTurns', 'poisonTurns',
   'loopDir', 'lineDir', 'facing', 'moveSteps', 'stealthRevealed', 'gimmickCounter', 'gimmickPhase',
-  'emedralStunUntil', 'emedralAffected', 'emedralWeakUntil', 'vulnerableTurns', 'guardOpenTurns', 'stunnedTurns', 'awakened', 'revived', 'regenBlockedTurns',
+  'emedralStunUntil', 'emedralAffected', 'emedralWeakUntil', 'vulnerableTurns', 'guardOpenTurns', 'stunnedTurns', 'skillAttackDownUntil', 'skillDefenseDownUntil', 'awakened', 'revived', 'regenBlockedTurns',
   'summoned', 'cloneDepth', 'charging', 'chargeDir', 'plannedMove', 'challengeTurn', 'challengeWaves'
 ] as const;
 // 探索画面のズーム倍率（大きいほど拡大。1.0=等倍）
@@ -388,6 +388,10 @@ export class GameScene extends Phaser.Scene {
   playerRootTurns = 0;
   itemSealTurns = 0;
   skillChargeSteps = 100;
+  timeStopTurns = 0;
+  lanceSkillTurns = 0;
+  private timeStopColor?: Phaser.FX.ColorMatrix;
+  private timeStopClock?: Phaser.Time.TimerEvent;
   secretQuests: SecretQuestProgress = normalizeQuests();
   private skillRangePreview?: Phaser.GameObjects.Graphics;
   private skillRangePreviewKey = '';
@@ -559,6 +563,8 @@ export class GameScene extends Phaser.Scene {
     this.secretDualUnlocked = false;
     this.itemCatalogUnlocked = false;
     this.skillChargeSteps = 100;
+    this.timeStopTurns = 0;
+    this.lanceSkillTurns = 0;
     this.playerAnimation = new PlayerAnimation();
     this.playerAttacking = false;
     this.playerAnimToken = 0;
@@ -658,6 +664,8 @@ export class GameScene extends Phaser.Scene {
     }).setDepth(30).setVisible(false);
 
     this.buildFloor(resume?.state.floor ?? startFloor, resume?.state.inBossRoom ?? this.qaBossMode, resume);
+    this.refreshTimeStopEffect();
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.clearTimeStopEffect());
     this.restoringRun = false;
     const saveOnLeave = () => this.saveRun();
     const saveOnHidden = () => { if (document.visibilityState === 'hidden') this.saveRun(); };
@@ -668,6 +676,27 @@ export class GameScene extends Phaser.Scene {
       document.removeEventListener('visibilitychange', saveOnHidden);
     });
     this.saveRun();
+    if (!resume && location.hostname === 'localhost' && qaParams.has('qa-skill-v2')) {
+      const type = qaParams.get('qa-skill-v2');
+      const weapon = WEAPON_DEFS.find(def => def.weaponType === type);
+      if (weapon) this.player.weapon = makeWeapon(weapon.key, []);
+      this.player.hpMax = 300; this.player.hp = 180;
+      this.dungeonObjects = []; this.chests = []; this.bossObstacles = [];
+      for (const e of this.enemies) { e.sprite.destroy(); e.shadow?.destroy(); e.hpBar?.destroy(); e.aura?.destroy(); }
+      this.enemies = []; this.bossStates.clear();
+      this.player.x = Math.floor(this.dungeon.w / 2); this.player.y = Math.floor(this.dungeon.h / 2); this.player.dir = 'right';
+      for (let y = this.player.y - 4; y <= this.player.y + 4; y++) for (let x = this.player.x - 4; x <= this.player.x + 8; x++) {
+        if (this.dungeon.tiles[y]?.[x]) {
+          this.dungeon.tiles[y][x] = 'floor';
+          this.applyTileVisual(this.tileSprites[y][x], 'floor', getTheme(this.floor).era, x, y);
+        }
+      }
+      this.placeSprite(this.playerSprite, this.player.x, this.player.y);
+      for (const [dx, dy] of [[1,0],[2,0],[0,2],[-2,0],[0,-2]]) {
+        this.addEnemy({ ...NORMAL_MONSTER_DEFS[0], hp: 5000, atkMin: 0, atkMax: 0, gimmick: undefined }, this.player.x + dx, this.player.y + dy, 1);
+      }
+      this.updateVisibility(); this.emitRefresh();
+    }
     if (resume) {
       this.log('保存した冒険の続きから再開しました。', 'sys');
       this.time.delayedCall(50, () => this.emitRefresh());
@@ -3779,6 +3808,9 @@ export class GameScene extends Phaser.Scene {
       enemyAt: (x, y) => this.enemyAt(x, y),
       canHit: () => true
     });
+    if (type === 'dagger') {
+      plan.tiles = (['up', 'down', 'left', 'right'] as Dir[]).map(dir => this.timeStopMoveDestination(dir)).filter((tile): tile is Vec2 => !!tile);
+    }
     const key = type + ':' + plan.tiles.map(p => p.x + ',' + p.y).join(';');
     if (!this.skillRangePreview?.active) this.skillRangePreview = this.add.graphics().setDepth(2);
     this.skillRangePreview.setVisible(true);
@@ -3837,41 +3869,47 @@ export class GameScene extends Phaser.Scene {
       || (this.inBossRoom && !this.isInsideBossCombatFrame(x, y));
   }
 
-  async useWeaponSkill() {
+  async useWeaponSkill(sustainedLance = false, daggerFinisher = false) {
     const ui = this.scene.get('UIScene') as { overlayMode?: string } | undefined;
     if (this.busy || this.gameEnded || ui?.overlayMode && ui.overlayMode !== 'none' || this.pendingEquipment) return false;
     const weapon = this.player.weapon;
     const skill = weaponSkill(weapon?.weaponType);
     if (!weapon || !skill) return false;
     const deny = (message: string) => { this.log(message, 'sys'); Audio.playSe('deny'); return false; };
-    if (this.skillStepsRemaining > 0) return deny(`スキルはあと${this.skillStepsRemaining}歩で使える。`);
+    if (this.timeStopTurns > 0) return deny('零刻領域では攻撃できない。移動で時を進めよう。');
+    sustainedLance = sustainedLance && weapon.weaponType === 'lance' && this.lanceSkillTurns > 0;
+    if (!daggerFinisher && !sustainedLance && this.skillStepsRemaining > 0) return deny(`スキルはあと${this.skillStepsRemaining}歩で使える。`);
+    if (weapon.weaponType === 'dagger' && !daggerFinisher) {
+      this.skillChargeSteps = 0;
+      this.timeStopTurns = 5;
+      this.clearMoveInput();
+      this.refreshTimeStopEffect();
+      this.log('零刻領域！ 5ターン時が止まる。攻撃せず、敵をすり抜けて移動できる。', 'special');
+      this.emitRefresh();
+      this.saveRun();
+      return true;
+    }
+    this.lanceSkillTurns = 0;
     const plan = planSkill(weapon.weaponType, this.player, this.player.dir, {
       blocked: (x, y) => this.skillTileBlocked(x, y),
       enemyAt: (x, y) => this.enemyAt(x, y),
       canHit: e => !e.def.isFloorBoss || !this.dungeon.bossRoom
         || this.isInsideBossRoom(this.player.x, this.player.y) && this.isInsideBossRoom(e.x, e.y)
     });
-    let destination: Vec2 | undefined;
-    if (weapon.weaponType === 'dagger' && plan.targets.length) {
-      if (this.playerRootTurns > 0) return deny('足を取られて背後へ移動できない。');
-      const enemy = plan.targets[0];
-      const facing = directionVector(enemy.facing);
-      const distance = bossBodyRadius(enemy.def) + 1;
-      destination = { x: enemy.x - facing.x * distance, y: enemy.y - facing.y * distance };
-      if (this.skillTileBlocked(destination.x, destination.y) || this.enemyAt(destination.x, destination.y)
-        || this.chestAt(destination.x, destination.y) || this.dungeon.tiles[destination.y]?.[destination.x] === 'stairs'
-        || this.dungeon.teleportPads.some(p => p.x === destination!.x && p.y === destination!.y)
-        || enemy.def.isFloorBoss && !this.isInsideBossRoom(destination.x, destination.y)) {
-        return deny('敵の背後へ移動できない。');
-      }
-    }
     this.clearMoveInput();
     this.busy = true;
     this.playerAnimToken++;
     this.playerAttacking = true;
-    this.skillChargeSteps = 0;
+    if (!sustainedLance && !daggerFinisher) this.skillChargeSteps = 0;
     const origin = { x: this.player.x, y: this.player.y };
     const direction = this.player.dir;
+    if (daggerFinisher) {
+      const [dx, dy] = this.dirVec(this.player.dir);
+      const enemy = this.enemyAt(this.player.x + dx, this.player.y + dy);
+      plan.targets = enemy && plan.targets.includes(enemy) ? [enemy] : [];
+      plan.tiles = [{ x: this.player.x + dx, y: this.player.y + dy }];
+      if (!plan.targets.length) return false;
+    }
     const maxDefense = Math.max(0, ...plan.targets.map(e => e.def.def));
     Audio.playSe(skill.sound);
     this.log(`${skill.name}！`, 'special');
@@ -3879,34 +3917,29 @@ export class GameScene extends Phaser.Scene {
     try {
       this.setPlayerVisual(direction, 'atkWindup');
       if (weapon.key === 'w_hero_sword') await new Promise<void>(resolve => this.time.delayedCall(200, resolve));
-      if (destination) {
-        paintedVanish(this, origin);
-        await this.tween(this.playerSprite, { alpha: .08 }, 90, 'Quad.easeIn');
-        this.player.x = destination.x; this.player.y = destination.y;
-        this.player.dir = plan.targets[0].facing;
-        this.placeSprite(this.playerSprite, destination.x, destination.y);
-        this.playerSprite.setAlpha(this.invisTurns > 0 ? .4 : 1);
-        this.onEnterTile(destination.x, destination.y);
-        paintedVanish(this, destination);
-      }
       this.setPlayerVisual(this.player.dir, 'atk');
-      this.drawSkillEffect(weapon.weaponType, destination ?? origin, direction, plan.tiles, skill.color);
+      this.drawSkillEffect(weapon.weaponType, origin, direction, plan.tiles, skill.color);
       if (weapon.key === 'w_hero_sword') {
         const [dx,dy] = this.dirVec(direction);
         this.arcadiaSlashFx(origin.x + dx, origin.y + dy, direction);
       }
       await new Promise<void>(resolve => this.time.delayedCall(skillImpactTime(weapon.weaponType), resolve));
-      const shots = weapon.weaponType === 'handgun' ? 3 : 1;
+      const shots = weapon.weaponType === 'handgun' ? 5 : weapon.dual ? 3 : 1;
       for (let shot = 0; shot < shots && !this.gameEnded; shot++) {
         for (const enemy of plan.targets) {
           if (!enemy.alive || !this.enemies.includes(enemy) || this.gameEnded) continue;
-          const result = computePlayerAttack(this.player, enemy.def, weapon.weaponType === 'dagger', {
-            consumeDurability: false, multiplier: skill.multiplier,
-            hits: weapon.dual ? 2 : 1, defenseIgnore: weapon.weaponType === 'lance' ? .5 : 0
+          const result = computePlayerAttack(this.player, this.enemyDefenseDefinition(enemy), false, {
+            consumeDurability: false, multiplier: daggerFinisher ? (direction === enemy.facing ? 1.5 : 1) : skill.multiplier,
+            hits: weapon.dual ? 2 : 1, defenseIgnore: 0
           });
           this.applyEmedralHit(enemy, weapon);
           const damage = this.playerDamageAgainstGimmick(enemy, result.damage);
           enemy.hp -= damage;
+          if (weapon.weaponType === 'bow' && enemy.hp > 0) {
+            enemy.stunnedTurns = Math.max(enemy.stunnedTurns, 2);
+            paintedStun(this, enemy);
+            this.log(`${enemy.def.name}は2ターンスタンした！`, 'special');
+          }
           this.afterPlayerHitGimmick(enemy, weapon.element);
           this.discoverMonster(enemy.def.key);
           this.hitFx(enemy.x, enemy.y);
@@ -3926,7 +3959,23 @@ export class GameScene extends Phaser.Scene {
             this.drawEnemyHp(enemy);
           }
         }
-        if (shot < shots - 1) await new Promise<void>(resolve => this.time.delayedCall(110, resolve));
+        if (shot < shots - 1) await new Promise<void>(resolve => this.time.delayedCall(weapon.dual ? 160 : 110, resolve));
+      }
+      for (const enemy of plan.targets) {
+        if (!enemy.alive || enemy.hp <= 0) continue;
+        if (weapon.weaponType === 'handgun') {
+          enemy.skillDefenseDownUntil = this.turn + 3;
+          this.log(`${enemy.def.name}の防御力が3ターン30%低下！`, 'special');
+        } else if (weapon.weaponType === 'lance') {
+          enemy.skillAttackDownUntil = this.turn + 3;
+          this.log(`${enemy.def.name}の攻撃力が3ターン30%低下！`, 'special');
+        }
+      }
+      if (weapon.weaponType === 'longsword') {
+        const hpBefore = this.player.hp;
+        this.player.heal(70);
+        this.healFx(); Audio.playSe('heal');
+        this.log(`扇斬りの光でHPを${this.player.hp - hpBefore}回復した。`, 'special');
       }
       const wear = consumeWeaponDurability(weapon, maxDefense);
       if (wear.weaponRevived) this.log('武器のリペア効果が発動！ 壊れずに復活した。', 'special');
@@ -3940,7 +3989,7 @@ export class GameScene extends Phaser.Scene {
       this.playerAttacking = false;
       if (!this.gameEnded) {
         this.setPlayerVisual(this.player.dir, 'idle');
-        await this.finishTurn();
+        if (!daggerFinisher) await this.finishTurn();
       }
       return true;
     } catch (error) {
@@ -3958,8 +4007,70 @@ export class GameScene extends Phaser.Scene {
   private drawSkillEffect(type: Weapon['weaponType'], origin: Vec2, dir: Dir, tiles: Vec2[], color: number) {
     playPaintedSkill(this, type, origin, dir, tiles, this.player.weapon?.key ?? 'w_soldier_blade', color);
   }
+
+  private clearTimeStopEffect() {
+    this.timeStopClock?.remove(false);
+    this.timeStopClock = undefined;
+    // Phaser runtime supports ColorMatrix here; its bundled Controller-only signature is narrower.
+    if (this.timeStopColor) this.cameras.main.postFX.remove(this.timeStopColor as unknown as Phaser.FX.Controller);
+    this.timeStopColor = undefined;
+  }
+
+  private refreshTimeStopEffect() {
+    if (this.timeStopTurns <= 0) { this.clearTimeStopEffect(); return; }
+    if (!this.timeStopColor) {
+      this.timeStopColor = this.cameras.main.postFX.addColorMatrix();
+      this.timeStopColor.negative();
+    }
+    if (!this.timeStopClock) {
+      Audio.playSe('clockTick');
+      this.timeStopClock = this.time.addEvent({ delay: 550, loop: true, callback: () => {
+        if (this.timeStopTurns > 0 && !this.gameEnded) Audio.playSe('clockTick');
+      } });
+    }
+  }
+
+  private timeStopMoveDestination(dir: Dir) {
+    return timeStopDestination(this.player, dir, {
+      blocked: (x, y) => {
+        const tile = this.dungeon.tiles[y]?.[x], entrance = this.dungeon.bossEntrance;
+        return !tile || !isWalkable(tile) || ['pit', 'door', 'roomDoor'].includes(tile)
+          || !!(this.bossEntranceClosed && entrance && entrance.x === x && entrance.y === y)
+          || (this.inBossRoom && !this.isInsideBossCombatFrame(x, y));
+      },
+      enemy: (x, y) => !!this.enemyAt(x, y),
+      object: (x, y) => !!this.dungeonObjectAt(x, y) || !!this.bossObstacleAt(x, y) || !!this.chestAt(x, y)
+    });
+  }
+
+  private async moveDuringTimeStop(dir: Dir) {
+    this.player.dir = dir;
+    const destination = this.timeStopMoveDestination(dir);
+    if (!destination) { this.setPlayerVisual(dir, 'idle'); Audio.playSe('deny'); return; }
+    this.busy = true;
+    try {
+      const origin = { x: this.player.x, y: this.player.y };
+      paintedVanish(this, origin);
+      this.player.x = destination.x; this.player.y = destination.y;
+      this.skillChargeSteps = Math.min(100, this.skillChargeSteps + 1);
+      this.setPlayerVisual(dir, 'walk1');
+      await this.tween(this.playerSprite, { x: (destination.x + .5) * TILE, y: (destination.y + .5) * TILE }, 150, 'Sine.easeInOut');
+      this.setPlayerVisual(dir, 'idle');
+      const item = this.groundAt(destination.x, destination.y);
+      if (item) this.pickUp(item);
+      // Landing hazards, teleport pads and stairs resume with the world, preventing extra actions during a stopped turn.
+      await this.finishTurn();
+    } finally { this.busy = false; }
+  }
   async playerAct(dir: Dir, options: { moveOnly?: boolean } = {}) {
     if (this.busy || this.gameEnded) return;
+    if (this.timeStopTurns > 0) { await this.moveDuringTimeStop(dir); return; }
+    if (this.lanceSkillTurns > 0 && this.player.weapon?.weaponType === 'lance' && !options.moveOnly) {
+      const plan = planSkill('lance', this.player, dir, {
+        blocked: (x, y) => this.skillTileBlocked(x, y), enemyAt: (x, y) => this.enemyAt(x, y), canHit: () => true
+      });
+      if (plan.targets.length) { this.player.dir = dir; await this.useWeaponSkill(true); return; }
+    }
     try {
       this.player.dir = dir;
       const [dx, dy] = this.dirVec(dir);
@@ -4376,6 +4487,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   async playerAttack(e: Enemy, dir: Dir, ranged = false) {
+    if (this.timeStopTurns > 0) return;
     if (e.def.isFloorBoss && this.dungeon.bossRoom
       && (!this.isInsideBossRoom(this.player.x, this.player.y) || !this.isInsideBossRoom(e.x, e.y))) {
       this.log('魔物に近づくには、扉をくぐって部屋に入ろう。', 'sys');
@@ -4415,7 +4527,7 @@ export class GameScene extends Phaser.Scene {
       this.playerSprite.setPosition(homeX, homeY);
     }
 
-    const res = computePlayerAttack(this.player, e.def, !ranged && dir === e.facing);
+    const res = computePlayerAttack(this.player, this.enemyDefenseDefinition(e), !ranged && dir === e.facing);
     const attackingWeapon = this.player.weapon;
     let knockbackReady = false;
     if (attackingWeapon?.passive?.key === 'knockback') {
@@ -4934,11 +5046,16 @@ export class GameScene extends Phaser.Scene {
     const result = computeEnemyAttack(this.player, this.enemyAttackDefinition(e), element);
     result.steps.unshift(`難易度：${DIFFICULTY_RULES[this.difficulty].name}（敵攻撃 ×${DIFFICULTY_RULES[this.difficulty].attack}を反映済み）`);
     if (e.emedralAffected && e.emedralWeakUntil >= this.turn) result.steps.unshift('氷翠の効果：敵の攻撃力 ×0.7（切り捨て）を反映済み');
+    if (e.skillAttackDownUntil >= this.turn) result.steps.unshift('槍スキル：敵の攻撃力 ×0.7（切り捨て）を反映済み');
     return result;
   }
 
+  enemyDefenseDefinition(e: Enemy): MonsterDef {
+    return e.skillDefenseDownUntil >= this.turn ? { ...e.def, def: Math.floor(e.def.def * .7) } : e.def;
+  }
+
   enemyAttackDefinition(e: Enemy): MonsterDef {
-    return e.emedralWeakUntil >= this.turn && e.emedralAffected
+    return (e.emedralWeakUntil >= this.turn && e.emedralAffected) || e.skillAttackDownUntil >= this.turn
       ? { ...e.def, atkMin: Math.max(1, Math.floor(e.def.atkMin * .7)), atkMax: Math.max(1, Math.floor(e.def.atkMax * .7)) } : e.def;
   }
 
@@ -5103,6 +5220,20 @@ export class GameScene extends Phaser.Scene {
   // ============ 敵ターン ============
   async finishTurn() {
     this.turn++;
+    if (this.timeStopTurns > 0) {
+      this.timeStopTurns--;
+      this.refreshTimeStopEffect();
+      if (!this.timeStopTurns) {
+        this.log('零刻領域が解け、時が動き出した。', 'special');
+        if (this.player.weapon?.weaponType === 'dagger') {
+          this.busy = false;
+          await this.useWeaponSkill(false, true);
+        }
+      }
+      this.updateVisibility(); this.updateStairsHint(); this.emitRefresh();
+      return;
+    }
+    if (this.lanceSkillTurns > 0) this.lanceSkillTurns--;
     if (this.player.hp > this.player.hpMax * .2) this.emeraldGuardArmed = true;
     this.floorTurn++;
     // Player status duration follows player turns, not the number/type of active enemies.
@@ -6545,6 +6676,10 @@ export class GameScene extends Phaser.Scene {
   // ============ アイテム使用（UIから呼ばれる）============
   useItem(index: number) {
     if (this.busy || this.gameEnded) return;
+    if (this.timeStopTurns > 0) {
+      this.log('零刻領域では移動だけできる。アイテムは時が動いてから使おう。', 'sys');
+      Audio.playSe('deny'); return;
+    }
     if (this.itemSealTurns > 0) {
       this.log(`仮面の呪いでアイテムを使えない！ 残り${this.itemSealTurns}ターン`, 'dmg');
       Audio.playSe('deny');
@@ -7020,6 +7155,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   redeemCode(code: string): boolean {
+    if (code === '11111111') {
+      if (this.busy || this.gameEnded) return false;
+      this.skillChargeSteps = 100;
+      this.log('スキルのクールダウンをリセットした！', 'special');
+      Audio.playSe('click');
+      this.emitRefresh();
+      this.saveRun();
+      return true;
+    }
     const mode = difficultyFromCode(code);
     if (mode) {
       if (this.busy || this.gameEnded) return false;
@@ -7367,6 +7511,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   enterBossRoom() {
+    if (this.timeStopTurns > 0) { this.log('時が動いてから次の部屋へ進もう。', 'sys'); return; }
     if (this.busy || this.gameEnded || this.inBossRoom) return;
     this.busy = true;
     this.clickPathToken++;
@@ -7382,6 +7527,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   tryDescend() {
+    if (this.timeStopTurns > 0) { this.log('時が動いてから階段を使おう。', 'sys'); return; }
     if (this.busy || this.gameEnded) return;
     if (this.player.x !== this.dungeon.stairs.x || this.player.y !== this.dungeon.stairs.y) return;
     this.doDescend();
@@ -7447,6 +7593,7 @@ export class GameScene extends Phaser.Scene {
 
   gameOver(cleared: boolean) {
     if (this.gameEnded) return;
+    this.clearTimeStopEffect();
     this.gameEnded = true;
     for (const enemy of this.difficultyWarnings.keys()) this.clearDifficultyWarnings(enemy);
     const difficultyResult = cleared && !this.eventMode && this.floor === 30 && this.difficultyClearEligible ? recordDifficultyClear(this.difficulty) : undefined;
@@ -7676,6 +7823,14 @@ export class GameScene extends Phaser.Scene {
       this.log('暗闇の先へは自動移動できない。', 'sys');
       return;
     }
+    if (this.timeStopTurns > 0) {
+      const dx = target.x - this.player.x, dy = target.y - this.player.y;
+      if (!dx && !dy) return;
+      this.stopClickPath();
+      const dir: Dir = Math.abs(dx) > Math.abs(dy) ? dx > 0 ? 'right' : 'left' : dy > 0 ? 'down' : 'up';
+      await this.playerAct(dir, { moveOnly: true });
+      return;
+    }
 
     const token = ++this.clickPathToken;
     this.clickPathActive = true;
@@ -7697,6 +7852,9 @@ export class GameScene extends Phaser.Scene {
             && this.lineOfSight(this.player.x,this.player.y,clickedEnemy.x,clickedEnemy.y);
           if (adjacent || ranged) {
             const dir: Dir=Math.abs(dx)>Math.abs(dy)?dx>0?'right':'left':dy>0?'down':'up';
+            if (this.lanceSkillTurns > 0 && this.player.weapon?.weaponType === 'lance') {
+              await this.playerAct(dir); break;
+            }
             this.busy=true;
             try { await this.playerAttack(clickedEnemy,dir,ranged&&!adjacent); await this.finishTurn(); }
             finally { this.busy=false; }
@@ -7952,6 +8110,7 @@ export class GameScene extends Phaser.Scene {
     // 敵：ゆらゆらした待機モーション＋影の追従
     for (const e of this.enemies) {
       if (!e.sprite || !e.sprite.visible) continue;
+      if (this.timeStopTurns > 0) continue;
       if (e.directionArt) {
         // No animation state or frame cycling: swap only when the direction changes.
         this.updateEnemyDirection(e);
@@ -7988,6 +8147,8 @@ export class GameScene extends Phaser.Scene {
         this.updateEnemyFreezeFx(e);
         e.freezeFx.setPosition(e.sprite.x, e.sprite.y - 3).setDepth(e.sprite.depth + 0.35);
       }
+      const debuffKey = `${e.skillAttackDownUntil >= this.turn}:${e.skillDefenseDownUntil >= this.turn}`;
+      if (e.skillDebuffVisualKey !== debuffKey) this.drawEnemyHp(e);
       e.hpBar?.setPosition(e.sprite.x, e.sprite.y).setDepth(e.sprite.depth + 0.45);
     }
 
@@ -8077,6 +8238,23 @@ export class GameScene extends Phaser.Scene {
     const y = -20;
     e.hpBar.fillStyle(0x000000, 0.6); e.hpBar.fillRect(x - 1, y - 1, w + 2, 5);
     e.hpBar.fillStyle(0x40ff70, 1); e.hpBar.fillRect(x, y, w * Math.max(0, e.hp / e.hpMax), 3);
+    e.skillDebuffVisualKey = `${e.skillAttackDownUntil >= this.turn}:${e.skillDefenseDownUntil >= this.turn}`;
+    const icons = [e.skillAttackDownUntil >= this.turn ? 'attack' : '', e.skillDefenseDownUntil >= this.turn ? 'defense' : ''].filter(Boolean);
+    icons.forEach((kind, index) => {
+      const ix = -icons.length * 5 + index * 10, iy = y + 7, g = e.hpBar;
+      const color = kind === 'attack' ? 0xff998b : 0x8ecaff;
+      g.fillStyle(0x101520, .9).fillRoundedRect(ix - 1, iy - 1, 10, 10, 2);
+      g.lineStyle(1, color, 1);
+      if (kind === 'attack') {
+        g.fillStyle(color).fillRect(ix + 1, iy + 1, 2, 4);
+        g.fillTriangle(ix + 1, iy + 1, ix + 3, iy + 1, ix + 2, iy);
+        g.fillRect(ix, iy + 5, 4, 1);
+        g.fillRect(ix + 1.5, iy + 6, 1, 2);
+      } else {
+        g.strokePoints([{x:ix,y:iy+1},{x:ix+4,y:iy+1},{x:ix+4,y:iy+4},{x:ix+2,y:iy+6},{x:ix,y:iy+4}], true);
+      }
+      g.fillStyle(color).fillRect(ix + 5, iy + 3, 4, 1.5);
+    });
   }
 
   private torchRevealsEnemy(enemy: Enemy): boolean {
@@ -8456,6 +8634,8 @@ export class GameScene extends Phaser.Scene {
     // Saves created before weapon skills remain readable.
     if (!Number.isInteger(this.skillChargeSteps) || this.skillChargeSteps < 0) this.skillChargeSteps = 100;
     this.skillChargeSteps = Math.min(100, this.skillChargeSteps);
+    this.timeStopTurns = Math.max(0, Math.min(5, snapshot.state.timeStopTurns ?? 0));
+    this.lanceSkillTurns = 0;
     this.player = Object.assign(new Player(), snapshot.player);
     for (const item of this.player.inventory) {
       if (item.kind === 'mystery_bread') Object.assign(item, makeItem('mystery_bread'));

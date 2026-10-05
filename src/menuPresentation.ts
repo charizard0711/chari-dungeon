@@ -1,20 +1,40 @@
 import Phaser from 'phaser';
-import { GAME_W, GAME_H } from './layout';
+import { GAME_W, GAME_H, IS_MOBILE } from './layout';
 let game: Phaser.Game | undefined;
+let large = false;
+const sizeButtons: HTMLButtonElement[] = [];
 function applySize() {
   if(!game)return;
   const parent=document.getElementById('game-container')!;
   const scale=game.scale;
-  const zoom=Math.min(1,window.innerWidth/GAME_W,window.innerHeight/GAME_H);
+  const zoom=Math.min(large && !IS_MOBILE ? Infinity : 1,window.innerWidth/GAME_W,window.innerHeight/GAME_H);
   parent.style.width=`${GAME_W*zoom}px`;parent.style.height=`${GAME_H*zoom}px`;
   scale.scaleMode=Phaser.Scale.FIT;
   scale.displaySize.setAspectMode(Phaser.Structs.Size.FIT);
   scale.getParentBounds();
   scale.setGameSize(GAME_W,GAME_H);
   scale.refresh();
+  sizeButtons.forEach(button => button.setAttribute('aria-pressed', String((button.dataset.size === 'large') === large)));
 }
 export function installScreenSizing(instance: Phaser.Game) {
   game=instance;
+  if (!IS_MOBILE) {
+    const controls = document.createElement('div');
+    controls.id = 'screen-size-controls';
+    controls.setAttribute('role', 'group');
+    controls.setAttribute('aria-label', '画面サイズ');
+    const label = document.createElement('span');
+    label.textContent = '画面';
+    controls.append(label);
+    for (const [value, title] of [['small', '小'], ['large', '大']]) {
+      const button = document.createElement('button');
+      button.type = 'button'; button.textContent = title; button.dataset.size = value;
+      button.addEventListener('click', () => { large = value === 'large'; applySize(); button.blur(); });
+      controls.append(button); sizeButtons.push(button);
+    }
+    document.body.append(controls);
+  }
+  applySize();
   window.addEventListener('resize',applySize);
 }
 export function presentMenu(scene: Phaser.Scene) {

@@ -259,6 +259,10 @@ export async function renderBgm(name: BgmName): Promise<AudioBuffer> {
 interface SeSeg { type: Osc; f0: number; f1?: number; t: number; d: number; vol: number }
 
 const SE_SPECS: Partial<Record<SeName, { len: number; segs: SeSeg[] }>> = {
+  clockTick: { len: .18, segs: [
+    { type: 'noise', f0: 2400, t: 0, d: .018, vol: .38 },
+    { type: 'sine', f0: 1800, f1: 620, t: .003, d: .045, vol: .3 }
+  ] },
   click: { len: 0.08, segs: [{ type: 'square', f0: 900, t: 0, d: 0.05, vol: 0.3 }] },
   step: { len: 0.08, segs: [{ type: 'noise', f0: 220, t: 0, d: 0.05, vol: 0.25 }] },
   attack: {

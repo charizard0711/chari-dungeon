@@ -87,6 +87,7 @@ export class UIScene extends Phaser.Scene {
   joystick?: Phaser.GameObjects.Container;
   private releaseJoystick?: () => void;
   private skillHovered = false;
+  private skillTooltip?: Phaser.GameObjects.Text;
   // レイアウト依存の座標（PC / スマホ縦で切り替え）
   L!: {
     hpBar: { x: number; y: number; w: number };
@@ -598,18 +599,37 @@ export class UIScene extends Phaser.Scene {
       fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '9px' : '11px', fontStyle: 'bold', color: '#ddffff',
       stroke: '#071115', strokeThickness: 3, align: 'center'
     }).setOrigin(.5);
-    this.skillCounter = this.add.text(0, -6, '', { fontFamily: 'Arial Black', fontSize: IS_MOBILE ? '28px' : '34px', color: '#ffffff', stroke: '#071115', strokeThickness: 3 }).setOrigin(.5);
+    this.skillCounter = this.add.text(0, -6, '', { fontFamily: 'Meiryo', fontSize: IS_MOBILE ? '11px' : '13px', color: '#ffffff', stroke: '#071115', strokeThickness: 3 }).setOrigin(.5);
     button.add([this.skillBackground, this.skillGlyph, this.skillLabel, this.skillCounter]);
     if (!IS_MOBILE) button.add(this.add.text(radius - 10, 9, 'Q', { fontSize: '13px', color: '#bde4e9', backgroundColor: '#071115aa', padding: {x:3,y:2} }).setOrigin(.5));
     button.setSize(radius * 2, radius * 2).setInteractive({ hitArea: new Phaser.Geom.Circle(radius, radius, radius), hitAreaCallback: Phaser.Geom.Circle.Contains, useHandCursor: true });
+    this.skillTooltip = this.add.text(Math.max(8, x - 260), y - radius - 120, '', {
+      fontFamily: 'Meiryo', fontSize: '13px', color: '#f5e7bd', backgroundColor: '#101824f2',
+      padding: { x: 12, y: 10 }, wordWrap: { width: 270 }, lineSpacing: 5
+    }).setDepth(100).setVisible(false);
     button.on('pointerover', () => { this.skillHovered = true; this.gs.showSkillRangePreview(true); });
-    button.on('pointerout', () => { this.skillHovered = false; this.gs.showSkillRangePreview(false); });
+    let holdTimer: Phaser.Time.TimerEvent | undefined;
+    let held = false;
+    let pressed = false;
+    button.on('pointerout', () => { pressed = false; holdTimer?.remove(); this.skillHovered = false; this.gs.showSkillRangePreview(false); });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.skillHovered = false; this.gs.showSkillRangePreview(false); });
     button.on('pointerdown', (_pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
       event.stopPropagation();
+      if (IS_MOBILE) {
+        pressed = true; held = false; this.skillHovered = false;
+        holdTimer = this.time.delayedCall(350, () => { held = true; this.skillHovered = true; });
+        this.releaseJoystick?.();
+        return;
+      }
       this.skillHovered = false; this.gs.showSkillRangePreview(false);
       this.releaseJoystick?.();
       void this.gs.useWeaponSkill();
+    });
+    button.on('pointerup', () => {
+      if (!IS_MOBILE || !pressed) return;
+      pressed = false; holdTimer?.remove();
+      this.skillHovered = false; this.gs.showSkillRangePreview(false);
+      if (!held) void this.gs.useWeaponSkill();
     });
     this.refreshSkillButton();
     for (const entry of this.slotAuras) { entry.aura.emerald = ['w_hw_emedral', 's_hw_emerald'].includes(entry.icon.texture.key); entry.aura.enabled = entry.icon.texture.key === entry.key || entry.aura.emerald; }
@@ -628,7 +648,7 @@ export class UIScene extends Phaser.Scene {
     this.skillButton.setVisible(visible);
     if (!skill || !type) return;
     const remaining = this.gs.skillStepsRemaining;
-    const key = `${type}:${remaining}:${visible}`;
+    const key = `${type}:${remaining}:${visible}:${this.gs.timeStopTurns}:${this.gs.lanceSkillTurns}`;
     if (key === this.skillVisualKey) return;
     this.skillVisualKey = key;
     const radius = IS_MOBILE ? 38 : 48;
@@ -639,8 +659,9 @@ export class UIScene extends Phaser.Scene {
         .arc(0, 0, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - Math.min(1, remaining / 100))).strokePath();
     }
     this.skillGlyph!.setTexture(skillIconKey(type)).setAlpha(remaining > 0 ? .72 : 1);
-    this.skillLabel!.setText(skill.name === 'クロスビーム斬撃' ? 'クロスビーム\n斬撃' : skill.name).setColor(`#${skill.color.toString(16).padStart(6, '0')}`);
-    this.skillCounter!.setText('');
+    this.skillLabel!.setText(skill.name).setColor(`#${skill.color.toString(16).padStart(6, '0')}`);
+    this.skillCounter!.setText(this.gs.timeStopTurns > 0 ? `時停止 ${this.gs.timeStopTurns}`
+      : type === 'lance' && this.gs.lanceSkillTurns > 0 ? `四方 ${this.gs.lanceSkillTurns}` : '');
   }
 
   update() {
@@ -652,7 +673,15 @@ export class UIScene extends Phaser.Scene {
     const pointer = this.input.activePointer;
     const dynamiteHovered = !!this.dynamiteHoverZone?.active && this.input.isOver && !pointer.wasTouch
       && this.dynamiteHoverZone.getBounds().contains(pointer.x, pointer.y);
-    this.gs.showSkillRangePreview(!dynamiteHovered && this.skillHovered && !!this.skillButton?.visible);
+    const skillPreview = !dynamiteHovered && this.skillHovered && !!this.skillButton?.visible;
+    this.gs.showSkillRangePreview(skillPreview);
+    const hoveredSkill = weaponSkill(this.gs.player?.weapon?.weaponType);
+    this.skillTooltip?.setVisible(skillPreview && !!hoveredSkill);
+    if (skillPreview && hoveredSkill) {
+      const status = this.gs.timeStopTurns > 0 ? `時間停止：残り${this.gs.timeStopTurns}ターン`
+        : this.gs.skillStepsRemaining > 0 ? `再使用まであと${this.gs.skillStepsRemaining}歩` : '使用可能';
+      this.skillTooltip?.setText(`${hoveredSkill.name}\n${hoveredSkill.description}\n${status}`);
+    }
     this.gs.showDynamiteRangePreview(dynamiteHovered);
     if (this.overlayMode !== 'none' || this.gs.gameEnded) this.releaseJoystick?.();
   }
@@ -2305,11 +2334,15 @@ export class UIScene extends Phaser.Scene {
   }
 
   submitCode() {
+    const resetSkill = this.codeDigits === '11111111';
     const mode = difficultyFromCode(this.codeDigits);
     const accepted = this.gs.redeemCode(this.codeDigits);
     this.codeDigits = '';
     this.codeMessage = accepted ? '' : 'コードが違います';
-    if (accepted && mode) {
+    if (accepted && resetSkill) {
+      this.codeMessage = 'スキルのクールダウンをリセットしました';
+      this.rebuildOverlay();
+    } else if (accepted && mode) {
       this.setOverlay('none');
     } else if (accepted) {
       this.catalogCategory = 'all';

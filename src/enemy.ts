@@ -14,6 +14,7 @@ export class Enemy {
   shadow?: Phaser.GameObjects.Image;
   aura?: Phaser.GameObjects.Image;   // ボス/エリートの特殊オーラ
   hpBar!: Phaser.GameObjects.Graphics;
+  skillDebuffVisualKey = '';
   midBossVisualMultiplier = 1;
   baseScale = 1;      // 呼吸アニメ用の基準スケール
   bobPhase = 0;       // アイドル揺れの位相
@@ -39,6 +40,8 @@ export class Enemy {
   emedralAffected = false;
   emedralWeakUntil = 0;
   stunnedTurns = 0;
+  skillAttackDownUntil = -1;
+  skillDefenseDownUntil = -1;
   awakened = false;
   revived = false;
   regenBlockedTurns = 0;

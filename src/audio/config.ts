@@ -54,6 +54,7 @@ export const SE_DEFS = {
   weaponHandgun:    { key: 'se_weapon_handgun',    path: 'assets/audio/se_weapon_handgun.wav',    volume: 0.54 },
   weaponGreatsword: { key: 'se_weapon_greatsword', path: 'assets/audio/se_weapon_greatsword.wav', volume: 0.56 },
   weaponDual:       { key: 'se_weapon_dual',       path: 'assets/audio/se_weapon_dual.wav',       volume: 0.50 },
+  clockTick: { key: 'se_clock_tick', path: 'assets/audio/se_clock_tick.wav', volume: 0.48 },
   skillDagger: { key: 'se_skill_dagger', path: 'assets/audio/se_skill_dagger.wav', volume: 0.58 },
   skillLongsword: { key: 'se_skill_longsword', path: 'assets/audio/se_skill_longsword.wav', volume: 0.58 },
   skillLance: { key: 'se_skill_lance', path: 'assets/audio/se_skill_lance.wav', volume: 0.58 },
@@ -87,7 +88,7 @@ export const SE_DEFS = {
 export type SeName = keyof typeof SE_DEFS;
 // Only packaged sounds are requested; the remaining effects use their synth definitions.
 export const FILE_SE_NAMES: readonly SeName[] = [
-  'weaponBreak', 'shieldBreak', 'dynamite', 'attack', 'weaponDagger', 'weaponLongsword', 'weaponLance', 'weaponBow',
+  'clockTick', 'weaponBreak', 'shieldBreak', 'dynamite', 'attack', 'weaponDagger', 'weaponLongsword', 'weaponLance', 'weaponBow',
   'weaponHandgun', 'weaponGreatsword', 'weaponDual', 'skillDagger', 'skillLongsword',
   'skillLance', 'skillBow', 'skillHandgun', 'skillGreatsword', 'skillDual'
 ];

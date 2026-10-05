@@ -200,8 +200,8 @@ export class TitleScene extends Phaser.Scene {
     };
     render(this.initialStage);
     text(mobile?50:70,GAME_H-27,'遊び方',12,'#d6d1bc').setInteractive({useHandCursor:true}).on('pointerdown',()=>help.setVisible(true));
-    const sound=text(GAME_W-(mobile?45:70),GAME_H-27,'',12,'#d6d1bc').setInteractive({useHandCursor:true});
-    const refresh=()=>sound.setText(Audio.bgmOn||Audio.seOn?'音 ON':'音 OFF');
+    const sound=text(GAME_W-(mobile?45:70),GAME_H-27,'',22,'#d6d1bc').setPadding(8).setInteractive({useHandCursor:true});
+    const refresh=()=>sound.setText(Audio.bgmOn||Audio.seOn?'🔊':'🔇');
     sound.on('pointerdown',()=>{const on=!(Audio.bgmOn||Audio.seOn);if(Audio.bgmOn!==on)Audio.toggleBgm();if(Audio.seOn!==on)Audio.toggleSe();refresh()});refresh();
     text(cx,GAME_H-27,'CHARI DUNGEON',10,'#7e9696');
   }
@@ -239,9 +239,9 @@ export class TitleScene extends Phaser.Scene {
     }).setOrigin(.5).setStroke('#0c090e', 2).setInteractive({ useHandCursor: true })
       .on('pointerdown', () => { Audio.playSe('click'); help.setVisible(true); });
     const sound = this.add.text(GAME_W - 24, GAME_H - 30, '', {
-      fontFamily: FONT, fontSize: mobile ? '13px' : '15px', color: '#ffe0a0', backgroundColor: '#21151de0', padding: { x: 12, y: 10 }
+      fontFamily: FONT, fontSize: '22px', color: '#ffe0a0', backgroundColor: '#21151de0', padding: { x: 12, y: 10 }
     }).setOrigin(1, 1).setInteractive({ useHandCursor: true });
-    const refreshSound = () => sound.setText(Audio.bgmOn || Audio.seOn ? '音 ON' : '音 OFF');
+    const refreshSound = () => sound.setText(Audio.bgmOn || Audio.seOn ? '🔊' : '🔇');
     sound.on('pointerdown', () => {
       const enable = !(Audio.bgmOn || Audio.seOn);
       if (Audio.bgmOn !== enable) Audio.toggleBgm();

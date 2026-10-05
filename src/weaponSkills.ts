@@ -12,13 +12,13 @@ export interface WeaponSkill {
 }
 
 export const WEAPON_SKILLS = {
-  dagger: { name: '影渡り', description: '前方3マス以内の敵の背後へ移動して一撃', color: 0xb88cff, chargeSteps: 100, range: 3, multiplier: 1.25, sound: 'skillDagger' },
-  longsword: { name: '扇斬り', description: '正面・斜め前の3マスを斬る', color: 0x6fa8ff, chargeSteps: 100, range: 1, multiplier: 1.3, sound: 'skillLongsword' },
-  lance: { name: '貫通突き', description: '前方3マスを貫通・防御の50%を無視', color: 0xf0c75e, chargeSteps: 100, range: 3, multiplier: 1.35, sound: 'skillLance' },
-  bow: { name: '穿ち矢', description: '前方7マス以内の敵1体へ重い一撃', color: 0x74d88a, chargeSteps: 100, range: 7, multiplier: 1.8, sound: 'skillBow' },
-  handgun: { name: '三連射', description: '前方3マス以内の敵1体へ3発', color: 0xffac60, chargeSteps: 100, range: 3, multiplier: .65, sound: 'skillHandgun' },
+  dagger: { name: '零刻領域', description: '5ターン時間停止。敵をすり抜けて移動、終了時に正面を攻撃（背後1.5倍）', color: 0xb88cff, chargeSteps: 100, range: 3, multiplier: 0, sound: 'clockTick' },
+  longsword: { name: '扇斬り', description: '正面・斜め前の3マスを斬り、HPを70回復', color: 0x6fa8ff, chargeSteps: 100, range: 1, multiplier: 1.3, sound: 'skillLongsword' },
+  lance: { name: '貫通突き', description: '東西南北各3マスを攻撃・攻撃力30%低下を3ターン', color: 0xf0c75e, chargeSteps: 100, range: 3, multiplier: 1.35, sound: 'skillLance' },
+  bow: { name: '穿ち矢', description: '前方7マス以内の敵1体を攻撃し、2ターンスタン', color: 0x74d88a, chargeSteps: 100, range: 7, multiplier: 1.8, sound: 'skillBow' },
+  handgun: { name: '五連射', description: '前方3マス以内の敵1体へ5発・生存時に防御30%低下を3ターン', color: 0xffac60, chargeSteps: 100, range: 3, multiplier: .65, sound: 'skillHandgun' },
   greatsword: { name: '旋風斬り', description: '周囲8マスを斬り、敵を1マス押し戻す', color: 0xff7272, chargeSteps: 100, range: 1, multiplier: 1.45, sound: 'skillGreatsword' },
-  dual_sword: { name: 'クロスビーム斬撃', description: '前方一直線5マスへ交差する斬撃', color: 0x55dff3, chargeSteps: 100, range: 5, multiplier: .9, sound: 'skillDual' }
+  dual_sword: { name: '十字絶閃', description: '前方5マスを貫通する斬撃を3連発・各発は通常攻撃の1.5倍', color: 0xffa1ef, chargeSteps: 100, range: 5, multiplier: 1.5, sound: 'skillDual' }
 } satisfies Record<Exclude<WeaponType, 'twin_daggers'>, WeaponSkill>;
 
 export function weaponSkill(type?: WeaponType): WeaponSkill | null {
@@ -54,7 +54,16 @@ export function planSkill<T>(type: WeaponType, origin: Vec2, dir: Dir, context: 
     if (enemy && context.canHit(enemy) && !targets.includes(enemy)) targets.push(enemy);
     return !!enemy;
   };
-  if (type === 'greatsword') {
+  if (type === 'lance') {
+    for (const direction of ['up', 'down', 'left', 'right'] as Dir[]) {
+      const vector = directionVector(direction);
+      for (let n = 1; n <= skill.range; n++) {
+        const x = origin.x + vector.x * n, y = origin.y + vector.y * n;
+        if (context.blocked(x, y)) break;
+        append(x, y);
+      }
+    }
+  } else if (type === 'greatsword') {
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
       if (!dx && !dy) continue;
       if (dx && dy && context.blocked(origin.x + dx, origin.y) && context.blocked(origin.x, origin.y + dy)) continue;
@@ -76,4 +85,21 @@ export function planSkill<T>(type: WeaponType, origin: Vec2, dir: Dir, context: 
     }
   }
   return { tiles, targets };
+}
+
+/** A line of enemies/objects is crossed in one action, but walls and sealed boundaries cannot be crossed. */
+export function timeStopDestination(origin: Vec2, dir: Dir, context: {
+  blocked: (x: number, y: number) => boolean;
+  enemy: (x: number, y: number) => boolean;
+  object: (x: number, y: number) => boolean;
+}): Vec2 | null {
+  const d = directionVector(dir);
+  let x = origin.x + d.x, y = origin.y + d.y;
+  if (context.blocked(x, y)) return null;
+  if (!context.enemy(x, y)) return context.object(x, y) ? null : { x, y };
+  while (context.enemy(x, y) || context.object(x, y)) {
+    x += d.x; y += d.y;
+    if (context.blocked(x, y)) return null;
+  }
+  return { x, y };
 }

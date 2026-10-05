@@ -15,7 +15,7 @@ import { DIRECTIONAL_MONSTERS } from '../monsterDirections';
 import { HELD_EQUIPMENT, HELD_FRAME_SIZE } from '../equipmentAppearance';
 import { RUIN_TERRAIN_FLOORS, RUIN_TERRAIN_PARTS, RUIN_FLOOR_FRAME_SIZE, ruinTerrainKey, ruinFloorKey } from '../ruinTerrain';
 import { GAME_W, GAME_H } from '../layout';
-import { SKILL_ICON_ART } from '../skillArt';
+import { SKILL_ICON_ART, SKILL_FX_ART } from '../skillArt';
 import { ADVENTURE_ART } from '../adventureArt';
 import { DURABILITY_WARNING_ART } from '../durabilityWarnings';
 import { HALLOWEEN_ART } from '../halloweenContent';
@@ -247,6 +247,9 @@ export class BootScene extends Phaser.Scene {
     }
     for (const [key, path] of Object.entries(WEAPON_ART)) {
       this.load.image(key, path);
+    }
+    for (const [key, path] of Object.entries(SKILL_FX_ART)) {
+      this.load.spritesheet(key, path, { frameWidth: 887, frameHeight: 887 });
     }
     for (const [key, path] of Object.entries({ ...SHIELD_ART, ...SKILL_ICON_ART, ...ADVENTURE_ART })) {
       this.load.image(key, path);
