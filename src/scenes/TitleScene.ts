@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 
-import { presentMenu, menuBackdrop } from '../menuPresentation';
+import { presentMenu } from '../menuPresentation';
+import { addTitleLoop } from '../titleOpening';
 import { GAME_W, GAME_H } from '../main';
 import { Audio } from '../audio/manager';
 import { readRunSave } from '../runSave';
@@ -116,12 +117,7 @@ export class TitleScene extends Phaser.Scene {
 
   private createCinematicTitle(explore: () => void, event: () => void) {
     const mobile = GAME_W < 700, cx = GAME_W / 2;
-    const bg = menuBackdrop(this, 'title_citadel_v1').setName('title-cinematic-background');
-
-    const blur = bg.postFX?.addBlur(0, 1, 1, .45);
-    if (blur) this.tweens.add({targets:blur,x:0,y:0,strength:0,duration:2400,ease:'Sine.inOut',onComplete:()=>{if(bg.active)bg.postFX.remove(blur)}});
-    const openingVeil=this.add.rectangle(cx,GAME_H/2,GAME_W*4,GAME_H*4,0xeaf8ff,.12);
-    this.tweens.add({targets:openingVeil,alpha:0,duration:2400,ease:'Sine.inOut',onComplete:()=>openingVeil.destroy()});
+    addTitleLoop(this);
     this.add.rectangle(cx,GAME_H/2,GAME_W,GAME_H,0x061014,mobile?.16:.04);
     this.add.rectangle(cx,GAME_H-100,GAME_W,200,0x030b10,.20);
     const logo = this.add.image(cx,mobile?280:260,'title_golden_crossed_swords').setName('title-logo');

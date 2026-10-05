@@ -4163,7 +4163,7 @@ export class GameScene extends Phaser.Scene {
     } else if (t === 'voidRift') {
       this.damagePlayer(4 + Math.floor(this.floor / 9), '虚無の亀裂に生命力を奪われた！');
     } else if (t === 'ice') {
-      // Movement continues one extra tile in the same direction below.
+      // Continue in the same direction until leaving the ice or reaching an obstacle.
     }
     this.applyBossHazardOnEntry(x, y);
     // アイテム拾得
@@ -4204,7 +4204,8 @@ export class GameScene extends Phaser.Scene {
       const tile = this.dungeon.tiles[ny]?.[nx];
       if (!tile || !isWalkable(tile) || tile === 'pit'
         || (this.inBossRoom && !this.isInsideBossCombatFrame(nx, ny))
-        || this.enemyAt(nx, ny) || this.chestAt(nx, ny) || this.bossObstacleAt(nx, ny)) {
+        || this.enemyAt(nx, ny) || this.chestAt(nx, ny) || this.bossObstacleAt(nx, ny)
+        || this.dungeonObjectAt(nx, ny)) {
         this.log('氷の上で滑ったが、障害物にぶつかった！', 'sys');
         return slid;
       }
@@ -6284,6 +6285,10 @@ export class GameScene extends Phaser.Scene {
         e.sprite.setAlpha(v ? (e.stealthRevealed ? 1 : .08) : 0);
         e.shadow?.setAlpha(v ? (e.stealthRevealed ? .55 : .08) : 0);
         if (e.hpBar) e.hpBar.setAlpha(e.stealthRevealed ? 1 : 0.08);
+      } else if (e.def.gimmick === 'burrow' && e.charging) {
+        e.sprite.setAlpha(v ? .05 : 0);
+        e.shadow?.setAlpha(v ? .03 : 0);
+        e.hpBar?.setAlpha(.05);
       } else e.sprite.setAlpha(v ? 1 : 0);
     }
     for (const c of this.chests) {
@@ -7657,6 +7662,9 @@ export class GameScene extends Phaser.Scene {
         actions++;
         await this.playerAct(dir, { moveOnly: true });
         const positionAfter = `${this.player.x},${this.player.y}`;
+        // Ice can carry us past the clicked cell. Stop at the landing point instead
+        // of planning a return trip onto the ice and sliding back again.
+        if (this.player.x !== nextX || this.player.y !== nextY) break;
         // ボス戦は1タップ1行動。通常戦も攻撃・被弾・足止めが起きた時点で止める。
         if (bossCombat || encounteredEnemy || this.player.hp !== hpBefore || positionAfter === positionBefore) break;
         // 引き寄せやノックバックで同じ場所を循環した場合は即停止する。
@@ -8016,7 +8024,9 @@ export class GameScene extends Phaser.Scene {
   private canClickEnemy(enemy: Enemy): boolean {
     if (!enemy.alive || !enemy.sprite?.active || !enemy.sprite.visible || enemy.sprite.alpha <= 0) return false;
     if (enemy.def.isDarkNinja && !enemy.stealthRevealed && !this.torchRevealsEnemy(enemy)) return false;
-    if (enemy.def.gimmick === 'burrow' && enemy.charging && !this.torchRevealsEnemy(enemy)) return false;
+    // Adjacent melee remains available while burrowed, just as with directional input.
+    if (enemy.def.gimmick === 'burrow' && enemy.charging && !this.torchRevealsEnemy(enemy)
+      && bodyDistance(enemy, bossBodyRadius(enemy.def), this.player) > 1) return false;
     return true;
   }
 

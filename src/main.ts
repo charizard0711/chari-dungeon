@@ -1,4 +1,4 @@
-import { installScreenSizeControls } from './menuPresentation';
+import { installScreenSizing } from './menuPresentation';
 import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene';
 import { TitleScene } from './scenes/TitleScene';
@@ -29,6 +29,6 @@ const config: Phaser.Types.Core.GameConfig = {
 };
 
 const game = new Phaser.Game(config);
-installScreenSizeControls(game);
+installScreenSizing(game);
 // デバッグ用に公開
 (window as any).__game = game;
