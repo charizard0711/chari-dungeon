@@ -629,14 +629,15 @@ const MONSTER_DEFS_RAW: MonsterDef[] = [
   }
 ];
 
-export const MONSTER_DEFS: MonsterDef[] = [...MONSTER_DEFS_RAW.map((monster) => ({
+export const NORMAL_MONSTER_DEFS: MonsterDef[] = MONSTER_DEFS_RAW.map((monster) => ({
   ...monster,
   element: MONSTER_ELEMENTS[monster.key],
   gimmick: MONSTER_GIMMICKS[monster.key]?.kind,
   gimmickText: MONSTER_GIMMICKS[monster.key]?.text,
   description: [monster.description, MONSTER_GIMMICKS[monster.key]?.text ? `【特性】${MONSTER_GIMMICKS[monster.key].text}` : '']
     .filter(Boolean).join(' ')
-})), ...HALLOWEEN_MONSTERS];
+}));
+export const MONSTER_DEFS: MonsterDef[] = [...NORMAL_MONSTER_DEFS, ...HALLOWEEN_MONSTERS];
 
 // ===== 階層テーマ（2フロアごとに名前・見た目が変わる）=====
 export interface FloorTheme {

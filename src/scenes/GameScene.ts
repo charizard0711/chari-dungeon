@@ -22,7 +22,7 @@ import { normalizeQuests, mergeQuests, recordQuestKill, claimQuest, completedQue
 import { playPaintedSkill, paintedImpact, paintedVanish, skillImpactTime } from '../skillEffects';
 import { resolveShieldHit } from '../shieldEffects';
 import type { BossRoomZone, OptionalRoom, OptionalRoomKind, Room } from '../dungeon';
-import { getTheme, eraSuffix, MONSTER_DEFS, WEAPON_DEFS, makeItem, gradeColor, ITEM_DEFS, ELEMENT_INFO, monsterElement } from '../data';
+import { getTheme, eraSuffix, MONSTER_DEFS, NORMAL_MONSTER_DEFS, WEAPON_DEFS, makeItem, gradeColor, ITEM_DEFS, ELEMENT_INFO, monsterElement } from '../data';
 import type { Armor, Dir, Element, MonsterElement, EquipmentGrade, ItemKind, MonsterDef, Shield, TileType, Vec2, Weapon } from '../types';
 import {
   Player, rollWeapon, rollWeaponByGrade, rollGlacialBossWeapon, rollVolcanicBossWeapon, rollShield, rollShieldByGrade,
@@ -71,7 +71,7 @@ const RUN_STATE_KEYS = [
   'emeraldGuardReadyTurn', 'emeraldGuardUntil', 'emeraldGuardArmed', 'eventMode', 'eventStartingWeapon', 'difficulty', 'revivesUsed', 'difficultyClearEligible',
   'floor', 'turn', 'floorTurn', 'score', 'floorStartHp', 'floorDamaged', 'floorBossDefeated',
   'inBossRoom', 'bossRewardClaimed', 'bossEntranceClosed', 'weaponWonThisFloor', 'reviveSeedSeen',
-  'floorPotionDrops', 'shopPurchases', 'enhancementScrollDrops', 'reservedBossScroll', 'pendingEquipment',
+  'floorPotionDrops', 'shopPurchases', 'enhancementScrollDrops', 'enhancementScrollClaimedBlocks', 'reservedBossScroll', 'pendingEquipment',
   'secretDualUnlocked', 'itemCatalogUnlocked', 'playerRootTurns', 'itemSealTurns', 'playerGender',
   'playerArmor', 'lightRadius', 'shroomTurns', 'torchTurns', 'lanternTurns', 'invisTurns',
   'transformation', 'penaltyFlags', 'skillChargeSteps', 'secretQuests'
@@ -353,6 +353,7 @@ export class GameScene extends Phaser.Scene {
   reviveSeedSeen = false;
   shopPurchases: Record<ShopItemKind, number> = { potion: 0, repair: 0, slime_scroll: 0, boss5_scroll: 0 };
   enhancementScrollDrops: Record<EnhancementScrollKind, boolean> = { stone: false, shieldstone: false };
+  enhancementScrollClaimedBlocks: number[] = [];
   reservedBossScroll: EnhancementScrollKind | null = null;
   clickPathToken = 0;
   clickPathActive = false;
@@ -543,6 +544,7 @@ export class GameScene extends Phaser.Scene {
     this.shopPurchases = { potion: 0, repair: 0, slime_scroll: 0, boss5_scroll: 0 };
     this.enhancementScrollDrops = { stone: false, shieldstone: false };
     this.reservedBossScroll = null;
+    this.enhancementScrollClaimedBlocks = [];
     this.clickPathToken = 0;
     this.clickPathActive = false;
     this.lastMapClickAt = 0;
@@ -1649,7 +1651,7 @@ export class GameScene extends Phaser.Scene {
 
   spawnEnemies(floor: number) {
     if (this.eventMode) { this.spawnHalloweenEnemies(); return; }
-    const pool = MONSTER_DEFS.filter((m) =>
+    const pool = NORMAL_MONSTER_DEFS.filter((m) =>
       m.minFloor <= floor && floor <= m.maxFloor && !m.isBoss && !m.isTreasureRabbit
     );
     if (this.inBossRoom) {
@@ -1952,8 +1954,8 @@ export class GameScene extends Phaser.Scene {
         this.applyTileVisual(this.tileSprites[pos.y][pos.x], hazard, getTheme(this.floor).era, pos.x, pos.y);
       }
     }
-    if (optional.kind === 'ambush' || optional.kind === 'hazard') {
-      const pool = MONSTER_DEFS.filter((monster) => monster.minFloor <= this.floor && this.floor <= monster.maxFloor
+    if ((optional.kind === 'ambush' || optional.kind === 'hazard') && !this.milestoneFloorCleared()) {
+      const pool = (this.eventMode ? HALLOWEEN_MOBS : NORMAL_MONSTER_DEFS).filter((monster) => monster.minFloor <= this.floor && this.floor <= monster.maxFloor
         && !monster.isBoss && !monster.isTreasureRabbit);
       const positions = Phaser.Utils.Array.Shuffle([
         { x: room.cx - 2, y: room.cy - 1 }, { x: room.cx + 2, y: room.cy - 1 },
@@ -3708,11 +3710,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   private claimRegularEnhancementScroll(): EnhancementScrollKind | null {
+    if (this.enhancementScrollClaimedBlocks.includes(Math.ceil(this.floor / 2)) || this.reservedBossScroll) return null;
     const candidates: EnhancementScrollKind[] = (['stone', 'shieldstone'] as EnhancementScrollKind[])
       .filter((kind) => !this.enhancementScrollDrops[kind] && kind !== this.reservedBossScroll);
     if (!candidates.length) return null;
     const kind = candidates[Math.floor(Math.random() * candidates.length)];
     this.enhancementScrollDrops[kind] = true;
+    this.enhancementScrollClaimedBlocks.push(Math.ceil(this.floor / 2));
     return kind;
   }
 
@@ -3722,7 +3726,8 @@ export class GameScene extends Phaser.Scene {
     return kind;
   }
 
-  private dropGuaranteedBossScroll(x: number, y: number): EnhancementScrollKind {
+  private dropGuaranteedBossScroll(x: number, y: number): EnhancementScrollKind | null {
+    if (this.enhancementScrollClaimedBlocks.includes(Math.ceil(this.floor / 2))) return null;
     const preferred = this.reservedBossScroll;
     const fallback: EnhancementScrollKind = preferred === 'stone' ? 'shieldstone' : 'stone';
     const kind = preferred && !this.enhancementScrollDrops[preferred]
@@ -3731,6 +3736,7 @@ export class GameScene extends Phaser.Scene {
         ? fallback
         : preferred ?? fallback;
     this.enhancementScrollDrops[kind] = true;
+    this.enhancementScrollClaimedBlocks.push(Math.ceil(this.floor / 2));
     this.dropItem(x, y, kind);
     return kind;
   }
@@ -4531,7 +4537,7 @@ export class GameScene extends Phaser.Scene {
         const pool: ItemKind[] = ['potion', 'torch', 'warp', 'invis'];
         this.dropItem(e.x, e.y, pool[Math.floor(Math.random() * pool.length)]);
       }
-      // ボス用の1枚は予約し、通常敵・エリートからはもう一方だけを各マップ最大1枚に制限する。
+      // ボス・敵・宝箱を合わせて2フロアごとに強化スクロールを1枚までに制限する。
       if (!def.isFloorBoss && Math.random() < SCROLL_DROP_RATE * dropRateScale) {
         const scroll = this.claimRegularEnhancementScroll();
         if (scroll) this.dropItem(e.x, e.y, scroll);
@@ -4597,7 +4603,7 @@ export class GameScene extends Phaser.Scene {
     if (def.isFloorBoss) {
       for (const object of [...this.enemies]) if (object.def.halloweenOwner === def.key) this.destroyHalloweenObject(object, false);
       const guaranteedScroll = this.dropGuaranteedBossScroll(e.x, e.y);
-      this.log(`倒れた魔物のそばに、${ITEM_DEFS[guaranteedScroll].name}が残されていた。`, 'special');
+      if (guaranteedScroll) this.log(`倒れた魔物のそばに、${ITEM_DEFS[guaranteedScroll].name}が残されていた。`, 'special');
       this.unlockFloorGate(def.name, { x: e.x, y: e.y });
     }
   }
@@ -4694,7 +4700,7 @@ export class GameScene extends Phaser.Scene {
       this.damagePlayer((fiery ? 5 : 3) + Math.floor(this.floor / 10), fiery ? '迷い火の爆発！' : '砕けた氷片が飛び散った！', e);
       this.effectFx(e.x, e.y, 'fx_magic', 1.5, 360, fiery ? 0xff8b42 : 0x8de9ff);
     }
-    if (!obliterate && e.def.gimmick === 'split' && e.cloneDepth === 0) {
+    if (!obliterate && !this.milestoneFloorCleared() && e.def.gimmick === 'split' && e.cloneDepth === 0) {
       const spots = Phaser.Utils.Array.Shuffle([
         { x: e.x + 1, y: e.y }, { x: e.x - 1, y: e.y },
         { x: e.x, y: e.y + 1 }, { x: e.x, y: e.y - 1 }
@@ -5145,7 +5151,12 @@ export class GameScene extends Phaser.Scene {
     this.emitRefresh();
   }
 
+  private milestoneFloorCleared(): boolean {
+    return this.floor % 5 === 0 && this.floorBossDefeated;
+  }
+
   applyLongStay() {
+    if (this.milestoneFloorCleared()) return;
     if (this.eventMode) return;
     if (this.inBossRoom && hasFinalDepthTerrain(this.floor)) return;
     const f = this.floorTurn;
@@ -5161,13 +5172,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   spawnWanderer(elite: boolean) {
+    if (this.milestoneFloorCleared()) return;
     if (this.inBossRoom && hasFinalDepthTerrain(this.floor)) return;
     if (hasFinalDepthTerrain(this.floor) && this.enemies.filter(e => e.alive && !e.def.isFloorBoss).length >= finalDepthMobCount(this.floor, false, 15)) return;
-    const pool = MONSTER_DEFS.filter((m) =>
+    const pool = NORMAL_MONSTER_DEFS.filter((m) =>
       m.minFloor <= this.floor && this.floor <= m.maxFloor && !m.isBoss && !m.isTreasureRabbit
       && (elite ? m.isElite : true)
     );
-    const usePool = pool.length ? pool : MONSTER_DEFS.filter((m) => !m.isBoss && !m.isTreasureRabbit);
+    const usePool = pool.length ? pool : NORMAL_MONSTER_DEFS.filter((m) => !m.isBoss && !m.isTreasureRabbit);
     const def = usePool[Math.floor(Math.random() * usePool.length)];
     const pos = this.inBossRoom
       ? this.randomBossCombatFloor(this.occupiedPositions())
@@ -5186,7 +5198,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   summonGimmickMonsters(e: Enemy, key: string, count: number) {
-    const base = (this.eventMode ? HALLOWEEN_MOBS : MONSTER_DEFS).find((monster) => monster.key === key);
+    if (this.milestoneFloorCleared()) return;
+    const base = (this.eventMode ? HALLOWEEN_MOBS : NORMAL_MONSTER_DEFS).find((monster) => monster.key === key);
     if (!base) return;
     const spots = Phaser.Utils.Array.Shuffle([
       { x: e.x + 1, y: e.y }, { x: e.x - 1, y: e.y },
@@ -8427,6 +8440,9 @@ export class GameScene extends Phaser.Scene {
   private restoreRunState(snapshot: RunSnapshot) {
     const journal = this.secretQuests;
     Object.assign(this, pickFields(snapshot.state, RUN_STATE_KEYS));
+    this.enhancementScrollClaimedBlocks = Array.isArray(snapshot.state.enhancementScrollClaimedBlocks)
+      ? [...snapshot.state.enhancementScrollClaimedBlocks]
+      : Object.values(this.enhancementScrollDrops).some(Boolean) ? [Math.ceil(this.floor / 2)] : [];
     this.eventMode = snapshot.state.eventMode ?? null;
     this.emeraldGuardUntil = snapshot.state.emeraldGuardUntil ?? 0;
     this.emeraldGuardReadyTurn = snapshot.state.emeraldGuardReadyTurn ?? (this.emeraldGuardUntil > 0 ? this.emeraldGuardUntil + 97 : 0);
@@ -8465,7 +8481,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private restoreRunEntities(snapshot: RunSnapshot) {
-    for (const saved of snapshot.enemies) {
+    const restoredEnemies: (Enemy | undefined)[] = [];
+    for (const [index, saved] of snapshot.enemies.entries()) {
+      // Remove event enemies leaked into older ordinary-stage saves, preserving boss indices.
+      if (!this.eventMode && saved.state.def.key.startsWith('m_hw_')) continue;
       if (this.floor === 10 && saved.state.def.isFloorBoss && saved.state.def.key === 'm_horn_demon') {
         saved.state.def = { ...saved.state.def, key: 'm_giant_bull', name: '巨角の猛牛', bossTint: 0xffffff,
           element: undefined, description: MONSTER_DEFS.find(m => m.key === 'm_giant_bull')!.description };
@@ -8476,6 +8495,7 @@ export class GameScene extends Phaser.Scene {
         saved.visual.tint = 0xffffff;
       }
       const e = this.addEnemy(saved.state.def, saved.state.x, saved.state.y, 1);
+      restoredEnemies[index] = e;
       Object.assign(e, saved.state);
       e.sprite.setTexture(saved.visual.texture).setScale(saved.visual.scaleX, saved.visual.scaleY)
         .setTint(saved.visual.tint).setAlpha(saved.visual.alpha);
@@ -8522,7 +8542,7 @@ export class GameScene extends Phaser.Scene {
       if (object.used) { restored.sprite.setTint(0x7b8c8a).setAlpha(.72); restored.waterFx?.setVisible(false); }
     }
     for (const saved of snapshot.bosses) {
-      const enemy = this.enemies[saved.enemy];
+      const enemy = restoredEnemies[saved.enemy];
       if (!enemy) continue;
       this.registerBossGimmick(enemy, saved.state.kind);
       const state = this.bossStates.get(enemy)!;
