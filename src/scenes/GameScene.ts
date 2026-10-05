@@ -7048,8 +7048,9 @@ export class GameScene extends Phaser.Scene {
     }
     this.player.gold -= 500;
 
-    // Each selected pool has its own 0.01% legendary; the armor category roll does not dilute it.
-    const legendaryWon = Math.random() < ARCADIA_GACHA_RATE;
+    // Ordinary SSS equipment is exclusive to normal runs, including the gacha.
+    // Each normal pool has its own 0.01% legendary chance before the armor category roll.
+    const legendaryWon = !this.eventMode && Math.random() < ARCADIA_GACHA_RATE;
     const arcadiaWon = pool === 'weapon' && legendaryWon;
     const arcadiaShieldWon = pool === 'armor' && legendaryWon;
 
