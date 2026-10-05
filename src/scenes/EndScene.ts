@@ -4,6 +4,8 @@ import Phaser from 'phaser';
 import { GAME_W, GAME_H } from '../main';
 import { Audio } from '../audio/manager';
 import { getSelectedGender, type PlayerGender } from '../playerAppearance';
+import { createDamageJournal } from '../damageJournalUI';
+import type { AdventureEntry, DamageEntry } from '../damageJournal';
 
 interface EndStats {
   eventMode?: 'halloween' | null;
@@ -23,14 +25,18 @@ interface EndStats {
   hpMax: number;
   discovered: number;
   totalMonsters: number;
+  damageHistory?: DamageEntry[];
+  adventureHistory?: AdventureEntry[];
 }
 
 export class EndScene extends Phaser.Scene {
+  private journal?: Phaser.GameObjects.Container;
   constructor() {
     super('EndScene');
   }
 
   create(stats: EndStats) {
+    this.journal = undefined;
     if (stats.eventMode === 'halloween') { this.createHalloweenResult(stats); return; }
     if (!stats.cleared) { this.createDefeat(stats); return; }
     presentVictory(this, stats, (x, y, label, primary, action) => this.defeatButton(x, y, label, primary, action));
@@ -49,6 +55,7 @@ export class EndScene extends Phaser.Scene {
     const leave=(scene:string)=>{if(leaving)return;leaving=true;this.scene.start(scene);};
     this.defeatButton(cx,610,'武器を選んでもう一度',true,()=>leave('HalloweenScene'));
     this.defeatButton(cx,690,'タイトルへ',false,()=>leave('TitleScene'));
+    if (!stats.cleared) this.addDamageLog(stats, mobile ? 541 : 548);
   }
 
   private createDefeat(stats: EndStats) {
@@ -83,7 +90,20 @@ export class EndScene extends Phaser.Scene {
     this.add.text(cx, mobile ? 328 : 350, DIFFICULTY_RULES[difficultyOf(stats.difficulty)].name, {fontFamily:'"Yu Gothic UI"',fontSize:'14px',color:DIFFICULTY_RULES[difficultyOf(stats.difficulty)].text}).setOrigin(.5);
     this.defeatButton(mobile ? cx : cx - 166, mobile ? 658 : 640, 'もう一度挑戦', true, () => leave('GameScene'));
     this.defeatButton(mobile ? cx : cx + 166, mobile ? 734 : 640, 'タイトルへ', false, () => leave('TitleScene'));
-    this.input.keyboard?.once('keydown-ENTER', () => leave('GameScene'));
+    this.addDamageLog(stats, mobile ? 613 : 584);
+    const retry = () => { if (!this.journal?.active) leave('GameScene'); };
+    this.input.keyboard?.on('keydown-ENTER', retry);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.input.keyboard?.off('keydown-ENTER', retry));
+  }
+
+  private addDamageLog(stats: EndStats, y: number) {
+    const open = (fatalFirst = false) => {
+      if (this.journal?.active) return;
+      this.journal = createDamageJournal(this, stats.damageHistory ?? [], stats.adventureHistory ?? [], difficultyOf(stats.difficulty), () => { this.journal = undefined; }, fatalFirst);
+    };
+    this.add.image(GAME_W / 2 - 66, y, 'ui_nav_damage_log').setDisplaySize(32, 32);
+    this.add.text(GAME_W / 2 + 16, y, '詳細ログを見る', { fontFamily: '"Yu Gothic UI"', fontSize: '16px', color: '#f0d398', padding: { x: 16, y: 10 } })
+      .setOrigin(.5).setInteractive({ useHandCursor: true }).on('pointerdown', () => open(true));
   }
 
   private resultFrame(x: number, y: number, w: number, h: number) {

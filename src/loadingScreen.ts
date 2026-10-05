@@ -1,5 +1,12 @@
 const screen = () => document.getElementById('loading-screen');
 
+export function showLoading(progress = 0, label = '動画の再生を準備中…') {
+  const root = screen();
+  if (!root) return;
+  root.style.removeProperty('display');
+  updateLoading(progress, label);
+}
+
 export function updateLoading(progress: number, label: string) {
   const root = screen();
   if (!root) return;
@@ -10,5 +17,6 @@ export function updateLoading(progress: number, label: string) {
 }
 
 export function finishLoading() {
-  screen()?.remove();
+  const root = screen();
+  if (root) root.style.display = 'none';
 }

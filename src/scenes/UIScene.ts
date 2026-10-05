@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { HALLOWEEN_FLOORS } from '../halloweenContent';
-import { DIFFICULTY_RULES, difficultyFromCode } from '../difficulty';
+import { DIFFICULTY_RULES, difficultyFromCode, difficultyEnemy } from '../difficulty';
+import { questMenuAlpha } from '../secretQuests';
+import { createDamageJournal } from '../damageJournalUI';
 import { buildQuestJournal, QuestCelebrations } from '../secretQuestUI';
 import { LegendaryAura } from '../legendaryAura';
 import { CATALOG_TABS, ITEM_CATALOG, catalogPage, type CatalogCategory, type CatalogEntry } from '../itemCatalog';
@@ -18,7 +20,7 @@ import { durabilityRisk } from '../combat';
 import { DurabilityWarnings } from '../durabilityWarnings';
 import { weaponFullName } from '../player';
 import { getTheme, MAGIC_DESC, MONSTER_DEFS, ITEM_DEFS, gradeColor, isRareItem, ELEMENT_INFO, monsterElement } from '../data';
-import type { Armor, MagicCode, ItemKind, Item, Dir, Weapon, Shield, Element, EquipmentGrade } from '../types';
+import type { Armor, MagicCode, ItemKind, Item, Dir, Weapon, Shield, Element, EquipmentGrade, MonsterDef } from '../types';
 import { shieldFullName } from '../player';
 import { Audio } from '../audio/manager';
 import { EQUIPMENT_LIMIT, SHOP_PRICES, type ShopItemKind } from '../balance';
@@ -56,7 +58,7 @@ export class UIScene extends Phaser.Scene {
   private dynamiteHoverZone?: Phaser.GameObjects.Zone;
   private durabilityWarnings?: DurabilityWarnings;
   overlay!: Phaser.GameObjects.Container;
-  overlayMode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' | 'itemcatalog' | 'equipmentcatalog' | 'repair' | 'quests' = 'none';
+  overlayMode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' | 'itemcatalog' | 'equipmentcatalog' | 'repair' | 'quests' | 'details' = 'none';
   repairKind: 'weapon' | 'shield' = 'weapon';
   repairPageIndex = 0;
   repairPageCount = 1;
@@ -99,6 +101,9 @@ export class UIScene extends Phaser.Scene {
   inventoryScrollMax = 0;
   codexScrollRow = 0;
   codexScrollMax = 0;
+  private monsterDetail?: MonsterDef;
+  private damageJournal?: Phaser.GameObjects.Container;
+  private questMenuArt: (Phaser.GameObjects.Graphics | Phaser.GameObjects.Image | Phaser.GameObjects.Text)[] = [];
   secretDirection: 'left' | 'right' | null = null;
   secretAlternatingPresses = 0;
 
@@ -110,6 +115,9 @@ export class UIScene extends Phaser.Scene {
     this.itemSlotKinds = [];
     this.dynamiteHoverZone = undefined;
     this.secretRewardOpen = false;
+    this.questMenuArt = [];
+    this.monsterDetail = undefined;
+    this.damageJournal = undefined;
     this.slotAuras = [];
     this.overlayMode = 'none';
     this.gachaAnimating = false;
@@ -213,7 +221,7 @@ export class UIScene extends Phaser.Scene {
     // ローカル表示確認用。例: ?mobile=1&qa-game&qa-overlay=settings
     if (location.hostname === 'localhost') {
       const qaOverlay = new URLSearchParams(location.search).get('qa-overlay');
-      const allowed = ['equip', 'inv', 'codex', 'equipmentcatalog', 'settings', 'shop', 'gacha'] as const;
+      const allowed = ['equip', 'inv', 'codex', 'equipmentcatalog', 'details', 'settings', 'shop', 'gacha'] as const;
       if (qaOverlay && allowed.includes(qaOverlay as typeof allowed[number])) {
         this.time.delayedCall(100, () => this.setOverlay(qaOverlay as typeof allowed[number]));
       }
@@ -299,9 +307,9 @@ export class UIScene extends Phaser.Scene {
       { t: '持ち物・装備', icon: 'ui_nav_inventory', f: () => this.openInventory() },
       { t: 'ショップ', icon: 'ui_nav_shop', f: () => this.setOverlay('shop') },
       { t: 'ガチャ', icon: 'ui_nav_gacha', f: () => this.setOverlay('gacha') },
-      { t: 'モンスター図鑑', icon: 'ui_nav_codex', f: () => this.setOverlay('codex') },
-      { t: '装備図鑑', icon: 'ui_nav_equipment_codex', f: () => this.setOverlay('equipmentcatalog') },
+      { t: '冒険図鑑', icon: 'ui_nav_codex', f: () => this.setOverlay('codex') },
       { t: '秘密クエスト', icon: 'ui_nav_quests', f: () => this.setOverlay('quests') },
+      { t: '詳細ログ', icon: 'ui_nav_damage_log', f: () => this.setOverlay('details') },
       { t: '設定', icon: 'ui_nav_settings', f: () => this.showSettings() }
     ];
     let y = 84;
@@ -327,6 +335,8 @@ export class UIScene extends Phaser.Scene {
     zone.on('pointerover', () => draw(this.gs.difficulty === 'hard' ? 0x12314b : 0x35202a, this.theme.color));
     zone.on('pointerout', () => draw(0x141017));
     zone.on('pointerdown', () => { Audio.playSe('click'); onClick(); });
+    zone.setName(iconKey === 'ui_nav_damage_log' ? 'menu-details' : iconKey === 'ui_nav_codex' ? 'menu-codex' : iconKey === 'ui_nav_quests' ? 'menu-quests' : `menu-${iconKey}`);
+    if (iconKey === 'ui_nav_quests') this.questMenuArt.push(g, icon, t);
     void icon; void t;
   }
 
@@ -498,8 +508,8 @@ export class UIScene extends Phaser.Scene {
       { icon: 'ui_nav_shop', label: '店', f: () => this.setOverlay('shop') },
       { icon: 'ui_nav_gacha', label: 'ガチャ', f: () => this.setOverlay('gacha') },
       { icon: 'ui_nav_codex', label: '図鑑', f: () => this.setOverlay('codex') },
-      { icon: 'ui_nav_equipment_codex', label: '装備図鑑', f: () => this.setOverlay('equipmentcatalog') },
       { icon: 'ui_nav_quests', label: '秘密', f: () => this.setOverlay('quests') },
+      { icon: 'ui_nav_damage_log', label: '詳細ログ', f: () => this.setOverlay('details') },
       { icon: 'ui_nav_settings', label: '設定', f: () => this.showSettings() }
     ];
     this.panel(8, 800, 374, 36);
@@ -509,11 +519,13 @@ export class UIScene extends Phaser.Scene {
       const g = this.add.graphics();
       const draw = (c: number) => { g.clear(); g.fillStyle(c, 1).fillRoundedRect(x, y, w, h, 6); };
       draw(0x25121e);
-      this.add.image(x + w / 2, y + 10, it.icon).setDisplaySize(21, 21);
-      this.add.text(x + w / 2, y + 25, it.label, {
+      const icon = this.add.image(x + w / 2, y + 10, it.icon).setDisplaySize(21, 21);
+      const label = this.add.text(x + w / 2, y + 25, it.label, {
         fontFamily: '"Yu Gothic UI"', fontSize: '8px', color: '#dfe7f0'
       }).setOrigin(.5);
       const zone = this.add.zone(x, y, w, h).setOrigin(0).setInteractive({ useHandCursor: true });
+      zone.setName(it.icon === 'ui_nav_damage_log' ? 'menu-details' : it.icon === 'ui_nav_codex' ? 'menu-codex' : it.icon === 'ui_nav_quests' ? 'menu-quests' : `menu-${it.icon}`);
+      if (it.icon === 'ui_nav_quests') this.questMenuArt.push(g, icon, label);
       zone.on('pointerdown', () => { draw(0x264a48); Audio.playSe('click'); it.f(); });
       zone.on('pointerup', () => draw(0x25121e));
       zone.on('pointerout', () => draw(0x25121e));
@@ -632,6 +644,8 @@ export class UIScene extends Phaser.Scene {
   }
 
   update() {
+    const pulse = questMenuAlpha(this.gs.secretQuests, this.time.now);
+    for (const art of this.questMenuArt) art.setAlpha(pulse);
     this.refreshSkillButton();
     this.durabilityWarnings?.update(this.gs.player, this.time.now, this.overlayMode === 'none' && !this.gs.gameEnded);
     for (const entry of this.slotAuras) { entry.aura.emerald = ['w_hw_emedral', 's_hw_emerald'].includes(entry.icon.texture.key); entry.aura.enabled = entry.icon.texture.key === entry.key || entry.aura.emerald; }
@@ -1075,11 +1089,11 @@ export class UIScene extends Phaser.Scene {
     this.rebuildOverlay();
   }
 
-  setOverlay(mode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' | 'itemcatalog' | 'equipmentcatalog' | 'repair' | 'quests') {
+  setOverlay(mode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' | 'itemcatalog' | 'equipmentcatalog' | 'repair' | 'quests' | 'details') {
     if (this.gachaAnimating) return; // 演出中は切替禁止
     if (this.gs.pendingEquipment && mode !== 'equip') mode = 'equip';
     if (mode === 'equip' && this.overlayMode !== 'equip') this.equipScrollIndex = 0;
-    if (mode === 'codex' && this.overlayMode !== 'codex') this.codexScrollRow = 0;
+    if (mode === 'codex' && this.overlayMode !== 'codex') { this.codexScrollRow = 0; this.monsterDetail = undefined; }
     if (mode === 'repair' && this.overlayMode !== 'repair') this.repairPageIndex = 0;
     if (mode === 'pick') this.pickPageIndex = 0;
     if (mode === 'equipmentcatalog' && this.overlayMode !== mode) {
@@ -1092,6 +1106,7 @@ export class UIScene extends Phaser.Scene {
       this.secretDirection = null;
       this.secretAlternatingPresses = 0;
     }
+    if (mode !== 'details') { this.damageJournal?.destroy(true); this.damageJournal = undefined; }
     this.overlayMode = mode;
     this.releaseJoystick?.();
     this.refreshSkillButton();
@@ -1112,6 +1127,21 @@ export class UIScene extends Phaser.Scene {
   }
 
   handleEquipmentSecret(event: KeyboardEvent) {
+    if (this.overlayMode === 'details') {
+      if (event.key === 'Escape') { event.preventDefault(); this.setOverlay('none'); }
+      return;
+    }
+    if (this.overlayMode === 'codex') {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (this.monsterDetail) { this.monsterDetail = undefined; this.rebuildOverlay(); }
+        else this.setOverlay('none');
+      } else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'ArrowRight', 'ArrowDown', 'PageDown'].includes(event.key)) {
+        event.preventDefault();
+        if (!event.repeat) this.scrollCodex(['ArrowLeft', 'ArrowUp', 'PageUp'].includes(event.key) ? -1 : 1);
+      }
+      return;
+    }
     if (this.overlayMode === 'pick') {
       if (['ArrowLeft', 'ArrowUp', 'PageUp', 'ArrowRight', 'ArrowDown', 'PageDown'].includes(event.key)) {
         event.preventDefault();
@@ -1133,11 +1163,6 @@ export class UIScene extends Phaser.Scene {
       return;
     }
     if (this.handleCodeAndCatalogKey(event)) return;
-    if (this.overlayMode === 'codex' && (event.code === 'ArrowUp' || event.code === 'ArrowDown')) {
-      event.preventDefault();
-      this.scrollCodex(event.code === 'ArrowDown' ? 1 : -1);
-      return;
-    }
     const equipmentListVisible = this.overlayMode === 'equip'
       || this.overlayMode === 'inv' && this.inventoryTab === 'equip';
     if (!equipmentListVisible || event.repeat || this.gs.secretDualUnlocked) return;
@@ -1171,7 +1196,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   scrollCodex(delta: number) {
-    if (this.overlayMode !== 'codex' || this.codexScrollMax <= 0) return;
+    if (this.overlayMode !== 'codex' || this.codexScrollMax <= 0 || this.monsterDetail) return;
     const next = Phaser.Math.Clamp(this.codexScrollRow + delta, 0, this.codexScrollMax);
     if (next === this.codexScrollRow) return;
     this.codexScrollRow = next;
@@ -1180,18 +1205,30 @@ export class UIScene extends Phaser.Scene {
 
   rebuildOverlay() {
     if (this.gachaAnimating) return; // 演出中に消さない
+    if (this.overlayMode === 'details') {
+      if (!this.damageJournal?.active) {
+        this.overlay.removeAll(true);
+        this.damageJournal = createDamageJournal(this, this.gs.damageHistory, this.gs.adventureHistory, this.gs.difficulty, () => this.setOverlay('none'));
+      }
+      return;
+    }
     this.hideTooltip();
     this.overlay.removeAll(true);
     const { x, y, w, h } = this.overlayMode === 'quests' && !IS_MOBILE ? { x: 230, y: 40, w: 820, h: 680 }
-      : ['itemcatalog', 'equipmentcatalog'].includes(this.overlayMode) && !IS_MOBILE
-      ? { x: 180, y: 40, w: 920, h: 660 }
+      : ['itemcatalog', 'equipmentcatalog', 'codex'].includes(this.overlayMode) && !IS_MOBILE
+      ? { x: 180, y: 40, w: 920, h: 680 }
       : ['settings', 'shop', 'repair'].includes(this.overlayMode) && !IS_MOBILE
         ? { x: 200, y: 60, w: 680, h: 620 } : this.L.ov;
+    const illustrated = ['codex', 'equipmentcatalog'].includes(this.overlayMode);
+    if (illustrated) {
+      this.overlay.add(this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x020307, .72).setInteractive());
+      this.overlay.add(this.add.image(x + w / 2, y + h / 2, this.theme.panel).setDisplaySize(w, h));
+    }
     const g = this.add.graphics();
     g.fillStyle(0x110b13, 0.985).fillRoundedRect(x, y, w, h, 14);
     g.fillStyle(0x143034, .26).fillRoundedRect(x + 5, y + 5, w - 10, h - 10, 10);
     g.lineStyle(1.5, this.theme.color).strokeRoundedRect(x, y, w, h, 14);
-    this.overlay.add(g);
+    if (!illustrated) this.overlay.add(g); else g.destroy();
 
     const pickTitles = ['武器を変更', '服を変更', '盾を変更'];
     const title =
@@ -1200,18 +1237,18 @@ export class UIScene extends Phaser.Scene {
       this.overlayMode === 'quests' ? '秘密クエスト' :
       this.overlayMode === 'settings' ? '設定' :
       this.overlayMode === 'itemcatalog' ? '全アイテム一覧' :
-      this.overlayMode === 'equipmentcatalog' ? '装備図鑑' :
+      ['equipmentcatalog', 'codex'].includes(this.overlayMode) ? '冒険図鑑' :
       this.overlayMode === 'shop' ? 'フロアショップ' :
       this.overlayMode === 'repair' ? '修復する装備を選ぶ' :
       this.overlayMode === 'gacha' ? 'ダンジョンガチャ' :
       this.overlayMode === 'pick' ? pickTitles[this.pickSlot] :
       'モンスター図鑑';
-    this.overlay.add(this.add.text(x + 16, y + 12, title, {
-      fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '15px' : '18px',
+    this.overlay.add(this.add.text(x + (illustrated ? 32 : 16), y + (illustrated ? 21 : 12), title, {
+      fontFamily: '"Yu Gothic UI"', fontSize: illustrated ? IS_MOBILE ? '20px' : '24px' : IS_MOBILE ? '15px' : '18px',
       color: this.theme.text, fontStyle: 'bold', wordWrap: { width: w - 72 }
     }));
     // 閉じるボタン
-    const cb = this.add.text(x + w - (IS_MOBILE ? 48 : 34), y + (IS_MOBILE ? 2 : 10), this.gs.pendingEquipment ? '🔒' : '✕', {
+    const cb = this.add.text(x + w - (illustrated ? 64 : IS_MOBILE ? 48 : 34), y + (illustrated ? 14 : IS_MOBILE ? 2 : 10), this.gs.pendingEquipment ? '🔒' : '✕', {
       fontFamily: 'sans-serif', fontSize: IS_MOBILE ? '25px' : '22px', color: '#ff8b8b',
       padding: IS_MOBILE ? { x: 10, y: 8 } : { x: 0, y: 0 }
     });
@@ -1225,7 +1262,16 @@ export class UIScene extends Phaser.Scene {
     else if (this.overlayMode === 'quests') buildQuestJournal(this, x, y, w, h);
     else if (this.overlayMode === 'inv') this.buildUnifiedInventoryOverlay(x, y, w, h);
     else if (this.overlayMode === 'settings') this.buildSettingsOverlay(x, y, w, h);
-    else if (['itemcatalog', 'equipmentcatalog'].includes(this.overlayMode)) this.buildItemCatalogOverlay(x, y, w, h);
+    else if (illustrated) {
+      const gap = 8, tabW = (w - 48 - gap) / 2;
+      for (const [i, mode] of (['codex', 'equipmentcatalog'] as const).entries()) {
+        this.overlay.add(this.rowButton(x + 24 + i * (tabW + gap), y + 51, tabW, i === 0 ? 'モンスター' : '装備', this.overlayMode === mode,
+          () => this.setOverlay(mode)).setName(`codex-tab-${i === 0 ? 'monsters' : 'equipment'}`));
+      }
+      if (this.overlayMode === 'codex') this.buildCodexOverlay(x + 8, y + 50, w - 16, h - 58);
+      else this.buildItemCatalogOverlay(x + 8, y + 50, w - 16, h - 58);
+    }
+    else if (this.overlayMode === 'itemcatalog') this.buildItemCatalogOverlay(x, y, w, h);
     else if (this.overlayMode === 'shop') this.buildShopOverlay(x, y, w);
     else if (this.overlayMode === 'repair') this.buildRepairOverlay(x, y, w, h);
     else if (this.overlayMode === 'gacha') this.buildGachaOverlay(x, y, w, h);
@@ -1643,92 +1689,60 @@ export class UIScene extends Phaser.Scene {
   }
 
   buildCodexOverlay(x: number, y: number, w: number, h: number) {
-    const columns = w >= 640 ? 4 : 3;
-    const gap = 6;
-    const rowH = 40;
-    const colW = (w - 32 - gap * (columns - 1)) / columns;
-    const startY = y + 66;
-    const totalRows = Math.ceil(MONSTER_DEFS.length / columns);
-    const visibleRows = Math.max(3, Math.floor((h - 106) / rowH));
-    this.codexScrollMax = Math.max(0, totalRows - visibleRows);
-    this.codexScrollRow = Phaser.Math.Clamp(this.codexScrollRow, 0, this.codexScrollMax);
-    const firstIndex = this.codexScrollRow * columns;
-    const lastIndex = Math.min(MONSTER_DEFS.length, (this.codexScrollRow + visibleRows) * columns);
-
-    this.overlay.add(this.add.text(x + 16, y + 43, 'ホイール／上下ボタン／スワイプでスクロール', {
-      fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '10px' : '11px', color: '#86a9ad'
-    }));
-
-    MONSTER_DEFS.slice(firstIndex, lastIndex).forEach((m, visibleIndex) => {
-      const i = firstIndex + visibleIndex;
-      const found = this.gs.discovered.has(m.key);
-      const col = i % columns;
-      const px = x + 16 + col * (colW + gap);
-      const py = startY + (Math.floor(i / columns) - this.codexScrollRow) * rowH;
-      const card = this.add.graphics();
-      card.fillStyle(found ? 0x152235 : 0x111824, 0.92).fillRoundedRect(px, py, colW, rowH - 3, 4);
-      card.lineStyle(1, found ? m.color : 0x2b3442, found ? 0.72 : 0.45)
-        .strokeRoundedRect(px, py, colW, rowH - 3, 4);
-      this.overlay.add(card);
-
-      if (found) {
-        const icon = this.add.image(px + 14, py + 13, m.key).setDisplaySize(24, 24);
-        this.overlay.add(icon);
-      } else {
-        this.overlay.add(this.add.text(px + 14, py + 13, '?', {
-          fontFamily: 'Georgia', fontSize: '15px', color: '#495568', fontStyle: 'bold'
-        }).setOrigin(0.5));
-      }
-
-      const name = found ? m.name : '未発見';
-      this.overlay.add(this.add.text(px + 29, py + 3, name, {
-        fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: found ? '#eef5ff' : '#596579', fontStyle: 'bold'
-      }));
-      const element = monsterElement(m);
-      const weakTo = element ? ELEMENT_INFO[element].weakTo : undefined;
-      const affinity = element ? `${ELEMENT_INFO[element].name}${weakTo ? `/弱${ELEMENT_INFO[weakTo].name}` : '/弱点なし'}` : '無属性';
-      this.overlay.add(this.add.text(px + 29, py + 15, found ? `${affinity} 体力${m.hp} 攻${m.atkMin}-${m.atkMax}` : m.key.startsWith('m_hw_') ? '???  ハロウィンイベント' : `???  ${m.minFloor}-${m.maxFloor}階`, {
-        fontFamily: '"Yu Gothic UI"', fontSize: '8px', color: found ? '#8fc8d7' : '#465264'
-      }));
-      const trait = found ? (m.gimmickText ?? '固有効果なし') : '効果 ???';
-      this.overlay.add(this.add.text(px + 29, py + 25, trait, {
-        fontFamily: '"Yu Gothic UI"', fontSize: '7px', color: found ? '#e7c96d' : '#465264',
-        wordWrap: { width: Math.max(60, colW - 34) }, maxLines: 1
-      }));
-    });
-
-    if (this.codexScrollMax > 0) {
-      const navY = y + h - 36;
-      const up = this.rowButton(x + w / 2 - 94, navY, 54, '▲', false, () => {
-        Audio.playSe('click');
-        this.scrollCodex(-1);
-      }, this.codexScrollRow > 0);
-      const down = this.rowButton(x + w / 2 + 40, navY, 54, '▼', false, () => {
-        Audio.playSe('click');
-        this.scrollCodex(1);
-      }, this.codexScrollRow < this.codexScrollMax);
-      const status = this.add.text(x + w / 2, navY + 14, `${this.codexScrollRow + 1} / ${this.codexScrollMax + 1}`, {
-        fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#9fb4c4'
-      }).setOrigin(0.5);
-      this.overlay.add([up, down, status]);
-
-      const dragZone = this.add.zone(x + 12, startY, w - 24, visibleRows * rowH - 3)
-        .setOrigin(0)
-        .setInteractive({ useHandCursor: true });
-      let dragStartY: number | null = null;
-      const finishDrag = (pointer: Phaser.Input.Pointer) => {
-        if (dragStartY === null) return;
-        const deltaRows = Math.round((dragStartY - pointer.y) / rowH);
-        dragStartY = null;
-        if (deltaRows !== 0) this.scrollCodex(deltaRows);
-      };
-      dragZone.on('pointerdown', (pointer: Phaser.Input.Pointer) => { dragStartY = pointer.y; });
-      dragZone.on('pointerup', finishDrag);
-      dragZone.on('pointerupoutside', finishDrag);
-      this.overlay.add(dragZone);
+    const label = (tx: number, ty: number, value: string, size: number, color = '#dfd9c9', width = w - 40) => {
+      const t = this.add.text(tx, ty, value, { fontFamily: '"Yu Gothic UI", Meiryo, sans-serif', fontSize: `${size}px`, color,
+        wordWrap: { width, useAdvancedWrap: true }, lineSpacing: 3 });
+      this.overlay.add(t); return t;
+    };
+    const portrait = (m: MonsterDef, cx: number, cy: number, size: number) => {
+      const art = this.add.image(cx, cy, m.key);
+      art.setScale(size / Math.max(art.width, art.height));
+      this.overlay.add(art); return art;
+    };
+    if (this.monsterDetail) {
+      const base = this.monsterDetail, m = difficultyEnemy(base, this.gs.difficulty);
+      this.overlay.add(this.rowButton(x + 16, y + 43, 138, '‹ 一覧に戻る', false, () => {
+        this.monsterDetail = undefined; this.rebuildOverlay();
+      }).setName('monster-detail-back'));
+      portrait(m, x + w / 2, y + (IS_MOBILE ? 193 : 172), IS_MOBILE ? 180 : 190);
+      label(x + w / 2, y + (IS_MOBILE ? 297 : 277), m.name, IS_MOBILE ? 23 : 28, this.theme.text).setOrigin(.5, 0);
+      const element = monsterElement(m), weakTo = element ? ELEMENT_INFO[element].weakTo : undefined;
+      const affinity = element ? `${ELEMENT_INFO[element].name}属性 ／ ${weakTo ? `弱点：${ELEMENT_INFO[weakTo].name}` : '弱点なし'}` : '無属性';
+      label(x + 24, y + 342, `${affinity}\nHP ${m.hp} ／ 攻撃 ${m.atkMin}〜${m.atkMax} ／ 防御 ${m.def}`, IS_MOBILE ? 14 : 19, '#b6dbe0', w - 48);
+      label(x + 24, y + 410, m.gimmickText ?? '固有効果なし', IS_MOBILE ? 15 : 18, '#efd59b', w - 48);
+      label(x + 24, y + h - 73, m.key.startsWith('m_hw_') ? 'ハロウィンイベントで出現' : `出現：${m.minFloor}〜${m.maxFloor}階`, 13, '#a0b5bd', w - 48);
+      label(x + 24, y + h - 46, `数値は${this.theme.name}の基本能力。戦闘中の強化・弱体は詳細ログで確認。`, IS_MOBILE ? 10 : 13, '#8a9aa5', w - 48);
+      return;
     }
+    const pageSize = 9, columns = 3, gap = IS_MOBILE ? 7 : 14;
+    this.codexScrollMax = Math.max(0, Math.ceil(MONSTER_DEFS.length / pageSize) - 1);
+    this.codexScrollRow = Phaser.Math.Clamp(this.codexScrollRow, 0, this.codexScrollMax);
+    label(x + 16, y + 43, `発見 ${this.gs.discovered.size} / ${MONSTER_DEFS.length}体 · 絵を押すと詳しい情報`, IS_MOBILE ? 11 : 15, '#9db8c5');
+    const colW = (w - 32 - gap * 2) / columns, rowH = (h - 129 - gap * 2) / 3;
+    const startY = y + 76;
+    MONSTER_DEFS.slice(this.codexScrollRow * pageSize, (this.codexScrollRow + 1) * pageSize).forEach((base, index) => {
+      const found = this.gs.discovered.has(base.key), m = difficultyEnemy(base, this.gs.difficulty);
+      const px = x + 16 + index % columns * (colW + gap), py = startY + Math.floor(index / columns) * (rowH + gap);
+      this.overlay.add(this.add.rectangle(px, py, colW, rowH, found ? 0x10202b : 0x10151d, .94).setOrigin(0).setStrokeStyle(1, found ? this.theme.color : 0x3b4149));
+      const artSize = Math.min(IS_MOBILE ? 83 : 102, rowH - (IS_MOBILE ? 80 : 62));
+      if (found) portrait(m, px + colW / 2, py + artSize / 2 + 9, artSize).setName(`monster-card-art-${base.key}`);
+      else label(px + colW / 2, py + 23, '？', IS_MOBILE ? 47 : 64, '#505c66', colW).setOrigin(.5, 0);
+      const nameY = py + artSize + 14;
+      label(px + colW / 2, nameY, found ? m.name : '未発見', IS_MOBILE ? 11 : 17, found ? '#f3e4c7' : '#82909a', colW - 12).setOrigin(.5, 0).setAlign('center');
+      const element = monsterElement(m);
+      if (IS_MOBILE) label(px + colW / 2, py + rowH - 44, found ? element ? `${ELEMENT_INFO[element].name}属性` : '無属性' : '？？？', 10, '#a9cbd1', colW - 10).setOrigin(.5, 0);
+      label(px + colW / 2, py + rowH - 24, found ? IS_MOBILE ? '詳細を見る ›' : `${element ? ELEMENT_INFO[element].name : '無'} · HP ${m.hp} · 攻 ${m.atkMin}〜${m.atkMax}  ›` : base.key.startsWith('m_hw_') ? 'イベント' : `${m.minFloor}〜${m.maxFloor}階`, IS_MOBILE ? 10 : 13, '#cbb98f', colW - 10).setOrigin(.5, 0);
+      const zone = this.add.zone(px, py, colW, rowH).setOrigin(0).setName(`monster-card-${base.key}`);
+      if (found) zone.setInteractive({ useHandCursor: true }).on('pointerdown', () => {
+        Audio.playSe('click'); this.monsterDetail = base; this.rebuildOverlay();
+      });
+      this.overlay.add(zone);
+    });
+    const navY = y + h - 40;
+    this.overlay.add(this.rowButton(x + 16, navY, IS_MOBILE ? 82 : 110, '‹ 前へ', false, () => this.scrollCodex(-1), this.codexScrollRow > 0).setName('codex-prev'));
+    label(x + w / 2, navY + 14, `${this.codexScrollRow + 1} / ${this.codexScrollMax + 1}`, 14, this.theme.text, 90).setOrigin(.5);
+    this.overlay.add(this.rowButton(x + w - (IS_MOBILE ? 98 : 126), navY, IS_MOBILE ? 82 : 110, '次へ ›', false, () => this.scrollCodex(1), this.codexScrollRow < this.codexScrollMax).setName('codex-next'));
   }
-
   turnRepairPage(delta: number) {
     if (this.overlayMode !== 'repair') return;
     const next = Phaser.Math.Clamp(this.repairPageIndex + delta, 0, this.repairPageCount - 1);

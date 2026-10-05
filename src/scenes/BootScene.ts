@@ -103,6 +103,8 @@ const SHIELD_ART = {
 } as const;
 
 const UI_ART = {
+  ui_nav_damage_log: 'assets/ui/journal-v1/nav-damage-log.webp',
+  ui_damage_journal_panel: 'assets/ui/journal-v1/modal.webp',
   ui_nav_explore: 'assets/ui/generated/nav-explore.png',
   ui_nav_inventory: 'assets/ui/generated/nav-inventory.png',
   ui_nav_shop: 'assets/ui/generated/nav-shop.png',

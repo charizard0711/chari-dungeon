@@ -33,6 +33,10 @@ export function canClaimQuest(p: SecretQuestProgress) {
   // Any individual reward claimed in an older save also consumes the single journal reward.
   return questsRevealed(p) && completedQuestCount(p) === SECRET_QUESTS.length && p.claimed.length === 0;
 }
+/** A slow 3.2-second pulse while the completed journal has an unclaimed reward. */
+export function questMenuAlpha(p: SecretQuestProgress, time: number) {
+  return canClaimQuest(p) ? .72 + .28 * Math.cos(time * Math.PI * 2 / 3200) : 1;
+}
 /** Call once per defeated enemy. Clues drop independently and collect into the journal. */
 export function recordQuestKill(p: SecretQuestProgress, monster: string, random = Math.random) {
   const wasRevealed = questsRevealed(p);

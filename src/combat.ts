@@ -1,6 +1,6 @@
 import type { Weapon, Shield, MonsterDef, MonsterElement } from './types';
 import { Player } from './player';
-import { elementMultiplier, monsterElement } from './data';
+import { elementMultiplier, monsterElement, ELEMENT_INFO } from './data';
 
 export interface AttackResult {
   damage: number;
@@ -100,13 +100,25 @@ export function consumeWeaponDurability(w: Weapon, defense: number) {
 export interface DefendResult {
   damage: number;
   shieldBroke: boolean;
+  steps: string[];
 }
 
 export function computeEnemyAttack(p: Player, def: MonsterDef, attackElement?: MonsterElement): DefendResult {
   let dmg = irand(def.atkMin, def.atkMax);
-  dmg = Math.max(1, dmg - Math.floor(p.def * 0.7));
-  dmg = Math.max(1, Math.floor(dmg * elementMultiplier(attackElement ?? monsterElement(def), p.shield?.element)));
-  if (p.weapon?.passive?.key === 'sturdy') dmg = Math.max(1, Math.floor(dmg * 0.95));
+  const steps = [`攻撃力 ${def.atkMin}〜${def.atkMax} → 今回の抽選値 ${dmg}`];
+  const beforeDefense = dmg, reduction = Math.floor(p.def * 0.7);
+  dmg = Math.max(1, dmg - reduction);
+  steps.push(`防御 ${p.def} × 0.7 → 切り捨て ${reduction}／${beforeDefense} − ${reduction} → ${dmg}（最低1）`);
+  const incomingElement = attackElement ?? monsterElement(def);
+  const multiplier = elementMultiplier(incomingElement, p.shield?.element);
+  const beforeElement = dmg;
+  dmg = Math.max(1, Math.floor(dmg * multiplier));
+  steps.push(`属性：${incomingElement ? ELEMENT_INFO[incomingElement].name : '無'} → 盾${p.shield?.element ? ELEMENT_INFO[p.shield.element].name : '無'}／${beforeElement} × ${multiplier} → ${dmg}（切り捨て・最低1）`);
+  if (p.weapon?.passive?.key === 'sturdy') {
+    const before = dmg;
+    dmg = Math.max(1, Math.floor(dmg * 0.95));
+    steps.push(`武器の${p.weapon.passive.name}／${before} × 0.95 → ${dmg}（切り捨て・最低1）`);
+  }
 
   let shieldBroke = false;
   const s = p.shield;
@@ -116,8 +128,9 @@ export function computeEnemyAttack(p: Player, def: MonsterDef, attackElement?: M
     const wear = 1 + Math.floor(avgAtk / 6);
     s.dur -= wear;
     if (s.dur <= 0) { s.dur = 0; shieldBroke = true; }
+    steps.push(`盾の耐久 −${wear} → ${s.dur}${shieldBroke ? '／この攻撃で破損' : ''}`);
   }
-  return { damage: dmg, shieldBroke };
+  return { damage: dmg, shieldBroke, steps };
 }
 
 // 破損リスク表示（低/中/高/危険）

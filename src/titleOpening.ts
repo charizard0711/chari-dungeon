@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { finishLoading, updateLoading } from './loadingScreen';
+import { finishLoading, showLoading, updateLoading } from './loadingScreen';
 
 const TITLE_VIDEO_URL = 'assets/video/title-lake-wing-loop.mp4';
 let titleVideoSource = TITLE_VIDEO_URL;
@@ -93,9 +93,15 @@ export function playTitleOpening(scene: Phaser.Scene): void {
 
 /** メニュー選択中も湖の動画を繰り返し再生する。 */
 export function addTitleLoop(scene: Phaser.Scene): void {
+  showLoading(.98);
+  const fallback = scene.add.image(0, 0, 'title_citadel_v1').setDepth(-3);
+  const inputEnabled = scene.input.enabled;
+  scene.input.enabled = false;
   const videos = [0, 1].map(index => scene.add.video(0, 0).setName(`title-lake-video-${index}`).setDepth(-2).setAlpha(0));
   const fit = () => {
     const camera = scene.cameras.main;
+    fallback.setPosition(camera.midPoint.x, camera.midPoint.y);
+    fallback.setScale(Math.max(scene.scale.width / camera.zoom / fallback.width, scene.scale.height / camera.zoom / fallback.height));
     for (const video of videos) {
       video.setPosition(camera.midPoint.x, camera.midPoint.y);
       if (video.width && video.height) video.setScale(Math.max(scene.scale.width / camera.zoom / video.width, scene.scale.height / camera.zoom / video.height));
@@ -103,20 +109,32 @@ export function addTitleLoop(scene: Phaser.Scene): void {
   };
   let active = 0;
   let transitioning = false;
+  let ready = false;
+  const reveal = () => {
+    if (ready) return;
+    ready = true;
+    clearTimeout(safetyTimer);
+    updateLoading(1, '準備ができました');
+    scene.game.events.once(Phaser.Core.Events.POST_RENDER, finishLoading);
+    scene.input.enabled = inputEnabled;
+  };
+  const safetyTimer = setTimeout(reveal, 15000);
   for (const video of videos) {
     video.loadURL(titleVideoSource, true);
     video.on('playing', fit);
   }
-  videos[0].once('playing', () => {
+  // `created` fires after Phaser has received and sized the first decoded frame.
+  videos[0].once('created', () => {
+    fit();
     videos[0].setAlpha(1);
-    updateLoading(1, '準備ができました');
-    scene.game.events.once(Phaser.Core.Events.POST_RENDER, finishLoading);
+    reveal();
   });
   videos[0].once('error', () => {
     console.error('オープニング動画を読み込めませんでした');
-    finishLoading();
+    reveal();
   });
   videos[0].play(true);
+  fit();
   // Wing poses are matched by trimming; a short overlap softens the remaining seam.
   const update = () => {
     const current = videos[active];
@@ -139,6 +157,8 @@ export function addTitleLoop(scene: Phaser.Scene): void {
   scene.events.on(Phaser.Scenes.Events.UPDATE, update);
   scene.scale.on('resize', fit);
   scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+    clearTimeout(safetyTimer);
+    scene.game.events.off(Phaser.Core.Events.POST_RENDER, finishLoading);
     scene.scale.off('resize', fit);
     scene.events.off(Phaser.Scenes.Events.UPDATE, update);
     videos.forEach(video => video.stop());

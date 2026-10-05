@@ -100,10 +100,10 @@ export class TitleScene extends Phaser.Scene {
       }
     });
 
-    const exploreKey = (event: KeyboardEvent) => { event.preventDefault(); if (!resumeDialog) this.titleAction?.(); };
+    const exploreKey = (event: KeyboardEvent) => { event.preventDefault(); if (this.input.enabled && !resumeDialog) this.titleAction?.(); };
     this.input.keyboard?.on('keydown-ENTER', exploreKey);
     this.input.keyboard?.on('keydown-SPACE', exploreKey);
-    const backKey = () => { if (resumeDialog) closeResumeDialog(); else this.titleBack?.(); };
+    const backKey = () => { if (!this.input.enabled) return; if (resumeDialog) closeResumeDialog(); else this.titleBack?.(); };
     this.input.keyboard?.on('keydown-ESC', backKey);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.input.keyboard?.off('keydown-ENTER', exploreKey);
@@ -144,8 +144,18 @@ export class TitleScene extends Phaser.Scene {
       const line=text(cx,y,label,mobile?20:23);
       text(cx,y+39,sub,mobile?10:12,'#a5b8ba');
       this.add.zone(cx,y,width,70).setName(name).setInteractive({useHandCursor:true})
-        .on('pointerover',()=>{plate.setTint(0xc6f5ff);line.setColor('#ffe1a0');this.tweens.add({targets:[line,arrow],x:'+=5',duration:140});accent.setFillStyle(0x82ffff)})
-        .on('pointerout',()=>{plate.clearTint();line.setColor('#eee7d6');line.x=cx;arrow.x=cx+width/2-26;accent.setFillStyle(0xe8d49c)})
+        .on('pointerover',()=>{
+          if(mobile)return;
+          plate.setTint(0xc6f5ff);line.setColor('#ffe1a0');
+          this.tweens.killTweensOf([line,arrow]);
+          this.tweens.add({targets:line,x:cx+5,scale:1.08,duration:140});
+          this.tweens.add({targets:arrow,x:cx+width/2-21,duration:140});accent.setFillStyle(0x82ffff);
+        })
+        .on('pointerout',()=>{
+          if(mobile)return;
+          this.tweens.killTweensOf([line,arrow]);
+          plate.clearTint();line.setColor('#eee7d6').setScale(1);line.x=cx;arrow.x=cx+width/2-26;accent.setFillStyle(0xe8d49c);
+        })
         .on('pointerdown',()=>{Audio.playSe('click');action()});
     };
     const render=(next:typeof stage)=>{
@@ -165,7 +175,6 @@ export class TitleScene extends Phaser.Scene {
         this.titleAction=()=>render('mode');this.titleBack=()=>{};
       } else {
         this.add.rectangle(cx,mobile?458:437,mobile?GAME_W-20:650,mobile?500:475,0x071b25,.72).setStrokeStyle(1,0xd6c798,.45);
-        text(cx,mobile?217:200,'◆  ADVENTURE  ◆',10,'#a8d7d9');
         text(cx,mobile?250:234,stage==='mode'?'冒険を選ぶ':stage==='dungeon'?'ダンジョンへ':'季節の冒険へ',mobile?24:28,'#e8cf99');
         text(cx,mobile?280:268,stage==='mode'?'あなたの次の物語は、どこから。':'冒険者を選び、出発しよう。',12,'#a5b8ba');
         if(stage==='mode') {

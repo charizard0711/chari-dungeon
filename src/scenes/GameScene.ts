@@ -18,7 +18,7 @@ import { TILE } from '../textures';
 import { hasRuinTerrain, ruinTerrainKey, ruinFloorKey, ruinFloorFrame } from '../ruinTerrain';
 import { generateDungeon, generateBossArena, DungeonData, randomFloor, isWalkable, addDiamondTreasury, removeLegacyRoomDoors } from '../dungeon';
 import { rollTreasuryReward } from '../treasury';
-import { normalizeQuests, mergeQuests, recordQuestKill, claimQuest, completedQuestCount, readQuestJournal, writeQuestJournal, type SecretQuestProgress } from '../secretQuests';
+import { normalizeQuests, mergeQuests, recordQuestKill, claimQuest, completedQuestCount, readQuestJournal, writeQuestJournal, SECRET_QUESTS, type SecretQuestProgress } from '../secretQuests';
 import { playPaintedSkill, paintedImpact, paintedVanish, skillImpactTime } from '../skillEffects';
 import { resolveShieldHit } from '../shieldEffects';
 import type { BossRoomZone, OptionalRoom, OptionalRoomKind, Room } from '../dungeon';
@@ -36,6 +36,7 @@ import { getMonsterAnimation, monsterAnimationFrame } from '../monsterAnimation'
 import type { MonsterAction } from '../monsterAnimation';
 import { AURELIUS_DIRECTIONS, DIRECTIONAL_MONSTERS, MONSTER_DIRECTION_FRAME, monsterDirectionPose } from '../monsterDirections';
 import { computePlayerAttack, computeEnemyAttack, consumeWeaponDurability } from '../combat';
+import { appendJournal, type DamageEntry, type AdventureEntry } from '../damageJournal';
 import { planSkill, weaponSkill, directionVector } from '../weaponSkills';
 import { Audio } from '../audio/manager';
 import { clearRunSave, pickFields, readRunSave, writeRunSave, type RunSnapshot } from '../runSave';
@@ -478,6 +479,9 @@ export class GameScene extends Phaser.Scene {
       this.player.inventory.push(makeItem('torch'));
     }
     this.secretQuests = this.runSaveEnabled() && !this.eventMode ? readQuestJournal() : normalizeQuests();
+    if (location.hostname === 'localhost' && new URLSearchParams(location.search).has('qa-quest-ready')) {
+      this.secretQuests = normalizeQuests({ fragments: 5, kills: Object.fromEntries(SECRET_QUESTS.map(q => [q.id, q.count])) });
+    }
     const qaParams = new URLSearchParams(location.search);
     const qaGender = qaParams.get('qa-gender');
     this.playerGender = location.hostname === 'localhost' && isPlayerGender(qaGender)
@@ -562,6 +566,8 @@ export class GameScene extends Phaser.Scene {
     // シーン再起動時、Phaserはインスタンスを再利用するため
     // 前回の（破棄済み）オブジェクト参照をリセットする
     this.logHistory = [];
+    this.damageHistory = [];
+    this.adventureHistory = [];
     this.playerSprite = undefined as any;
     this.playerShadow = undefined;
     this.playerAura = undefined;
@@ -817,6 +823,18 @@ export class GameScene extends Phaser.Scene {
     }
     if (location.hostname === 'localhost' && qaParams.has('qa-hurt')) {
       this.time.delayedCall(260, () => this.damagePlayer(8, 'QA被弾テスト'));
+    }
+    if (location.hostname === 'localhost' && qaParams.has('qa-journal')) {
+      this.time.delayedCall(260, () => {
+        const enemy = this.enemies.find(e => e.alive);
+        if (!enemy) return;
+        for (let i = 0; i < 13; i++) {
+          this.player.hp = this.player.hpMax;
+          const result = this.computeIncomingAttack(enemy);
+          this.damagePlayer(result.damage, `${enemy.def.name}の攻撃！`, enemy, result.steps);
+        }
+        this.player.hp = this.player.hpMax;
+      });
     }
     if (location.hostname === 'localhost' && qaParams.has('qa-death')) {
       this.player.hp = 1;
@@ -3160,7 +3178,7 @@ export class GameScene extends Phaser.Scene {
     const result = this.computeIncomingAttack(e, element);
     const damage = Math.max(1, Math.floor(result.damage * factor));
     Audio.playSe(elementAttackSe(element ?? monsterElement(e.def)));
-    this.damagePlayer(damage, label, e);
+    this.damagePlayer(damage, label, e, [...result.steps, `技の倍率 ×${factor}／${result.damage} × ${factor} → ${damage}（切り捨て・最低1）`]);
     if (result.shieldBroke) this.handleShieldBreak();
     this.hitFx(this.player.x, this.player.y);
   }
@@ -4906,8 +4924,11 @@ export class GameScene extends Phaser.Scene {
   emeraldGuardActive() { return this.player.shield?.key === 's_hw_emerald' && this.turn < this.emeraldGuardUntil; }
 
   computeIncomingAttack(e: Enemy, element?: MonsterElement) {
-    if (this.emeraldGuardActive()) return { damage: 0, shieldBroke: false };
-    return computeEnemyAttack(this.player, this.enemyAttackDefinition(e), element);
+    if (this.emeraldGuardActive()) return { damage: 0, shieldBroke: false, steps: ['氷翠の王域：無敵結界が有効'] };
+    const result = computeEnemyAttack(this.player, this.enemyAttackDefinition(e), element);
+    result.steps.unshift(`難易度：${DIFFICULTY_RULES[this.difficulty].name}（敵攻撃 ×${DIFFICULTY_RULES[this.difficulty].attack}を反映済み）`);
+    if (e.emedralAffected && e.emedralWeakUntil >= this.turn) result.steps.unshift('氷翠の効果：敵の攻撃力 ×0.7（切り捨て）を反映済み');
+    return result;
   }
 
   enemyAttackDefinition(e: Enemy): MonsterDef {
@@ -4915,12 +4936,29 @@ export class GameScene extends Phaser.Scene {
       ? { ...e.def, atkMin: Math.max(1, Math.floor(e.def.atkMin * .7)), atkMax: Math.max(1, Math.floor(e.def.atkMax * .7)) } : e.def;
   }
 
-  damagePlayer(dmg: number, reason: string, attacker?: Enemy) {
+  damagePlayer(dmg: number, reason: string, attacker?: Enemy, calculation?: string[]) {
+    if (this.gameEnded) return;
+    const hpBefore = this.player.hp;
+    const steps = calculation ? [...calculation] : [`固定・特殊ダメージ：${dmg}（通常の攻撃力・防御計算を使わない）`];
+    const entry: DamageEntry = { turn: this.turn, floor: this.floor, source: attacker?.def.name ?? '地形・状態など', reason,
+      damage: 0, hpBefore, hpAfter: hpBefore, lethal: false, steps };
     if (this.player.hp > this.player.hpMax * .2) this.emeraldGuardArmed = true;
     if (this.player.shield?.key === 's_hw_emerald' && this.player.hp <= this.player.hpMax * .2 && this.emeraldGuardArmed) this.activateEmeraldGuard();
-    if (this.emeraldGuardActive()) { this.updateEmeraldGuardFx(); return; }
+    if (this.emeraldGuardActive()) {
+      steps.push('氷翠の王域：無敵結界で最終ダメージ 0');
+      appendJournal(this.damageHistory, entry);
+      this.updateEmeraldGuardFx(); return;
+    }
+    const beforeShield = dmg;
+    const shieldName = this.player.shield?.passive?.name;
     const shieldResult = this.resolveShieldDefense(dmg, attacker);
     dmg = shieldResult.damage;
+    if (beforeShield !== dmg) steps.push(`盾の${shieldName ?? '加護'}／${beforeShield} → ${dmg}${shieldResult.message ? `（${shieldResult.message}）` : ''}`);
+    steps.push(`最終ダメージ ${dmg}／HP ${hpBefore} − ${dmg} → ${Math.max(0, hpBefore - dmg)}`);
+    entry.damage = dmg;
+    entry.hpAfter = Math.max(0, hpBefore - dmg);
+    entry.lethal = hpBefore - dmg <= 0;
+    appendJournal(this.damageHistory, entry);
 
     if (shieldResult.message) this.log(shieldResult.message, 'special');
     if (dmg > 0) {
@@ -4937,11 +4975,14 @@ export class GameScene extends Phaser.Scene {
 
     if (shieldResult.heal > 0 && this.player.hp > 0) {
       this.player.heal(shieldResult.heal);
+      steps.push(`盾の回復 +${shieldResult.heal}／HP → ${this.player.hp}`);
+      entry.hpAfter = this.player.hp;
       this.log(`${this.player.shield?.passive?.name ?? '盾の加護'}でHPを${shieldResult.heal}回復した。`, 'special');
       this.effectFx(this.player.x, this.player.y, 'fx_heal', 1.4, 420);
     }
 
     if (shieldResult.reflect > 0 && attacker?.alive) {
+      steps.push(`盾の反射：${attacker.def.name}に${shieldResult.reflect}ダメージ`);
       attacker.hp -= shieldResult.reflect;
       this.log(`${this.player.shield?.passive?.name ?? '盾の反射'}が${attacker.def.name}へ${shieldResult.reflect}ダメージを返した！`, 'special');
       this.hitFx(attacker.x, attacker.y);
@@ -4950,7 +4991,13 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (this.player.shield?.key === 's_hw_emerald' && this.player.hp > 0 && this.player.hp <= this.player.hpMax * .2 && this.emeraldGuardArmed) this.activateEmeraldGuard();
-    if (this.player.hp <= 0) this.handlePlayerDown();
+    if (this.player.hp <= 0) {
+      this.handlePlayerDown();
+      if (!this.gameEnded && this.player.hp > 0) {
+        entry.revived = true;
+        steps.push(`復活のタネ：HP ${this.player.hp}で復活`);
+      }
+    }
   }
 
   activateEmeraldGuard() {
@@ -5678,7 +5725,7 @@ export class GameScene extends Phaser.Scene {
     if (e.frameAnimation || e.directionArt) {
       return this.playDrawnEnemyAttack(e, 'claw', () => {
         Audio.playSe(elementAttackSe(enemyElement));
-        this.damagePlayer(damage, `${e.def.name}の${profile.label}${enemyElementInfo.name}属性攻撃！`, e);
+        this.damagePlayer(damage, `${e.def.name}の${profile.label}${enemyElementInfo.name}属性攻撃！`, e, [...res.steps, `技の倍率 ×${profile.factor}／${res.damage} × ${profile.factor} → ${damage}（切り捨て・最低1）`]);
         this.afterEnemyHitGimmick(e, damage, false);
         this.effectFx(this.player.x, this.player.y, 'fx_slash', 1.15, 250, enemyElementInfo.color);
         this.hitFx(this.player.x, this.player.y);
@@ -5705,7 +5752,7 @@ export class GameScene extends Phaser.Scene {
       e.animating = false;
       e.sprite.setScale(e.baseScale).setAngle(0);
       Audio.playSe(elementAttackSe(enemyElement));
-      this.damagePlayer(damage, `${e.def.name}の${profile.label}${enemyElementInfo.name}属性攻撃！`, e);
+      this.damagePlayer(damage, `${e.def.name}の${profile.label}${enemyElementInfo.name}属性攻撃！`, e, [...res.steps, `技の倍率 ×${profile.factor}／${res.damage} × ${profile.factor} → ${damage}（切り捨て・最低1）`]);
       this.afterEnemyHitGimmick(e, damage, false);
       this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.4, 360, enemyElementInfo.color);
       this.hitFx(this.player.x, this.player.y);
@@ -5732,7 +5779,7 @@ export class GameScene extends Phaser.Scene {
         if (!e.alive || this.gameEnded) return;
         const res = this.computeIncomingAttack(e, profile.element);
         const damage = Math.max(1, Math.floor(res.damage * profile.factor));
-        this.damagePlayer(damage, `${e.def.name}の${profile.label}${enemyElementInfo.name}属性遠距離攻撃！`, e);
+        this.damagePlayer(damage, `${e.def.name}の${profile.label}${enemyElementInfo.name}属性遠距離攻撃！`, e, [...res.steps, `技の倍率 ×${profile.factor}／${res.damage} × ${profile.factor} → ${damage}（切り捨て・最低1）`]);
         this.afterEnemyHitGimmick(e, damage, true);
         if (res.shieldBroke) this.handleShieldBreak();
         this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.45, 360, enemyElementInfo.color);
@@ -5759,7 +5806,7 @@ export class GameScene extends Phaser.Scene {
         e.sprite.setScale(e.baseScale);
         const res = this.computeIncomingAttack(e, profile.element);
         const damage = Math.max(1, Math.floor(res.damage * profile.factor));
-        this.damagePlayer(damage, `${e.def.name}の${profile.label}${enemyElementInfo.name}属性遠距離攻撃！`, e);
+        this.damagePlayer(damage, `${e.def.name}の${profile.label}${enemyElementInfo.name}属性遠距離攻撃！`, e, [...res.steps, `技の倍率 ×${profile.factor}／${res.damage} × ${profile.factor} → ${damage}（切り捨て・最低1）`]);
         this.afterEnemyHitGimmick(e, damage, true);
         if (res.shieldBroke) this.handleShieldBreak();
         this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.45, 360, enemyElementInfo.color);
@@ -7429,7 +7476,9 @@ export class GameScene extends Phaser.Scene {
       hp: this.player.hp,
       hpMax: this.player.hpMax,
       discovered: this.discovered.size,
-      totalMonsters: MONSTER_DEFS.length
+      totalMonsters: MONSTER_DEFS.length,
+      damageHistory: this.damageHistory,
+      adventureHistory: this.adventureHistory
     };
     this.time.delayedCall(cleared ? 800 : 1000, () => {
       this.scene.stop('UIScene');
@@ -8336,6 +8385,8 @@ export class GameScene extends Phaser.Scene {
       openedRooms: [...this.openedOptionalRooms].map(room => this.dungeon.optionalRooms.indexOf(room)).filter(i => i >= 0),
       discovered: [...this.discovered],
       logs: this.logHistory,
+      damageHistory: this.damageHistory,
+      adventureHistory: this.adventureHistory,
       enemies: this.enemies.map(enemy => ({
         state: pickFields(enemy, ENEMY_STATE_KEYS),
         visual: { texture: enemy.sprite.texture.key, scaleX: enemy.sprite.scaleX, scaleY: enemy.sprite.scaleY,
@@ -8402,6 +8453,8 @@ export class GameScene extends Phaser.Scene {
     this.discovered = new Set([...this.discovered, ...snapshot.discovered]);
     if (this.runSaveEnabled()) writeCodexSave(this.discovered);
     this.logHistory = snapshot.logs.map(entry => ({ ...entry, msg: this.playerFacingSavedLog(entry.msg) }));
+    this.damageHistory = (Array.isArray(snapshot.damageHistory) ? snapshot.damageHistory : []).slice(-120);
+    this.adventureHistory = (Array.isArray(snapshot.adventureHistory) ? snapshot.adventureHistory : []).slice(-120);
     this.qaBossMode = false;
     this.qaBossRoomZone = undefined;
     setSelectedGender(this.playerGender);
@@ -8513,8 +8566,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   logHistory: { msg: string; type: string }[] = [];
+  damageHistory: DamageEntry[] = [];
+  adventureHistory: AdventureEntry[] = [];
 
   log(msg: string, type: 'sys' | 'dmg' | 'item' | 'gold' | 'special' = 'sys') {
+    appendJournal(this.adventureHistory, { turn: this.turn, floor: this.floor, msg, type });
     this.logHistory.push({ msg, type });
     if (this.logHistory.length > 8) this.logHistory.shift();
     this.events.emit('log', { msg, type });
