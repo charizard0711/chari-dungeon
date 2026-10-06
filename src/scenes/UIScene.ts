@@ -1,3 +1,4 @@
+import { weaponChargeSteps, weaponWearReduction, shieldEnhancementHeal } from '../enhancement';
 import Phaser from 'phaser';
 import { HALLOWEEN_FLOORS } from '../halloweenContent';
 import { DIFFICULTY_RULES, difficultyFromCode, difficultyEnemy } from '../difficulty';
@@ -654,9 +655,9 @@ export class UIScene extends Phaser.Scene {
     const radius = IS_MOBILE ? 38 : 48;
     this.skillBackground!.clear();
     this.skillBackground!.lineStyle(2, skill.color, .25).strokeCircle(0, 0, radius);
-    if (remaining < 100) {
+    if (remaining < this.gs.skillChargeRequired) {
       this.skillBackground!.lineStyle(3, skill.color, .6).beginPath()
-        .arc(0, 0, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - Math.min(1, remaining / 100))).strokePath();
+        .arc(0, 0, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - Math.min(1, remaining / this.gs.skillChargeRequired))).strokePath();
     }
     this.skillGlyph!.setTexture(skillIconKey(type)).setAlpha(remaining > 0 ? .72 : 1);
     this.skillLabel!.setText(skill.name).setColor(`#${skill.color.toString(16).padStart(6, '0')}`);
@@ -733,6 +734,7 @@ export class UIScene extends Phaser.Scene {
         ? `${ELEMENT_INFO[weapon.element].name}属性`
         : `${ELEMENT_INFO[weapon.element].name}属性（弱点1.5倍・同属性0.75倍）`);
     }
+    if (weapon.plus >= 5) effects.push(`強化効果: スキル${weaponChargeSteps(weapon.plus)}歩・耐久消耗-${weaponWearReduction(weapon.plus)}（最低1）`);
     if (weapon.passive) effects.push(compact ? weapon.passive.name : `${weapon.passive.name}: ${weapon.passive.description}`);
     if (!compact) {
       for (const magic of weapon.magics) effects.push(`${magic.label}: ${MAGIC_DESC[magic.code]}`);
@@ -747,6 +749,7 @@ export class UIScene extends Phaser.Scene {
         ? `${ELEMENT_INFO[shield.element].name}属性防御`
         : `${ELEMENT_INFO[shield.element].name}属性防御（同属性0.75倍・弱点1.5倍）`);
     }
+    if (shield.plus >= 5) effects.push(`強化効果: 3回被攻撃ごとHP${shieldEnhancementHeal(shield.plus)}回復`);
     if (shield.passive) effects.push(compact ? shield.passive.name : `${shield.passive.name}: ${shield.passive.description}`);
     return effects.length ? effects.join(' / ') : 'なし';
   }
@@ -845,7 +848,7 @@ export class UIScene extends Phaser.Scene {
     });
     label.setName('fountain-rate');
     const zone = this.add.zone(0, 0, 122, 30).setOrigin(0).setInteractive({ useHandCursor: true });
-    const show = () => this.showTooltip(this.gs.eventMode ? '収穫の祝福' : this.gs.player.fountainBlessingPower === 1.2 ? '銀の泉の加護' : '噴水の加護',
+    const show = () => this.showTooltip(this.gs.eventMode ? '収穫の祝福' : this.gs.player.fountainBlessingPower === 1.5 ? '金の泉の加護' : this.gs.player.fountainBlessingPower === 1.2 ? '銀の泉の加護' : '噴水の加護',
       `${this.gs.floor}階のボス討伐まで、攻撃力・防御力が${this.gs.player.fountainBlessingRate}倍。\n重ねて使っても倍率は増えません。`, x, y + 34);
     zone.on('pointerover', show);
     zone.on('pointerout', () => this.hideTooltip());

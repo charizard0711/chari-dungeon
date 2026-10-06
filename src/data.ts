@@ -264,12 +264,11 @@ export function magicLabel(code: MagicCode, level: number): string {
 
 // ===== アイテム定義 =====
 export const ITEM_DEFS: Record<ItemKind, Omit<Item, 'kind'>> = {
+  skill_drink: { name: 'スキルドリンク', desc: 'スキルを即時チャージし、待ち歩数を0にする。通常MOBから3%でドロップ。', textureKey: 'i_skill_drink' },
   potion:  { name: '回復ポーション', desc: 'HPを40回復する', textureKey: 'i_potion' },
-  shroom:  { name: '光るキノコ', desc: '周囲をしばらく明るくする', textureKey: 'i_shroom' },
   torch:   { name: '松明', desc: '10ターンの間、壁の向こうまで明るくする', textureKey: 'i_torch' },
-  mystery_bread: { name: 'ふしぎパン', desc: 'HPと所持する武器・盾の耐久を全回復。装備中の武器・盾だけ強化値が必ず+1。', textureKey: 'i_mystery_bread' },
+  mystery_bread: { name: 'ふしぎパン', desc: 'HP全回復。装備中の武器・盾＋ランダムな予備武器3本・盾3枚を修復し+1（最大8個）。', textureKey: 'i_mystery_bread' },
   dynamite: { name: 'ダイナマイト', desc: '周囲の通常敵を爆風で一撃撃破。ボスには最大HPの20%の固定ダメージ。自分は無傷。', textureKey: 'i_dynamite' },
-  bomb:    { name: 'ボムナッツ', desc: '周囲の敵に範囲ダメージ', textureKey: 'i_bomb' },
   warp:    { name: 'リコールベル', desc: '今いる階のスタート位置へ戻る', textureKey: 'i_warp' },
   revive:  { name: '復活のタネ', desc: '倒れた時に一度だけ復活', textureKey: 'i_revive' },
   candykey: { name: 'お菓子のカギ', desc: '収穫城の金扉を開ける。敵から1%で入手。1回で1個消費', textureKey: 'i_candykey' },

@@ -1,3 +1,5 @@
+import { weaponChargeSteps, isRemovedItem } from '../enhancement';
+import { SKILL_DRINK_DROP_RATE } from '../balance';
 import { equipmentKeys, readEquipmentCodexSave, writeEquipmentCodexSave, readCodexSave, writeCodexSave } from '../codexSave';
 import { ITEM_CATALOG, ITEM_CATALOG_CODE, type CatalogClaimResult } from '../itemCatalog';
 import { hasVolcanoTerrain, volcanoTerrainKey, volcanoFloorFrame, VOLCANO_PROP_KINDS, type VolcanoPropKind, type VolcanoPart } from '../volcanoTerrain';
@@ -73,7 +75,7 @@ const RUN_STATE_KEYS = [
   'inBossRoom', 'bossRewardClaimed', 'bossEntranceClosed', 'weaponWonThisFloor', 'reviveSeedSeen',
   'floorPotionDrops', 'shopPurchases', 'enhancementScrollDrops', 'enhancementScrollClaimedBlocks', 'reservedBossScroll', 'pendingEquipment',
   'secretDualUnlocked', 'itemCatalogUnlocked', 'playerRootTurns', 'itemSealTurns', 'playerGender',
-  'playerArmor', 'lightRadius', 'shroomTurns', 'torchTurns', 'lanternTurns', 'invisTurns',
+  'playerArmor', 'lightRadius', 'torchTurns', 'lanternTurns', 'invisTurns',
   'transformation', 'penaltyFlags', 'skillChargeSteps', 'timeStopTurns', 'lanceSkillTurns', 'secretQuests'
 ] as const;
 const ENEMY_STATE_KEYS = [
@@ -232,6 +234,7 @@ interface DungeonObject {
   waterRipples?: { sprite: Phaser.GameObjects.Rectangle; phase: number }[];
   used: boolean;
   silverFountain?: boolean;
+  goldFountain?: boolean;
   breakable: boolean;
 }
 
@@ -404,7 +407,8 @@ export class GameScene extends Phaser.Scene {
 
   playerSprite!: Phaser.GameObjects.Image;
   playerShadow?: Phaser.GameObjects.Image; // 足元の影（接地感）
-  playerAura?: Phaser.GameObjects.Image; // 武器強化のオーラ（剣が光る演出）
+  playerAura?: Phaser.GameObjects.Image;
+  enhancementAura?: Phaser.GameObjects.Container; // 武器強化のオーラ（剣が光る演出）
   weaponSprite?: Phaser.GameObjects.Image; // キャラが手に持つ武器（装備で変化）
   equipmentRenderer?: EquipmentRenderer;
   playerVisualFrame: PlayerVisualFrame = 'idle';
@@ -417,7 +421,7 @@ export class GameScene extends Phaser.Scene {
   playerAnimToken = 0;
   stairsHint!: Phaser.GameObjects.Text;
   lightRadius = 3;
-  shroomTurns = 0;
+
   torchTurns = 0;
   lanternTurns = 0;
   themeTileTint = 0xffffff; // 現在フロアのタイル色合い（2階ごとに変わる）
@@ -921,7 +925,7 @@ export class GameScene extends Phaser.Scene {
       this.floorStartHp = this.player.hp;
       this.floorDamaged = false;
       this.penaltyFlags = { p100: false, p150: false, p200: false, p250: false };
-      this.shroomTurns = 0;
+
       this.torchTurns = 0;
       this.lanternTurns = 0;
       this.invisTurns = 0;
@@ -3379,7 +3383,8 @@ export class GameScene extends Phaser.Scene {
       const room = (index === 0 ? lakeRoom : undefined)
         ?? candidates.find((candidate) => !this.dungeonObjects.some((object) => object.x === candidate.cx && object.y === candidate.cy));
       if (!room) break;
-      this.addDungeonObject(kind, room.cx, room.cy, 3, 3, false, Math.random() < .03);
+      const roll = Math.random();
+      this.addDungeonObject(kind, room.cx, room.cy, 3, 3, false, roll >= .01 && roll < .04, roll < .01);
     }
   }
 
@@ -3586,9 +3591,9 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  addDungeonObject(kind: DungeonObjectKind, centerX: number, centerY: number, w: number, h: number, breakable = false, silverFountain = false) {
+  addDungeonObject(kind: DungeonObjectKind, centerX: number, centerY: number, w: number, h: number, breakable = false, silverFountain = false, goldFountain = false) {
     const isHealing = kind === 'fountain';
-    const texture = kind === 'fountain' ? this.eventMode ? 'hw_candy' : silverFountain ? 'terrain_silver_fountain' : 'terrain_healing_fountain' : this.roomPropTexture(kind);
+    const texture = kind === 'fountain' ? this.eventMode ? 'hw_candy' : goldFountain ? 'terrain_gold_fountain' : silverFountain ? 'terrain_silver_fountain' : 'terrain_healing_fountain' : this.roomPropTexture(kind);
     const renderTiles = kind === 'fountain' ? this.eventMode ? 1.5 : 3 : this.roomPropRenderTiles(kind);
     const worldX = centerX * TILE + TILE / 2;
     const worldY = centerY * TILE + TILE / 2;
@@ -3618,7 +3623,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.dungeonObjects.push({
       kind, x: centerX, y: centerY, w, h, sprite, waterFx, waterDrops, waterRipples,
-      used: false, breakable, silverFountain: isHealing && !this.eventMode && silverFountain
+      used: false, breakable, silverFountain: isHealing && !this.eventMode && silverFountain, goldFountain: isHealing && !this.eventMode && goldFountain
     });
   }
 
@@ -3643,9 +3648,15 @@ export class GameScene extends Phaser.Scene {
     const blessingAvailable = !this.floorBossDefeated || (!this.inBossRoom && this.floorHasGate(this.floor));
     if (blessingAvailable) {
       this.player.fountainBlessingFloor = this.floor;
-      this.player.fountainBlessingPower = object.silverFountain ? 1.2 : 1.1;
+      this.player.fountainBlessingPower = object.goldFountain ? 1.5 : object.silverFountain ? 1.2 : 1.1;
     }
-    if (object.silverFountain) {
+    if (object.goldFountain) {
+      for (const item of new Set<Weapon | Shield>([...this.player.weapons, ...this.player.shields, ...(this.player.weapon ? [this.player.weapon] : []), ...(this.player.shield ? [this.player.shield] : [])])) {
+        item.dur = item.durMax; item.plus = (item.plus ?? 0) + 1;
+      }
+      this.updatePlayerAura();
+      this.log('金の泉で所持するすべての武器・盾を修復し、すべて+1強化した！', 'special');
+    } else if (object.silverFountain) {
       if (this.player.weapon) this.player.weapon.dur = this.player.weapon.durMax;
       if (this.player.shield) this.player.shield.dur = this.player.shield.durMax;
       this.log('銀の泉で、装備中の武器と盾の耐久が全回復した。', 'special');
@@ -3656,8 +3667,8 @@ export class GameScene extends Phaser.Scene {
     this.effectFx(object.x, object.y, 'fx_magic', 1.8, 720, 0x62f7e8);
     this.healFx();
     Audio.playSe('heal');
-    this.log(`${this.eventMode ? '魔法のお菓子で' : object.silverFountain ? '銀の泉で' : '古代の噴水で'}体力が全回復した。${healed > 0 ? `（+${healed}）` : ''}`, 'item');
-    if (blessingAvailable) this.log(`${this.eventMode ? '収穫の祝福' : object.silverFountain ? '銀の泉の加護' : '噴水の加護'}：この階のボス討伐まで攻撃・防御が${this.player.fountainBlessingPower}倍！`, 'special');
+    this.log(`${this.eventMode ? '魔法のお菓子で' : object.goldFountain ? '金の泉で' : object.silverFountain ? '銀の泉で' : '古代の噴水で'}体力が全回復した。${healed > 0 ? `（+${healed}）` : ''}`, 'item');
+    if (blessingAvailable) this.log(`${this.eventMode ? '収穫の祝福' : object.goldFountain ? '金の泉の加護' : object.silverFountain ? '銀の泉の加護' : '噴水の加護'}：この階のボス討伐まで攻撃・防御が${this.player.fountainBlessingPower}倍！`, 'special');
     this.emitRefresh();
   }
 
@@ -3835,8 +3846,10 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  get skillChargeRequired() { return weaponChargeSteps(this.player.weapon?.plus); }
+
   get skillStepsRemaining() {
-    return Math.max(0, 100 - this.skillChargeSteps);
+    return Math.max(0, this.skillChargeRequired - this.skillChargeSteps);
   }
 
   showDynamiteRangePreview(show: boolean) {
@@ -4690,6 +4703,8 @@ export class GameScene extends Phaser.Scene {
       this.log('ダイナマイトがこぼれ落ちた！', 'special');
     }
 
+    if (!def.isBoss && !def.isFloorBoss && !def.isTreasureRabbit && Math.random() < SKILL_DRINK_DROP_RATE) this.dropItem(e.x, e.y, 'skill_drink');
+
     if (!def.isBoss && !def.isFloorBoss && !def.isTreasureRabbit && Math.random() < MYSTERY_BREAD_DROP_RATE) {
       this.dropItem(e.x, e.y, 'mystery_bread');
       this.log('ふしぎパンがこぼれ落ちた！', 'special');
@@ -5265,7 +5280,6 @@ export class GameScene extends Phaser.Scene {
       this.damagePlayer(3, '毒に侵されている！');
       if (this.gameEnded) return;
     }
-    if (this.shroomTurns > 0) this.shroomTurns--;
     if (this.torchTurns > 0) {
       this.torchTurns--;
       if (this.torchTurns === 0) this.log('松明の火が消え、視界が元に戻った。', 'sys');
@@ -6343,8 +6357,7 @@ export class GameScene extends Phaser.Scene {
   updateVisibility() {
     const d = this.dungeon;
     const wallPiercingLight = this.torchTurns > 0 || this.lanternTurns > 0;
-    const shroomRadius = this.shroomTurns > 0 ? 7 : this.lightRadius;
-    const radius = wallPiercingLight ? 10 : Math.max(this.lightRadius, shroomRadius);
+    const radius = wallPiercingLight ? 10 : this.lightRadius;
     const playerInsideBossRoom = this.isInsideBossRoom(this.player.x, this.player.y);
     if (this.eventMode && !this.gameEnded) Audio.playBgm(this.floorBgm(false));
     const bossRoomConcealed = !!d.bossRoom && !!d.bossEntry && !playerInsideBossRoom;
@@ -6722,7 +6735,6 @@ export class GameScene extends Phaser.Scene {
       }
       case 'slime_scroll': this.startTransformation('slime'); passTurn = false; break;
       case 'boss5_scroll': this.startTransformation('boss5'); passTurn = false; break;
-      case 'shroom': this.shroomTurns = 12; this.log('光るキノコで周囲が明るくなった。', 'item'); Audio.playSe('pickup'); passTurn = false; break;
       case 'torch': {
         this.torchTurns = 10;
         this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.45, 460, 0xffa52f);
@@ -6733,7 +6745,7 @@ export class GameScene extends Phaser.Scene {
       }
       case 'mystery_bread': this.useMysteryBread(); break;
       case 'dynamite': this.useDynamite(); break;
-      case 'bomb': this.useBomb(); break;
+      case 'skill_drink': this.skillChargeSteps = this.skillChargeRequired; this.log('スキルドリンクでスキルがチャージ完了！', 'special'); this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.4, 500, 0x62dfff); Audio.playSe('pickup'); break;
       case 'warp': consumed = this.useWarp(); passTurn = false; break;
       case 'seal': this.useSeal(); break;
       case 'revive': this.log('復活のタネは倒れた時に自動で使われる。', 'sys'); Audio.playSe('deny'); consumed = false; passTurn = false; break;
@@ -6781,20 +6793,20 @@ export class GameScene extends Phaser.Scene {
       ...(this.player.weapon ? [this.player.weapon] : []),
       ...(this.player.shield ? [this.player.shield] : [])
     ]);
-    // 耐久は所持品すべてを回復し、+1強化は装備中の武器・盾だけ。
-    const equipment = new Set<Weapon | Shield>([
-      ...this.player.weapons, ...this.player.shields,
-      ...equipped
-    ]);
-    for (const item of equipment) item.dur = item.durMax;
-    for (const item of equipped) {
-      item.plus = (item.plus ?? 0) + 1;
+    const targets = new Set<Weapon | Shield>(equipped);
+    for (const collection of [this.player.weapons, this.player.shields]) {
+      const pool = [...new Set<Weapon | Shield>(collection)].filter(item => !equipped.has(item));
+      for (let n = 0; n < 3 && pool.length; n++) {
+        const [item] = pool.splice(Math.floor(Math.random() * pool.length), 1);
+        targets.add(item);
+      }
     }
+    for (const item of targets) { item.dur = item.durMax; item.plus = (item.plus ?? 0) + 1; }
     this.updatePlayerAura();
     this.healFx();
     this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.4, 500, 0xffd17d);
     Audio.playSe('heal');
-    this.log('ふしぎパンを食べた！ HPと所持する武器・盾の耐久が全回復し、装備中の武器と盾が+1強化された。', 'special');
+    this.log('ふしぎパンを食べた！ HP全回復！ 装備中の武器・盾＋予備の武器3本・盾3枚をランダムに修復し、最大8個を+1強化した。', 'special');
   }
 
   startTransformation(kind: TransformationKind) {
@@ -6908,24 +6920,6 @@ export class GameScene extends Phaser.Scene {
         .setAngle(angle*180/Math.PI).setDepth(25).setBlendMode(Phaser.BlendModes.ADD);
       this.tweens.add({targets:spark,x:cx+Math.cos(angle)*distance,y:cy+Math.sin(angle)*distance,alpha:0,
         duration:220+Math.random()*260,ease:'Cubic.easeOut',onComplete:()=>spark.destroy()});
-    }
-  }
-
-  useBomb() {
-    this.log('ボムナッツが炸裂！', 'special');
-    Audio.playSe('bomb');
-    this.cameras.main.shake(200, 0.01);
-    for (const e of [...this.enemies]) {
-      if (e.def.isFloorBoss && this.dungeon.bossRoom
-        && (!this.isInsideBossRoom(this.player.x, this.player.y) || !this.isInsideBossRoom(e.x, e.y))) continue;
-      const dist = Math.abs(e.x - this.player.x) + Math.abs(e.y - this.player.y);
-      if (dist <= 2) {
-        const dmg = 25 + Math.floor(Math.random() * 20);
-        e.hp -= dmg;
-        this.hitFx(e.x, e.y);
-        this.log(`${e.def.name}に${dmg}の爆発ダメージ！`, 'dmg');
-        if (e.hp <= 0) this.killEnemy(e, 0); else this.drawEnemyHp(e);
-      }
     }
   }
 
@@ -7635,6 +7629,7 @@ export class GameScene extends Phaser.Scene {
       this.playPlayerDeath();
       this.weaponSprite?.setVisible(false);
       this.playerAura?.setVisible(false);
+      this.enhancementAura?.setVisible(false);
       Audio.playBgm('gameover'); // 敗北ジングル
     }
 
@@ -7768,12 +7763,24 @@ export class GameScene extends Phaser.Scene {
 
   // 強化値は輝きの強さだけを上げ、武器色は属性だけで変える。
   updatePlayerAura() {
+    const enhancementPlus = this.player.weapon?.plus ?? 0;
+    const auraKey = enhancementPlus >= 10 ? 'enhancement_aura_red' : 'enhancement_aura_blue';
+    if (enhancementPlus >= 5 && this.textures.exists(auraKey)) {
+      if (!this.enhancementAura?.active) {
+        this.enhancementAura = this.add.container(0, 0, [
+          this.add.image(0, 0, auraKey).setDisplaySize(58, 74).setAlpha(.65),
+          this.add.image(0, 0, auraKey).setDisplaySize(51, 68).setAlpha(.35).setFlipX(true)
+        ]);
+      }
+      for (const child of this.enhancementAura.list) (child as Phaser.GameObjects.Image).setTexture(auraKey);
+      this.enhancementAura.setVisible(true);
+    } else this.enhancementAura?.setVisible(false);
     if (this.playerAura) {
       const plus = this.player.weapon?.plus ?? 0;
       const grade = this.player.weapon?.grade ?? 'D';
       const element = this.player.weapon?.element;
       const highGrade = grade === 'A' || grade === 'S' || grade === 'SSS';
-      if (plus > 0 || highGrade || element) {
+      if (plus >= 5) {
         this.playerAura.setVisible(true)
           .setTint(this.player.weapon?.key === 'w_hero_sword' ? 0xffd35a : element ? ELEMENT_INFO[element].color : gradeColor(grade))
           .setAlpha(Math.min(0.92, 0.34 + plus * 0.12 + (highGrade ? 0.14 : 0)))
@@ -8117,6 +8124,15 @@ export class GameScene extends Phaser.Scene {
       this.playerShadow.setDepth(ps.depth - 0.22);
     }
 
+    if (this.enhancementAura?.visible) {
+      this.enhancementAura.setPosition(ps.x, ps.y - 8).setDepth(ps.depth - .18);
+      this.enhancementAura.list.forEach((child, i) => {
+        const flame = child as Phaser.GameObjects.Image;
+        const phase = this.time.now / (230 + i * 80) + i * 2;
+        flame.setDisplaySize(58 + Math.sin(phase) * 4, 74 + Math.cos(phase * 1.3) * 8)
+          .setY(-Math.sin(phase * .7) * 4).setAlpha((i ? .25 : .5) + Math.sin(phase) * .12);
+      });
+    }
     if (this.playerAura && this.playerAura.visible) {
       this.playerAura.x = ps.x;
       this.playerAura.y = ps.y - 4;
@@ -8661,6 +8677,7 @@ export class GameScene extends Phaser.Scene {
     this.timeStopTurns = Math.max(0, Math.min(5, snapshot.state.timeStopTurns ?? 0));
     this.lanceSkillTurns = 0;
     this.player = Object.assign(new Player(), snapshot.player);
+    this.player.inventory = this.player.inventory.filter(item => !isRemovedItem(item.kind));
     for (const item of this.player.inventory) {
       if (item.kind === 'mystery_bread') Object.assign(item, makeItem('mystery_bread'));
     }
@@ -8728,6 +8745,7 @@ export class GameScene extends Phaser.Scene {
       this.chests.push({ ...saved, sprite, glow, baseScale: sprite.scaleX });
     }
     for (const item of snapshot.ground) {
+      if (isRemovedItem(item.kind)) continue;
       const equipment = item.weapon ?? item.shield ?? item.armor;
       if (equipment) refreshLegendaryEquipment(equipment);
       const texture = item.kind === 'armor' ? armorTextureKey(item.armor!.key)
@@ -8741,10 +8759,10 @@ export class GameScene extends Phaser.Scene {
     }
     // Older lake-floor saves can contain two fountains. Keep a used one first so reload never grants an extra use.
     const fountains = snapshot.objects.filter(object => object.kind === 'fountain');
-    const keptFountain = fountains.find(object => object.used) ?? fountains.find(object => object.silverFountain) ?? fountains[0];
+    const keptFountain = fountains.find(object => object.used) ?? fountains.find(object => object.goldFountain) ?? fountains.find(object => object.silverFountain) ?? fountains[0];
     for (const object of snapshot.objects) {
       if (object.kind === 'fountain' && object !== keptFountain) continue;
-      this.addDungeonObject(object.kind, object.x, object.y, object.w, object.h, object.breakable, object.silverFountain ?? false);
+      this.addDungeonObject(object.kind, object.x, object.y, object.w, object.h, object.breakable, object.silverFountain ?? false, object.goldFountain ?? false);
       const restored = this.dungeonObjects[this.dungeonObjects.length - 1];
       restored.used = object.used;
       if (object.used) { restored.sprite.setTint(0x7b8c8a).setAlpha(.72); restored.waterFx?.setVisible(false); }

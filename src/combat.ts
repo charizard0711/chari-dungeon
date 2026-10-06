@@ -1,3 +1,4 @@
+import { weaponWearReduction } from './enhancement';
 import type { Weapon, Shield, MonsterDef, MonsterElement } from './types';
 import { Player } from './player';
 import { elementMultiplier, monsterElement, ELEMENT_INFO } from './data';
@@ -81,7 +82,7 @@ export function computePlayerAttack(p: Player, def: MonsterDef, backstab = false
 /** Skills spend durability once per activation, even when hitting multiple targets. */
 export function consumeWeaponDurability(w: Weapon, defense: number) {
     let weaponBroke = false, weaponRevived = false;
-    w.dur -= (1 + Math.floor(defense / 4)) * 2;
+    w.dur -= Math.max(1, (1 + Math.floor(defense / 4)) * 2 - weaponWearReduction(w.plus));
     if (w.dur <= 0) {
       const rMagic = w.magics.find((m) => m.code === 'R');
       if (rMagic && !w.repairUsed) {

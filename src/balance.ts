@@ -3,9 +3,8 @@ import type { ItemKind } from './types';
 // 消耗品1個の売却額。ショップ商品の買値を下回るように設定する。
 export const ITEM_SELL_PRICES: Record<ItemKind, number> = {
   potion: 10,
-  shroom: 12,
+  skill_drink: 40,
   torch: 8,
-  bomb: 20,
   dynamite: 60,
   mystery_bread: 100,
   warp: 20,
@@ -44,3 +43,5 @@ export const DYNAMITE_DROP_RATE = 0.02;
 export const DYNAMITE_RADIUS = 2;
 // Independent 1% roll in every difficulty; do not apply ordinary loot multipliers.
 export const MYSTERY_BREAD_DROP_RATE = 0.01;
+
+export const SKILL_DRINK_DROP_RATE = 0.03;

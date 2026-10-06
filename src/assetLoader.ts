@@ -84,8 +84,6 @@ const FRAME_DEFS: FrameDef[] = [
   { key: 'w_gravity', sheet: 'items', r: [1307, 58, 1423, 198], mode: 'sprite', size: 48},
 
   // ---- 消耗品 ----
-  { key: 'i_shroom', sheet: 'items', r: [415, 505, 526, 645], mode: 'sprite', size: 48},
-  { key: 'i_bomb', sheet: 'items', r: [907, 505, 1018, 645], mode: 'sprite', size: 48},
   { key: 'i_revive', sheet: 'items', r: [1245, 505, 1356, 645], mode: 'sprite', size: 48},
 
   // ---- お宝・キーアイテム ----

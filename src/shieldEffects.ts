@@ -1,3 +1,4 @@
+import { shieldEnhancementHeal } from './enhancement';
 import type { MonsterElement, Shield } from './types';
 
 export interface ShieldDefenseContext { hp: number; hpMax: number; attackerElement?: MonsterElement }
@@ -6,8 +7,8 @@ export interface ShieldDefenseContext { hp: number; hpMax: number; attackerEleme
 export function resolveShieldHit(shield: Shield | null, damage: number, context: ShieldDefenseContext, random = Math.random) {
   let adjusted = damage, heal = 0, reflect = 0;
   let message: string | undefined;
-  if (!shield?.passive || damage <= 0) return { damage, heal, reflect, message };
-  const key = shield.passive.key;
+  if (!shield || damage <= 0) return { damage, heal, reflect, message };
+  const key = shield.passive?.key;
   const reduce = (rate: number) => { adjusted = Math.max(1, Math.floor(damage * (1 - rate))); };
   const blockEvery = (interval: number) => {
     if (count % interval === 0) { adjusted = 0; message = `${shield.name}の${shield.passive!.name}！ 攻撃を完全に無効化！`; }
@@ -39,6 +40,7 @@ export function resolveShieldHit(shield: Shield | null, damage: number, context:
       if (adjusted > 0) reflect = Math.floor(adjusted * .2);
       break;
   }
-  if (adjusted > 0 && adjusted < damage) message = `${shield.name}の${shield.passive.name}でダメージを軽減！`;
+  if (count % 3 === 0) heal += shieldEnhancementHeal(shield.plus);
+  if (adjusted > 0 && adjusted < damage) message = `${shield.name}の${shield.passive?.name ?? '守り'}でダメージを軽減！`;
   return { damage: adjusted, heal, reflect, message };
 }
