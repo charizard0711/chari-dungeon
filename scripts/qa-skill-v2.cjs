@@ -55,6 +55,7 @@ function harness(type) {
     const [h,e]=harness(type); assert.equal(await h.useWeaponSkill(),true);
     assert.equal(h.player.hits,hits,type); assert.equal(h.turn,1); assert.equal(h.skillChargeSteps,0);
     if(type==='longsword')assert.equal(h.player.hp,170);
+    if(type==='greatsword')assert.equal(h.player.hp,110);
     if(type==='bow') {
       assert.equal(e.stunnedTurns,2);
       h.enemyAct=()=>{throw Error('Stunned enemy must not act');};
@@ -67,6 +68,20 @@ function harness(type) {
       assert.equal(e.skillAttackDownUntil,3);
     }
     if(type==='handgun') assert.equal(e.skillDefenseDownUntil,3);
+  }
+  for (const scenario of ['multiple','empty','cap','objects','kill']) {
+    const [g, first] = harness('greatsword');
+    const second = {...first, x:4, def:{...first.def}};
+    g.enemies = [first,second];
+    g.enemyAt = (x,y) => g.enemies.find(e=>e.x===x&&e.y===y) ?? null;
+    let knocks=0; g.knockbackEnemy=async()=>{knocks++;};
+    if(scenario==='empty')g.enemyAt=()=>null;
+    if(scenario==='cap')g.player.hp=295;
+    if(scenario==='objects')second.def.halloweenObject=true;
+    if(scenario==='kill'){first.hp=1;g.killEnemy=e=>{e.alive=false;g.enemies=g.enemies.filter(a=>a!==e);};}
+    assert.equal(await g.useWeaponSkill(),true);
+    assert.equal(g.player.hp,scenario==='empty'?100:scenario==='cap'?300:scenario==='objects'?110:120,scenario);
+    assert.equal(knocks,scenario==='empty'?0:scenario==='kill'?1:2,scenario+' knockback');
   }
   const [h,e]=harness('dagger');assert.equal(await h.useWeaponSkill(),true);
   assert.equal(h.timeStopTurns,5);assert.equal(h.player.hits,0);assert.equal(h.turn,0);
@@ -84,5 +99,5 @@ function harness(type) {
     h.turn=turn;assert.equal(h.enemyAttackDefinition(e).atkMin,70);assert.equal(h.enemyDefenseDefinition(e).def,70);
   }
   h.turn=9;assert.equal(h.enemyAttackDefinition(e).atkMin,100);assert.equal(h.enemyDefenseDefinition(e).def,100);
-  console.log('PASS: time-stop collision/5 free turns/finisher; lance four directions/attack debuff; HP+70; bow stun; five gun shots; three cross slashes; greatsword unchanged');
+  console.log('PASS: time-stop collision/5 free turns/finisher; lance four directions/attack debuff; HP+70; bow stun; five gun shots; three cross slashes; greatsword per-monster healing/kill/empty/cap/object exclusion/knockback');
 })().catch(e=>{console.error(e);process.exit(1)});

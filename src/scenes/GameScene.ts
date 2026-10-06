@@ -2192,6 +2192,7 @@ export class GameScene extends Phaser.Scene {
   revealMimic(e: Enemy, attacked = false) {
     if (e.awakened) return;
     e.awakened = true;
+    this.drawEnemyHp(e);
     e.animating = true;
     e.sprite.setTexture(e.def.key).setScale(e.baseScale * 0.68).setAlpha(1).clearTint().setAngle(0);
     e.shadow?.setAlpha(0.55);
@@ -3911,6 +3912,7 @@ export class GameScene extends Phaser.Scene {
       if (!plan.targets.length) return false;
     }
     const maxDefense = Math.max(0, ...plan.targets.map(e => e.def.def));
+    const greatswordHits = new Set<Enemy>();
     Audio.playSe(skill.sound);
     this.log(`${skill.name}！`, 'special');
     this.emitRefresh();
@@ -3935,6 +3937,7 @@ export class GameScene extends Phaser.Scene {
           this.applyEmedralHit(enemy, weapon);
           const damage = this.playerDamageAgainstGimmick(enemy, result.damage);
           enemy.hp -= damage;
+          if (weapon.weaponType === 'greatsword' && !enemy.def.halloweenObject) greatswordHits.add(enemy);
           if (weapon.weaponType === 'bow' && enemy.hp > 0) {
             enemy.stunnedTurns = Math.max(enemy.stunnedTurns, 2);
             paintedStun(this, enemy);
@@ -3976,6 +3979,12 @@ export class GameScene extends Phaser.Scene {
         this.player.heal(70);
         this.healFx(); Audio.playSe('heal');
         this.log(`扇斬りの光でHPを${this.player.hp - hpBefore}回復した。`, 'special');
+      }
+      if (greatswordHits.size > 0) {
+        const hpBefore = this.player.hp;
+        this.player.heal(greatswordHits.size * 10);
+        this.healFx(); Audio.playSe('heal');
+        this.log(`旋風斬りで${greatswordHits.size}体に命中し、HPを${this.player.hp - hpBefore}回復した。`, 'special');
       }
       const wear = consumeWeaponDurability(weapon, maxDefense);
       if (wear.weaponRevived) this.log('武器のリペア効果が発動！ 壊れずに復活した。', 'special');
@@ -4632,7 +4641,7 @@ export class GameScene extends Phaser.Scene {
     if (!options.quiet) Audio.playSe('kill');
     if (leveled) { this.log(`レベルアップ！ Lv.${this.player.level} になった。`, 'special'); if (!options.quiet) Audio.playSe('levelup'); this.levelupFx(); }
     if (def.isTreasureRabbit) {
-      const ssElemental = WEAPON_DEFS.filter((weapon) => weapon.ss && weapon.element);
+      const ssElemental = WEAPON_DEFS.filter((weapon) => weaponRarity(weapon) === 'SS' && weapon.element && !weapon.exclusiveLoot);
       const rewardDef = ssElemental[Math.floor(Math.random() * ssElemental.length)];
       if (rewardDef) {
         const reward = makeWeapon(rewardDef.key, []);
@@ -6468,7 +6477,7 @@ export class GameScene extends Phaser.Scene {
       e.shadow?.setVisible(v);
       e.aura?.setVisible(v);
       e.freezeFx?.setVisible(v);
-      if (e.hpBar) e.hpBar.setVisible(v).setAlpha(1);
+      if (e.hpBar) e.hpBar.setVisible(v && !(e.def.gimmick === 'mimic' && !e.awakened)).setAlpha(1);
       if (this.torchRevealsEnemy(e)) {
         e.sprite.setAlpha(v ? 1 : 0);
         e.shadow?.setAlpha(v ? .55 : 0);
@@ -8229,9 +8238,14 @@ export class GameScene extends Phaser.Scene {
     });
   }
   drawEnemyHp(e: Enemy) {
+    if (e.def.gimmick === 'mimic' && !e.awakened) {
+      e.hpBar?.clear().setVisible(false);
+      return;
+    }
     if (!e.hpBar) e.hpBar = this.add.graphics().setDepth(e.sprite.depth + 0.45);
     else e.hpBar.setDepth(e.sprite.depth + 0.45);
     e.hpBar.clear();
+    e.hpBar.setVisible(e.sprite.visible);
     e.hpBar.setPosition(e.sprite.x, e.sprite.y);
     const w = 24;
     const x = -w / 2;
