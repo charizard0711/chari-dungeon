@@ -408,7 +408,7 @@ export class GameScene extends Phaser.Scene {
   playerSprite!: Phaser.GameObjects.Image;
   playerShadow?: Phaser.GameObjects.Image; // 足元の影（接地感）
   playerAura?: Phaser.GameObjects.Image;
-  enhancementAura?: Phaser.GameObjects.Container; // 武器強化のオーラ（剣が光る演出）
+  enhancementAura?: Phaser.GameObjects.Container; // 武器と盾の強化値に応じた体の煙オーラ
   weaponSprite?: Phaser.GameObjects.Image; // キャラが手に持つ武器（装備で変化）
   equipmentRenderer?: EquipmentRenderer;
   playerVisualFrame: PlayerVisualFrame = 'idle';
@@ -7764,31 +7764,18 @@ export class GameScene extends Phaser.Scene {
   // 体の強化オーラは、装備中の武器と盾の低い方の強化値で判定する。
   updatePlayerAura() {
     const enhancementPlus = Math.min(this.player.weapon?.plus ?? 0, this.player.shield?.plus ?? 0);
-    const auraKey = enhancementPlus >= 15 ? 'enhancement_aura_gold' : enhancementPlus >= 10 ? 'enhancement_aura_red' : 'enhancement_aura_blue';
-    if (enhancementPlus >= 5 && this.textures.exists(auraKey)) {
+    const auraColor = enhancementPlus >= 15 ? 0xffcf58 : enhancementPlus >= 10 ? 0xff5263 : 0x55baff;
+    if (enhancementPlus >= 5 && this.textures.exists('fx_shadow')) {
       if (!this.enhancementAura?.active) {
-        this.enhancementAura = this.add.container(0, 0, [
-          this.add.image(0, 0, auraKey).setDisplaySize(36, 50).setAlpha(.65),
-          this.add.image(0, 0, auraKey).setDisplaySize(33, 47).setAlpha(.35).setFlipX(true)
-        ]);
+        this.enhancementAura = this.add.container(0, 0, Array.from({ length: 3 }, () =>
+          this.add.image(0, 0, 'fx_shadow')
+        ));
       }
-      for (const child of this.enhancementAura.list) (child as Phaser.GameObjects.Image).setTexture(auraKey);
+      for (const child of this.enhancementAura.list) (child as Phaser.GameObjects.Image).setTintFill(auraColor);
       this.enhancementAura.setVisible(true);
     } else this.enhancementAura?.setVisible(false);
-    if (this.playerAura) {
-      const plus = this.player.weapon?.plus ?? 0;
-      const grade = this.player.weapon?.grade ?? 'D';
-      const element = this.player.weapon?.element;
-      const highGrade = grade === 'A' || grade === 'S' || grade === 'SSS';
-      if (enhancementPlus >= 5) {
-        this.playerAura.setVisible(true)
-          .setTint(this.player.weapon?.key === 'w_hero_sword' ? 0xffd35a : element ? ELEMENT_INFO[element].color : gradeColor(grade))
-          .setAlpha(Math.min(0.92, 0.34 + plus * 0.12 + (highGrade ? 0.14 : 0)))
-          .setScale(0.9 + Math.min(0.35, plus * 0.06));
-      } else {
-        this.playerAura.setVisible(false);
-      }
-    }
+    // The colored smoke supplies the whole body aura; avoid mixing in the old grade glow.
+    this.playerAura?.setVisible(false);
     this.updateHeldEquipment();
   }
 
@@ -8127,10 +8114,13 @@ export class GameScene extends Phaser.Scene {
     if (this.enhancementAura?.visible) {
       this.enhancementAura.setPosition(ps.x, ps.y - 14).setDepth(ps.depth - .18);
       this.enhancementAura.list.forEach((child, i) => {
-        const flame = child as Phaser.GameObjects.Image;
-        const phase = this.time.now / (230 + i * 80) + i * 2;
-        flame.setDisplaySize(36 - i * 3 + Math.sin(phase) * 1, 50 - i * 3 + Math.cos(phase * 1.3) * 2)
-          .setY(-Math.sin(phase * .7) * 1.5).setAlpha((i ? .25 : .5) + Math.sin(phase) * .12);
+        const cloud = child as Phaser.GameObjects.Image;
+        // Same rising, rotating, fading smoke cycle as Rufalzent, kept close to the body.
+        const phase = (time / 2400 + i / 3) % 1;
+        cloud.setPosition(Math.sin(time / 650 + i * 2) * 1.5, -phase * 5)
+          .setDisplaySize(32 + phase * 9, 38 + phase * 10)
+          .setRotation(time * .00015 * (i % 2 ? -1 : 1) + i * 2)
+          .setAlpha(Math.sin(phase * Math.PI) * .42 * ps.alpha);
       });
     }
     if (this.playerAura && this.playerAura.visible) {
