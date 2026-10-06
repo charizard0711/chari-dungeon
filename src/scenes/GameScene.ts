@@ -7761,9 +7761,9 @@ export class GameScene extends Phaser.Scene {
   magicFx(x: number, y: number) { this.effectFx(x, y, 'fx_magic', 2.0, 600); }
   poisonFx(x: number, y: number) { this.effectFx(x, y, 'fx_poison', 1.5, 500); }
 
-  // 強化値は輝きの強さだけを上げ、武器色は属性だけで変える。
+  // 体の強化オーラは、装備中の武器と盾の低い方の強化値で判定する。
   updatePlayerAura() {
-    const enhancementPlus = this.player.weapon?.plus ?? 0;
+    const enhancementPlus = Math.min(this.player.weapon?.plus ?? 0, this.player.shield?.plus ?? 0);
     const auraKey = enhancementPlus >= 10 ? 'enhancement_aura_red' : 'enhancement_aura_blue';
     if (enhancementPlus >= 5 && this.textures.exists(auraKey)) {
       if (!this.enhancementAura?.active) {
@@ -7780,7 +7780,7 @@ export class GameScene extends Phaser.Scene {
       const grade = this.player.weapon?.grade ?? 'D';
       const element = this.player.weapon?.element;
       const highGrade = grade === 'A' || grade === 'S' || grade === 'SSS';
-      if (plus >= 5) {
+      if (enhancementPlus >= 5) {
         this.playerAura.setVisible(true)
           .setTint(this.player.weapon?.key === 'w_hero_sword' ? 0xffd35a : element ? ELEMENT_INFO[element].color : gradeColor(grade))
           .setAlpha(Math.min(0.92, 0.34 + plus * 0.12 + (highGrade ? 0.14 : 0)))
