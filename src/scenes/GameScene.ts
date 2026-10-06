@@ -7768,8 +7768,8 @@ export class GameScene extends Phaser.Scene {
     if (enhancementPlus >= 5 && this.textures.exists(auraKey)) {
       if (!this.enhancementAura?.active) {
         this.enhancementAura = this.add.container(0, 0, [
-          this.add.image(0, 0, auraKey).setDisplaySize(58, 74).setAlpha(.65),
-          this.add.image(0, 0, auraKey).setDisplaySize(51, 68).setAlpha(.35).setFlipX(true)
+          this.add.image(0, 0, auraKey).setDisplaySize(36, 50).setAlpha(.65),
+          this.add.image(0, 0, auraKey).setDisplaySize(33, 47).setAlpha(.35).setFlipX(true)
         ]);
       }
       for (const child of this.enhancementAura.list) (child as Phaser.GameObjects.Image).setTexture(auraKey);
@@ -8125,12 +8125,12 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (this.enhancementAura?.visible) {
-      this.enhancementAura.setPosition(ps.x, ps.y - 8).setDepth(ps.depth - .18);
+      this.enhancementAura.setPosition(ps.x, ps.y - 4).setDepth(ps.depth - .18);
       this.enhancementAura.list.forEach((child, i) => {
         const flame = child as Phaser.GameObjects.Image;
         const phase = this.time.now / (230 + i * 80) + i * 2;
-        flame.setDisplaySize(58 + Math.sin(phase) * 4, 74 + Math.cos(phase * 1.3) * 8)
-          .setY(-Math.sin(phase * .7) * 4).setAlpha((i ? .25 : .5) + Math.sin(phase) * .12);
+        flame.setDisplaySize(36 - i * 3 + Math.sin(phase) * 1, 50 - i * 3 + Math.cos(phase * 1.3) * 2)
+          .setY(-Math.sin(phase * .7) * 1.5).setAlpha((i ? .25 : .5) + Math.sin(phase) * .12);
       });
     }
     if (this.playerAura && this.playerAura.visible) {
