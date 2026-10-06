@@ -231,6 +231,7 @@ interface DungeonObject {
   waterDrops?: { sprite: Phaser.GameObjects.Rectangle; x: number; phase: number }[];
   waterRipples?: { sprite: Phaser.GameObjects.Rectangle; phase: number }[];
   used: boolean;
+  silverFountain?: boolean;
   breakable: boolean;
 }
 
@@ -3371,13 +3372,14 @@ export class GameScene extends Phaser.Scene {
       && !(this.dungeon.start.x >= room.x && this.dungeon.start.x < room.x + room.w
         && this.dungeon.start.y >= room.y && this.dungeon.start.y < room.y + room.h)));
     const candidates = [...rooms, ...fallbackRooms].filter((room) => room !== lakeRoom);
-    const wanted: HealingDungeonObjectKind[] = lakeRoom ? ['fountain', 'fountain'] : ['fountain'];
+    if (this.dungeonObjects.some(object => object.kind === 'fountain')) return;
+    const wanted: HealingDungeonObjectKind[] = ['fountain'];
     for (let index = 0; index < wanted.length; index++) {
       const kind = wanted[index];
       const room = (index === 0 ? lakeRoom : undefined)
         ?? candidates.find((candidate) => !this.dungeonObjects.some((object) => object.x === candidate.cx && object.y === candidate.cy));
       if (!room) break;
-      this.addDungeonObject(kind, room.cx, room.cy, 3, 3, false);
+      this.addDungeonObject(kind, room.cx, room.cy, 3, 3, false, Math.random() < .03);
     }
   }
 
@@ -3584,9 +3586,9 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  addDungeonObject(kind: DungeonObjectKind, centerX: number, centerY: number, w: number, h: number, breakable = false) {
+  addDungeonObject(kind: DungeonObjectKind, centerX: number, centerY: number, w: number, h: number, breakable = false, silverFountain = false) {
     const isHealing = kind === 'fountain';
-    const texture = kind === 'fountain' ? this.eventMode ? 'hw_candy' : 'terrain_healing_fountain' : this.roomPropTexture(kind);
+    const texture = kind === 'fountain' ? this.eventMode ? 'hw_candy' : silverFountain ? 'terrain_silver_fountain' : 'terrain_healing_fountain' : this.roomPropTexture(kind);
     const renderTiles = kind === 'fountain' ? this.eventMode ? 1.5 : 3 : this.roomPropRenderTiles(kind);
     const worldX = centerX * TILE + TILE / 2;
     const worldY = centerY * TILE + TILE / 2;
@@ -3616,7 +3618,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.dungeonObjects.push({
       kind, x: centerX, y: centerY, w, h, sprite, waterFx, waterDrops, waterRipples,
-      used: false, breakable
+      used: false, breakable, silverFountain: isHealing && !this.eventMode && silverFountain
     });
   }
 
@@ -3639,15 +3641,23 @@ export class GameScene extends Phaser.Scene {
     this.player.hp = this.player.hpMax;
     this.player.poisonTurns = 0;
     const blessingAvailable = !this.floorBossDefeated || (!this.inBossRoom && this.floorHasGate(this.floor));
-    if (blessingAvailable) this.player.fountainBlessingFloor = this.floor;
+    if (blessingAvailable) {
+      this.player.fountainBlessingFloor = this.floor;
+      this.player.fountainBlessingPower = object.silverFountain ? 1.2 : 1.1;
+    }
+    if (object.silverFountain) {
+      if (this.player.weapon) this.player.weapon.dur = this.player.weapon.durMax;
+      if (this.player.shield) this.player.shield.dur = this.player.shield.durMax;
+      this.log('銀の泉で、装備中の武器と盾の耐久が全回復した。', 'special');
+    }
     object.used = true;
     object.sprite.setTint(0x7b8c8a).setAlpha(0.72);
     object.waterFx?.setVisible(false);
     this.effectFx(object.x, object.y, 'fx_magic', 1.8, 720, 0x62f7e8);
     this.healFx();
     Audio.playSe('heal');
-    this.log(`${this.eventMode ? '魔法のお菓子で' : '古代の噴水で'}体力が全回復した。${healed > 0 ? `（+${healed}）` : ''}`, 'item');
-    if (blessingAvailable) this.log(`${this.eventMode ? '収穫の祝福' : '噴水の加護'}：この階のボス討伐まで攻撃・防御が1.1倍！`, 'special');
+    this.log(`${this.eventMode ? '魔法のお菓子で' : object.silverFountain ? '銀の泉で' : '古代の噴水で'}体力が全回復した。${healed > 0 ? `（+${healed}）` : ''}`, 'item');
+    if (blessingAvailable) this.log(`${this.eventMode ? '収穫の祝福' : object.silverFountain ? '銀の泉の加護' : '噴水の加護'}：この階のボス討伐まで攻撃・防御が${this.player.fountainBlessingPower}倍！`, 'special');
     this.emitRefresh();
   }
 
@@ -8729,8 +8739,12 @@ export class GameScene extends Phaser.Scene {
         .setDisplaySize(equipment ? 34 : 28, equipment ? 34 : 28).setAlpha(equipment ? .32 : .18);
       this.ground.push({ ...item, sprite, glow });
     }
+    // Older lake-floor saves can contain two fountains. Keep a used one first so reload never grants an extra use.
+    const fountains = snapshot.objects.filter(object => object.kind === 'fountain');
+    const keptFountain = fountains.find(object => object.used) ?? fountains.find(object => object.silverFountain) ?? fountains[0];
     for (const object of snapshot.objects) {
-      this.addDungeonObject(object.kind, object.x, object.y, object.w, object.h, object.breakable);
+      if (object.kind === 'fountain' && object !== keptFountain) continue;
+      this.addDungeonObject(object.kind, object.x, object.y, object.w, object.h, object.breakable, object.silverFountain ?? false);
       const restored = this.dungeonObjects[this.dungeonObjects.length - 1];
       restored.used = object.used;
       if (object.used) { restored.sprite.setTint(0x7b8c8a).setAlpha(.72); restored.waterFx?.setVisible(false); }

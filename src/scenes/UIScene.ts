@@ -843,9 +843,10 @@ export class UIScene extends Phaser.Scene {
     const label = this.add.text(29, 7, '攻・防 ×1.1', {
       fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#b9fff5', fontStyle: 'bold'
     });
+    label.setName('fountain-rate');
     const zone = this.add.zone(0, 0, 122, 30).setOrigin(0).setInteractive({ useHandCursor: true });
-    const show = () => this.showTooltip(this.gs.eventMode ? '収穫の祝福' : '噴水の加護',
-      `${this.gs.floor}階のボス討伐まで、攻撃力・防御力が1.1倍。\n重ねて使っても倍率は増えません。`, x, y + 34);
+    const show = () => this.showTooltip(this.gs.eventMode ? '収穫の祝福' : this.gs.player.fountainBlessingPower === 1.2 ? '銀の泉の加護' : '噴水の加護',
+      `${this.gs.floor}階のボス討伐まで、攻撃力・防御力が${this.gs.player.fountainBlessingRate}倍。\n重ねて使っても倍率は増えません。`, x, y + 34);
     zone.on('pointerover', show);
     zone.on('pointerout', () => this.hideTooltip());
     zone.on('pointerdown', (_p: unknown, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
@@ -860,6 +861,7 @@ export class UIScene extends Phaser.Scene {
     for (const entry of this.slotAuras) { entry.aura.emerald = ['w_hw_emedral', 's_hw_emerald'].includes(entry.icon.texture.key); entry.aura.enabled = entry.icon.texture.key === entry.key || entry.aura.emerald; }
     const p = this.gs.player;
     this.fountainBadge?.setVisible(p.fountainBlessingFloor !== null);
+    (this.fountainBadge?.getByName('fountain-rate') as Phaser.GameObjects.Text | undefined)?.setText(`攻・防 ×${p.fountainBlessingRate}`);
     const th = this.gs.dungeon?.glacialArena
       ? { ...getTheme(this.gs.floor), name: '氷晶の広間', accent: 0x8adfff }
       : this.gs.dungeon?.volcanoArena

@@ -29,9 +29,10 @@ export class Player {
   transformationAttackRate = 1;
   transformationDefBonus = 0;
   fountainBlessingFloor: number | null = null;
+  fountainBlessingPower: 1.1 | 1.2 = 1.1;
 
   get fountainBlessingRate(): number {
-    return this.fountainBlessingFloor === null ? 1 : 1.1;
+    return this.fountainBlessingFloor === null ? 1 : this.fountainBlessingPower;
   }
   gold = 0;
 

@@ -159,6 +159,7 @@ const TERRAIN_PROP_ART = {
   terrain_boss_brazier: 'assets/terrain/boss-brazier.png',
   terrain_rune_lamp: 'assets/terrain/rune-lamp.png',
   terrain_healing_fountain: 'assets/terrain/objects/healing-fountain-pixel.png',
+  terrain_silver_fountain: 'assets/terrain/objects/silver-fountain-pixel.png',
   terrain_teleport_pad: 'assets/terrain/objects/teleport-pad.png',
   terrain_midboss_floor_7x7: 'assets/terrain/objects/midboss-floor-7x7.png',
   terrain_hazard_poison: 'assets/terrain/hazards/toxic-sludge-v2.png',
