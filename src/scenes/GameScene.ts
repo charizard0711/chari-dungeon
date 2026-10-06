@@ -8118,7 +8118,7 @@ export class GameScene extends Phaser.Scene {
         // Same rising, rotating, fading smoke cycle as Rufalzent, kept close to the body.
         const phase = (time / 2400 + i / 3) % 1;
         cloud.setPosition(Math.sin(time / 650 + i * 2) * 1.5, -phase * 5)
-          .setDisplaySize(28 + phase * 8, 33 + phase * 9)
+          .setDisplaySize(25 + phase * 7, 33 + phase * 9)
           .setRotation(time * .00015 * (i % 2 ? -1 : 1) + i * 2)
           .setAlpha(Math.sin(phase * Math.PI) * .42 * ps.alpha);
       });
