@@ -7764,7 +7764,7 @@ export class GameScene extends Phaser.Scene {
   // 体の強化オーラは、装備中の武器と盾の低い方の強化値で判定する。
   updatePlayerAura() {
     const enhancementPlus = Math.min(this.player.weapon?.plus ?? 0, this.player.shield?.plus ?? 0);
-    const auraKey = enhancementPlus >= 10 ? 'enhancement_aura_red' : 'enhancement_aura_blue';
+    const auraKey = enhancementPlus >= 15 ? 'enhancement_aura_gold' : enhancementPlus >= 10 ? 'enhancement_aura_red' : 'enhancement_aura_blue';
     if (enhancementPlus >= 5 && this.textures.exists(auraKey)) {
       if (!this.enhancementAura?.active) {
         this.enhancementAura = this.add.container(0, 0, [
@@ -8125,7 +8125,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (this.enhancementAura?.visible) {
-      this.enhancementAura.setPosition(ps.x, ps.y - 4).setDepth(ps.depth - .18);
+      this.enhancementAura.setPosition(ps.x, ps.y - 14).setDepth(ps.depth - .18);
       this.enhancementAura.list.forEach((child, i) => {
         const flame = child as Phaser.GameObjects.Image;
         const phase = this.time.now / (230 + i * 80) + i * 2;
@@ -8135,7 +8135,7 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.playerAura && this.playerAura.visible) {
       this.playerAura.x = ps.x;
-      this.playerAura.y = ps.y - 4;
+      this.playerAura.y = ps.y - 14;
       const pulse = 0.9 + Math.sin(time * 0.006) * 0.15;
       this.playerAura.setScale(pulse);
       this.playerAura.setDepth(ps.depth - 0.16);

@@ -734,7 +734,7 @@ export class UIScene extends Phaser.Scene {
         ? `${ELEMENT_INFO[weapon.element].name}属性`
         : `${ELEMENT_INFO[weapon.element].name}属性（弱点1.5倍・同属性0.75倍）`);
     }
-    if (weapon.plus >= 5) effects.push(`強化効果: スキル${weaponChargeSteps(weapon.plus)}歩・耐久消耗-${weaponWearReduction(weapon.plus)}（最低1）`);
+    if (weapon.plus >= 5) effects.push(`強化効果: スキル${weaponChargeSteps(weapon.plus)}歩・${weapon.plus >= 15 ? '耐久消耗1固定' : `耐久消耗-${weaponWearReduction(weapon.plus)}（最低1）`}`);
     if (weapon.passive) effects.push(compact ? weapon.passive.name : `${weapon.passive.name}: ${weapon.passive.description}`);
     if (!compact) {
       for (const magic of weapon.magics) effects.push(`${magic.label}: ${MAGIC_DESC[magic.code]}`);

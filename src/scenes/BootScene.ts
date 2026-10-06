@@ -144,6 +144,7 @@ const ORIGINAL_ITEM_ART = {
   i_dynamite: 'assets/items/dynamite-v1.png',
   i_skill_drink: 'assets/items/skill-drink-v1.png',
   enhancement_aura_blue: 'assets/effects/enhancement-aura-blue.png',
+  enhancement_aura_gold: 'assets/effects/enhancement-aura-gold.png',
   enhancement_aura_red: 'assets/effects/enhancement-aura-red.png',
   i_mystery_bread: 'assets/items/mystery-bread-v1.webp',
   i_repair: 'assets/items/equipment-repair-stone.png'
