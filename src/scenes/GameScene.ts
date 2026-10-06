@@ -8112,13 +8112,13 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (this.enhancementAura?.visible) {
-      this.enhancementAura.setPosition(ps.x, ps.y - 14).setDepth(ps.depth - .18);
+      this.enhancementAura.setPosition(ps.x, ps.y - 6).setDepth(ps.depth - .18);
       this.enhancementAura.list.forEach((child, i) => {
         const cloud = child as Phaser.GameObjects.Image;
         // Same rising, rotating, fading smoke cycle as Rufalzent, kept close to the body.
         const phase = (time / 2400 + i / 3) % 1;
         cloud.setPosition(Math.sin(time / 650 + i * 2) * 1.5, -phase * 5)
-          .setDisplaySize(32 + phase * 9, 38 + phase * 10)
+          .setDisplaySize(28 + phase * 8, 33 + phase * 9)
           .setRotation(time * .00015 * (i % 2 ? -1 : 1) + i * 2)
           .setAlpha(Math.sin(phase * Math.PI) * .42 * ps.alpha);
       });
