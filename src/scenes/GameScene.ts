@@ -7761,9 +7761,11 @@ export class GameScene extends Phaser.Scene {
   magicFx(x: number, y: number) { this.effectFx(x, y, 'fx_magic', 2.0, 600); }
   poisonFx(x: number, y: number) { this.effectFx(x, y, 'fx_poison', 1.5, 500); }
 
-  // 体の強化オーラは、装備中の武器と盾の低い方の強化値で判定する。
+  // 双剣・弓は武器のみ、それ以外は武器と盾の低い強化値で体のオーラを判定。
   updatePlayerAura() {
-    const enhancementPlus = Math.min(this.player.weapon?.plus ?? 0, this.player.shield?.plus ?? 0);
+    const weapon = this.player.weapon;
+    const enhancementPlus = weapon?.dual || weapon?.weaponType === 'bow'
+      ? weapon.plus : Math.min(weapon?.plus ?? 0, this.player.shield?.plus ?? 0);
     const auraColor = enhancementPlus >= 15 ? 0xffcf58 : enhancementPlus >= 10 ? 0xff5263 : 0x55baff;
     if (enhancementPlus >= 5 && this.textures.exists('fx_shadow')) {
       if (!this.enhancementAura?.active) {
@@ -8118,7 +8120,7 @@ export class GameScene extends Phaser.Scene {
         // Same rising, rotating, fading smoke cycle as Rufalzent, kept close to the body.
         const phase = (time / 2400 + i / 3) % 1;
         cloud.setPosition(Math.sin(time / 650 + i * 2) * 1.5, -phase * 5)
-          .setDisplaySize(25 + phase * 7, 33 + phase * 9)
+          .setDisplaySize(23 + phase * 6, 30 + phase * 8)
           .setRotation(time * .00015 * (i % 2 ? -1 : 1) + i * 2)
           .setAlpha(Math.sin(phase * Math.PI) * .42 * ps.alpha);
       });
