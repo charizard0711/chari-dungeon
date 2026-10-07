@@ -1,9 +1,10 @@
 import type { Armor, Dir, EquipmentGrade } from './types';
+import { rollArmorTrait } from './equipmentTraits';
 
 export const PLAYER_GENDERS = ['male', 'female'] as const;
 export type PlayerGender = typeof PLAYER_GENDERS[number];
 
-export const PLAYER_ARMORS = ['leather', 'chain', 'plate', 'arcane', 'dragon', 'pumpkin_male', 'pumpkin_female'] as const;
+export const PLAYER_ARMORS = ['leather', 'chain', 'plate', 'arcane', 'dragon', 'dawn', 'aqua', 'crimson', 'pumpkin_male', 'pumpkin_female'] as const;
 export type PlayerArmor = typeof PLAYER_ARMORS[number];
 
 export const PLAYER_VISUAL_FRAMES = [
@@ -28,6 +29,9 @@ export interface PlayerArmorDef {
 }
 
 export const PLAYER_ARMOR_DEFS: Record<PlayerArmor, PlayerArmorDef> = {
+  dawn: { key:'dawn', name:'暁白の聖装', grade:'SS', defBonus:12, minFloor:25, exclusiveLoot:true },
+  crimson: { key:'crimson', name:'紅黒の天聖鎧', grade:'SSS', defBonus:16, minFloor:30, exclusiveLoot:true },
+  aqua: { key:'aqua', name:'蒼白の天聖鎧', grade:'SSS', defBonus:16, minFloor:30, exclusiveLoot:true },
   leather: { key: 'leather', name: '旅人の革装', grade: 'D', defBonus: 1, minFloor: 1 },
   chain: { key: 'chain', name: '鎖帷子', grade: 'C', defBonus: 3, minFloor: 5 },
   plate: { key: 'plate', name: '騎士の板金鎧', grade: 'B', defBonus: 5, minFloor: 10 },
@@ -58,6 +62,7 @@ export function isPlayerArmor(value: unknown): value is PlayerArmor {
 }
 
 export function armorForGrade(grade: EquipmentGrade): PlayerArmorDef {
+  if (grade === 'SS') return PLAYER_ARMOR_DEFS.dawn;
   return Object.values(PLAYER_ARMOR_DEFS).find((armor) => armor.grade === grade && !armor.exclusiveLoot)
     ?? PLAYER_ARMOR_DEFS[DEFAULT_PLAYER_ARMOR];
 }
@@ -73,7 +78,8 @@ export function makePlayerArmor(key: PlayerArmor): Armor {
     name: def.name,
     grade: def.grade,
     defBonus: def.defBonus,
-    plus: 0
+    plus: 0,
+    trait: rollArmorTrait()
   };
 }
 

@@ -2,10 +2,12 @@ import type { Weapon, Shield, Armor, Item, Dir, Magic, MagicCode, EquipmentGrade
 import { WEAPON_DEFS, SHIELD_DEFS, magicLabel, makeItem, ELEMENT_INFO } from './data';
 import { ELEMENTAL_EQUIPMENT_RATE } from './balance';
 import { DEFAULT_PLAYER_ARMOR, makePlayerArmor } from './playerAppearance';
+import { armorTraitValue } from './equipmentTraits';
 
 export const DEFAULT_PLAYER_WEAPON_KEY = 'w_iron_dagger';
 
 const WEAPON_PASSIVES: Record<WeaponType, WeaponPassive> = {
+  katana: { key: 'heavy_strike', name: '鋭刃', description: '与えるダメージ+6%' },
   dagger: { key: 'backstab', name: '背面急所', description: 'クリティカルダメージ+10%' },
   longsword: { key: 'sturdy', name: '剣身防御', description: '受けるダメージ-5%' },
   lance: { key: 'pierce', name: '貫通', description: '敵の防御を8%無視' },
@@ -21,7 +23,9 @@ export class Player {
   level = 1;
   exp = 0;
   expNext = 20;
-  hpMax = 100;
+  baseHpMax = 100;
+  get hpMax() { return this.baseHpMax + (this.weapon?.starred ? 50 : 0) + armorTraitValue(this.armor,'hp'); }
+  set hpMax(value: number) { this.baseHpMax = value - (this.weapon?.starred ? 50 : 0) - armorTraitValue(this.armor,'hp'); }
   hp = 100;
   baseAtkMin = 5;
   baseAtkMax = 12;
@@ -91,7 +95,7 @@ export class Player {
 
   get def(): number {
     let v = this.baseDef + Math.floor(this.level * 0.4);
-    if (this.armor) v += this.armor.defBonus + (this.armor.plus ?? 0);
+    if (this.armor) v += this.armor.defBonus + (this.armor.plus ?? 0) + armorTraitValue(this.armor,'defense');
     if (this.shield && this.shield.dur > 0) v += this.shield.defBonus + (this.shield.plus ?? 0);
     return Math.floor((v + this.transformationDefBonus) * this.fountainBlessingRate);
   }
@@ -140,7 +144,7 @@ export function makeShield(key: string, gradeOverride?: EquipmentGrade): Shield 
   const def = SHIELD_DEFS.find((d) => d.key === key)!;
   const grade = gradeOverride ?? def.grade;
   // SSS reclassifies the exclusive relic without changing its combat values.
-  const gradeIndex = { D: 0, C: 1, B: 2, A: 3, S: 4, SSS: 4 }[grade];
+  const gradeIndex = { D: 0, C: 1, B: 2, A: 3, S: 4, SS: 5, SSS: 4 }[grade];
   const defBonus = Math.max(def.defBonus, 2 + gradeIndex * 2);
   const durMax = Math.max(def.durMax, 40 + gradeIndex * 15);
   return {
@@ -158,7 +162,7 @@ export function shieldFullName(s: Shield): string {
 export function refreshLegendaryEquipment(item: Pick<Weapon | Shield, 'key' | 'name' | 'grade'>): void {
   const def = item.key === 'w_hero_sword' ? WEAPON_DEFS.find(d => d.key === item.key)
     : item.key === 's_arcadia_guard' ? SHIELD_DEFS.find(d => d.key === item.key) : undefined;
-  if (def) { item.name = def.name; item.grade = def.grade; }
+  if (def) { item.name = def.name + ('starred' in item && item.starred ? '★' : ''); item.grade = def.grade; }
 }
 
 function addRandomLootTraits(weapon: Weapon): Weapon {
@@ -217,7 +221,7 @@ export function rollWeapon(floor: number): Weapon {
 }
 
 export function rollWeaponByGrade(grade: EquipmentGrade): Weapon {
-  const pool = equipmentPoolAtElementRate(WEAPON_DEFS.filter((d) => !d.exclusiveLoot && d.grade === grade));
+  const pool = equipmentPoolAtElementRate(WEAPON_DEFS.filter((d) => !d.exclusiveLoot && (d.grade === grade || grade === 'S' && d.grade === 'SS')));
   const picked = pool[Math.floor(Math.random() * pool.length)] ?? WEAPON_DEFS[0];
   const magicCount = grade === 'S' ? 2 : grade === 'A' ? 1 : grade === 'B' && Math.random() < 0.35 ? 1 : 0;
   return addRandomLootTraits(makeWeapon(picked.key, rollMagics(magicCount)));

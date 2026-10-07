@@ -30,8 +30,8 @@ export function writeCodexSave(discovered: Iterable<string>): boolean {
 
 export const EQUIPMENT_CODEX_SAVE_KEY = 'chari-dungeon.equipment-codex.v1';
 
-export function equipmentKeys(player: { weapons: { key: string }[]; shields: { key: string }[]; armors: { key: string }[] }): string[] {
-  return [...player.weapons.map(item => item.key), ...player.shields.map(item => item.key),
+export function equipmentKeys(player: { weapons: { key: string; starred?: boolean }[]; shields: { key: string }[]; armors: { key: string }[] }): string[] {
+  return [...player.weapons.flatMap(item => item.starred ? [item.key,`star_${item.key}`] : [item.key]), ...player.shields.map(item => item.key),
     ...player.armors.map(item => `armor_${item.key}`)];
 }
 

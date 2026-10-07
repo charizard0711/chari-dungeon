@@ -12,11 +12,12 @@ export interface WeaponSkill {
 }
 
 export const WEAPON_SKILLS = {
+  katana: { name: '風牙', description: '前方3マスに竜巻を送り、敵を空いているマスへ1マス押し戻す。成功した敵1体につき次のチャージを5歩短縮', color: 0x9ceef0, chargeSteps: 100, range: 3, multiplier: 1.35, sound: 'skillLance' },
   dagger: { name: '零刻領域', description: '5ターン時間停止。終了時に正面を攻撃。背後なら先に敵最大HPの5%固定ダメージ、その後に通常攻撃2倍', color: 0xb88cff, chargeSteps: 100, range: 3, multiplier: 0, sound: 'clockTick' },
   longsword: { name: '扇斬り', description: '正面・斜め前の3マスを斬り、HPを70回復', color: 0x6fa8ff, chargeSteps: 100, range: 1, multiplier: 1.3, sound: 'skillLongsword' },
-  lance: { name: '貫通突き', description: '東西南北各3マスを攻撃・攻撃力30%低下を3ターン', color: 0xf0c75e, chargeSteps: 100, range: 3, multiplier: 1.35, sound: 'skillLance' },
+  lance: { name: '貫通突き', description: '東西南北各2マスを攻撃・攻撃力20%低下を3ターン', color: 0xf0c75e, chargeSteps: 100, range: 2, multiplier: 1.35, sound: 'skillLance' },
   bow: { name: '穿ち矢', description: '前方7マス以内の敵1体を攻撃し、2ターンスタン', color: 0x74d88a, chargeSteps: 100, range: 7, multiplier: 1.8, sound: 'skillBow' },
-  handgun: { name: '五連射', description: '前方3マス以内の敵1体へ5発・生存時に防御30%低下を3ターン', color: 0xffac60, chargeSteps: 100, range: 3, multiplier: .65, sound: 'skillHandgun' },
+  handgun: { name: '五連射', description: '前方3マス以内の敵1体へ5発・生存時に防御10%低下を3ターン', color: 0xffac60, chargeSteps: 100, range: 3, multiplier: .65, sound: 'skillHandgun' },
   greatsword: { name: '旋風斬り', description: '周囲8マスを斬り、敵を1マス押し戻す。命中したモンスター1体につきHP10回復', color: 0xff7272, chargeSteps: 100, range: 1, multiplier: 1.45, sound: 'skillGreatsword' },
   dual_sword: { name: '十字絶閃', description: '前方5マスを貫通する斬撃を3連発・各発は通常攻撃の1.5倍', color: 0xffa1ef, chargeSteps: 100, range: 5, multiplier: 1.5, sound: 'skillDual' }
 } satisfies Record<Exclude<WeaponType, 'twin_daggers'>, WeaponSkill>;

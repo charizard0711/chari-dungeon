@@ -1,16 +1,17 @@
+import { katanaSlashColor } from './equipmentAccessories';
 import Phaser from 'phaser';
 import type { Dir, Vec2, WeaponType } from './types';
 import { TILE } from './textures';
 import { directionVector } from './weaponSkills';
 
-export const skillImpactTime = (type: WeaponType) => type === 'bow' ? 450 : type === 'handgun' ? 100 : type === 'greatsword' ? 270 : type === 'dagger' ? 90 : 150;
+export const skillImpactTime = (type: WeaponType) => type === 'katana' ? 640 : type === 'bow' ? 450 : type === 'handgun' ? 100 : type === 'greatsword' ? 270 : type === 'dagger' ? 90 : 150;
 const world = (p: Vec2) => ({ x: (p.x + .5) * TILE, y: (p.y + .5) * TILE });
 function art(scene: Phaser.Scene, key: string, x: number, y: number, w: number, h = w, additive = true) {
   const image = scene.add.image(x, y, key).setDisplaySize(w, h).setDepth(24).setName('painted-skill-fx');
   if (additive) image.setBlendMode(Phaser.BlendModes.ADD);
   return image;
 }
-function fade(scene: Phaser.Scene, sprite: Phaser.GameObjects.Image, duration: number, delay = 0) {
+function fade(scene: Phaser.Scene, sprite: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite, duration: number, delay = 0) {
   scene.tweens.add({ targets: sprite, alpha: 0, duration, delay, onComplete: () => sprite.destroy() });
 }
 export function paintedImpact(scene: Phaser.Scene, tile: Vec2, color = 0xffffff) {
@@ -36,6 +37,7 @@ export function playPaintedSkill(scene: Phaser.Scene, type: WeaponType, origin: 
   const emit = (key: string, x: number, y: number, w: number, h = w) => art(scene, key, x, y, w, h);
   const crescent = (x: number, y: number, size: number, rotation: number, turn: number, duration: number, delay = 0) => {
     const slash = emit('fx_crescent', x, y, size).setRotation(rotation).setAlpha(0);
+    if (type === 'katana') slash.setTint(katanaSlashColor({key:weaponKey.replace(/^star_/,''),starred:weaponKey.startsWith('star_')}));
     if (type === 'dagger') slash.setTint(0xd4a7ff);
     if (type === 'greatsword') slash.setTint(0xffc488);
     if (type === 'longsword') slash.setTint(0xa1c7ff);
@@ -43,7 +45,14 @@ export function playPaintedSkill(scene: Phaser.Scene, type: WeaponType, origin: 
     scene.tweens.add({ targets: slash, rotation: rotation + turn, duration, delay, ease: 'Cubic.out' });
     fade(scene, slash, duration - 60, delay + 60);
   };
-  if (type === 'greatsword') {
+  if (type === 'katana') {
+    if (!scene.anims.exists('katana-tornado-v2')) scene.anims.create({key:'katana-tornado-v2', frames:scene.anims.generateFrameNumbers('fx_katana_tornado_v2',{start:0,end:7}), frameRate:18, repeat:-1});
+    const tornado = scene.add.sprite(p.x, p.y + TILE * .3, 'fx_katana_tornado_v2')
+      .setOrigin(.5,.88).setDisplaySize(TILE * 2.3,TILE * 3.1).setDepth(24)
+      .setName('painted-skill-fx').setAlpha(.86).play('katana-tornado-v2');
+    crescent(p.x + d.x * TILE * .35, p.y + d.y * TILE * .35, TILE * 2.1, angle - .8, 1.7, 210);
+    scene.tweens.add({ targets: tornado, x:end.x, y:end.y + TILE * .3, duration:640, ease:'Linear', onComplete:()=>fade(scene,tornado,180) });
+  } else if (type === 'greatsword') {
     crescent(p.x, p.y, TILE * 3.2, angle, Math.PI * 2.1, 430);
     crescent(p.x, p.y, TILE * 2.7, angle + Math.PI, Math.PI * 2.1, 430, 55);
     scene.cameras.main.shake(130, .0015);
@@ -62,7 +71,8 @@ export function playPaintedSkill(scene: Phaser.Scene, type: WeaponType, origin: 
     const charge = emit('fx_impact', p.x + d.x * 13, p.y + d.y * 13, TILE * 2.2).setAlpha(.75);
     fade(scene, charge, 160);
     if (distance > 0) scene.time.delayedCall(150, () => {
-      const arrow = emit('fx_arrow', p.x, p.y, TILE * 3.8, TILE * 1.3).setOrigin(1, .5).setRotation(angle);
+      const arrowKey = `arrow_${weaponKey.replace(/^star_/, '')}`;
+      const arrow = art(scene, arrowKey, p.x, p.y, TILE * 1.6, TILE * 1.6, false).setRotation(angle + Math.PI / 4);
       scene.tweens.add({ targets: arrow, x: end.x, y: end.y, duration: 300, ease: 'Linear', onComplete: () => arrow.destroy() });
     });
   } else if (type === 'handgun') {

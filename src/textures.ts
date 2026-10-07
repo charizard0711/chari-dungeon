@@ -626,7 +626,7 @@ function buildWeaponTextures(scene: Phaser.Scene) {
   }
   // 盾
   const elementColors = { fire: 0xff5a36, thunder: 0xffe348, water: 0x3fa9ff, ice: 0x82e9ff } as const;
-  const gradeColors = { D: 0x8c929c, C: 0xbac5d1, B: 0x8d596e, A: 0xcaa34b, S: 0xf2e7bf, SSS: 0xff83d9 } as const;
+  const gradeColors = { D: 0x8c929c, C: 0xbac5d1, B: 0x8d596e, A: 0xcaa34b, S: 0xf2e7bf, SS: 0xffa465, SSS: 0xff83d9 } as const;
   for (const def of SHIELD_DEFS) {
     const c = def.element ? elementColors[def.element] : gradeColors[def.grade];
     iconTexture(scene, def.key, (g) => {

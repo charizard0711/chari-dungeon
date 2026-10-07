@@ -1,7 +1,9 @@
+import { isTwoHanded } from './equipmentRules';
 import { ELEMENT_INFO, ITEM_DEFS, SHIELD_DEFS, WEAPON_DEFS } from './data';
 import { armorTextureKey, PLAYER_ARMORS, PLAYER_ARMOR_DEFS } from './playerAppearance';
 import { makeShield, weaponRarity } from './player';
 import type { Element, EquipmentGrade, WeaponType } from './types';
+import { armorTraitDescription } from './equipmentTraits';
 
 export const ITEM_CATALOG_CODE = '19960711';
 export const CATALOG_TABS = [
@@ -25,7 +27,7 @@ export interface CatalogEntry {
 }
 const WEAPON_NAMES: Record<WeaponType, string> = {
   dagger: '短剣', longsword: '片手剣', lance: '槍', bow: '弓', handgun: '銃',
-  greatsword: '大剣', dual_sword: '双剣', twin_daggers: '双短剣'
+  greatsword: '大剣', katana: '刀', dual_sword: '双剣', twin_daggers: '双短剣'
 };
 const affinity = (element?: Element) => element ? `${ELEMENT_INFO[element].name}属性` : '無属性';
 
@@ -37,7 +39,8 @@ export const ITEM_CATALOG: readonly CatalogEntry[] = [
     summary: `${weaponRarity(weapon)} / ${WEAPON_NAMES[weapon.weaponType]} / ${affinity(weapon.element)}`,
     description: [
       `攻撃力 ${weapon.atkMin}〜${weapon.atkMax}　耐久 ${weapon.durMax}`,
-      weapon.dual ? '二刀流：1ターンに2回攻撃。盾は装備できません。' : '',
+      weapon.dual ? '二刀流：1ターンに2回攻撃。盾は装備できません。' : isTwoHanded(weapon) ? '両手持ち。盾は装備できません。' : '',
+      weapon.weaponType === 'katana' ? 'スキル：前方3マスに竜巻を送り、敵を空いているマスへ押し戻す。成功した敵1体につき次のチャージを5歩短縮。' : '',
       weapon.passive ? `${weapon.passive.name}：${weapon.passive.description}` : ''
     ].filter(Boolean).join('\n')
   })),
@@ -53,7 +56,7 @@ export const ITEM_CATALOG: readonly CatalogEntry[] = [
   ...PLAYER_ARMORS.map((key): CatalogEntry => {
     const armor = PLAYER_ARMOR_DEFS[key];
     return { key: `armor_${key}`, category: 'armor', name: armor.name, textureKey: armorTextureKey(key),
-      grade: armor.grade, summary: `${armor.grade} / 服`, description: `防御力 +${armor.defBonus}` };
+      grade: armor.grade, summary: `${armor.grade} / 服`, description: `防御力 +${armor.defBonus}\n入手時に追加効果を1つ抽選（HP・防御・スキル歩数・ポーション回復・特殊アイテムのドロップ率）\n${armorTraitDescription({...armor,plus:0,trait:'rare_drop'})}（付与率1%）` };
   }),
   ...Object.entries(ITEM_DEFS).map(([kind, item]): CatalogEntry => ({
     key: kind, category: 'item', name: item.name, textureKey: item.textureKey,

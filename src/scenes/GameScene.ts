@@ -1,3 +1,5 @@
+import { weaponAccessoryKey, katanaSlashColor } from '../equipmentAccessories';
+import { isTwoHanded } from '../equipmentRules';
 import { weaponChargeSteps, isRemovedItem } from '../enhancement';
 import { SKILL_DRINK_DROP_RATE } from '../balance';
 import { equipmentKeys, readEquipmentCodexSave, writeEquipmentCodexSave, readCodexSave, writeCodexSave } from '../codexSave';
@@ -69,6 +71,8 @@ import {
 
 // マップ表示ビューポート（画面上の座標。スマホ縦持ちでは縦型レイアウト）
 import { MAP_X, MAP_Y, MAP_W, MAP_H } from '../layout';
+import { playRevivalPresentation } from '../revivalPresentation';
+import { armorTraitDescription, armorTraitValue, rollStarWeapon, starWeaponKey } from '../equipmentTraits';
 
 const ANIM = 116;
 const RUN_STATE_KEYS = [
@@ -333,6 +337,8 @@ export class GameScene extends Phaser.Scene {
   difficulty: Difficulty = 'normal';
   difficultyClearEligible = true;
   revivesUsed = 0;
+  reviving = false;
+  revivalPromise?: Promise<void>;
   player!: Player;
   dungeon!: DungeonData;
   eventMode: 'halloween' | null = null;
@@ -363,6 +369,8 @@ export class GameScene extends Phaser.Scene {
   reservedBossScroll: EnhancementScrollKind | null = null;
   clickPathToken = 0;
   clickPathActive = false;
+  clickPathQuick = false;
+  clickDestinationRing?: Phaser.GameObjects.Graphics;
   lastMapClickAt = 0;
   qaBossMode = false;
   qaBossRoomZone?: BossRoomZone;
@@ -1077,7 +1085,8 @@ export class GameScene extends Phaser.Scene {
     this.updatePlayerAura();
     this.refreshTransformationVisual();
     // Keep sub-pixel movement, matching the antialiased renderer in main.ts.
-    this.cameras.main.startFollow(this.playerSprite, false, 0.15, 0.15);
+    // Player motion is already tweened; follow it directly without a second, lagging interpolation.
+    this.cameras.main.startFollow(this.playerSprite, false, 1, 1);
     this.cameras.main.setZoom(MAP_ZOOM);
 
     // 敵配置
@@ -3228,7 +3237,7 @@ export class GameScene extends Phaser.Scene {
     this.log(`${broken.name}は壊れて砕け散った！`, 'dmg');
     Audio.playSe('shieldBreak');
     this.player.shields = this.player.shields.filter((shield) => shield !== broken);
-    this.player.shield = this.player.weapon?.dual || this.player.weapon?.weaponType === 'bow' ? null : this.player.shields[0] ?? null;
+    this.player.shield = isTwoHanded(this.player.weapon) ? null : this.player.shields[0] ?? null;
   }
 
   spawnBossWalls(e: Enemy, candidates: Vec2[], count: number, kind: 'bone' | 'iron') {
@@ -3704,7 +3713,7 @@ export class GameScene extends Phaser.Scene {
       const pool: ItemKind[] = object.kind === 'jar'
         ? ['potion', 'potion', 'torch', 'invis']
         : ['potion', 'torch', 'torch'];
-      const regularScroll = Math.random() < SCROLL_DROP_RATE ? this.claimRegularEnhancementScroll() : null;
+      const regularScroll = Math.random() < SCROLL_DROP_RATE * this.rareItemDropRate ? this.claimRegularEnhancementScroll() : null;
       const kind = regularScroll ?? pool[Math.floor(Math.random() * pool.length)];
       this.dropItem(object.x, object.y, kind);
       this.log(`${object.kind === 'jar' ? '壺' : '樽'}を壊すと、${ITEM_DEFS[kind].name}が出てきた！`, 'item');
@@ -3747,7 +3756,7 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i < n; i++) {
       const pos = randomFloor(this.dungeon, [...this.occupiedPositions(), ...arenaCells]);
       if (!pos) continue;
-      const regularScroll = Math.random() < SCROLL_DROP_RATE ? this.claimRegularEnhancementScroll() : null;
+      const regularScroll = Math.random() < SCROLL_DROP_RATE * this.rareItemDropRate ? this.claimRegularEnhancementScroll() : null;
       const kind: ItemKind | 'coin' = regularScroll ?? commonKinds[Math.floor(Math.random() * commonKinds.length)];
       const texKey = kind === 'coin' ? 'coin' : `i_${kind}`;
       const spr = this.add.image(0, 0, texKey).setDepth(5).setOrigin(0.5, 0.6).setDisplaySize(22, 22);
@@ -3822,7 +3831,7 @@ export class GameScene extends Phaser.Scene {
     const ui = this.scene.get('UIScene') as { overlayMode?: string } | undefined;
     const type = this.player?.weapon?.weaponType;
     const skill = weaponSkill(type);
-    if (!show || !type || !skill || this.gameEnded || this.busy || ui?.overlayMode !== 'none') {
+    if (!show || !type || !skill || this.reviving || this.gameEnded || this.busy || ui?.overlayMode !== 'none') {
       this.skillRangePreview?.setVisible(false);
       this.skillRangePreviewKey = '';
       return;
@@ -3848,7 +3857,8 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  get skillChargeRequired() { return weaponChargeSteps(this.player.weapon?.plus); }
+  get skillChargeRequired() { return Math.max(1, weaponChargeSteps(this.player.weapon?.plus) - armorTraitValue(this.player.armor,'charge')); }
+  get rareItemDropRate() { return 1 + armorTraitValue(this.player.armor,'rare_drop') * .1; }
 
   get skillStepsRemaining() {
     return Math.max(0, this.skillChargeRequired - this.skillChargeSteps);
@@ -3857,7 +3867,7 @@ export class GameScene extends Phaser.Scene {
   showDynamiteRangePreview(show: boolean) {
     const ui = this.scene.get('UIScene') as { overlayMode?: string } | undefined;
     if (!show || !this.player?.inventory.some(item => item.kind === 'dynamite')
-      || !this.dungeon || this.gameEnded || this.busy || ui?.overlayMode !== 'none') {
+      || !this.dungeon || this.reviving || this.gameEnded || this.busy || ui?.overlayMode !== 'none') {
       this.dynamiteRangePreview?.setVisible(false);
       this.dynamiteRangePreviewKey = '';
       return;
@@ -3897,7 +3907,7 @@ export class GameScene extends Phaser.Scene {
 
   async useWeaponSkill(sustainedLance = false, daggerFinisher = false) {
     const ui = this.scene.get('UIScene') as { overlayMode?: string } | undefined;
-    if (this.busy || this.gameEnded || ui?.overlayMode && ui.overlayMode !== 'none' || this.pendingEquipment) return false;
+    if (this.reviving || this.busy || this.gameEnded || ui?.overlayMode && ui.overlayMode !== 'none' || this.pendingEquipment) return false;
     const weapon = this.player.weapon;
     const skill = weaponSkill(weapon?.weaponType);
     if (!weapon || !skill) return false;
@@ -3929,6 +3939,7 @@ export class GameScene extends Phaser.Scene {
     if (!sustainedLance && !daggerFinisher) this.skillChargeSteps = 0;
     const origin = { x: this.player.x, y: this.player.y };
     const direction = this.player.dir;
+    if (weapon.weaponType === 'katana') plan.targets.sort((a,b)=>Math.abs(b.x-origin.x)+Math.abs(b.y-origin.y)-Math.abs(a.x-origin.x)-Math.abs(a.y-origin.y));
     if (daggerFinisher) {
       const [dx, dy] = this.dirVec(this.player.dir);
       const enemy = this.enemyAt(this.player.x + dx, this.player.y + dy);
@@ -3943,6 +3954,7 @@ export class GameScene extends Phaser.Scene {
     this.emitRefresh();
     try {
       this.setPlayerVisual(direction, 'atkWindup');
+      if (weapon.weaponType === 'katana') await new Promise<void>(resolve => this.time.delayedCall(170, resolve));
       if (weapon.key === 'w_hero_sword') await new Promise<void>(resolve => this.time.delayedCall(200, resolve));
       this.setPlayerVisual(this.player.dir, 'atk');
       this.drawSkillEffect(weapon.weaponType, origin, direction, plan.tiles, skill.color);
@@ -3989,6 +4001,7 @@ export class GameScene extends Phaser.Scene {
             this.effectFx(enemy.x, enemy.y, 'fx_levelup', 1.6, 520, 0xc7eaff);
           } else if (enemy.hp <= 0) this.killEnemy(enemy, result.killScoreBonus);
           if (enemy.alive) {
+            if (weapon.weaponType === 'katana' && !enemy.def.halloweenObject) { const vector = directionVector(direction); if (await this.knockbackEnemy(enemy, vector.x, vector.y)) this.skillChargeSteps = Math.min(this.skillChargeRequired, this.skillChargeSteps + 5); }
             if (weapon.weaponType === 'greatsword') await this.knockbackEnemy(enemy, Math.sign(enemy.x - origin.x), Math.sign(enemy.y - origin.y));
             this.drawEnemyHp(enemy);
           }
@@ -3999,10 +4012,10 @@ export class GameScene extends Phaser.Scene {
         if (!enemy.alive || enemy.hp <= 0) continue;
         if (weapon.weaponType === 'handgun') {
           enemy.skillDefenseDownUntil = this.turn + 3;
-          this.log(`${enemy.def.name}の防御力が3ターン30%低下！`, 'special');
+          this.log(`${enemy.def.name}の防御力が3ターン10%低下！`, 'special');
         } else if (weapon.weaponType === 'lance') {
           enemy.skillAttackDownUntil = this.turn + 3;
-          this.log(`${enemy.def.name}の攻撃力が3ターン30%低下！`, 'special');
+          this.log(`${enemy.def.name}の攻撃力が3ターン20%低下！`, 'special');
         }
       }
       if (weapon.weaponType === 'longsword') {
@@ -4023,7 +4036,7 @@ export class GameScene extends Phaser.Scene {
         this.log(`${weapon.name}は壊れて消滅した…`, 'dmg'); Audio.playSe('weaponBreak');
         this.player.weapons = this.player.weapons.filter(w => w !== weapon);
         this.player.weapon = this.player.weapons[0] ?? null;
-        if ((this.player.weapon?.dual || this.player.weapon?.weaponType === 'bow')) this.player.shield = null;
+        if (isTwoHanded(this.player.weapon)) this.player.shield = null;
         this.updatePlayerAura();
       }
       this.playerAttacking = false;
@@ -4045,7 +4058,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawSkillEffect(type: Weapon['weaponType'], origin: Vec2, dir: Dir, tiles: Vec2[], color: number) {
-    playPaintedSkill(this, type, origin, dir, tiles, this.player.weapon?.key ?? 'w_soldier_blade', color);
+    playPaintedSkill(this, type, origin, dir, tiles, this.player.weapon?.starred ? `star_${this.player.weapon.key}` : this.player.weapon?.key ?? 'w_soldier_blade', color);
   }
 
   private clearTimeStopEffect() {
@@ -4103,7 +4116,7 @@ export class GameScene extends Phaser.Scene {
     } finally { this.busy = false; }
   }
   async playerAct(dir: Dir, options: { moveOnly?: boolean } = {}) {
-    if (this.busy || this.gameEnded) return;
+    if (this.reviving || this.busy || this.gameEnded) return;
     if (this.timeStopTurns > 0) { await this.moveDuringTimeStop(dir); return; }
     if (this.lanceSkillTurns > 0 && this.player.weapon?.weaponType === 'lance' && !options.moveOnly) {
       const plan = planSkill('lance', this.player, dir, {
@@ -4549,11 +4562,13 @@ export class GameScene extends Phaser.Scene {
     // 敵の方向へ踏み込む（前进→戻る）と斬撃エフェクト
     const [ddx, ddy] = this.dirVec(dir);
     const homeX = this.playerSprite.x, homeY = this.playerSprite.y;
-    const elementColor = this.player.weapon?.element ? ELEMENT_INFO[this.player.weapon.element].color : 0xdfe7f0;
+    const elementColor = this.player.weapon?.weaponType === 'katana' ? katanaSlashColor(this.player.weapon) : this.player.weapon?.element ? ELEMENT_INFO[this.player.weapon.element].color : 0xdfe7f0;
     if (ranged) {
-      const arrow = this.add.image(this.playerSprite.x, this.playerSprite.y, 'fx_bolt')
-        .setDepth(20).setTint(elementColor).setDisplaySize(TILE * .9, TILE * .45);
-      arrow.setRotation(Phaser.Math.Angle.Between(this.playerSprite.x, this.playerSprite.y, e.sprite.x, e.sprite.y));
+      const bow = this.player.weapon?.weaponType === 'bow';
+      const arrow = this.add.image(this.playerSprite.x, this.playerSprite.y, bow ? weaponAccessoryKey(this.player.weapon)! : 'fx_bolt')
+        .setDepth(20).setDisplaySize(TILE * .9, TILE * (bow ? .9 : .45));
+      if (!bow) arrow.setTint(elementColor);
+      arrow.setRotation(Phaser.Math.Angle.Between(this.playerSprite.x, this.playerSprite.y, e.sprite.x, e.sprite.y) + (bow ? Math.PI / 4 : 0));
       await this.tween(arrow, { x: e.sprite.x, y: e.sprite.y }, 180, 'Quad.easeIn');
       arrow.destroy();
       this.effectFx(e.x, e.y, 'fx_magic', 1.0, 220, elementColor);
@@ -4613,7 +4628,7 @@ export class GameScene extends Phaser.Scene {
       Audio.playSe('weaponBreak');
       this.player.weapons = this.player.weapons.filter((x) => x !== bw);
       this.player.weapon = this.player.weapons[0] ?? null;
-      if ((this.player.weapon?.dual || this.player.weapon?.weaponType === 'bow') && this.player.shield) {
+      if (isTwoHanded(this.player.weapon) && this.player.shield) {
         this.player.shield = null;
         this.log('両手で武器を構え、盾を外した。', 'sys');
       }
@@ -4690,36 +4705,36 @@ export class GameScene extends Phaser.Scene {
         this.dropItem(e.x, e.y, pool[Math.floor(Math.random() * pool.length)]);
       }
       // ボス・敵・宝箱を合わせて2フロアごとに強化スクロールを1枚までに制限する。
-      if (!def.isFloorBoss && Math.random() < SCROLL_DROP_RATE * dropRateScale) {
+      if (!def.isFloorBoss && Math.random() < SCROLL_DROP_RATE * dropRateScale * this.rareItemDropRate) {
         const scroll = this.claimRegularEnhancementScroll();
         if (scroll) this.dropItem(e.x, e.y, scroll);
       }
       // エリート/ボスは超レアで復活の種。
-      if ((def.isElite || def.isBoss) && !this.reviveSeedSeen && Math.random() < 0.08 * dropRateScale) {
+      if ((def.isElite || def.isBoss) && !this.reviveSeedSeen && Math.random() < 0.08 * dropRateScale * this.rareItemDropRate) {
         this.reviveSeedSeen = true;
         this.dropItem(e.x, e.y, 'revive');
         this.log('復活のタネがこぼれ落ちた…！ この冒険で現れるのは一度だけだ。', 'special');
       }
     }
 
-    if (!this.eventMode && !def.isBoss && !def.isFloorBoss && !def.isTreasureRabbit && Math.random() < FLOOR_KEY_DROP_RATE) {
+    if (!this.eventMode && !def.isBoss && !def.isFloorBoss && !def.isTreasureRabbit && Math.random() < FLOOR_KEY_DROP_RATE * this.rareItemDropRate) {
       this.dropItem(e.x, e.y, 'floorkey');
     }
 
-    if (!def.isBoss && !def.isFloorBoss && !def.isTreasureRabbit && Math.random() < DYNAMITE_DROP_RATE) {
+    if (!def.isBoss && !def.isFloorBoss && !def.isTreasureRabbit && Math.random() < DYNAMITE_DROP_RATE * this.rareItemDropRate) {
       this.dropItem(e.x, e.y, 'dynamite');
       this.log('ダイナマイトがこぼれ落ちた！', 'special');
     }
 
     if (!def.isBoss && !def.isFloorBoss && !def.isTreasureRabbit && Math.random() < SKILL_DRINK_DROP_RATE) this.dropItem(e.x, e.y, 'skill_drink');
 
-    if (!def.isBoss && !def.isFloorBoss && !def.isTreasureRabbit && Math.random() < MYSTERY_BREAD_DROP_RATE) {
+    if (!def.isBoss && !def.isFloorBoss && !def.isTreasureRabbit && Math.random() < MYSTERY_BREAD_DROP_RATE * this.rareItemDropRate) {
       this.dropItem(e.x, e.y, 'mystery_bread');
       this.log('ふしぎパンがこぼれ落ちた！', 'special');
     }
 
     if (this.eventMode) {
-      if (Math.random() < .01) this.dropItem(e.x,e.y,'candykey');
+      if (Math.random() < .01 * this.rareItemDropRate) this.dropItem(e.x,e.y,'candykey');
       if (!def.isFloorBoss && Math.random() < .10) {
         if (Math.random() < .5) this.dropEquipment(e.x,e.y,'weapon',rollWeapon(this.floor*4));
         else this.dropEquipment(e.x,e.y,'shield',rollShield(this.floor*4));
@@ -4727,7 +4742,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (!this.eventMode && (def.isBoss || def.isFloorBoss) && !def.isTreasureRabbit && Math.random() < ARCADIA_BOSS_DROP_RATE) {
-      this.dropEquipment(e.x, e.y, 'weapon', makeWeapon('w_hero_sword', []));
+      this.dropEquipment(e.x, e.y, 'weapon', makeWeapon(Math.random() < .5 ? 'w_hero_sword' : 'w_katana_divine', []));
       this.log('まばゆい光の中から、覇天剣アルカディアが現れた！', 'special');
     }
     if (!this.eventMode && (def.isBoss || def.isFloorBoss) && !def.isTreasureRabbit && Math.random() < ARCADIA_BOSS_DROP_RATE) {
@@ -4933,6 +4948,12 @@ export class GameScene extends Phaser.Scene {
       : this.floor >= 5 ? 'C'
       : 'D';
     const isMilestoneBoss = this.inBossRoom && this.floor % 5 === 0;
+    if (isMilestoneBoss && [25,30].includes(this.floor) && Math.random() < .2) this.dropEquipment(origin.x,origin.y,'armor',makePlayerArmor('dawn'));
+    if (isMilestoneBoss && this.floor === 30) {
+      for (const armor of ['aqua', 'crimson'] as const) {
+        if (Math.random() < .01) this.dropEquipment(origin.x,origin.y,'armor',makePlayerArmor(armor));
+      }
+    }
     const forceArmorDrop = location.hostname === 'localhost'
       && new URLSearchParams(location.search).has('qa-boss-armor');
 
@@ -4958,7 +4979,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     const rewardRoll = Math.random();
-    if (!this.reviveSeedSeen && rewardRoll < 0.06) {
+    if (!this.reviveSeedSeen && rewardRoll < 0.06 * this.rareItemDropRate) {
       this.reviveSeedSeen = true;
       this.dropItem(origin.x, origin.y, 'revive');
     } else if (rewardRoll < 0.28) {
@@ -5011,7 +5032,7 @@ export class GameScene extends Phaser.Scene {
   dropEquipment(x: number, y: number, kind: 'shield', equipment: Shield): void;
   dropEquipment(x: number, y: number, kind: 'armor', equipment: Armor): void;
   dropEquipment(x: number, y: number, kind: 'weapon' | 'shield' | 'armor', equipment: Weapon | Shield | Armor) {
-    if (kind === 'armor' && this.ownsArmor((equipment as Armor).key)) return;
+    if (kind === 'weapon') rollStarWeapon(equipment as Weapon);
     const pos = this.findGroundDropPosition(x, y);
     if (!pos) {
       if (kind === 'weapon') this.receiveWeapon(equipment as Weapon, '魔物の宝');
@@ -5020,7 +5041,7 @@ export class GameScene extends Phaser.Scene {
       this.log('落とせる床がないため、ボス装備を自動回収した。', 'special');
       return;
     }
-    const textureKey = kind === 'armor' ? armorTextureKey(equipment.key) : equipment.key;
+    const textureKey = kind === 'armor' ? armorTextureKey(equipment.key) : kind === 'weapon' && (equipment as Weapon).starred ? starWeaponKey(equipment.key) : equipment.key;
     const sprite = this.add.image(0, 0, equipmentIconTexture(textureKey)).setDepth(5).setOrigin(0.5, 0.6).setDisplaySize(24, 24);
     this.placeSprite(sprite, pos.x, pos.y);
     sprite.setVisible(this.isTileCurrentlyVisible(pos.x, pos.y));
@@ -5088,17 +5109,17 @@ export class GameScene extends Phaser.Scene {
     const result = computeEnemyAttack(this.player, this.enemyAttackDefinition(e), element);
     result.steps.unshift(`難易度：${DIFFICULTY_RULES[this.difficulty].name}（敵攻撃 ×${DIFFICULTY_RULES[this.difficulty].attack}を反映済み）`);
     if (e.emedralAffected && e.emedralWeakUntil >= this.turn) result.steps.unshift('氷翠の効果：敵の攻撃力 ×0.7（切り捨て）を反映済み');
-    if (e.skillAttackDownUntil >= this.turn) result.steps.unshift('槍スキル：敵の攻撃力 ×0.7（切り捨て）を反映済み');
+    if (e.skillAttackDownUntil >= this.turn) result.steps.unshift('槍スキル：敵の攻撃力 ×0.8（切り捨て）を反映済み');
     return result;
   }
 
   enemyDefenseDefinition(e: Enemy): MonsterDef {
-    return e.skillDefenseDownUntil >= this.turn ? { ...e.def, def: Math.floor(e.def.def * .7) } : e.def;
+    return e.skillDefenseDownUntil >= this.turn ? { ...e.def, def: Math.floor(e.def.def * .9) } : e.def;
   }
 
   enemyAttackDefinition(e: Enemy): MonsterDef {
-    return (e.emedralWeakUntil >= this.turn && e.emedralAffected) || e.skillAttackDownUntil >= this.turn
-      ? { ...e.def, atkMin: Math.max(1, Math.floor(e.def.atkMin * .7)), atkMax: Math.max(1, Math.floor(e.def.atkMax * .7)) } : e.def;
+    const rate = Math.min(e.emedralWeakUntil >= this.turn && e.emedralAffected ? .7 : 1, e.skillAttackDownUntil >= this.turn ? .8 : 1);
+    return rate < 1 ? { ...e.def, atkMin: Math.max(1, Math.floor(e.def.atkMin * rate)), atkMax: Math.max(1, Math.floor(e.def.atkMax * rate)) } : e.def;
   }
 
   damagePlayer(dmg: number, reason: string, attacker?: Enemy, calculation?: string[]) {
@@ -5207,6 +5228,18 @@ export class GameScene extends Phaser.Scene {
       this.player.inventory.splice(idx, 1);
       this.player.hp = Math.floor(this.player.hpMax * 0.6);
       this.log('復活のタネが芽吹いた！ HPが回復して復活した。', 'special');
+      if (this.playerSprite?.active) {
+        this.reviving = true;
+        this.clearMoveInput();
+        this.scene.pause();
+        const ui = this.scene.get('UIScene');
+        this.revivalPromise = playRevivalPresentation(ui, this.playerSprite, this.player.weapon?.key).finally(() => {
+          this.reviving = false;
+          this.revivalPromise = undefined;
+          if (this.scene.isPaused()) this.scene.resume();
+          this.emitRefresh();
+        });
+      }
       return;
     }
     this.gameOver(false);
@@ -5315,6 +5348,7 @@ export class GameScene extends Phaser.Scene {
     if (this.gameEnded) return;
 
     await this.enemyTurn();
+    if (this.revivalPromise) await this.revivalPromise;
 
     if (this.gameEnded) return;
 
@@ -5611,6 +5645,7 @@ export class GameScene extends Phaser.Scene {
   async enemyTurn() {
     const anims: Promise<void>[] = [];
     for (const e of this.enemies) {
+      if (this.revivalPromise) await this.revivalPromise;
       if (this.gameEnded) break;
       if (!e.alive || e.def.halloweenObject) continue;
       if (e.def.isHalloweenRetainer && this.floor === 5) {
@@ -6644,7 +6679,7 @@ export class GameScene extends Phaser.Scene {
       this.log('★金の宝箱だ！ レアなお宝が眠っている！', 'special');
       // 武器はガチャ限定。金の宝箱は上位素材・盾・服・復活アイテムを抽選する。
       const rr = Math.random();
-      if (rr < 0.15 && !this.reviveSeedSeen) {
+      if (rr < 0.15 * this.rareItemDropRate && !this.reviveSeedSeen) {
         this.reviveSeedSeen = true;
         this.player.inventory.push(makeItem('revive'));
         this.log('超レア！ この冒険で一度だけの復活のタネが入っていた！', 'special');
@@ -6698,7 +6733,7 @@ export class GameScene extends Phaser.Scene {
           }
         } else {
           const consumableKinds: ItemKind[] = ['potion', 'torch', 'warp', 'invis'];
-          const regularScroll = Math.random() < SCROLL_DROP_RATE ? this.grantRegularEnhancementScroll() : null;
+          const regularScroll = Math.random() < SCROLL_DROP_RATE * this.rareItemDropRate ? this.grantRegularEnhancementScroll() : null;
           const k = regularScroll ?? consumableKinds[Math.floor(Math.random() * consumableKinds.length)];
           if (regularScroll || this.grantChestConsumable(k)) this.log(`宝箱から「${makeItem(k).name}」を入手。`, 'item');
         }
@@ -6715,7 +6750,7 @@ export class GameScene extends Phaser.Scene {
 
   // ============ アイテム使用（UIから呼ばれる）============
   useItem(index: number) {
-    if (this.busy || this.gameEnded) return;
+    if (this.reviving || this.busy || this.gameEnded) return;
     if (this.timeStopTurns > 0) {
       this.log('零刻領域では移動だけできる。アイテムは時が動いてから使おう。', 'sys');
       Audio.playSe('deny'); return;
@@ -6731,7 +6766,10 @@ export class GameScene extends Phaser.Scene {
     let passTurn = true;
 
     switch (item.kind) {
-      case 'potion': this.player.heal(40); this.log('回復ポーションでHPを40回復した。', 'item'); Audio.playSe('heal'); this.healFx(); break;
+      case 'potion': {
+        const amount=40+armorTraitValue(this.player.armor,'potion');
+        this.player.heal(amount); this.log(`回復ポーションでHPを${amount}回復した。`, 'item'); Audio.playSe('heal'); this.healFx(); break;
+      }
       case 'stone': consumed = this.useStone(); passTurn = false; break;
       case 'shieldstone': consumed = this.useShieldStone(); passTurn = false; break;
       case 'repair': {
@@ -6891,11 +6929,11 @@ export class GameScene extends Phaser.Scene {
       if (!enemy.alive || Math.max(0, Math.abs(enemy.x-origin.x)-radius) > DYNAMITE_RADIUS
         || Math.max(0, Math.abs(enemy.y-origin.y)-radius) > DYNAMITE_RADIUS) continue;
       const boss = !!(enemy.def.isBoss || enemy.def.isFloorBoss || enemy.def.isHalloweenRetainer);
-      const damage = boss ? Math.max(1, Math.ceil(enemy.hpMax * .2)) : enemy.hp;
+      const damage = boss ? Math.max(1, Math.ceil(enemy.hp * .1)) : enemy.hp;
       enemy.hp -= damage;
       this.discoverMonster(enemy.def.key);
       this.hitFx(enemy.x, enemy.y);
-      this.log(boss ? `${enemy.def.name}に${damage}の爆発ダメージ！（最大HPの20%）`
+      this.log(boss ? `${enemy.def.name}に${damage}の爆発ダメージ！（残りHPの10%）`
         : `${enemy.def.name}を爆風で一撃撃破！`, 'dmg');
       if (enemy.hp <= 0) this.killEnemy(enemy, 0, { quiet: true, obliterate: true });
       else { this.flashSprite(enemy.sprite); this.drawEnemyHp(enemy); }
@@ -6932,7 +6970,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   repairEquipment(kind: 'weapon' | 'shield', equipment: Weapon | Shield): boolean {
-    if (this.busy || this.gameEnded || this.itemSealTurns > 0) return false;
+    if (this.reviving || this.busy || this.gameEnded || this.itemSealTurns > 0) return false;
     const stoneIndex = this.player.inventory.findIndex(item => item.kind === 'repair');
     const owned: (Weapon | Shield)[] = kind === 'weapon' ? this.player.weapons : this.player.shields;
     if (stoneIndex < 0 || !owned.includes(equipment)) return false;
@@ -7048,7 +7086,7 @@ export class GameScene extends Phaser.Scene {
       this.tweens.add({ targets: fx, alpha: 0, displayWidth: 70.4, displayHeight: 70.4, duration: 500, onComplete: () => fx.destroy() });
       this.cameras.main.shake(150, 0.006);
       this.player.shields = this.player.shields.filter((x) => x !== s);
-      this.player.shield = this.player.weapon?.dual || this.player.weapon?.weaponType === 'bow' ? null : this.player.shields[0] ?? null;
+      this.player.shield = isTwoHanded(this.player.weapon) ? null : this.player.shields[0] ?? null;
     }
     this.emitRefresh();
     return true;
@@ -7062,6 +7100,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   receiveWeapon(weapon: Weapon, source: string): boolean {
+    rollStarWeapon(weapon);
     if (this.player.weapons.length < EQUIPMENT_LIMIT) {
       this.player.weapons.push(weapon);
       this.recordOwnedEquipment();
@@ -7075,7 +7114,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   claimSecretQuest(weaponKey: string): boolean {
-    if (this.gameEnded || this.busy || this.pendingEquipment) return false;
+    if (this.reviving || this.gameEnded || this.busy || this.pendingEquipment) return false;
     if (!claimQuest(this.secretQuests, weaponKey)) return false;
     const reward = makeWeapon(weaponKey, []);
     this.receiveWeapon(reward, '秘密クエスト');
@@ -7133,10 +7172,6 @@ export class GameScene extends Phaser.Scene {
   }
 
   receiveArmor(armor: Armor, source: string): boolean {
-    if (this.ownsArmor(armor.key)) {
-      this.log(`${armorFullName(armor)}はすでに持っているため、重複して入手しなかった。`, 'sys');
-      return false;
-    }
     if (this.player.armors.length < EQUIPMENT_LIMIT) {
       this.player.armors.push(armor);
       this.recordOwnedEquipment();
@@ -7177,7 +7212,7 @@ export class GameScene extends Phaser.Scene {
 
   redeemCode(code: string): boolean {
     if (code === '11111111') {
-      if (this.busy || this.gameEnded) return false;
+      if (this.reviving || this.busy || this.gameEnded) return false;
       this.skillChargeSteps = 100;
       this.log('スキルのクールダウンをリセットした！', 'special');
       Audio.playSe('click');
@@ -7187,7 +7222,7 @@ export class GameScene extends Phaser.Scene {
     }
     const mode = difficultyFromCode(code);
     if (mode) {
-      if (this.busy || this.gameEnded) return false;
+      if (this.reviving || this.busy || this.gameEnded) return false;
       if (mode !== this.difficulty) {
         this.difficulty = mode;
         this.difficultyClearEligible = false;
@@ -7224,7 +7259,7 @@ export class GameScene extends Phaser.Scene {
     return true;
   }
 
-  claimCatalogItem(key: string): CatalogClaimResult {
+  claimCatalogItem(key: string, starred = false): CatalogClaimResult {
     if (!this.itemCatalogUnlocked || this.gameEnded) {
       return { status: 'unavailable', message: 'コードを入力して一覧を開いてください。' };
     }
@@ -7237,7 +7272,10 @@ export class GameScene extends Phaser.Scene {
     if (!entry) return { status: 'unavailable', message: 'アイテムが見つかりません。' };
     let received: boolean;
     if (entry.category === 'weapon') {
-      received = this.receiveWeapon(makeWeapon(entry.key, []), 'アイテム一覧');
+      const weapon = makeWeapon(entry.key, []);
+      weapon.variantRolled = true;
+      if (starred) { weapon.starred = true; weapon.name += '★'; }
+      received = this.receiveWeapon(weapon, 'アイテム一覧');
     } else if (entry.category === 'shield') {
       received = this.receiveShield(makeShield(entry.key), 'アイテム一覧');
     } else if (entry.category === 'armor') {
@@ -7250,7 +7288,7 @@ export class GameScene extends Phaser.Scene {
       received = true;
     }
     if (!received) return { status: 'pending', message: '装備を売却すると受け取れます。' };
-    this.log(`アイテム一覧から「${entry.name}」を1個取得した！`, 'item');
+    this.log(`アイテム一覧から「${entry.name}${starred && entry.category === 'weapon' ? '★' : ''}」を1個取得した！`, 'item');
     Audio.playSe('coin');
     this.emitRefresh();
     return { status: 'received', message: '1個取得しました。所持品に追加しました。' };
@@ -7260,7 +7298,7 @@ export class GameScene extends Phaser.Scene {
   // 500Gで1回。武器と防具（盾・服）を別々に抽選する。
   // 戻り値は実際の装備の等級・色・名前・アイコン。ゴールド不足はnull。
   gachaPull(pool: GachaPool = 'weapon'): GachaResult | null {
-    if (this.gameEnded || this.busy || this.pendingEquipment) return null;
+    if (this.reviving || this.gameEnded || this.busy || this.pendingEquipment) return null;
     if (pool === 'weapon' && this.weaponWonThisFloor) {
       this.log('この階の武器は取得済みです。防具ガチャは利用できます。', 'sys');
       Audio.playSe('deny');
@@ -7312,9 +7350,8 @@ export class GameScene extends Phaser.Scene {
       pool === 'weapon' ? 'weapon' : arcadiaShieldWon ? 'shield'
         : forcedCategory === 'shield' || forcedCategory === 'armor' ? forcedCategory
           : categoryRoll < 0.8 ? 'shield' : 'armor';
-    if (prizeCategory === 'armor' && this.ownsArmor(armorForGrade(grade).key)) prizeCategory = 'shield';
     if (prizeCategory === 'armor') {
-      const armor = armorForGrade(grade);
+      const armor = armorForGrade(rank === 'SS' ? 'SS' : grade);
       const item = makePlayerArmor(armor.key);
       this.receiveArmor(item, 'ガチャ');
       name = armorFullName(item);
@@ -7323,22 +7360,22 @@ export class GameScene extends Phaser.Scene {
       category = '服';
       hasEffect = true;
       elementName = '無属性';
-      feature = `防御力 +${armor.defBonus}`;
+      feature = `防御力 +${armor.defBonus} / ${armorTraitDescription(item)}`;
     } else if (prizeCategory === 'weapon') {
       const eventPool = HALLOWEEN_WEAPONS.filter(w=>w.grade!=='SSS');
-      const w = arcadiaWon ? makeWeapon('w_hero_sword', []) : this.eventMode && Math.random()<.05 ? makeWeapon(eventPool[Math.floor(Math.random()*eventPool.length)].key,[]) : rollWeaponByGrade(grade);
+      const w = arcadiaWon ? makeWeapon(Math.random() < .5 ? 'w_hero_sword' : 'w_katana_divine', []) : this.eventMode && Math.random()<.05 ? makeWeapon(eventPool[Math.floor(Math.random()*eventPool.length)].key,[]) : rollWeaponByGrade(grade);
       if (rank === 'SS') w.plus = Math.max(w.plus, 3);
       else if (rank === 'S') w.plus = Math.max(w.plus, 1);
       this.receiveWeapon(w, 'ガチャ');
       this.weaponWonThisFloor = true;
       name = weaponFullName(w);
       equipmentGrade = weaponRarity(w);
-      texKey = w.key;
+      texKey = w.starred ? starWeaponKey(w.key) : w.key;
       category = '武器';
       hasEffect = !!w.passive;
       elementColor = w.element ? ELEMENT_INFO[w.element].color : undefined;
       elementName = w.element ? `${ELEMENT_INFO[w.element].name}属性` : '無属性';
-      feature = w.passive?.name ?? (w.magics.length ? `魔法刻印 ${w.magics.map((magic) => magic.label).join('')}` : undefined);
+      feature = w.starred ? '装備中の最大HP+50' : w.passive?.name ?? (w.magics.length ? `魔法刻印 ${w.magics.map((magic) => magic.label).join('')}` : undefined);
     } else {
       const eventPool = HALLOWEEN_SHIELDS.filter(s=>s.grade!=='SSS');
       const s = arcadiaShieldWon ? makeShield('s_arcadia_guard') : this.eventMode && Math.random()<.05 ? makeShield(eventPool[Math.floor(Math.random()*eventPool.length)].key) : rollShieldByGrade(grade);
@@ -7395,7 +7432,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   sellItem(kind: ItemKind): boolean {
-    if (this.busy || this.gameEnded) return false;
+    if (this.reviving || this.busy || this.gameEnded) return false;
     const index = this.player.inventory.findIndex((item) => item.kind === kind);
     if (index < 0) return false;
     const item = this.player.inventory[index];
@@ -7437,7 +7474,7 @@ export class GameScene extends Phaser.Scene {
     this.player.weapon = w;
     this.log(`${weaponFullName(w)}を装備した。`, 'sys');
     // 二刀流は両手がふさがるので盾を外す
-    if ((w.dual || w.weaponType === 'bow') && this.player.shield) {
+    if (isTwoHanded(w) && this.player.shield) {
       this.player.shield = null;
       this.log('両手で武器を構え、盾を外した。', 'sys');
     }
@@ -7446,8 +7483,8 @@ export class GameScene extends Phaser.Scene {
   equipShield(i: number) {
     const s = this.player.shields[i];
     if (!s) return;
-    if ((this.player.weapon?.dual || this.player.weapon?.weaponType === 'bow')) {
-      this.log('弓・二刀流中は盾を持てない。（武器を持ち替えれば装備できる）', 'sys');
+    if (isTwoHanded(this.player.weapon)) {
+      this.log('両手武器の装備中は盾を持てない。（武器を持ち替えれば装備できる）', 'sys');
       Audio.playSe('deny');
       return;
     }
@@ -7455,7 +7492,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   equipmentSellBase(grade: EquipmentGrade): number {
-    return { D: 20, C: 45, B: 90, A: 160, S: 280, SSS: 280 }[grade];
+    return { D: 20, C: 45, B: 90, A: 160, S: 280, SS: 420, SSS: 560 }[grade];
   }
 
   weaponSellPrice(weapon: Weapon): number {
@@ -7533,7 +7570,7 @@ export class GameScene extends Phaser.Scene {
 
   enterBossRoom() {
     if (this.timeStopTurns > 0) { this.log('時が動いてから次の部屋へ進もう。', 'sys'); return; }
-    if (this.busy || this.gameEnded || this.inBossRoom) return;
+    if (this.reviving || this.busy || this.gameEnded || this.inBossRoom) return;
     this.busy = true;
     this.clickPathToken++;
     Audio.playSe('seal');
@@ -7549,7 +7586,7 @@ export class GameScene extends Phaser.Scene {
 
   tryDescend() {
     if (this.timeStopTurns > 0) { this.log('時が動いてから階段を使おう。', 'sys'); return; }
-    if (this.busy || this.gameEnded) return;
+    if (this.reviving || this.busy || this.gameEnded) return;
     if (this.player.x !== this.dungeon.stairs.x || this.player.y !== this.dungeon.stairs.y) return;
     this.doDescend();
   }
@@ -7768,10 +7805,10 @@ export class GameScene extends Phaser.Scene {
   magicFx(x: number, y: number) { this.effectFx(x, y, 'fx_magic', 2.0, 600); }
   poisonFx(x: number, y: number) { this.effectFx(x, y, 'fx_poison', 1.5, 500); }
 
-  // 双剣・弓は武器のみ、それ以外は武器と盾の低い強化値で体のオーラを判定。
+  // 両手武器は武器のみ、それ以外は武器と盾の低い強化値で体のオーラを判定。
   updatePlayerAura() {
     const weapon = this.player.weapon;
-    const enhancementPlus = weapon?.dual || weapon?.weaponType === 'bow'
+    const enhancementPlus = isTwoHanded(weapon)
       ? weapon.plus : Math.min(weapon?.plus ?? 0, this.player.shield?.plus ?? 0);
     const auraColor = enhancementPlus >= 15 ? 0xffcf58 : enhancementPlus >= 10 ? 0xff5263 : 0x55baff;
     if (enhancementPlus >= 5 && this.textures.exists('fx_shadow')) {
@@ -7812,7 +7849,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.lastMapClickAt = clickedAt;
-    if (this.busy) return;
+    if (this.reviving || this.busy) return;
 
     const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
     const target = { x: Math.floor(world.x / TILE), y: Math.floor(world.y / TILE) };
@@ -7856,8 +7893,18 @@ export class GameScene extends Phaser.Scene {
 
     const token = ++this.clickPathToken;
     this.clickPathActive = true;
-    this.setBoostTier(2);
-    this.effectFx(target.x, target.y, 'fx_move_v3', 0.9, 260, 0x58d9d1);
+    this.clickPathQuick = Math.abs(target.x - this.player.x) + Math.abs(target.y - this.player.y) >= 2;
+    this.setBoostTier(0);
+    this.clickDestinationRing?.destroy();
+    const destinationRing = this.add.graphics().setPosition((target.x + .5) * TILE, (target.y + .5) * TILE)
+      .setDepth(9).setName('click-destination-ring');
+    destinationRing.lineStyle(5, 0xffdc70, .18).strokeEllipse(0, 0, 29, 18);
+    destinationRing.lineStyle(1.6, 0xffef9a, 1).strokeEllipse(0, 0, 29, 18);
+    for (const [x,y,dx,dy] of [[-16,0,5,0],[16,0,-5,0],[0,-11,0,4],[0,11,0,-4]]) {
+      destinationRing.lineBetween(x,y,x+dx,y+dy);
+    }
+    this.clickDestinationRing = destinationRing;
+    this.tweens.add({targets:destinationRing,alpha:.65,duration:450,yoyo:true,repeat:-1,ease:'Sine.inOut'});
 
     const visited = new Set<string>([`${this.player.x},${this.player.y}`]);
     let actions = 0;
@@ -7892,8 +7939,6 @@ export class GameScene extends Phaser.Scene {
         const [dx, dy] = this.dirVec(dir);
         const nextX = this.player.x + dx;
         const nextY = this.player.y + dy;
-        const bossCombat = this.enemies.some((enemy) => enemy.def.isFloorBoss && enemy.alive)
-          && (this.inBossRoom || this.isInsideBossRoom(this.player.x, this.player.y));
         const blockingEnemy = this.enemyAt(nextX, nextY);
         if (blockingEnemy) {
           if (!this.canClickEnemy(blockingEnemy)) this.log('何かいるようだ…', 'sys');
@@ -7908,17 +7953,19 @@ export class GameScene extends Phaser.Scene {
         // Ice can carry us past the clicked cell. Stop at the landing point instead
         // of planning a return trip onto the ice and sliding back again.
         if (this.player.x !== nextX || this.player.y !== nextY) break;
-        // ボス戦は1タップ1行動。通常戦も攻撃・被弾・足止めが起きた時点で止める。
-        if (bossCombat || encounteredEnemy || this.player.hp !== hpBefore || positionAfter === positionBefore) break;
+        // Continue toward the destination in boss rooms too; stop on contact, damage or blocked movement.
+        if (encounteredEnemy || this.player.hp !== hpBefore || positionAfter === positionBefore) break;
         // 引き寄せやノックバックで同じ場所を循環した場合は即停止する。
         if (visited.has(positionAfter)) break;
         visited.add(positionAfter);
-        if (this.busy) break;
+        if (this.reviving || this.busy) break;
       }
     } catch (error) {
       console.error('タッチ自動移動を安全停止しました:', error);
       this.log('タッチ自動移動を停止した。もう一度タップして操作できます。', 'sys');
     } finally {
+      destinationRing.destroy();
+      if (this.clickDestinationRing === destinationRing) this.clickDestinationRing = undefined;
       if (token === this.clickPathToken) {
         this.clickPathActive = false;
         this.setBoostTier(0);
@@ -7927,6 +7974,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   stopClickPath() {
+    this.clickDestinationRing?.destroy();
+    this.clickDestinationRing = undefined;
     this.clickPathToken++;
     this.clickPathActive = false;
     this.setBoostTier(0);
@@ -7992,7 +8041,7 @@ export class GameScene extends Phaser.Scene {
       if (!this.clickPathActive) this.setBoostTier(0);
     }
     // busy中もキーを離した事実は反映する。予約は行動可能になるまで保持。
-    if (this.busy) return;
+    if (this.reviving || this.busy) return;
     if (this.queuedMove) {
       const queued = this.queuedMove;
       this.queuedMove = null;
@@ -8028,14 +8077,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   currentMoveDuration(): number {
-    if (this.clickPathActive) return 40;
+    if (this.clickPathActive) return this.clickPathQuick ? 80 : 104;
     if (this.holdBoostTier === 2) return 44;
     if (this.holdBoostTier === 1) return 62;
     return 104;
   }
 
   currentTurnAnimDuration(base: number): number {
-    const scale = this.clickPathActive ? 0.48 : this.holdBoostTier === 2 ? 0.44 : this.holdBoostTier === 1 ? 0.64 : 1;
+    const scale = this.clickPathActive ? (this.clickPathQuick ? .8 : 1) : this.holdBoostTier === 2 ? 0.44 : this.holdBoostTier === 1 ? 0.64 : 1;
     return Math.max(28, Math.round(base * scale));
   }
 
@@ -8529,8 +8578,8 @@ export class GameScene extends Phaser.Scene {
 
   setPlayerVisual(dir: Dir, frame: PlayerVisualFrame) {
     const arcadia = this.player.weapon?.key === 'w_hero_sword';
-    this.playerAnimation.attackFrameMs = arcadia ? 65 : 26;
-    this.playerAnimation.windupFrameMs = arcadia ? 90 : 29;
+    this.playerAnimation.attackFrameMs = arcadia ? 65 : this.player.weapon?.weaponType === 'katana' ? 52 : 26;
+    this.playerAnimation.windupFrameMs = arcadia ? 90 : this.player.weapon?.weaponType === 'katana' ? 70 : 29;
     this.playerAnimation.play(frame, this.time.now);
     this.playerVisualSince = this.playerAnimation.since;
     this.player.dir = dir;
@@ -8595,6 +8644,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   emitRefresh() {
+    this.player.hp = Math.min(this.player.hp, this.player.hpMax);
     this.recordOwnedEquipment();
     this.events.emit('refresh');
     this.savePending = true;
@@ -8604,7 +8654,7 @@ export class GameScene extends Phaser.Scene {
     const { weapon, shield, armor, ...player } = this.player;
     return {
       state: pickFields(this, RUN_STATE_KEYS),
-      player,
+      player: { ...player, hpMax: this.player.hpMax },
       equipped: {
         weapon: weapon ? this.player.weapons.indexOf(weapon) : -1,
         shield: shield ? this.player.shields.indexOf(shield) : -1,
@@ -8637,7 +8687,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   saveRun() {
-    if (this.restoringRun || this.busy || this.gameEnded || !this.playerSprite || !this.dungeon || this.player.hp <= 0) return false;
+    if (this.restoringRun || this.reviving || this.busy || this.gameEnded || !this.playerSprite || !this.dungeon || this.player.hp <= 0) return false;
     if (!this.runSaveEnabled()) return false;
     this.savePending = false;
     const saved = writeRunSave(this.captureRun());
@@ -8677,6 +8727,7 @@ export class GameScene extends Phaser.Scene {
     this.timeStopTurns = Math.max(0, Math.min(5, snapshot.state.timeStopTurns ?? 0));
     this.lanceSkillTurns = 0;
     this.player = Object.assign(new Player(), snapshot.player);
+    this.player.baseHpMax = snapshot.player.baseHpMax ?? snapshot.player.hpMax;
     this.player.inventory = this.player.inventory.filter(item => !isRemovedItem(item.kind));
     for (const item of this.player.inventory) {
       if (item.kind === 'mystery_bread') Object.assign(item, makeItem('mystery_bread'));
@@ -8684,7 +8735,7 @@ export class GameScene extends Phaser.Scene {
     for (const item of [...this.player.weapons, ...this.player.shields]) refreshLegendaryEquipment(item);
     if (this.pendingEquipment) refreshLegendaryEquipment(this.pendingEquipment.item);
     this.player.weapon = this.player.weapons[snapshot.equipped.weapon] ?? null;
-    this.player.shield = this.player.weapon?.dual || this.player.weapon?.weaponType === 'bow' ? null : this.player.shields[snapshot.equipped.shield] ?? null;
+    this.player.shield = isTwoHanded(this.player.weapon) ? null : this.player.shields[snapshot.equipped.shield] ?? null;
     this.player.armor = this.player.armors[snapshot.equipped.armor] ?? null;
     this.recordOwnedEquipment();
     this.discovered = new Set([...this.discovered, ...snapshot.discovered]);
@@ -8764,7 +8815,7 @@ export class GameScene extends Phaser.Scene {
       const equipment = item.weapon ?? item.shield ?? item.armor;
       if (equipment) refreshLegendaryEquipment(equipment);
       const texture = item.kind === 'armor' ? armorTextureKey(item.armor!.key)
-        : equipment?.key ?? (item.kind === 'coin' ? 'coin' : `i_${item.kind}`);
+        : item.weapon?.starred ? starWeaponKey(item.weapon.key) : equipment?.key ?? (item.kind === 'coin' ? 'coin' : `i_${item.kind}`);
       const sprite = this.add.image(0, 0, equipmentIconTexture(texture)).setDepth(5).setOrigin(.5, .6).setDisplaySize(equipment ? 24 : 22, equipment ? 24 : 22);
       this.placeSprite(sprite, item.x, item.y);
       const glow = this.add.image(sprite.x, sprite.y - 2, 'glow').setDepth(sprite.depth - .12)

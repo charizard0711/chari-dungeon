@@ -27,12 +27,12 @@ export interface Magic {
   label: string;
 }
 
-export type EquipmentGrade = 'D' | 'C' | 'B' | 'A' | 'S' | 'SSS';
+export type EquipmentGrade = 'D' | 'C' | 'B' | 'A' | 'S' | 'SS' | 'SSS';
 
 export type Element = 'fire' | 'thunder' | 'water' | 'ice';
 // Dark is a monster affinity; equipment rolls retain the original four elements.
 export type MonsterElement = Element | 'dark';
-export type WeaponType = 'dagger' | 'longsword' | 'lance' | 'bow' | 'handgun' | 'greatsword' | 'dual_sword' | 'twin_daggers';
+export type WeaponType = 'dagger' | 'longsword' | 'lance' | 'bow' | 'handgun' | 'greatsword' | 'katana' | 'dual_sword' | 'twin_daggers';
 
 export interface WeaponPassive {
   key: 'backstab' | 'sturdy' | 'pierce' | 'eagle_eye' | 'quickdraw' | 'heavy_strike' | 'twin_edge' | 'blood_edge' | 'knockback' | 'hero_heal' | 'emedral';
@@ -41,6 +41,8 @@ export interface WeaponPassive {
 }
 
 export interface Weapon {
+  starred?: boolean;
+  variantRolled?: boolean;
   key: string;       // テクスチャ/種別キー
   name: string;
   atkMin: number;
@@ -83,6 +85,7 @@ export interface Shield {
 
 // 服・鎧。装備すると防御力とキャラクターの見た目が同時に変わる。
 export interface Armor {
+  trait?: import('./equipmentTraits').ArmorTrait;
   key: string;
   name: string;
   defBonus: number;
@@ -95,7 +98,7 @@ export type ItemKind =
   | 'potion'      // 回復ポーション
   | 'torch'       // 松明（10ターン、壁を越えて上下左右10マスを照らす）
   | 'mystery_bread' // ふしぎパン
-  | 'dynamite'    // ダイナマイト（周囲5×5、通常敵即死・ボス最大HP20%）
+  | 'dynamite'    // ダイナマイト（周囲5×5、通常敵即死・ボス残りHP10%）
   | 'warp'        // リコールベル（現在の階の開始地点へ戻る）
   | 'revive'      // 復活のタネ
   | 'candykey'

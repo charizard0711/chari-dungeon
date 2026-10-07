@@ -12,13 +12,13 @@ const DIRECTIONAL_SHIELD_KEYS = new Set([
   's_flame_aegis', 's_tidal_aegis', 's_storm_aegis', 's_frost_aegis'
 ]);
 export const HELD_EQUIPMENT = [...WEAPON_DEFS, ...SHIELD_DEFS]
-  .filter(def => def.key !== 'w_hero_sword' && !def.key.startsWith('w_hw_') && !def.key.startsWith('w_secret_') && ('weaponType' in def || DIRECTIONAL_SHIELD_KEYS.has(def.key))).map(def => ({
+  .filter(def => !def.key.startsWith('w_katana_') && def.key !== 'w_hero_sword' && !def.key.startsWith('w_hw_') && !def.key.startsWith('w_secret_') && ('weaponType' in def || DIRECTIONAL_SHIELD_KEYS.has(def.key))).map(def => ({
   itemKey:def.key, textureKey:`held_${def.key}`, path:`assets/equipment/directional/${def.key}.png`
 }));
-export const HELD_EQUIPMENT_KEYS = new Set([...HELD_EQUIPMENT.map(art=>art.itemKey), 'w_hero_sword', ...WEAPON_DEFS.filter(d => d.key.startsWith('w_secret_')).map(d => d.key)]);
+export const HELD_EQUIPMENT_KEYS = new Set([...HELD_EQUIPMENT.map(art=>art.itemKey), 'w_hero_sword', ...WEAPON_DEFS.filter(d => d.key.startsWith('w_secret_') || d.key.startsWith('w_katana_')).map(d => d.key)]);
 
 export function heldArtSize(type: WeaponType | 'shield') {
-  return {dagger:16,longsword:23,lance:32,bow:25,handgun:18,greatsword:29,dual_sword:20,twin_daggers:18,shield:13}[type];
+  return {dagger:16,longsword:23,lance:32,bow:25,handgun:18,greatsword:29,katana:27,dual_sword:20,twin_daggers:18,shield:13}[type];
 }
 
 export function heldGrip(type: WeaponType | 'shield', dir: Dir): [number, number] {
@@ -40,7 +40,7 @@ export function heldHandPose(dir: Dir, frame: PlayerVisualFrame, gender: PlayerG
   if (attack && type !== 'shield') {
     const target = ranged ? 0 : {down:Math.PI*.8,left:-Math.PI/2,right:Math.PI/2,up:0}[dir];
     const windup = ranged ? 0 : dir === 'left' ? .7 : -.7;
-    const progress = Math.min(1, Math.max(0, elapsed / (action === 'windup' ? 58 : 85)));
+    const progress = Math.min(1, Math.max(0, elapsed / (action === 'windup' ? type === 'katana' ? 120 : 58 : type === 'katana' ? 170 : 85)));
     const ease = progress * progress * (3 - 2 * progress);
     angle = action === 'windup' ? angle + (windup - angle) * ease : windup + (target - windup) * ease;
   }

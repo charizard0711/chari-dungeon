@@ -108,7 +108,7 @@ export function weaponAttackSe(type?: WeaponType): SeName {
     lance: 'weaponLance',
     bow: 'weaponBow',
     handgun: 'weaponHandgun',
-    greatsword: 'weaponGreatsword',
+    greatsword: 'weaponGreatsword', katana: 'weaponLongsword',
     dual_sword: 'weaponDual',
     twin_daggers: 'weaponDual'
   } as const)[type];

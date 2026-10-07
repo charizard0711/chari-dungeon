@@ -13,11 +13,11 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
       for(const key of REFRESHED_EFFECT_KEYS){const texture=g.textures.get(key).getSourceImage();if(texture.width!==512)throw Error('Effect missing '+key);}
       u.setOverlay('shop');
       if(u.overlay.list.some(s=>s.texture?.key==='ui_shop_header'))throw Error('Shop ornament still present');
-      return {scale:u.overlay.scaleX,alpha:u.overlay.alpha,effects:REFRESHED_EFFECT_KEYS.length};
+      return {scale:u.overlay.list[1].scaleX/.22,alpha:u.overlay.list[1].alpha,effects:REFRESHED_EFFECT_KEYS.length};
     });
     assert.equal(initial.scale,.88);assert.equal(initial.alpha,.35);
     await page.waitForTimeout(100);
-    const middle=await page.evaluate(()=>window.__game.scene.getScene('UIScene').overlay.scaleX);
+    const middle=await page.evaluate(()=>window.__game.scene.getScene('UIScene').overlay.list[1].scaleX/.22);
     assert.ok(middle>initial.scale&&middle<=1);
     await page.waitForTimeout(200);
     await page.evaluate(async()=>{

@@ -1,3 +1,4 @@
+import { isTwoHanded } from './equipmentRules';
 import type Phaser from 'phaser';
 import type { Weapon, Shield } from './types';
 
@@ -36,7 +37,7 @@ export class DurabilityWarnings {
   update(player: Equipped, now: number, show: boolean) {
     let y = this.map.y + 8;
     for (const entry of this.entries) {
-      const equipment = entry.kind === 'shield' && (player.weapon?.dual || player.weapon?.weaponType === 'bow')
+      const equipment = entry.kind === 'shield' && isTwoHanded(player.weapon)
         ? null : player[entry.kind];
       if (!show || !isDurabilityLow(equipment)) {
         entry.image.setVisible(false);

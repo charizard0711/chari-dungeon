@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { finishLoading, showLoading, updateLoading } from './loadingScreen';
 
-const TITLE_VIDEO_URL = 'assets/video/title-lake-wing-loop.mp4';
+const TITLE_VIDEO_URL = 'assets/video/title-lake-kling-loop-v2.mp4';
 let titleVideoSource = TITLE_VIDEO_URL;
 
 /** Fetch once and report the actual downloaded bytes before starting the title. */
@@ -135,7 +135,7 @@ export function addTitleLoop(scene: Phaser.Scene): void {
   });
   videos[0].play(true);
   fit();
-  // Wing poses are matched by trimming; a short overlap softens the remaining seam.
+  // The clip has a baked 0.5s tail-to-head blend; a short playback overlap avoids decoder gaps.
   const update = () => {
     const current = videos[active];
     if (transitioning || !current.video || !Number.isFinite(current.video.duration)

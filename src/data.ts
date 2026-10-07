@@ -21,6 +21,18 @@ export interface WeaponDef {
 }
 
 export const WEAPON_DEFS: WeaponDef[] = [
+  // 両手持ちの刀。全グレードと4属性。
+  { key: 'w_katana_iron', name: '黒鉄の刀', atkMin: 7, atkMax: 15, durMax: 180, minFloor: 1, rarity: 12, grade: 'D', weaponType: 'katana' },
+  { key: 'w_katana_mist', name: '霞斬り', atkMin: 9, atkMax: 18, durMax: 195, minFloor: 3, rarity: 9, grade: 'C', weaponType: 'katana' },
+  { key: 'w_katana_moon', name: '月影の刀', atkMin: 11, atkMax: 22, durMax: 210, minFloor: 8, rarity: 6, grade: 'B', weaponType: 'katana' },
+  { key: 'w_katana_sun', name: '日輪刀アカツキ', atkMin: 13, atkMax: 26, durMax: 225, minFloor: 13, rarity: 3, grade: 'A', weaponType: 'katana' },
+  { key: 'w_katana_dragon', name: '龍牙刀ムラクモ', atkMin: 15, atkMax: 30, durMax: 240, minFloor: 21, rarity: 1, grade: 'S', weaponType: 'katana' },
+  { key: 'w_katana_sky', name: '天翔刀アマツカゼ', atkMin: 17, atkMax: 33, durMax: 255, minFloor: 25, rarity: 1, grade: 'SS', weaponType: 'katana' },
+  { key: 'w_katana_divine', name: '神刀タツマキ', atkMin: 19, atkMax: 36, durMax: 285, minFloor: 30, rarity: 1, grade: 'SSS', weaponType: 'katana', exclusiveLoot: true },
+  { key: 'w_katana_fire', name: '焔刀カエン', atkMin: 9, atkMax: 18, durMax: 195, minFloor: 4, rarity: 9, grade: 'C', weaponType: 'katana', element: 'fire' },
+  { key: 'w_katana_water', name: '水刀シズク', atkMin: 9, atkMax: 18, durMax: 195, minFloor: 4, rarity: 9, grade: 'C', weaponType: 'katana', element: 'water' },
+  { key: 'w_katana_thunder', name: '雷刀イカヅチ', atkMin: 11, atkMax: 22, durMax: 210, minFloor: 8, rarity: 6, grade: 'B', weaponType: 'katana', element: 'thunder' },
+  { key: 'w_katana_ice', name: '氷刀シラユキ', atkMin: 11, atkMax: 22, durMax: 210, minFloor: 8, rarity: 6, grade: 'B', weaponType: 'katana', element: 'ice' },
   { key: 'w_secret_ember', name: '焔凰剣フェニクシア', atkMin: 12, atkMax: 22, durMax: 190, minFloor: 1, rarity: 1, grade: 'S', weaponType: 'longsword', element: 'fire', initialPlus: 3, exclusiveLoot: true,
     passive: { key: 'sturdy', name: '不滅の刃', description: '被ダメージを5%軽減する' } },
   { key: 'w_secret_tide', name: '海嘯弓ネレイア', atkMin: 10, atkMax: 20, durMax: 170, minFloor: 1, rarity: 1, grade: 'S', weaponType: 'bow', element: 'water', initialPlus: 3, exclusiveLoot: true,
@@ -268,7 +280,7 @@ export const ITEM_DEFS: Record<ItemKind, Omit<Item, 'kind'>> = {
   potion:  { name: '回復ポーション', desc: 'HPを40回復する', textureKey: 'i_potion' },
   torch:   { name: '松明', desc: '10ターンの間、壁の向こうまで明るくする', textureKey: 'i_torch' },
   mystery_bread: { name: 'ふしぎパン', desc: 'HP全回復。装備中の武器・盾＋ランダムな予備武器3本・盾3枚を修復し+1（最大8個）。', textureKey: 'i_mystery_bread' },
-  dynamite: { name: 'ダイナマイト', desc: '周囲の通常敵を爆風で一撃撃破。ボスには最大HPの20%の固定ダメージ。自分は無傷。', textureKey: 'i_dynamite' },
+  dynamite: { name: 'ダイナマイト', desc: '周囲の通常敵を爆風で一撃撃破。ボスには残りHPの10%の固定ダメージ。自分は無傷。', textureKey: 'i_dynamite' },
   warp:    { name: 'リコールベル', desc: '今いる階のスタート位置へ戻る', textureKey: 'i_warp' },
   revive:  { name: '復活のタネ', desc: '倒れた時に一度だけ復活', textureKey: 'i_revive' },
   candykey: { name: 'お菓子のカギ', desc: '収穫城の金扉を開ける。敵から1%で入手。1回で1個消費', textureKey: 'i_candykey' },
@@ -303,7 +315,7 @@ export function plusColorHex(plus: number): string {
 }
 
 export function gradeColor(grade: EquipmentGrade): number {
-  return { D: 0x9ba8b4, C: 0x61c78d, B: 0x56a8ff, A: 0xb57aff, S: 0xffc857, SSS: 0xff83d9 }[grade];
+  return { D: 0x9ba8b4, C: 0x61c78d, B: 0x56a8ff, A: 0xb57aff, S: 0xffc857, SS: 0xffa465, SSS: 0xff83d9 }[grade];
 }
 
 export function gradeColorHex(grade: EquipmentGrade): string {

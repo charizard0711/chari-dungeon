@@ -1,4 +1,7 @@
-import { equipmentIconTexture } from '../artRefresh';
+import { weaponAccessoryKey, weaponAccessoryLabel } from '../equipmentAccessories';
+import { isTwoHanded } from '../equipmentRules';
+import { equipmentIconTexture, equipmentIconFlipX, STAR_EQUIPMENT_BACKGROUND } from '../artRefresh';
+import { armorTraitDescription, starWeaponKey } from '../equipmentTraits';
 import { openModalMotion, resetModalMotion } from '../modalMotion';
 import { weaponChargeSteps, weaponWearReduction, shieldEnhancementHeal } from '../enhancement';
 import Phaser from 'phaser';
@@ -77,6 +80,7 @@ export class UIScene extends Phaser.Scene {
   catalogPageIndex = 0;
   catalogPageCount = 1;
   catalogDetail: CatalogEntry | null = null;
+  catalogVariant: 'normal' | 'star' | null = null;
   catalogClaimMessage = '';
   enemyInfoText!: Phaser.GameObjects.Text;
   private enemyInfoTimer?: Phaser.Time.TimerEvent;
@@ -395,6 +399,7 @@ export class UIScene extends Phaser.Scene {
       zone.on('pointerover', () => this.showEquipmentTooltip(kind, sx + sw / 2, sy + 4));
       zone.on('pointerout', () => this.hideTooltip());
       zone.on('pointerdown', () => {
+        if (slotIndex === 2 && weaponAccessoryKey(this.gs.player.weapon)) return;
         Audio.playSe('click');
         this.hideTooltip();
         this.pickSlot = slotIndex;
@@ -474,7 +479,7 @@ export class UIScene extends Phaser.Scene {
       this.equipSlots.push({ kind, tag, bg, icon, name, sub, rect: [sx, sy, sw, sh] });
       const slotIndex = i;
       const zone = this.add.zone(sx, sy, sw, sh).setOrigin(0).setInteractive({ useHandCursor: true });
-      zone.on('pointerdown', () => { Audio.playSe('click'); this.pickSlot = slotIndex; this.setOverlay('pick'); });
+      zone.on('pointerdown', () => { if (slotIndex === 2 && weaponAccessoryKey(this.gs.player.weapon)) return; Audio.playSe('click'); this.pickSlot = slotIndex; this.setOverlay('pick'); });
     }
 
     // ---- もちもの ----
@@ -641,8 +646,10 @@ export class UIScene extends Phaser.Scene {
   private refreshSlotAuras() {
     for (const entry of this.slotAuras) {
       const key = entry.icon.texture.key.replace(/^icon_/, '');
+      entry.aura.kind = key.startsWith('sheath_') ? 'scabbard' : entry.key === 'w_hero_sword' ? 'sword' : 'shield';
+      entry.aura.alternate = key.startsWith('sheath_star_');
       entry.aura.emerald = ['w_hw_emedral', 's_hw_emerald'].includes(key);
-      entry.aura.enabled = key === entry.key || entry.aura.emerald;
+      entry.aura.enabled = ['sheath_w_katana_divine', 'sheath_star_w_katana_divine'].includes(key) || key === 'w_katana_divine' || key === 'star_w_katana_divine' || !entry.icon.texture.key.startsWith('star_') && (key === entry.key || entry.aura.emerald);
       entry.aura.artRotation = entry.icon.texture.key.startsWith('icon_') ? Math.PI / 4 : 0;
     }
   }
@@ -670,7 +677,7 @@ export class UIScene extends Phaser.Scene {
       this.skillBackground!.lineStyle(3, skill.color, .6).beginPath()
         .arc(0, 0, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - Math.min(1, remaining / this.gs.skillChargeRequired))).strokePath();
     }
-    this.skillGlyph!.setTexture(skillIconKey(type)).setAlpha(remaining > 0 ? .72 : 1);
+    this.skillGlyph!.setTexture(skillIconKey(type)).setDisplaySize(IS_MOBILE ? 44 : 56, IS_MOBILE ? 44 : 56).setAlpha(remaining > 0 ? .72 : 1);
     this.skillLabel!.setText(skill.name).setColor(`#${skill.color.toString(16).padStart(6, '0')}`);
     this.skillCounter!.setText(this.gs.timeStopTurns > 0 ? `時停止 ${this.gs.timeStopTurns}`
       : type === 'lance' && this.gs.lanceSkillTurns > 0 ? `四方 ${this.gs.lanceSkillTurns}` : '');
@@ -740,6 +747,8 @@ export class UIScene extends Phaser.Scene {
 
   weaponEffectText(weapon: Weapon, compact = false): string {
     const effects: string[] = [];
+    if (isTwoHanded(weapon)) effects.push('両手持ち・盾装備不可');
+    if (weapon.starred) effects.push('装備中の最大HP +50');
     if (weapon.element) {
       effects.push(compact
         ? `${ELEMENT_INFO[weapon.element].name}属性`
@@ -782,12 +791,13 @@ export class UIScene extends Phaser.Scene {
       if (!armor) return this.showTooltip('服', '服を装備していない', anchorX, anchorY);
       return this.showTooltip(
         armorFullName(armor),
-        `防御力 +${armor.defBonus + armor.plus}\n見た目 ${PLAYER_ARMOR_DEFS[armor.key as keyof typeof PLAYER_ARMOR_DEFS]?.name ?? armor.name}`,
+        `防御力 +${armor.defBonus + armor.plus}\n見た目 ${PLAYER_ARMOR_DEFS[armor.key as keyof typeof PLAYER_ARMOR_DEFS]?.name ?? armor.name}\n${armorTraitDescription(armor)}`,
         anchorX, anchorY
       );
     }
-    if ((p.weapon?.dual || p.weapon?.weaponType === 'bow')) {
-      return this.showTooltip('盾を装備できない', '弓と二刀流は両手を使うため、盾を持てない', anchorX, anchorY);
+    if (weaponAccessoryKey(p.weapon)) return this.showTooltip(`${p.weapon!.name}の${weaponAccessoryLabel(p.weapon)}`, '武器に付属する装備です。武器を変更すると盾を選べます。', anchorX, anchorY);
+    if (isTwoHanded(p.weapon)) {
+      return this.showTooltip('盾を装備できない', 'この武器は両手を使うため、盾を持てない', anchorX, anchorY);
     }
     const shield = p.shield;
     if (!shield) return this.showTooltip('盾', '盾を装備していない', anchorX, anchorY);
@@ -817,7 +827,7 @@ export class UIScene extends Phaser.Scene {
       preview.shield = shield;
       title = shieldFullName(shield);
       lines.push(`防御力 +${shield.defBonus + (shield.plus ?? 0)}`,
-        p.weapon?.dual || p.weapon?.weaponType === 'bow' ? '弓・二刀流中は盾を装備できません'
+        isTwoHanded(p.weapon) ? '両手武器の装備中は盾を装備できません'
           : `装備時の防御力 ${preview.def}（現在 ${p.def}）`,
         `耐久 ${shield.dur} / ${shield.durMax}（${durabilityRisk(shield.dur, shield.durMax).label}）`,
         `効果 ${this.shieldEffectText(shield)}`);
@@ -826,6 +836,7 @@ export class UIScene extends Phaser.Scene {
       preview.armor = armor;
       title = armorFullName(armor);
       lines.push(`防御力 +${armor.defBonus + (armor.plus ?? 0)}`,
+        armorTraitDescription(armor),
         `装備時の防御力 ${preview.def}（現在 ${p.def}）`, '耐久なし',
         `見た目 ${PLAYER_ARMOR_DEFS[armor.key as keyof typeof PLAYER_ARMOR_DEFS]?.name ?? armor.name}`);
     }
@@ -922,10 +933,10 @@ export class UIScene extends Phaser.Scene {
     const w = p.weapon, a = p.armor, s = p.shield;
     const empty = { tex: null, sub: 'なし', plus: 0 };
     const slotInfo: Record<'weapon' | 'armor' | 'shield', { tex: string | null; sub: string; plus: number; grade?: EquipmentGrade; element?: Element }> = {
-      weapon: w ? { tex: w.key, sub: `攻${w.atkMin}-${w.atkMax}`, plus: w.plus, grade: w.grade, element: w.element } : empty,
+      weapon: w ? { tex: w.starred ? starWeaponKey(w.key) : w.key, sub: `攻${w.atkMin}-${w.atkMax}`, plus: w.plus, grade: w.grade, element: w.element } : empty,
       armor: a ? { tex: armorTextureKey(a.key), sub: `防+${a.defBonus + a.plus}`, plus: a.plus, grade: a.grade } : empty,
-      shield: (w?.dual || w?.weaponType === 'bow')
-        ? { tex: w.key, sub: w.weaponType === 'bow' ? '両手持ち' : '二刀流', plus: w.plus, grade: w.grade, element: w.element }
+      shield: isTwoHanded(w)
+        ? { tex: weaponAccessoryKey(w) ?? (w.starred ? starWeaponKey(w.key) : w.key), sub: weaponAccessoryKey(w) ? weaponAccessoryLabel(w) : w.dual ? '二刀流' : '両手持ち', plus: w.plus, grade: w.grade, element: w.element }
         : s ? { tex: s.key, sub: `防+${s.defBonus + s.plus}`, plus: s.plus, grade: s.grade, element: s.element } : empty
     };
     this.equipSlots.forEach((slot) => {
@@ -934,15 +945,16 @@ export class UIScene extends Phaser.Scene {
       const has = info.tex !== null;
       const rim = this.elementColor(info.element) ?? (info.grade ? gradeColor(info.grade) : this.theme.color);
       slot.bg.clear();
-      slot.bg.fillStyle(0x0a1c20, has ? .96 : 0.5).fillRoundedRect(sx, sy, sw, sh, 10);
+      slot.bg.fillStyle((info.tex?.startsWith('star_') || slot.kind === 'shield' && !!w?.starred && !!weaponAccessoryKey(w)) ? STAR_EQUIPMENT_BACKGROUND : 0x0a1c20, has ? .96 : 0.5).fillRoundedRect(sx, sy, sw, sh, 10);
       slot.bg.lineStyle(info.grade === 'SSS' ? 3.5 : info.grade === 'S' ? 3 : info.grade === 'A' ? 2.5 : 1.5, rim, has ? 1 : 0.5).strokeRoundedRect(sx, sy, sw, sh, 8);
       if (has) {
-        slot.icon.setTexture(equipmentIconTexture(info.tex!)).setDisplaySize(this.equipIconSize, this.equipIconSize).setVisible(true).setAlpha(1);
-        slot.icon.clearTint();
+        slot.icon.setTexture(equipmentIconTexture(info.tex!)).setFlipX(equipmentIconFlipX(info.tex!)).setDisplaySize(this.equipIconSize, this.equipIconSize).setVisible(true).setAlpha(1);
+        slot.icon.clearTint().setRotation(0);
+        if (info.tex?.startsWith('sheath_')) slot.icon.setDisplaySize(this.equipIconSize, this.equipIconSize * .2).setRotation(-Math.PI / 4);
       } else {
         slot.icon.setVisible(false);
       }
-      slot.name.setText(slot.tag).setColor(has ? '#e6eef7' : '#6b7c8c');
+      slot.name.setText(slot.kind === 'shield' && weaponAccessoryKey(w) ? weaponAccessoryLabel(w) : slot.tag).setColor(has ? '#e6eef7' : '#6b7c8c');
       slot.sub.setText(IS_MOBILE ? info.sub : '');
     });
     if (this.paperDoll && this.gs.playerArmor) {
@@ -1071,10 +1083,15 @@ export class UIScene extends Phaser.Scene {
   }
 
   showTooltip(title: string, desc: string, anchorX: number, anchorY: number) {
+    this.tooltip.getByName('rare-drop-description')?.destroy();
+    const pinkLine = desc.split('\n').find(line=>line.startsWith('特殊アイテムのドロップ率'));
+    if (pinkLine) desc = desc.split('\n').filter(line=>line!==pinkLine).join('\n');
     this.tooltipTitle.setWordWrapWidth(IS_MOBILE ? 220 : 280).setText(title).setPosition(10, 8);
     this.tooltipDesc.setText(desc).setPosition(10, 8 + this.tooltipTitle.height + 6);
-    const w = Math.max(this.tooltipTitle.width, this.tooltipDesc.width) + 20;
-    const h = this.tooltipDesc.y + this.tooltipDesc.height + 8;
+    const pink = pinkLine ? this.add.text(10,this.tooltipDesc.y+this.tooltipDesc.height+4,pinkLine,{fontFamily:'"Yu Gothic UI"',fontSize:'12px',color:'#ff83d9',wordWrap:{width:220}}).setName('rare-drop-description') : undefined;
+    if (pink) this.tooltip.add(pink);
+    const w = Math.max(this.tooltipTitle.width, this.tooltipDesc.width, pink?.width ?? 0) + 20;
+    const h = pink ? pink.y+pink.height+8 : this.tooltipDesc.y + this.tooltipDesc.height + 8;
     this.tooltipBg.clear();
     this.tooltipBg.fillStyle(0x0a1420, 0.97).fillRoundedRect(0, 0, w, h, 6);
     this.tooltipBg.lineStyle(1.5, 0x3fe0d0).strokeRoundedRect(0, 0, w, h, 6);
@@ -1135,6 +1152,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   setOverlay(mode: 'none' | 'equip' | 'inv' | 'codex' | 'settings' | 'shop' | 'gacha' | 'pick' | 'itemcatalog' | 'equipmentcatalog' | 'repair' | 'quests' | 'details') {
+    if (this.gs.reviving) return;
     if (this.gachaAnimating) return; // 演出中は切替禁止
     if (this.gs.pendingEquipment && mode !== 'equip') mode = 'equip';
     if (mode === 'equip' && this.overlayMode !== 'equip') this.equipScrollIndex = 0;
@@ -1339,7 +1357,7 @@ export class UIScene extends Phaser.Scene {
   buildPickOverlay(x: number, y: number, w: number, h: number) {
     const p = this.gs.player;
     const owned = this.pickSlot === 0 ? p.weapons : this.pickSlot === 1 ? p.armors : p.shields;
-    const shieldBlocked = this.pickSlot === 2 && (p.weapon?.dual || p.weapon?.weaponType === 'bow');
+    const shieldBlocked = this.pickSlot === 2 && isTwoHanded(p.weapon);
     const removeHeight = this.pickSlot === 1 ? 0 : 38;
     const noticeHeight = (shieldBlocked ? 48 : 0) + removeHeight;
     const rowsPerPage = Math.max(1, Math.floor((h - 52 - noticeHeight - 58) / 38));
@@ -1377,7 +1395,7 @@ export class UIScene extends Phaser.Scene {
         const risk = durabilityRisk(wp.dur, wp.durMax);
         const elementColor = this.elementColor(wp.element);
         const frameCol = elementColor ?? gradeColor(wp.grade);
-        const icon = this.framedIcon(x + 34, cy + 16, wp.key, frameCol, 36);
+        const icon = this.framedIcon(x + 34, cy + 16, wp.starred ? starWeaponKey(wp.key) : wp.key, frameCol, 36);
         const row = this.rowButton(x + 58, cy, w - 74, `${equipped ? '▶ ' : '　'}${weaponFullName(wp)}  攻${wp.atkMin}-${wp.atkMax}  耐久${wp.dur}/${wp.durMax}(${risk.label})  効果:${this.weaponEffectText(wp, true)}`, equipped, () => this.gs.equipWeapon(i));
         this.bindEquipmentTooltip(row, icon[1], { kind: 'weapon', item: wp });
         this.overlay.add([...icon, row]);
@@ -1401,7 +1419,7 @@ export class UIScene extends Phaser.Scene {
     } else {
       // 盾
       if (shieldBlocked) {
-        this.overlay.add(this.add.text(x + 20, cy, '⚠ 弓・二刀流中は盾を持てない（武器を持ち替えれば装備できる）', {
+        this.overlay.add(this.add.text(x + 20, cy, '⚠ 両手武器の装備中は盾を持てない（武器を持ち替えれば装備できる）', {
           fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: this.theme.text, wordWrap: { width: w - 40 }
         }));
         cy += noticeHeight;
@@ -1427,10 +1445,14 @@ export class UIScene extends Phaser.Scene {
   framedIcon(cx: number, cy: number, texKey: string, frameColor: number, box = 36, tintColor?: number): Phaser.GameObjects.GameObject[] {
     const g = this.add.graphics();
     const hs = box / 2;
-    g.fillStyle(0x10161f, 1).fillRoundedRect(cx - hs, cy - hs, box, box, 6);
+    g.fillStyle(texKey.startsWith('star_') ? STAR_EQUIPMENT_BACKGROUND : 0x10161f, 1).fillRoundedRect(cx - hs, cy - hs, box, box, 6);
     g.lineStyle(2.5, frameColor).strokeRoundedRect(cx - hs, cy - hs, box, box, 6);
-    const icon = this.add.image(cx, cy, equipmentIconTexture(texKey)).setDisplaySize(box - 2, box - 2);
+    const icon = this.add.image(cx, cy, equipmentIconTexture(texKey)).setFlipX(equipmentIconFlipX(texKey)).setDisplaySize(box - 2, box - 2);
     if (tintColor !== undefined) icon.setTintFill(tintColor);
+    if (texKey === 'w_katana_divine' || texKey === 'star_w_katana_divine') {
+      this.overlay.add([g, icon]);
+      new LegendaryAura(this, icon, 'sword');
+    }
     return [g, icon];
   }
 
@@ -1475,7 +1497,7 @@ export class UIScene extends Phaser.Scene {
         const equipped = wp === p.weapon;
         const risk = durabilityRisk(wp.dur, wp.durMax);
         const elementColor = this.elementColor(wp.element);
-        const icon = this.framedIcon(x + 34, cy + 14, wp.key, elementColor ?? gradeColor(wp.grade), 34);
+        const icon = this.framedIcon(x + 34, cy + 14, wp.starred ? starWeaponKey(wp.key) : wp.key, elementColor ?? gradeColor(wp.grade), 34);
         const row = this.rowButton(x + 56, cy, w - 78 - sellW, `⚔ ${equipped ? '▶ ' : ''}${weaponFullName(wp)}  耐久${wp.dur}/${wp.durMax}(${risk.label})  効果:${this.weaponEffectText(wp, true)}`, equipped, () => this.gs.equipWeapon(entry.index));
         this.bindEquipmentTooltip(row, icon[1], { kind: 'weapon', item: wp });
         const sell = this.rowButton(x + w - sellW - 10, cy, sellW,
@@ -1558,24 +1580,24 @@ export class UIScene extends Phaser.Scene {
         label: '武器',
         name: p.weapon ? weaponFullName(p.weapon) : '素手',
         sub: p.weapon ? `攻${p.weapon.atkMin}-${p.weapon.atkMax}　耐久${p.weapon.dur}/${p.weapon.durMax}` : '装備なし',
-        texture: p.weapon?.key,
+        texture: p.weapon?.starred ? starWeaponKey(p.weapon.key) : p.weapon?.key,
         color: p.weapon ? this.elementColor(p.weapon.element) ?? gradeColor(p.weapon.grade) : 0x36585d,
         slot: 0
       },
       {
         label: '服',
         name: armor ? armorFullName(armor) : '装備なし',
-        sub: armor ? `防+${armor.defBonus + armor.plus}` : '装備なし',
+        sub: armor ? `防+${armor.defBonus + armor.plus}　${armorTraitDescription(armor)}` : '装備なし',
         texture: armor ? armorTextureKey(armor.key) : undefined,
         color: armor ? gradeColor(armor.grade) : 0x36585d,
         slot: 1
       },
       {
-        label: '盾',
-        name: (p.weapon?.dual || p.weapon?.weaponType === 'bow') ? (p.weapon?.weaponType === 'bow' ? '弓装備中' : '二刀流中') : p.shield ? shieldFullName(p.shield) : '装備なし',
-        sub: (p.weapon?.dual || p.weapon?.weaponType === 'bow') ? '盾は装備できない' : p.shield ? `防+${p.shield.defBonus + p.shield.plus}　耐久${p.shield.dur}/${p.shield.durMax}` : '装備なし',
-        texture: (p.weapon?.dual || p.weapon?.weaponType === 'bow') ? p.weapon.key : p.shield?.key,
-        color: (p.weapon?.dual || p.weapon?.weaponType === 'bow')
+        label: weaponAccessoryLabel(p.weapon),
+        name: weaponAccessoryKey(p.weapon) ? `${p.weapon!.name}の${weaponAccessoryLabel(p.weapon)}` : isTwoHanded(p.weapon) ? (p.weapon?.dual ? '二刀流中' : '両手武器装備中') : p.shield ? shieldFullName(p.shield) : '装備なし',
+        sub: weaponAccessoryKey(p.weapon) ? '武器の付属品（変更不可）' : isTwoHanded(p.weapon) ? '盾は装備できない' : p.shield ? `防+${p.shield.defBonus + p.shield.plus}　耐久${p.shield.dur}/${p.shield.durMax}` : '装備なし',
+        texture: weaponAccessoryKey(p.weapon) ?? (isTwoHanded(p.weapon) ? (p.weapon.starred ? starWeaponKey(p.weapon.key) : p.weapon.key) : p.shield?.key),
+        color: isTwoHanded(p.weapon)
           ? this.elementColor(p.weapon.element) ?? gradeColor(p.weapon.grade)
           : p.shield ? this.elementColor(p.shield.element) ?? gradeColor(p.shield.grade) : 0x36585d,
         slot: 2
@@ -1585,7 +1607,7 @@ export class UIScene extends Phaser.Scene {
     equippedCards.forEach((card, index) => {
       const px = x + 16 + index * (cardW + cardGap);
       const bg = this.add.graphics();
-      bg.fillStyle(0x0a1c20, 0.98).fillRoundedRect(px, summaryY, cardW, 72, 7);
+      bg.fillStyle(card.texture?.startsWith('star_') ? STAR_EQUIPMENT_BACKGROUND : 0x0a1c20, 0.98).fillRoundedRect(px, summaryY, cardW, 72, 7);
       bg.lineStyle(1.5, card.color, 0.95).strokeRoundedRect(px, summaryY, cardW, 72, 7);
       const label = this.add.text(px + 8, summaryY + 5, card.label, {
         fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '9px' : '11px', color: '#8fded8', fontStyle: 'bold'
@@ -1595,18 +1617,21 @@ export class UIScene extends Phaser.Scene {
         wordWrap: { width: cardW - 54 }
       }).setOrigin(0, 0.5);
       const sub = this.add.text(px + 48, summaryY + 50, card.sub, {
-        fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '7px' : '9px', color: '#9fb4c4',
+        fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '7px' : '9px', color: card.slot === 1 && armor?.trait === 'rare_drop' ? '#ff83d9' : '#9fb4c4',
         wordWrap: { width: cardW - 54 }
       }).setOrigin(0, 0.5);
       this.overlay.add([bg, label, name, sub]);
       if (card.texture && this.textures.exists(card.texture)) {
-        const icon = this.add.image(px + 27, summaryY + 43, equipmentIconTexture(card.texture), card.frame)
+        const icon = this.add.image(px + 27, summaryY + 43, equipmentIconTexture(card.texture), card.frame).setFlipX(equipmentIconFlipX(card.texture))
           .setDisplaySize(IS_MOBILE ? 34 : 40, IS_MOBILE ? 34 : 40);
+        if (card.texture.startsWith('sheath_')) icon.setDisplaySize(IS_MOBILE ? 34 : 40, IS_MOBILE ? 7 : 8).setRotation(-Math.PI / 4);
         this.overlay.add(icon);
+        if (['sheath_w_katana_divine', 'sheath_star_w_katana_divine'].includes(card.texture)) { const aura = new LegendaryAura(this, icon, 'scabbard'); aura.alternate = card.texture.startsWith('sheath_star_'); }
       }
       if (card.slot !== undefined) {
         const zone = this.add.zone(px, summaryY, cardW, 72).setOrigin(0).setInteractive({ useHandCursor: true });
         zone.on('pointerdown', () => {
+          if (card.slot === 2 && weaponAccessoryKey(p.weapon)) return;
           Audio.playSe('click');
           this.pickSlot = card.slot!;
           this.setOverlay('pick');
@@ -1659,7 +1684,7 @@ export class UIScene extends Phaser.Scene {
         const wp = entry.item;
         const equipped = wp === p.weapon;
         const risk = durabilityRisk(wp.dur, wp.durMax);
-        const icon = this.framedIcon(x + 33, cy + 14, wp.key, this.elementColor(wp.element) ?? gradeColor(wp.grade), 32);
+        const icon = this.framedIcon(x + 33, cy + 14, wp.starred ? starWeaponKey(wp.key) : wp.key, this.elementColor(wp.element) ?? gradeColor(wp.grade), 32);
         const row = this.rowButton(x + 54, cy, w - 76 - actionW, `⚔ ${equipped ? '▶ ' : ''}${weaponFullName(wp)}　耐久${wp.dur}/${wp.durMax}(${risk.label})　${this.weaponEffectText(wp, true)}`, equipped, () => this.gs.equipWeapon(entry.index));
         this.bindEquipmentTooltip(row, icon[1], { kind: 'weapon', item: wp });
         const action = this.rowButton(x + w - actionW - 10, cy, actionW,
@@ -1822,7 +1847,7 @@ export class UIScene extends Phaser.Scene {
       const restored = Math.max(0, Math.min(50, equipment.durMax - equipment.dur));
       const equipped = equipment === p.weapon || equipment === p.shield;
       const bg = this.add.graphics().fillStyle(0x112a31).fillRoundedRect(x + 16, cy, w - 32, 64, 8);
-      const icon = this.framedIcon(x + 42, cy + 32, equipment.key, gradeColor(equipment.grade), 36);
+      const icon = this.framedIcon(x + 42, cy + 32, 'starred' in equipment && equipment.starred ? starWeaponKey(equipment.key) : equipment.key, gradeColor(equipment.grade), 36);
       const name = this.add.text(x + 68, cy + 6, `${equipped ? '装備中 ' : ''}${equipment.name} +${equipment.plus}`, {
         fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#e1f2ec', wordWrap: { width: w - 172, useAdvancedWrap: true }
       });
@@ -2177,7 +2202,7 @@ export class UIScene extends Phaser.Scene {
       this.tweens.add({ targets: rays, angle: 360, duration: high ? 8000 : 15000, repeat: -1 });
 
       // 品物が宝箱から飛び出して浮かぶ
-      const itemPlate = track(this.add.circle(cx, itemY, 57, 0x020708, .82)
+      const itemPlate = track(this.add.circle(cx, itemY, 57, result.texKey.startsWith('star_') ? STAR_EQUIPMENT_BACKGROUND : 0x020708, .82)
         .setStrokeStyle(2, result.color, .72).setDepth(304).setScale(.45).setAlpha(0));
       this.tweens.add({ targets: itemPlate, scale: 1, alpha: 1, duration: 420, delay: 160, ease: 'Back.easeOut' });
       const halo = track(this.add.image(cx, itemY, 'glow').setDepth(305)
@@ -2188,7 +2213,7 @@ export class UIScene extends Phaser.Scene {
         effectFrame.lineStyle(4, result.elementColor ?? result.color, 1).strokeRoundedRect(cx - 48, itemY - 48, 96, 96, 12);
         this.tweens.add({ targets: effectFrame, alpha: 1, duration: 300, delay: 300 });
       }
-      const icon = track(this.add.image(cx, chest.y - 6, equipmentIconTexture(result.texKey)).setDepth(306).setDisplaySize(22, 22).setAlpha(0));
+      const icon = track(this.add.image(cx, chest.y - 6, equipmentIconTexture(result.texKey)).setFlipX(equipmentIconFlipX(result.texKey)).setDepth(306).setDisplaySize(22, 22).setAlpha(0));
       if (result.tintIcon && result.elementColor !== undefined) icon.setTintFill(result.elementColor);
       this.tweens.add({
         targets: icon, y: itemY, displayWidth: 78, displayHeight: 78, alpha: 1,
@@ -2227,7 +2252,7 @@ export class UIScene extends Phaser.Scene {
       const metaParts = [`${result.category} / 等級 ${result.grade}`, result.elementName ?? '無属性'];
       if (result.feature) metaParts.push(`固有効果: ${result.feature}`);
       const meta = track(this.add.text(cx, itemY + 102, metaParts.join('   ◆   '), {
-        fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '9px' : '11px', color: '#b8d8d6',
+        fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '9px' : '11px', color: result.feature?.includes('特殊アイテムのドロップ率') ? '#ff83d9' : '#b8d8d6',
         fontStyle: 'bold', align: 'center', wordWrap: { width: cardW - 52 }
       }).setOrigin(.5).setAlpha(0).setDepth(307));
       this.tweens.add({ targets: meta, alpha: 1, duration: 350, delay: 680 });
@@ -2413,17 +2438,17 @@ export class UIScene extends Phaser.Scene {
   selectCatalogItem(entry: CatalogEntry) {
     if (this.overlayMode === 'equipmentcatalog') {
       if (!this.gs.discoveredEquipment.has(entry.key)) return;
-      this.catalogDetail = entry;
+      this.catalogDetail = ITEM_CATALOG.find(item => item.key === entry.key) ?? entry;
       this.rebuildOverlay();
       return;
     }
-    const result = this.gs.claimCatalogItem(entry.key);
+    const result = this.gs.claimCatalogItem(entry.key, entry.textureKey.startsWith('star_'));
     this.catalogClaimMessage = result.message;
     if (result.status === 'pending') {
       this.setOverlay('equip');
       return;
     }
-    this.catalogDetail = entry;
+    this.catalogDetail = ITEM_CATALOG.find(item => item.key === entry.key) ?? entry;
     this.rebuildOverlay();
   }
 
@@ -2438,21 +2463,35 @@ export class UIScene extends Phaser.Scene {
       return label;
     };
     const addArt = (entry: CatalogEntry, cx: number, cy: number, size: number) => {
-      const icon = this.add.image(cx, cy, equipmentIconTexture(entry.textureKey));
+      const icon = this.add.image(cx, cy, equipmentIconTexture(entry.textureKey)).setFlipX(equipmentIconFlipX(entry.textureKey));
       icon.setScale(size / Math.max(icon.width, icon.height));
       this.overlay.add(icon);
-      if (['w_hero_sword', 's_arcadia_guard', 'w_hw_emedral', 's_hw_emerald'].includes(entry.key)) { const aura = new LegendaryAura(this, icon, entry.key.startsWith('w_') ? 'sword' : 'shield'); aura.emerald = entry.key.startsWith('w_hw_') || entry.key.startsWith('s_hw_'); aura.artRotation = icon.texture.key.startsWith('icon_') ? Math.PI / 4 : 0; }
+      if (entry.key === 'w_katana_divine' || !entry.textureKey.startsWith('star_') && ['w_hero_sword', 's_arcadia_guard', 'w_hw_emedral', 's_hw_emerald'].includes(entry.key)) { const aura = new LegendaryAura(this, icon, entry.key.startsWith('w_') ? 'sword' : 'shield'); aura.emerald = entry.key.startsWith('w_hw_') || entry.key.startsWith('s_hw_'); aura.artRotation = icon.texture.key.startsWith('icon_') ? Math.PI / 4 : 0; }
     };
     if (this.catalogDetail) {
-      const entry = this.catalogDetail;
-      this.overlay.add(this.rowButton(x + 16, y + 50, 132, '‹ 一覧に戻る', false, () => {
+      const baseEntry = this.catalogDetail;
+      const hasStar = baseEntry.category === 'weapon' && (!equipmentOnly || this.gs.discoveredEquipment.has(starWeaponKey(baseEntry.key)));
+      const showStar = hasStar && (this.catalogVariant === 'star' || equipmentOnly && this.catalogVariant !== 'normal');
+      const entry = showStar ? {...baseEntry,name:baseEntry.name+'★',textureKey:starWeaponKey(baseEntry.key),description:baseEntry.description+'\n装備中の最大HP +50'} : baseEntry;
+      if (showStar) this.overlay.add(this.add.rectangle(x+16,y+88,w-32,h-130,STAR_EQUIPMENT_BACKGROUND).setOrigin(0).setName('star-catalog-background'));
+      if (hasStar) {
+        for (const [index,variant,label] of [[0,'normal','通常個体'],[1,'star','特殊個体']] as const) {
+          this.overlay.add(this.rowButton(x+w-244+index*114,y+50,108,label,showStar ? variant==='star' : variant==='normal',()=>{
+            this.catalogVariant=variant;this.rebuildOverlay();
+          }));
+        }
+      }
+      this.overlay.add(this.rowButton(x + 16, y + 50, IS_MOBILE ? 96 : 132, IS_MOBILE ? '‹ 一覧' : '‹ 一覧に戻る', false, () => {
         this.catalogDetail = null;
+        this.catalogVariant = null;
         this.rebuildOverlay();
       }));
       addArt(entry, x + w / 2, y + 196, IS_MOBILE ? 172 : 200);
       addText(x + 24, y + 320, entry.name, IS_MOBILE ? 21 : 26, '#fff2cb', w - 48);
       addText(x + 24, y + 396, entry.summary, 16, '#58d9d1', w - 48);
-      addText(x + 24, y + 432, entry.description, 16, '#dfe7f0', w - 48);
+      const rareLine = entry.description.split('\n').find(line=>line.startsWith('特殊アイテムのドロップ率'));
+      const description = addText(x + 24, y + 432, rareLine ? entry.description.split('\n').filter(line=>line!==rareLine).join('\n') : entry.description, 16, '#dfe7f0', w - 48);
+      if (rareLine) addText(x+24,description.y+description.height+6,rareLine,16,'#ff83d9',w-48);
       if (!equipmentOnly) {
         addText(x + 24, y + h - 112, this.catalogClaimMessage, 14, '#fff2cb', w - 48);
         const ownedArmor = entry.category === 'armor' && this.gs.ownsArmor(entry.key.slice('armor_'.length));
@@ -2487,16 +2526,18 @@ export class UIScene extends Phaser.Scene {
     const cardH = (h - 164 - gap * (rows - 1)) / rows;
     page.entries.forEach((entry, index) => {
       const found = !equipmentOnly || this.gs.discoveredEquipment.has(entry.key);
+      const hasStar = entry.category === 'weapon' && this.gs.discoveredEquipment.has(starWeaponKey(entry.key));
+      const displayEntry = hasStar ? {...entry,name:entry.name+'★',textureKey:starWeaponKey(entry.key)} : entry;
       const px = x + 16 + (index % columns) * (cardW + gap);
       const py = y + 114 + Math.floor(index / columns) * (cardH + gap);
       const color = !found ? 0x465264 : entry.element ? ELEMENT_INFO[entry.element].color : entry.grade ? gradeColor(entry.grade) : this.theme.color;
       const card = this.add.graphics();
-      card.fillStyle(0x142630).fillRoundedRect(px, py, cardW, cardH, 8);
+      card.fillStyle(hasStar ? STAR_EQUIPMENT_BACKGROUND : 0x142630).fillRoundedRect(px, py, cardW, cardH, 8);
       card.lineStyle(1, color, .65).strokeRoundedRect(px, py, cardW, cardH, 8);
       this.overlay.add(card);
-      if (found) addArt(entry, px + cardW / 2, py + 43, 72);
+      if (found) addArt(displayEntry, px + cardW / 2, py + 43, 72);
       else addText(px + cardW / 2, py + 43, "?", 42, "#596579").setOrigin(.5);
-      const name = addText(px + 10, py + 85, found ? entry.name : '未入手', IS_MOBILE ? 12 : 15, '#f5ead1', cardW - 20);
+      const name = addText(px + 10, py + 85, found ? displayEntry.name : '未入手', IS_MOBILE ? 12 : 15, '#f5ead1', cardW - 20);
       // 長い道具名も省略せず、カード内に収める。
       while (name.height > cardH - 115 && parseInt(name.style.fontSize as string) > 10) {
         name.setFontSize(parseInt(name.style.fontSize as string) - 1);
@@ -2506,6 +2547,7 @@ export class UIScene extends Phaser.Scene {
       const zone = this.add.zone(px, py, cardW, cardH).setOrigin(0);
       if (found) zone.setInteractive({ useHandCursor: true });
       zone.on('pointerdown', () => {
+        this.catalogVariant = null;
         this.selectCatalogItem(entry);
       });
       this.overlay.add(zone);
