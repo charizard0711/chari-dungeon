@@ -1,4 +1,5 @@
 import { katanaSlashColor } from './equipmentAccessories';
+import { requestEquipmentArt } from './lazyEquipmentArt';
 import { isTwoHanded } from './equipmentRules';
 import Phaser from 'phaser';
 import { starWeaponKey } from './equipmentTraits';
@@ -54,6 +55,7 @@ export class EquipmentRenderer {
     this.waistFitting.setVisible(!!katana && dir === 'down');
     if (katana) {
       const sheathKey = `sheath_${weapon?.starred ? 'star_' : ''}${weapon!.key}`;
+      requestEquipmentArt(sheathKey);
       if (this.scene.textures.exists(sheathKey)) this.scabbard.setTexture(sheathKey);
       this.scabbard.setOrigin(.78, .5).setDisplaySize(unit * 25, unit * 5)
         .setPosition(body.x + unit * (dir === 'left' ? 5 : -2), body.y + unit * 5)
@@ -82,6 +84,7 @@ export class EquipmentRenderer {
       // Keep old saves readable if an asset fails to load.
       const starred = 'starred' in item && item.starred;
       const hasArt = !starred && this.scene.textures.exists(key), texture = starred ? starWeaponKey(item.key) : hasArt ? key : item.key;
+      requestEquipmentArt(texture);
       const artFrame = hasArt ? HELD_DIRECTION_FRAME[dir] : undefined;
       if (sprite.texture.key !== texture || (hasArt && String(sprite.frame.name) !== String(artFrame))) sprite.setTexture(texture,artFrame);
       const pose = heldHandPose(dir,frame,gender,offhand,elapsed,type,body.texture.key);
@@ -114,7 +117,9 @@ export class EquipmentRenderer {
           pose.depth = dir === 'up' ? -.12 : .18;
         }
       }
-      if (type === 'katana' || type === 'greatsword') pose.x = 20;
+      if (type === 'katana') pose.x = 20;
+      // Keep every greatsword's grip just left of the hand in all poses.
+      if (type === 'greatsword') pose.x = 16;
       if (type === 'katana') {
         const heading = {right:0, down:Math.PI/2, left:Math.PI, up:-Math.PI/2}[dir];
         const sweep = Math.min(1, elapsed / 130);

@@ -8077,14 +8077,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   currentMoveDuration(): number {
-    if (this.clickPathActive) return this.clickPathQuick ? 80 : 104;
+    if (this.clickPathActive) return 40;
     if (this.holdBoostTier === 2) return 44;
     if (this.holdBoostTier === 1) return 62;
     return 104;
   }
 
   currentTurnAnimDuration(base: number): number {
-    const scale = this.clickPathActive ? (this.clickPathQuick ? .8 : 1) : this.holdBoostTier === 2 ? 0.44 : this.holdBoostTier === 1 ? 0.64 : 1;
+    const scale = this.clickPathActive ? 0.48 : this.holdBoostTier === 2 ? 0.44 : this.holdBoostTier === 1 ? 0.64 : 1;
     return Math.max(28, Math.round(base * scale));
   }
 

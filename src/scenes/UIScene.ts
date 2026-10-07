@@ -1286,7 +1286,15 @@ export class UIScene extends Phaser.Scene {
       : ['settings', 'shop', 'repair'].includes(this.overlayMode) && !IS_MOBILE
         ? { x: 250, y: 50, w: 780, h: 660 } : this.L.ov;
     const illustrated = ['codex', 'equipmentcatalog'].includes(this.overlayMode);
-    this.overlay.add(this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x020307, .72).setInteractive());
+    const dimmer = this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x020307, .72).setInteractive();
+    dimmer.on('pointerdown', (pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation();
+      if (pointer.x >= x && pointer.x <= x + w && pointer.y >= y && pointer.y <= y + h) return;
+      if (this.gs.pendingEquipment || this.gachaAnimating) return;
+      Audio.playSe('click');
+      this.setOverlay('none');
+    });
+    this.overlay.add(dimmer);
     const frameScale = IS_MOBILE ? .18 : .22;
     this.overlay.add(this.add.nineslice(x + w / 2, y + h / 2, 'ui_modal_frame', undefined,
       w / frameScale, h / frameScale, 256, 256, 256, 256).setScale(frameScale).setName('painted-modal-frame'));
