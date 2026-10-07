@@ -1,0 +1,27 @@
+[
+  {
+    "key": "ui_modal_frame",
+    "prompt": "Use case: stylized-concept. Production painted game UI asset. Painted fantasy RPG modal panel, square canvas, obsidian black and midnight teal recessed empty center occupying 85 percent, delicate antique gold brass border, small crimson gemstone corner accents, subtle etched vines and clockwork motifs only at outermost edges, corners within canvas, luxurious restrained frame matching Chari Dungeon. No text, no content inside, no buttons, no scene. Opaque dark interior. High resolution smooth finely illustrated edges, not pixel art, no watermark.",
+    "path": "C:\\Users\\masam\\.codex\\generated_images\\01a10f78-b8dd-7c52-8d89-8100c6d49665\\exec-24d06b40-2856-48d4-8fb6-645a847b719e.png"
+  },
+  {
+    "key": "ui_close_button",
+    "prompt": "Use case: stylized-concept. Production painted game UI asset. Single fantasy RPG close button: small square obsidian jewel button with antique gold rim, crisp red copper diagonal X clearly visible centered, polished painted materials, readable small icon, transparent background, no letters, no other objects. High resolution smooth finely illustrated edges, not pixel art, no watermark.",
+    "path": "C:\\Users\\masam\\.codex\\generated_images\\01a10f78-b8dd-7c52-8d89-8100c6d49665\\exec-863f55cc-d8d1-4cde-bac2-9825f4230c80.png"
+  },
+  {
+    "key": "ui_gacha_header",
+    "prompt": "Use case: stylized-concept. Production painted game UI asset. Single wide decorative fantasy RPG gacha header vignette: ornate antique gold treasure chest and faceted crimson blue jewels at the left and right edges, central 65 percent entirely transparent for runtime title text, thin edge flourish. Transparent background, no text. High resolution smooth finely illustrated edges, not pixel art, no watermark.",
+    "path": "C:\\Users\\masam\\.codex\\generated_images\\01a10f78-b8dd-7c52-8d89-8100c6d49665\\exec-8c0d4a71-7497-4228-8acd-7f1f1fea974b.png"
+  },
+  {
+    "key": "ui_shop_header",
+    "prompt": "Use case: stylized-concept. Production painted game UI asset. Single wide decorative fantasy RPG shop header vignette: antique brass merchant scale, potion and tiny coin purse at the left and right edges, dark teal gold painted material, central 65 percent entirely transparent for runtime title text, thin decorative edge flourish. Transparent background, no letters, no text. High resolution smooth finely illustrated edges, not pixel art, no watermark.",
+    "path": "C:\\Users\\masam\\.codex\\generated_images\\01a10f78-b8dd-7c52-8d89-8100c6d49665\\exec-6bdb7910-cdb9-4122-ac86-298d4ccb7381.png"
+  },
+  {
+    "key": "ui_settings_header",
+    "prompt": "Use case: stylized-concept. Production painted game UI asset. Single wide decorative fantasy RPG settings header vignette: intricate brass gears and cobalt crystal knob at the left and right edges, central 65 percent entirely transparent for runtime title text, thin edge flourish. Transparent background, no text. High resolution smooth finely illustrated edges, not pixel art, no watermark.",
+    "path": "C:\\Users\\masam\\.codex\\generated_images\\01a10f78-b8dd-7c52-8d89-8100c6d49665\\exec-48239b30-fa42-494b-9bb4-5131efd2f7b2.png"
+  }
+]

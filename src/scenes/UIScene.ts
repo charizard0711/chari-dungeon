@@ -1,3 +1,4 @@
+import { equipmentIconTexture } from '../artRefresh';
 import { weaponChargeSteps, weaponWearReduction, shieldEnhancementHeal } from '../enhancement';
 import Phaser from 'phaser';
 import { HALLOWEEN_FLOORS } from '../halloweenContent';
@@ -633,7 +634,16 @@ export class UIScene extends Phaser.Scene {
       if (!held) void this.gs.useWeaponSkill();
     });
     this.refreshSkillButton();
-    for (const entry of this.slotAuras) { entry.aura.emerald = ['w_hw_emedral', 's_hw_emerald'].includes(entry.icon.texture.key); entry.aura.enabled = entry.icon.texture.key === entry.key || entry.aura.emerald; }
+    this.refreshSlotAuras();
+  }
+
+  private refreshSlotAuras() {
+    for (const entry of this.slotAuras) {
+      const key = entry.icon.texture.key.replace(/^icon_/, '');
+      entry.aura.emerald = ['w_hw_emedral', 's_hw_emerald'].includes(key);
+      entry.aura.enabled = key === entry.key || entry.aura.emerald;
+      entry.aura.artRotation = entry.icon.texture.key.startsWith('icon_') ? Math.PI / 4 : 0;
+    }
   }
 
   isSkillPointer(x: number, y: number) {
@@ -670,7 +680,7 @@ export class UIScene extends Phaser.Scene {
     for (const art of this.questMenuArt) art.setAlpha(pulse);
     this.refreshSkillButton();
     this.durabilityWarnings?.update(this.gs.player, this.time.now, this.overlayMode === 'none' && !this.gs.gameEnded);
-    for (const entry of this.slotAuras) { entry.aura.emerald = ['w_hw_emedral', 's_hw_emerald'].includes(entry.icon.texture.key); entry.aura.enabled = entry.icon.texture.key === entry.key || entry.aura.emerald; }
+    this.refreshSlotAuras();
     const pointer = this.input.activePointer;
     const dynamiteHovered = !!this.dynamiteHoverZone?.active && this.input.isOver && !pointer.wasTouch
       && this.dynamiteHoverZone.getBounds().contains(pointer.x, pointer.y);
@@ -861,7 +871,7 @@ export class UIScene extends Phaser.Scene {
 
   refresh() {
     this.refreshSkillButton();
-    for (const entry of this.slotAuras) { entry.aura.emerald = ['w_hw_emedral', 's_hw_emerald'].includes(entry.icon.texture.key); entry.aura.enabled = entry.icon.texture.key === entry.key || entry.aura.emerald; }
+    this.refreshSlotAuras();
     const p = this.gs.player;
     this.fountainBadge?.setVisible(p.fountainBlessingFloor !== null);
     (this.fountainBadge?.getByName('fountain-rate') as Phaser.GameObjects.Text | undefined)?.setText(`攻・防 ×${p.fountainBlessingRate}`);
@@ -926,7 +936,7 @@ export class UIScene extends Phaser.Scene {
       slot.bg.fillStyle(0x0a1c20, has ? .96 : 0.5).fillRoundedRect(sx, sy, sw, sh, 10);
       slot.bg.lineStyle(info.grade === 'SSS' ? 3.5 : info.grade === 'S' ? 3 : info.grade === 'A' ? 2.5 : 1.5, rim, has ? 1 : 0.5).strokeRoundedRect(sx, sy, sw, sh, 8);
       if (has) {
-        slot.icon.setTexture(info.tex!).setDisplaySize(this.equipIconSize, this.equipIconSize).setVisible(true).setAlpha(1);
+        slot.icon.setTexture(equipmentIconTexture(info.tex!)).setDisplaySize(this.equipIconSize, this.equipIconSize).setVisible(true).setAlpha(1);
         slot.icon.clearTint();
       } else {
         slot.icon.setVisible(false);
@@ -1144,7 +1154,7 @@ export class UIScene extends Phaser.Scene {
     this.overlayMode = mode;
     this.releaseJoystick?.();
     this.refreshSkillButton();
-    for (const entry of this.slotAuras) { entry.aura.emerald = ['w_hw_emedral', 's_hw_emerald'].includes(entry.icon.texture.key); entry.aura.enabled = entry.icon.texture.key === entry.key || entry.aura.emerald; }
+    this.refreshSlotAuras();
     this.gs.clearMoveInput();
     this.hideTooltip();
     this.hideEnemyInfo();
@@ -1254,15 +1264,10 @@ export class UIScene extends Phaser.Scene {
       : ['settings', 'shop', 'repair'].includes(this.overlayMode) && !IS_MOBILE
         ? { x: 200, y: 60, w: 680, h: 620 } : this.L.ov;
     const illustrated = ['codex', 'equipmentcatalog'].includes(this.overlayMode);
-    if (illustrated) {
-      this.overlay.add(this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x020307, .72).setInteractive());
-      this.overlay.add(this.add.image(x + w / 2, y + h / 2, this.theme.panel).setDisplaySize(w, h));
-    }
-    const g = this.add.graphics();
-    g.fillStyle(0x110b13, 0.985).fillRoundedRect(x, y, w, h, 14);
-    g.fillStyle(0x143034, .26).fillRoundedRect(x + 5, y + 5, w - 10, h - 10, 10);
-    g.lineStyle(1.5, this.theme.color).strokeRoundedRect(x, y, w, h, 14);
-    if (!illustrated) this.overlay.add(g); else g.destroy();
+    this.overlay.add(this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x020307, .72).setInteractive());
+    this.overlay.add(this.add.image(x + w / 2, y + h / 2, 'ui_modal_frame').setDisplaySize(w, h).setName('painted-modal-frame'));
+    const header = ({shop:'ui_shop_header', gacha:'ui_gacha_header', settings:'ui_settings_header'} as Record<string,string>)[this.overlayMode];
+    if (header) this.overlay.add(this.add.image(x + w / 2, y + 24, header).setDisplaySize(w - 36, 42).setAlpha(.65).setName('painted-modal-header'));
 
     const pickTitles = ['武器を変更', '服を変更', '盾を変更'];
     const title =
@@ -1277,15 +1282,14 @@ export class UIScene extends Phaser.Scene {
       this.overlayMode === 'gacha' ? 'ダンジョンガチャ' :
       this.overlayMode === 'pick' ? pickTitles[this.pickSlot] :
       'モンスター図鑑';
-    this.overlay.add(this.add.text(x + (illustrated ? 32 : 16), y + (illustrated ? 21 : 12), title, {
+    this.overlay.add(this.add.text(x + w / 2, y + 22, title, {
       fontFamily: '"Yu Gothic UI"', fontSize: illustrated ? IS_MOBILE ? '20px' : '24px' : IS_MOBILE ? '15px' : '18px',
-      color: this.theme.text, fontStyle: 'bold', wordWrap: { width: w - 72 }
-    }));
+      color: this.theme.text, fontStyle: 'bold', align: 'center', wordWrap: { width: w - 120 }
+    }).setOrigin(.5, 0));
     // 閉じるボタン
-    const cb = this.add.text(x + w - (illustrated ? 64 : IS_MOBILE ? 48 : 34), y + (illustrated ? 14 : IS_MOBILE ? 2 : 10), this.gs.pendingEquipment ? '🔒' : '✕', {
-      fontFamily: 'sans-serif', fontSize: IS_MOBILE ? '25px' : '22px', color: '#ff8b8b',
-      padding: IS_MOBILE ? { x: 10, y: 8 } : { x: 0, y: 0 }
-    });
+    const cb = this.gs.pendingEquipment
+      ? this.add.text(x + w - 44, y + 12, '🔒', { fontSize: '24px' })
+      : this.add.image(x + w - 28, y + 27, 'ui_close_button').setDisplaySize(IS_MOBILE ? 40 : 34, IS_MOBILE ? 40 : 34).setName('painted-modal-close');
     if (!this.gs.pendingEquipment) {
       cb.setInteractive({ useHandCursor: true });
       cb.on('pointerdown', () => { Audio.playSe('click'); this.setOverlay('none'); });
@@ -1415,7 +1419,7 @@ export class UIScene extends Phaser.Scene {
     const hs = box / 2;
     g.fillStyle(0x10161f, 1).fillRoundedRect(cx - hs, cy - hs, box, box, 6);
     g.lineStyle(2.5, frameColor).strokeRoundedRect(cx - hs, cy - hs, box, box, 6);
-    const icon = this.add.image(cx, cy, texKey).setDisplaySize(box - 2, box - 2);
+    const icon = this.add.image(cx, cy, equipmentIconTexture(texKey)).setDisplaySize(box - 2, box - 2);
     if (tintColor !== undefined) icon.setTintFill(tintColor);
     return [g, icon];
   }
@@ -1586,7 +1590,7 @@ export class UIScene extends Phaser.Scene {
       }).setOrigin(0, 0.5);
       this.overlay.add([bg, label, name, sub]);
       if (card.texture && this.textures.exists(card.texture)) {
-        const icon = this.add.image(px + 27, summaryY + 43, card.texture, card.frame)
+        const icon = this.add.image(px + 27, summaryY + 43, equipmentIconTexture(card.texture), card.frame)
           .setDisplaySize(IS_MOBILE ? 34 : 40, IS_MOBILE ? 34 : 40);
         this.overlay.add(icon);
       }
@@ -2174,7 +2178,7 @@ export class UIScene extends Phaser.Scene {
         effectFrame.lineStyle(4, result.elementColor ?? result.color, 1).strokeRoundedRect(cx - 48, itemY - 48, 96, 96, 12);
         this.tweens.add({ targets: effectFrame, alpha: 1, duration: 300, delay: 300 });
       }
-      const icon = track(this.add.image(cx, chest.y - 6, result.texKey).setDepth(306).setDisplaySize(22, 22).setAlpha(0));
+      const icon = track(this.add.image(cx, chest.y - 6, equipmentIconTexture(result.texKey)).setDepth(306).setDisplaySize(22, 22).setAlpha(0));
       if (result.tintIcon && result.elementColor !== undefined) icon.setTintFill(result.elementColor);
       this.tweens.add({
         targets: icon, y: itemY, displayWidth: 78, displayHeight: 78, alpha: 1,
@@ -2424,10 +2428,10 @@ export class UIScene extends Phaser.Scene {
       return label;
     };
     const addArt = (entry: CatalogEntry, cx: number, cy: number, size: number) => {
-      const icon = this.add.image(cx, cy, entry.textureKey);
+      const icon = this.add.image(cx, cy, equipmentIconTexture(entry.textureKey));
       icon.setScale(size / Math.max(icon.width, icon.height));
       this.overlay.add(icon);
-      if (['w_hero_sword', 's_arcadia_guard', 'w_hw_emedral', 's_hw_emerald'].includes(entry.key)) { const aura = new LegendaryAura(this, icon, entry.key.startsWith('w_') ? 'sword' : 'shield'); aura.emerald = entry.key.startsWith('w_hw_') || entry.key.startsWith('s_hw_'); }
+      if (['w_hero_sword', 's_arcadia_guard', 'w_hw_emedral', 's_hw_emerald'].includes(entry.key)) { const aura = new LegendaryAura(this, icon, entry.key.startsWith('w_') ? 'sword' : 'shield'); aura.emerald = entry.key.startsWith('w_hw_') || entry.key.startsWith('s_hw_'); aura.artRotation = icon.texture.key.startsWith('icon_') ? Math.PI / 4 : 0; }
     };
     if (this.catalogDetail) {
       const entry = this.catalogDetail;

@@ -8,6 +8,7 @@ import { FINAL_DEPTH_BOSSES, FINAL_ELEMENTS, FINAL_ELEMENT_LABEL, finalDepthMobC
 import { hasFinalDepthTerrain, finalDepthTerrainKey, finalDepthFloorFrame, finalDepthPropKinds, FINAL_DEPTH_COLORS, type FinalDepthPropKind, type FinalDepthPart } from '../finalDepthTerrain';
 import { hasThunderTerrain, thunderTerrainKey, thunderFloorFrame, THUNDER_PROP_KINDS, type ThunderPropKind, type ThunderPart } from '../thunderTerrain';
 import Phaser from 'phaser';
+import { equipmentIconTexture } from '../artRefresh';
 import { presentGame } from '../menuPresentation';
 import { GOLDEN_KING, GOLDEN_SHIELD, HALLOWEEN_BOSSES, HALLOWEEN_MOBS, HALLOWEEN_RETAINERS, HALLOWEEN_WEAPONS, HALLOWEEN_SHIELDS, HALLOWEEN_FLOORS, HALLOWEEN_COLORS } from '../halloweenContent';
 import { generateHalloweenDungeon, halloweenDecorations } from '../halloweenDungeon';
@@ -5013,7 +5014,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const textureKey = kind === 'armor' ? armorTextureKey(equipment.key) : equipment.key;
-    const sprite = this.add.image(0, 0, textureKey).setDepth(5).setOrigin(0.5, 0.6).setDisplaySize(24, 24);
+    const sprite = this.add.image(0, 0, equipmentIconTexture(textureKey)).setDepth(5).setOrigin(0.5, 0.6).setDisplaySize(24, 24);
     this.placeSprite(sprite, pos.x, pos.y);
     sprite.setVisible(this.isTileCurrentlyVisible(pos.x, pos.y));
     const glow = this.add.image(sprite.x, sprite.y - 2, 'glow').setDepth(4.6)
@@ -8742,7 +8743,7 @@ export class GameScene extends Phaser.Scene {
       if (equipment) refreshLegendaryEquipment(equipment);
       const texture = item.kind === 'armor' ? armorTextureKey(item.armor!.key)
         : equipment?.key ?? (item.kind === 'coin' ? 'coin' : `i_${item.kind}`);
-      const sprite = this.add.image(0, 0, texture).setDepth(5).setOrigin(.5, .6).setDisplaySize(equipment ? 24 : 22, equipment ? 24 : 22);
+      const sprite = this.add.image(0, 0, equipmentIconTexture(texture)).setDepth(5).setOrigin(.5, .6).setDisplaySize(equipment ? 24 : 22, equipment ? 24 : 22);
       this.placeSprite(sprite, item.x, item.y);
       const glow = this.add.image(sprite.x, sprite.y - 2, 'glow').setDepth(sprite.depth - .12)
         .setBlendMode(Phaser.BlendModes.ADD).setTint(equipment ? gradeColor(equipment.grade) : item.kind === 'coin' || item.kind === 'mystery_bread' ? 0xffc45a : 0x88dfd4)

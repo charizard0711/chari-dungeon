@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { equipmentIconTexture } from '../artRefresh';
 import { presentMenu, menuBackdrop } from '../menuPresentation';
 import { GAME_W, GAME_H } from '../layout';
 import { WEAPON_DEFS, gradeColor } from '../data';
@@ -79,7 +80,7 @@ export class HalloweenScene extends Phaser.Scene {
       const y = (mobile ? 323 : 392)+Math.floor(i/cols)*(height+8);
       const chosen = this.selected === w.key;
       this.add.rectangle(x,y,width,height,chosen?0x503029:0x231c2d, .98).setStrokeStyle(chosen?2:1,chosen?0xffc96e:0x685172);
-      this.add.image(x-width/2+26,y,w.key).setDisplaySize(40,40);
+      this.add.image(x-width/2+26,y,equipmentIconTexture(w.key)).setDisplaySize(40,40);
       this.add.text(x-width/2+51,y-12,w.name,{fontFamily:FONT,fontSize:mobile?'10px':'13px',color:chosen?'#fff0c9':'#d6c8db',wordWrap:{width:width-58}});
       this.add.text(x-width/2+51,y+10,`${w.grade} · 攻撃 ${w.atkMin}〜${w.atkMax}${chosen?' · 選択中':''}`,{fontFamily:FONT,fontSize:'10px',color:`#${gradeColor(w.grade).toString(16).padStart(6,'0')}`});
       this.add.zone(x,y,width,height).setName(`event-weapon-${w.key}`).setInteractive({useHandCursor:true}).on('pointerdown',()=>{this.selected=w.key;Audio.playSe('click');this.drawCollection();});

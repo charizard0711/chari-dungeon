@@ -1,3 +1,4 @@
+import { REFRESHED_MONSTER_KEYS } from './artRefresh';
 import Phaser from 'phaser';
 
 // ========================================================================
@@ -148,7 +149,7 @@ function tileDefs(): FrameDef[] {
 const ALL_DEFS = [...FRAME_DEFS, ...tileDefs()];
 
 // 個別PNGへ差し替えた初期モンスターは、旧スプライトシートで上書きしない。
-const INDIVIDUAL_ART_OVERRIDES = new Set(['m_mush', 'm_mole', 'i_revive']);
+const INDIVIDUAL_ART_OVERRIDES = new Set(['m_mush', 'm_mole', 'i_revive', ...REFRESHED_MONSTER_KEYS]);
 
 // タイル素材の外周には、素材シート上で単体表示するための暗い縁が入っている。
 // ゲーム内では隣接タイル同士を連続して見せたい地形だけ、縁を少しクロップする。

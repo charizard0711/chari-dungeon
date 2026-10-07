@@ -40,7 +40,9 @@ export function createDamageJournal(scene: Phaser.Scene, damage: DamageEntry[], 
       .setTint(difficulty === 'hard' ? 0xb0dcff : difficulty === 'master' ? 0xffe29b : 0xe9d2a8));
     root.add(scene.add.image(x + 42, y + 36, 'ui_nav_damage_log').setDisplaySize(40, 40));
     text(x + 70, y + 21, '詳細ログ', mobile ? 21 : 26, theme.text, w - 142);
-    button(x + w - 62, y + 17, 42, '✕', close).setName('journal-close');
+    const closeArt = scene.add.image(x + w - 38, y + 36, 'ui_close_button').setDisplaySize(38, 38).setName('journal-close');
+    closeArt.setInteractive({useHandCursor:true}).on('pointerdown', () => { Audio.playSe('click'); close(); });
+    root.add(closeArt);
     const tabW = (w - 54) / 2;
     button(x + 24, y + 72, tabW, '被ダメージ', () => { tab = 'damage'; page = 0; selected = undefined; selectedAdventure = undefined; render(); }, tab === 'damage').setName('journal-tab-damage');
     button(x + 30 + tabW, y + 72, tabW, '冒険ログ', () => { tab = 'adventure'; page = 0; selected = undefined; selectedAdventure = undefined; render(); }, tab === 'adventure').setName('journal-tab-adventure');

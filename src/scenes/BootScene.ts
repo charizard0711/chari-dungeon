@@ -1,3 +1,4 @@
+import { ART_REFRESH } from '../artRefresh';
 import { updateLoading } from '../loadingScreen';
 import { prepareTitleVideo } from '../titleOpening';
 import { VOLCANO_FLOORS, VOLCANO_PARTS, volcanoTerrainKey } from '../volcanoTerrain';
@@ -260,7 +261,7 @@ export class BootScene extends Phaser.Scene {
     for (const [key, path] of Object.entries({ ...SHIELD_ART, ...SKILL_ICON_ART, ...ADVENTURE_ART })) {
       this.load.image(key, path);
     }
-    for (const [key, path] of Object.entries({ ...UI_ART, ...DURABILITY_WARNING_ART })) {
+    for (const [key, path] of Object.entries({ ...UI_ART, ...DURABILITY_WARNING_ART, ...ART_REFRESH })) {
       this.load.image(key, path);
     }
     for (const key of EXPANSION_MONSTER_KEYS) {

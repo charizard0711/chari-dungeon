@@ -16,6 +16,7 @@ export class LegendaryAura {
   private disposed = false;
   enabled = true;
   emerald = false;
+  artRotation = 0;
   constructor(private scene: Phaser.Scene, private target: Phaser.GameObjects.Image, private kind: LegendaryAuraKind) {
     this.back = scene.add.graphics(); this.front = scene.add.graphics();
     if (kind === 'shield') this.smoke = Array.from({length: 3}, () => scene.add.image(0, 0, 'fx_shadow'));
@@ -36,9 +37,9 @@ export class LegendaryAura {
     for (const cloud of this.smoke) cloud.setVisible(visible);
     for (const cloud of this.painted) cloud.setVisible(visible && this.emerald);
     if (!visible) return;
-    const now = this.scene.time.now, w = s.displayWidth, h = s.displayHeight;
+    const now = this.scene.time.now, w = s.displayWidth, h = s.displayHeight, rotation = s.rotation + this.artRotation;
     for (const [g, offset] of [[this.back, -.001], [this.front, .001]] as const) {
-      g.setPosition(s.x, s.y).setRotation(s.rotation).setDepth(s.depth + offset).setAlpha(s.alpha);
+      g.setPosition(s.x, s.y).setRotation(rotation).setDepth(s.depth + offset).setAlpha(s.alpha);
     }
     if (this.emerald) {
       this.smoke.forEach(cloud => cloud.setVisible(false));
@@ -48,9 +49,9 @@ export class LegendaryAura {
         const bow = this.kind === 'sword';
         const drift = phase * h * (bow ? .045 : .15);
         const dx = cx + Math.sin(now / 950 + i * 2) * w * .035, dy = cy - drift;
-        cloud.setPosition(s.x + dx * Math.cos(s.rotation) - dy * Math.sin(s.rotation), s.y + dx * Math.sin(s.rotation) + dy * Math.cos(s.rotation))
+        cloud.setPosition(s.x + dx * Math.cos(rotation) - dy * Math.sin(rotation), s.y + dx * Math.sin(rotation) + dy * Math.cos(rotation))
           .setDisplaySize(w * (bow ? .50 + phase * .06 : 1.03 + phase * .25), h * (bow ? .85 + phase * .06 : 1.03 + phase * .20))
-          .setRotation(s.rotation + Math.sin(now / 1800 + i) * .09).setFlipX(i === 1)
+          .setRotation(rotation + Math.sin(now / 1800 + i) * .09).setFlipX(i === 1)
           .setAlpha(Math.sin(phase * Math.PI) * .60 * s.alpha).setDepth(s.depth - .002 - i * .001);
       });
     } else if (this.kind === 'sword') {
