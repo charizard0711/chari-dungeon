@@ -1,0 +1,77 @@
+[
+  {
+    "key": "fx_slash",
+    "prompt": "Production isolated transparent 2D fantasy RPG visual effect sprite: a single thin sweeping ivory silver crescent sword slash, clean luminous tapered arc, transparent hollow center. Smooth finely painted magical illustration matching polished Chari Dungeon artwork, crisp graceful edges, no pixel art. Restrained translucent glow, a readable small central silhouette and ample empty space. Full effect centered with 12 percent clear padding, no cropping. True transparent background, no black or colored background rectangle, no scenery, no character, no weapon object, no words, no border. Neutral effects must stay pale and reusable for runtime tint. Square canvas; horizontal projectiles centered horizontally within canvas.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a10f78-b8dd-7c52-8d89-8100c6d49665\\exec-5b4dc277-1f78-49da-9d1d-846ade678d63.png"
+  },
+  {
+    "key": "fx_hit",
+    "prompt": "Production isolated transparent 2D fantasy RPG visual effect sprite: small refined white gold impact spark burst, five short tapered rays and very few flecks, compact clear center. Smooth finely painted magical illustration matching polished Chari Dungeon artwork, crisp graceful edges, no pixel art. Restrained translucent glow, a readable small central silhouette and ample empty space. Full effect centered with 12 percent clear padding, no cropping. True transparent background, no black or colored background rectangle, no scenery, no character, no weapon object, no words, no border. Neutral effects must stay pale and reusable for runtime tint. Square canvas; horizontal projectiles centered horizontally within canvas.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a10f78-b8dd-7c52-8d89-8100c6d49665\\exec-f0beb2d9-4438-4d7b-9c7c-3ef51bb745fa.png"
+  },
+  {
+    "key": "fx_heal",
+    "prompt": "Production isolated transparent 2D fantasy RPG visual effect sprite: gentle emerald and aqua healing wisps rising vertically from a thin floor ellipse, tiny plus-shaped luminous motes, ethereal restorative magic. Smooth finely painted magical illustration matching polished Chari Dungeon artwork, crisp graceful edges, no pixel art. Restrained translucent glow, a readable small central silhouette and ample empty space. Full effect centered with 12 percent clear padding, no cropping. True transparent background, no black or colored background rectangle, no scenery, no character, no weapon object, no words, no border. Neutral effects must stay pale and reusable for runtime tint. Square canvas; horizontal projectiles centered horizontally within canvas.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a10f78-b8dd-7c52-8d89-8100c6d49665\\exec-2d772ba0-9bb3-46f7-b694-19850ab1c65e.png"
+  },
+  {
+    "key": "fx_magic",
+    "prompt": "Production isolated transparent 2D fantasy RPG visual effect sprite: a restrained cyan and gold rune circle in shallow isometric floor perspective, delicate glowing engravings and thin rim, empty transparent center. Smooth finely painted magical illustration matching polished Chari Dungeon artwork, crisp graceful edges, no pixel art. Restrained translucent glow, a readable small central silhouette and ample empty space. Full effect centered with 12 percent clear padding, no cropping. True transparent background, no black or colored background rectangle, no scenery, no character, no weapon object, no words, no border. Neutral effects must stay pale and reusable for runtime tint. Square canvas; horizontal projectiles centered horizontally within canvas.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a10f78-b8dd-7c52-8d89-8100c6d49665\\exec-90643930-7c9a-473f-9873-35cdcffb425b.png"
+  },
+  {
+    "key": "fx_poison",
+    "prompt": "Production isolated transparent 2D fantasy RPG visual effect sprite: small translucent emerald violet poison vapor curling upward, wispy fine tendrils, no skull or solid silhouette. Smooth finely painted magical illustration matching polished Chari Dungeon artwork, crisp graceful edges, no pixel art. Restrained translucent glow, a readable small central silhouette and ample empty space. Full effect centered with 12 percent clear padding, no cropping. True transparent background, no black or colored background rectangle, no scenery, no character, no weapon object, no words, no border. Neutral effects must stay pale and reusable for runtime tint. Square canvas; horizontal projectiles centered horizontally within canvas.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a10f78-b8dd-7c52-8d89-8100c6d49665\\exec-44cb5183-bfdb-46c1-92cc-fcb6008f5775.png"
+  },
+  {
+    "key": "fx_levelup",
+    "prompt": "Production isolated transparent 2D fantasy RPG visual effect sprite: elegant gold and white upward light ribbons and fine star motes from a shallow elliptical floor ring, celebratory restrained luminous blessing. Smooth finely painted magical illustration matching polished Chari Dungeon artwork, crisp graceful edges, no pixel art. Restrained translucent glow, a readable small central silhouette and ample empty space. Full effect centered with 12 percent clear padding, no cropping. True transparent background, no black or colored background rectangle, no scenery, no character, no weapon object, no words, no border. Neutral effects must stay pale and reusable for runtime tint. Square canvas; horizontal projectiles centered horizontally within canvas.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a10f78-b8dd-7c52-8d89-8100c6d49665\\exec-275ef0ec-664a-431d-9347-44c6d8947e29.png"
+  },
+  {
+    "key": "fx_crescent",
+    "prompt": "Production isolated transparent 2D fantasy RPG visual effect sprite: large graceful cool white pale blue crescent sword energy slash, smooth layered tapered arcs, thin luminous edge, transparent hollow space. Smooth finely painted magical illustration matching polished Chari Dungeon artwork, crisp graceful edges, no pixel art. Restrained translucent glow, a readable small central silhouette and ample empty space. Full effect centered with 12 percent clear padding, no cropping. True transparent background, no black or colored background rectangle, no scenery, no character, no weapon object, no words, no border. Neutral effects must stay pale and reusable for runtime tint. Square canvas; horizontal projectiles centered horizontally within canvas.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a10f78-b8dd-7c52-8d89-8100c6d49665\\exec-d3ff0480-b88b-4f8f-b2de-a5f5039a349a.png"
+  },
+  {
+    "key": "fx_impact",
+    "prompt": "Production isolated transparent 2D fantasy RPG visual effect sprite: precise silver blue magical impact glint, sparse curved shards and fine rays, restrained brightness, compact spark. Smooth finely painted magical illustration matching polished Chari Dungeon artwork, crisp graceful edges, no pixel art. Restrained translucent glow, a readable small central silhouette and ample empty space. Full effect centered with 12 percent clear padding, no cropping. True transparent background, no black or colored background rectangle, no scenery, no character, no weapon object, no words, no border. Neutral effects must stay pale and reusable for runtime tint. Square canvas; horizontal projectiles centered horizontally within canvas.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a10f78-b8dd-7c52-8d89-8100c6d49665\\exec-4edd8898-b1cb-4288-bdbd-8474bd2677d4.png"
+  },
+  {
+    "key": "fx_arrow",
+    "prompt": "Production isolated transparent 2D fantasy RPG visual effect sprite: a single magical silver white energy arrow pointing horizontally RIGHT, long finely tapered streak behind it on left, slim arrowhead, no bow. Smooth finely painted magical illustration matching polished Chari Dungeon artwork, crisp graceful edges, no pixel art. Restrained translucent glow, a readable small central silhouette and ample empty space. Full effect centered with 12 percent clear padding, no cropping. True transparent background, no black or colored background rectangle, no scenery, no character, no weapon object, no words, no border. Neutral effects must stay pale and reusable for runtime tint. Square canvas; horizontal projectiles centered horizontally within canvas.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a10f78-b8dd-7c52-8d89-8100c6d49665\\exec-f1696ab6-d0e1-4daa-a741-d370c4829374.png"
+  },
+  {
+    "key": "fx_beam",
+    "prompt": "Production isolated transparent 2D fantasy RPG visual effect sprite: a narrow cool white cyan lance energy beam pointing horizontally RIGHT, smooth taper and subtle fine filaments, no large burst. Smooth finely painted magical illustration matching polished Chari Dungeon artwork, crisp graceful edges, no pixel art. Restrained translucent glow, a readable small central silhouette and ample empty space. Full effect centered with 12 percent clear padding, no cropping. True transparent background, no black or colored background rectangle, no scenery, no character, no weapon object, no words, no border. Neutral effects must stay pale and reusable for runtime tint. Square canvas; horizontal projectiles centered horizontally within canvas.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a10f78-b8dd-7c52-8d89-8100c6d49665\\exec-6774cb15-d8f0-45a4-9927-2adc6516316f.png"
+  },
+  {
+    "key": "fx_bolt",
+    "prompt": "Production isolated transparent 2D fantasy RPG visual effect sprite: a compact golden white projectile pointing horizontally RIGHT with short delicate streak behind it on left, no circular explosion. Smooth finely painted magical illustration matching polished Chari Dungeon artwork, crisp graceful edges, no pixel art. Restrained translucent glow, a readable small central silhouette and ample empty space. Full effect centered with 12 percent clear padding, no cropping. True transparent background, no black or colored background rectangle, no scenery, no character, no weapon object, no words, no border. Neutral effects must stay pale and reusable for runtime tint. Square canvas; horizontal projectiles centered horizontally within canvas.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a10f78-b8dd-7c52-8d89-8100c6d49665\\exec-7ea77f00-90f8-4064-9cf8-d78762b843a7.png"
+  },
+  {
+    "key": "fx_skill_cross_v3",
+    "prompt": "Production isolated transparent 2D fantasy RPG visual effect sprite: two clean diagonally crossing ivory pale violet sword slashes making a symmetric X, thin elegant tapered arcs, empty transparent surrounding space. Smooth finely painted magical illustration matching polished Chari Dungeon artwork, crisp graceful edges, no pixel art. Restrained translucent glow, a readable small central silhouette and ample empty space. Full effect centered with 12 percent clear padding, no cropping. True transparent background, no black or colored background rectangle, no scenery, no character, no weapon object, no words, no border. Neutral effects must stay pale and reusable for runtime tint. Square canvas; horizontal projectiles centered horizontally within canvas.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a10f78-b8dd-7c52-8d89-8100c6d49665\\exec-d0e363b7-2574-4f57-9a49-18e05b0e6f51.png"
+  },
+  {
+    "key": "fx_skill_stun_v3",
+    "prompt": "Production isolated transparent 2D fantasy RPG visual effect sprite: three small golden magical stars orbiting a delicate flat elliptical loop, separated luminous stars, empty transparent center. Smooth finely painted magical illustration matching polished Chari Dungeon artwork, crisp graceful edges, no pixel art. Restrained translucent glow, a readable small central silhouette and ample empty space. Full effect centered with 12 percent clear padding, no cropping. True transparent background, no black or colored background rectangle, no scenery, no character, no weapon object, no words, no border. Neutral effects must stay pale and reusable for runtime tint. Square canvas; horizontal projectiles centered horizontally within canvas.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a10f78-b8dd-7c52-8d89-8100c6d49665\\exec-13213037-acc8-4978-9736-9c982a2a22d0.png"
+  },
+  {
+    "key": "fx_move_v3",
+    "prompt": "Production isolated transparent 2D fantasy RPG visual effect sprite: a compact aqua cyan floor destination marker, very thin elegant shallow perspective circular ellipse with four tiny diamond points, empty transparent center, no dense runes. Smooth finely painted magical illustration matching polished Chari Dungeon artwork, crisp graceful edges, no pixel art. Restrained translucent glow, a readable small central silhouette and ample empty space. Full effect centered with 12 percent clear padding, no cropping. True transparent background, no black or colored background rectangle, no scenery, no character, no weapon object, no words, no border. Neutral effects must stay pale and reusable for runtime tint. Square canvas; horizontal projectiles centered horizontally within canvas.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a10f78-b8dd-7c52-8d89-8100c6d49665\\exec-545e30eb-2027-4465-a39e-7bd1bb5652d4.png"
+  },
+  {
+    "key": "fx_skill_dagger_v3",
+    "prompt": "Production isolated transparent 2D fantasy RPG visual effect sprite: an elegant violet silver broken clock halo in shallow floor perspective with five restrained luminous tick marks, wisps of purple time magic, transparent hollow center. Smooth finely painted magical illustration matching polished Chari Dungeon artwork, crisp graceful edges, no pixel art. Restrained translucent glow, a readable small central silhouette and ample empty space. Full effect centered with 12 percent clear padding, no cropping. True transparent background, no black or colored background rectangle, no scenery, no character, no weapon object, no words, no border. Neutral effects must stay pale and reusable for runtime tint. Square canvas; horizontal projectiles centered horizontally within canvas.",
+    "source": "C:\\Users\\masam\\.codex\\generated_images\\01a10f78-b8dd-7c52-8d89-8100c6d49665\\exec-0e047a59-fdd1-4676-8568-bd378d837ab0.png"
+  }
+]

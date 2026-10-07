@@ -12,7 +12,7 @@ export interface WeaponSkill {
 }
 
 export const WEAPON_SKILLS = {
-  dagger: { name: '零刻領域', description: '5ターン時間停止。敵をすり抜けて移動、終了時に正面を攻撃（背後1.5倍）', color: 0xb88cff, chargeSteps: 100, range: 3, multiplier: 0, sound: 'clockTick' },
+  dagger: { name: '零刻領域', description: '5ターン時間停止。終了時に正面を攻撃。背後なら先に敵最大HPの5%固定ダメージ、その後に通常攻撃2倍', color: 0xb88cff, chargeSteps: 100, range: 3, multiplier: 0, sound: 'clockTick' },
   longsword: { name: '扇斬り', description: '正面・斜め前の3マスを斬り、HPを70回復', color: 0x6fa8ff, chargeSteps: 100, range: 1, multiplier: 1.3, sound: 'skillLongsword' },
   lance: { name: '貫通突き', description: '東西南北各3マスを攻撃・攻撃力30%低下を3ターン', color: 0xf0c75e, chargeSteps: 100, range: 3, multiplier: 1.35, sound: 'skillLance' },
   bow: { name: '穿ち矢', description: '前方7マス以内の敵1体を攻撃し、2ターンスタン', color: 0x74d88a, chargeSteps: 100, range: 7, multiplier: 1.8, sound: 'skillBow' },

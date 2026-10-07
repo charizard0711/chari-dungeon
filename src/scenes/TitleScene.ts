@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { openModalMotion } from '../modalMotion';
 
 import { presentMenu } from '../menuPresentation';
 import { addTitleLoop } from '../titleOpening';
@@ -93,6 +94,7 @@ export class TitleScene extends Phaser.Scene {
       }).setOrigin(.5).setInteractive({ useHandCursor: true }).on('pointerdown', closeResumeDialog);
       const dialogChildren = this.children.list.filter(child => !previous.has(child));
       resumeDialog = this.add.container(0, 0, dialogChildren).setDepth(50);
+      openModalMotion(this, resumeDialog, GAME_W / 2, GAME_H / 2);
     };
     this.createCinematicTitle(requestExplore, () => {
       if (!starting && !resumeDialog) {

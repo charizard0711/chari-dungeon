@@ -9,6 +9,7 @@ import { hasFinalDepthTerrain, finalDepthTerrainKey, finalDepthFloorFrame, final
 import { hasThunderTerrain, thunderTerrainKey, thunderFloorFrame, THUNDER_PROP_KINDS, type ThunderPropKind, type ThunderPart } from '../thunderTerrain';
 import Phaser from 'phaser';
 import { equipmentIconTexture, REFRESHED_MONSTER_KEYS } from '../artRefresh';
+import { effectWorldSize } from '../effectRefresh';
 import { presentGame } from '../menuPresentation';
 import { GOLDEN_KING, GOLDEN_SHIELD, HALLOWEEN_BOSSES, HALLOWEEN_MOBS, HALLOWEEN_RETAINERS, HALLOWEEN_WEAPONS, HALLOWEEN_SHIELDS, HALLOWEEN_FLOORS, HALLOWEEN_COLORS } from '../halloweenContent';
 import { generateHalloweenDungeon, halloweenDecorations } from '../halloweenDungeon';
@@ -3954,8 +3955,14 @@ export class GameScene extends Phaser.Scene {
       for (let shot = 0; shot < shots && !this.gameEnded; shot++) {
         for (const enemy of plan.targets) {
           if (!enemy.alive || !this.enemies.includes(enemy) || this.gameEnded) continue;
+          const daggerBackstab = daggerFinisher && direction === enemy.facing;
+          if (daggerBackstab) {
+            const fixedDamage = Math.max(1, Math.floor(enemy.hpMax * .05));
+            enemy.hp -= fixedDamage;
+            this.log(`${skill.name}：${enemy.def.name}に先制固定${fixedDamage}ダメージ（最大HPの5%）`, 'special');
+          }
           const result = computePlayerAttack(this.player, this.enemyDefenseDefinition(enemy), false, {
-            consumeDurability: false, multiplier: daggerFinisher ? (direction === enemy.facing ? 1.5 : 1) : skill.multiplier,
+            consumeDurability: false, multiplier: daggerFinisher ? (daggerBackstab ? 2 : 1) : skill.multiplier,
             hits: weapon.dual ? 2 : 1, defenseIgnore: 0
           });
           this.applyEmedralHit(enemy, weapon);
@@ -7012,8 +7019,8 @@ export class GameScene extends Phaser.Scene {
       this.log(`強化失敗… ${w.name} は燃え尽きてしまった！`, 'dmg');
       Audio.playSe('weaponBreak');
       // 燃えるエフェクト（ヒットスパークを赤く）
-      const fx = this.add.image(this.playerSprite.x, this.playerSprite.y - 8, 'fx_hit').setDepth(22).setTint(0xff5020).setScale(1.2);
-      this.tweens.add({ targets: fx, alpha: 0, scale: 2.2, duration: 500, onComplete: () => fx.destroy() });
+      const fx = this.add.image(this.playerSprite.x, this.playerSprite.y - 8, 'fx_hit').setDepth(22).setTint(0xff5020).setDisplaySize(38.4,38.4);
+      this.tweens.add({ targets: fx, alpha: 0, displayWidth: 70.4, displayHeight: 70.4, duration: 500, onComplete: () => fx.destroy() });
       this.cameras.main.shake(150, 0.006);
       // 所持武器から除去し、別の武器へ持ち替え
       this.player.weapons = this.player.weapons.filter((x) => x !== w);
@@ -7037,8 +7044,8 @@ export class GameScene extends Phaser.Scene {
     } else {
       this.log(`盾の強化失敗… ${s.name} は砕けてしまった！`, 'dmg');
       Audio.playSe('shieldBreak');
-      const fx = this.add.image(this.playerSprite.x, this.playerSprite.y - 8, 'fx_hit').setDepth(22).setTint(0xff5020).setScale(1.2);
-      this.tweens.add({ targets: fx, alpha: 0, scale: 2.2, duration: 500, onComplete: () => fx.destroy() });
+      const fx = this.add.image(this.playerSprite.x, this.playerSprite.y - 8, 'fx_hit').setDepth(22).setTint(0xff5020).setDisplaySize(38.4,38.4);
+      this.tweens.add({ targets: fx, alpha: 0, displayWidth: 70.4, displayHeight: 70.4, duration: 500, onComplete: () => fx.destroy() });
       this.cameras.main.shake(150, 0.006);
       this.player.shields = this.player.shields.filter((x) => x !== s);
       this.player.shield = this.player.weapon?.dual || this.player.weapon?.weaponType === 'bow' ? null : this.player.shields[0] ?? null;
@@ -7737,21 +7744,20 @@ export class GameScene extends Phaser.Scene {
   }
 
   slashFx(x: number, y: number, tint?: number) {
-    const fx = this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, 'fx_slash').setDepth(20);
+    const fx = this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, 'fx_slash').setDepth(20).setDisplaySize(40,40);
     if (tint !== undefined && tint !== 0xdfe7f0) fx.setTint(tint);
-    this.tweens.add({ targets: fx, alpha: 0, scale: 1.4, duration: 220, onComplete: () => fx.destroy() });
+    this.tweens.add({ targets: fx, alpha: 0, displayWidth: 56, displayHeight: 56, duration: 220, onComplete: () => fx.destroy() });
   }
   hitFx(x: number, y: number) {
-    const fx = this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, 'fx_hit').setDepth(21);
-    this.tweens.add({ targets: fx, alpha: 0, scale: 1.5, duration: 260, onComplete: () => fx.destroy() });
+    const fx = this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, 'fx_hit').setDepth(21).setDisplaySize(32,32);
+    this.tweens.add({ targets: fx, alpha: 0, displayWidth: 48, displayHeight: 48, duration: 260, onComplete: () => fx.destroy() });
   }
   // 汎用エフェクト（効果シートの画像を表示。tint指定で色を変えられる）
   effectFx(x: number, y: number, key: string, scale = 1.5, dur = 500, tint?: number) {
     if (!this.textures.exists(key)) return;
     const fx = this.add.image(x * TILE + TILE / 2, y * TILE + TILE / 2, key).setDepth(22);
-    // The painted bolt is 768px wide; its world size must not depend on asset resolution.
-    const width = key === 'fx_bolt' ? TILE : fx.width;
-    const height = key === 'fx_bolt' ? TILE * .5 : fx.height;
+    // World dimensions stay independent of the illustration's resolution.
+    const [width, height] = effectWorldSize(key);
     fx.setDisplaySize(width * .8, height * .8);
     if (tint !== undefined) fx.setTint(tint);
     this.tweens.add({ targets: fx, alpha: 0, displayWidth: width * scale, displayHeight: height * scale,
@@ -7802,7 +7808,7 @@ export class GameScene extends Phaser.Scene {
     if (this.clickPathActive && clickedAt - this.lastMapClickAt <= 360) {
       this.lastMapClickAt = 0;
       this.stopClickPath();
-      this.effectFx(this.player.x, this.player.y, 'fx_magic', 0.72, 180, 0xffd36b);
+      this.effectFx(this.player.x, this.player.y, 'fx_move_v3', 0.72, 180, 0xffd36b);
       return;
     }
     this.lastMapClickAt = clickedAt;
@@ -7851,7 +7857,7 @@ export class GameScene extends Phaser.Scene {
     const token = ++this.clickPathToken;
     this.clickPathActive = true;
     this.setBoostTier(2);
-    this.effectFx(target.x, target.y, 'fx_magic', 0.9, 260, 0x58d9d1);
+    this.effectFx(target.x, target.y, 'fx_move_v3', 0.9, 260, 0x58d9d1);
 
     const visited = new Set<string>([`${this.player.x},${this.player.y}`]);
     let actions = 0;

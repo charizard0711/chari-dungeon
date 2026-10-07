@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { openModalMotion } from './modalMotion';
 import { GAME_W, GAME_H, IS_MOBILE } from './layout';
 import { DIFFICULTY_RULES, type Difficulty } from './difficulty';
 import { Audio } from './audio/manager';
@@ -121,5 +122,6 @@ export function createDamageJournal(scene: Phaser.Scene, damage: DamageEntry[], 
   scene.input.keyboard?.on('keydown', key);
   root.once(Phaser.GameObjects.Events.DESTROY, () => scene.input.keyboard?.off('keydown', key));
   render();
+  openModalMotion(scene, root, GAME_W / 2, GAME_H / 2);
   return root;
 }

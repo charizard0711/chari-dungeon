@@ -1,4 +1,5 @@
 import { equipmentIconTexture } from '../artRefresh';
+import { openModalMotion, resetModalMotion } from '../modalMotion';
 import { weaponChargeSteps, weaponWearReduction, shieldEnhancementHeal } from '../enhancement';
 import Phaser from 'phaser';
 import { HALLOWEEN_FLOORS } from '../halloweenContent';
@@ -1151,6 +1152,7 @@ export class UIScene extends Phaser.Scene {
       this.secretAlternatingPresses = 0;
     }
     if (mode !== 'details') { this.damageJournal?.destroy(true); this.damageJournal = undefined; }
+    const opening = mode !== 'none' && mode !== this.overlayMode;
     this.overlayMode = mode;
     this.releaseJoystick?.();
     this.refreshSkillButton();
@@ -1158,9 +1160,10 @@ export class UIScene extends Phaser.Scene {
     this.gs.clearMoveInput();
     this.hideTooltip();
     this.hideEnemyInfo();
-    if (mode === 'none') { this.overlay.setVisible(false); return; }
+    if (mode === 'none') { resetModalMotion(this, this.overlay); this.overlay.setVisible(false); return; }
     this.overlay.setVisible(true);
     this.rebuildOverlay();
+    if (opening && mode !== 'details') openModalMotion(this, this.overlay, GAME_W / 2, GAME_H / 2);
   }
 
   showForcedEquipmentSale() {
@@ -1168,6 +1171,7 @@ export class UIScene extends Phaser.Scene {
     this.overlayMode = 'equip';
     this.overlay.setVisible(true);
     this.rebuildOverlay();
+    openModalMotion(this, this.overlay, GAME_W / 2, GAME_H / 2);
   }
 
   handleEquipmentSecret(event: KeyboardEvent) {
@@ -1268,7 +1272,7 @@ export class UIScene extends Phaser.Scene {
     const frameScale = IS_MOBILE ? .18 : .22;
     this.overlay.add(this.add.nineslice(x + w / 2, y + h / 2, 'ui_modal_frame', undefined,
       w / frameScale, h / frameScale, 256, 256, 256, 256).setScale(frameScale).setName('painted-modal-frame'));
-    const header = ({shop:'ui_shop_header', gacha:'ui_gacha_header', settings:'ui_settings_header'} as Record<string,string>)[this.overlayMode];
+    const header = ({settings:'ui_settings_header'} as Record<string,string>)[this.overlayMode];
     if (header) {
       const art = this.add.image(x + 58, y + 25, header).setName('painted-modal-header');
       art.setScale(Math.min(92 / art.width, 32 / art.height));
@@ -2141,9 +2145,9 @@ export class UIScene extends Phaser.Scene {
       Audio.playSe(supreme ? 'levelup' : result.grade === 'A' ? 'kill' : 'chest');
 
       // 開封の炸裂
-      const burst = track(this.add.image(cx, chest.y - 10, 'fx_hit').setDepth(304).setScale(1.2)
+      const burst = track(this.add.image(cx, chest.y - 10, 'fx_hit').setDepth(304).setDisplaySize(38.4,38.4)
         .setBlendMode(Phaser.BlendModes.ADD).setTint(result.color));
-      this.tweens.add({ targets: burst, scale: high ? 5.5 : 3.0, alpha: 0, duration: 500 });
+      this.tweens.add({ targets: burst, displayWidth: high ? 176 : 96, displayHeight: high ? 176 : 96, alpha: 0, duration: 500 });
 
       // 品物のY位置（宝箱の上空・モーダル内に収まる固定高さ）
       const itemY = IS_MOBILE ? my + 315 : my + Math.min(180, mh * .42);

@@ -6,7 +6,7 @@ import { directionVector } from './weaponSkills';
 export const skillImpactTime = (type: WeaponType) => type === 'bow' ? 450 : type === 'handgun' ? 100 : type === 'greatsword' ? 270 : type === 'dagger' ? 90 : 150;
 const world = (p: Vec2) => ({ x: (p.x + .5) * TILE, y: (p.y + .5) * TILE });
 function art(scene: Phaser.Scene, key: string, x: number, y: number, w: number, h = w, additive = true) {
-  const image = scene.add.image(x, y, key, key === 'fx_skill_stun_v2' ? 1 : undefined).setDisplaySize(w, h).setDepth(24).setName('painted-skill-fx');
+  const image = scene.add.image(x, y, key).setDisplaySize(w, h).setDepth(24).setName('painted-skill-fx');
   if (additive) image.setBlendMode(Phaser.BlendModes.ADD);
   return image;
 }
@@ -23,8 +23,8 @@ export function paintedVanish(scene: Phaser.Scene, tile: Vec2) {
 }
 
 export function paintedStun(scene: Phaser.Scene, tile: Vec2) {
-  const p = world(tile), burst = art(scene, 'fx_skill_stun_v2', p.x, p.y - TILE * .4, TILE * 3.3);
-  scene.tweens.add({ targets: burst, displayWidth: TILE * 4.1, displayHeight: TILE * 4.1, alpha: 0,
+  const p = world(tile), burst = art(scene, 'fx_skill_stun_v3', p.x, p.y - TILE * .4, TILE * 1.15);
+  scene.tweens.add({ targets: burst, displayWidth: TILE * 1.45, displayHeight: TILE * 1.45, alpha: 0,
     duration: 650, ease: 'Cubic.out', onComplete: () => burst.destroy() });
 }
 
@@ -50,7 +50,7 @@ export function playPaintedSkill(scene: Phaser.Scene, type: WeaponType, origin: 
   } else if (type === 'longsword') {
     crescent(p.x + d.x * TILE * .35, p.y + d.y * TILE * .35, TILE * 2.8, angle + .7, 2.8, 340);
   } else if (type === 'dagger') {
-    const mist = art(scene, 'fx_shadow', p.x, p.y, TILE * 2, TILE * 2, false).setAlpha(.65);
+    const mist = art(scene, 'fx_skill_dagger_v3', p.x, p.y, TILE * 1.7, TILE * 1.1, false).setAlpha(.65);
     fade(scene, mist, 300);
     const last = tiles[tiles.length - 1];
     const target = last ? world(last) : {x:p.x+d.x*TILE, y:p.y+d.y*TILE};
@@ -90,7 +90,7 @@ export function playPaintedSkill(scene: Phaser.Scene, type: WeaponType, origin: 
   } else {
     if (!distance) return;
     for (let shot = 0; shot < 3; shot++) scene.time.delayedCall(shot * 160, () => {
-      const cross = emit('fx_skill_cross_v2', p.x, p.y, TILE).setRotation(angle);
+      const cross = emit('fx_skill_cross_v3', p.x, p.y, TILE).setRotation(angle);
       scene.tweens.add({ targets: cross, x: end.x, y: end.y, duration: 150,
         ease: 'Linear', onComplete: () => {
           scene.tweens.add({ targets: cross, displayWidth: TILE, displayHeight: TILE,

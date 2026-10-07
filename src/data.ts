@@ -168,7 +168,7 @@ export const SHIELD_DEFS: ShieldDef[] = [
   },
   {
     key: 's_thorn_guard', name: '反撃盾ヴァイン', defBonus: 4, durMax: 70, minFloor: 8, rarity: 6, grade: 'B',
-    passive: { key: 'thorns', name: '反射棘', description: '受けた攻撃ダメージの25%を敵へ返す' }
+    passive: { key: 'thorns', name: '反射棘', description: '受けた攻撃ダメージの10%を敵へ返す' }
   },
   {
     key: 's_chrono_guard', name: '時守りの盾クロノス', defBonus: 5, durMax: 75, minFloor: 14, rarity: 3, grade: 'A',

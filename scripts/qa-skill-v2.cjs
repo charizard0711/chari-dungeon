@@ -38,7 +38,7 @@ const Harness = vm.runInNewContext(ts.transpileModule(cls+'; Harness',{compilerO
   { weaponSkill, planSkill, Audio:{playSe(){}}, paintedImpact(){}, paintedStun(){}, skillImpactTime:()=>0,
     consumeWeaponDurability:()=>({}), computePlayerAttack:(p,e,b,opts)=>{p.hits++;p.lastMultiplier=opts.multiplier;return {damage:10,drain:0,killScoreBonus:0};} });
 function harness(type) {
-  const enemy = { x:6,y:5,hp:1000,alive:true,stunnedTurns:0,def:{name:'試験敵',def:0} };
+  const enemy = { x:6,y:5,hp:1000,hpMax:1000,alive:true,stunnedTurns:0,def:{name:'試験敵',def:0} };
   const h = Object.assign(new Harness(), { busy:false,gameEnded:false,timeStopTurns:0,lanceSkillTurns:0,skillStepsRemaining:0,
     turn:0,floorTurn:20,skillChargeSteps:100,playerAnimToken:0,
     player:{...origin,dir:'right',hp:100,hpMax:300,hits:0,weapon:{weaponType:type,dual:['dual_sword','twin_daggers'].includes(type)},heal(n){this.hp=Math.min(this.hpMax,this.hp+n);}},
@@ -92,8 +92,13 @@ function harness(type) {
   for(let n=4;n>=0;n--){await h.finishTurn();assert.equal(h.timeStopTurns,n);assert.equal(h.floorTurn,20);assert.equal(h.player.poisonTurns,3);}
   assert.equal(h.turn,5);
   assert.equal(h.player.hits,1);assert.equal(h.player.lastMultiplier,1);
-  e.facing='right';await h.useWeaponSkill(false,true);
-  assert.equal(h.player.lastMultiplier,1.5);assert.equal(h.turn,5);
+  e.facing='right';const beforeBackstab=e.hp;
+  const defenseDefinition=h.enemyDefenseDefinition.bind(h);let hpBeforeNormalAttack;
+  h.enemyDefenseDefinition=enemy=>{hpBeforeNormalAttack=enemy.hp;return defenseDefinition(enemy);};
+  await h.useWeaponSkill(false,true);
+  assert.equal(h.player.lastMultiplier,2);assert.equal(h.turn,5);
+  assert.equal(hpBeforeNormalAttack,beforeBackstab-50,'5% fixed damage must precede normal damage');
+  assert.equal(e.hp,beforeBackstab-60);
   e.def={def:100,atkMin:100,atkMax:100};e.skillAttackDownUntil=8;e.skillDefenseDownUntil=8;
   for (const turn of [6,7,8]) {
     h.turn=turn;assert.equal(h.enemyAttackDefinition(e).atkMin,70);assert.equal(h.enemyDefenseDefinition(e).def,70);

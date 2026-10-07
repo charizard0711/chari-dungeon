@@ -18,6 +18,12 @@ function load(relative) {
 }
 const combat = load('src/combat.ts'), journal = load('src/damageJournal.ts');
 const { resolveShieldHit } = load('src/shieldEffects.ts');
+for (const damage of [0, 1, 9, 10, 25, 100]) {
+  const shield = { name: '反撃盾ヴァイン', plus: 0, passive: { key: 'thorns', name: '反射棘' } };
+  const reflected = resolveShieldHit(shield, damage, {hp:100,hpMax:100});
+  assert.equal(reflected.reflect, damage === 0 ? 0 : Math.max(1, Math.floor(damage * .1)));
+  assert.equal(reflected.damage, damage);
+}
 const { difficultyEnemy, DIFFICULTY_RULES } = load('src/difficulty.ts');
 const def = { key: 'qa', name: '試験の敵', atkMin: 40, atkMax: 50, def: 0, hp: 100, minFloor: 1, maxFloor: 30, element: 'fire' };
 const p = { def: 10 };

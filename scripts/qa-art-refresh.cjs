@@ -28,7 +28,7 @@ const base = process.env.QA_URL || 'http://localhost:5176';
       });
       for(const mode of ['equip','inv','codex','settings','shop','gacha','pick','itemcatalog','equipmentcatalog','repair','quests']) {
         await page.evaluate(mode=>window.__game.scene.getScene('UIScene').setOverlay(mode),mode);
-        await page.waitForTimeout(80);
+        await page.waitForTimeout(300);
         const point=await page.evaluate(()=>{
           const u=window.__game.scene.getScene('UIScene'), children=u.overlay.list;
           if(!children.some(s=>s.name==='painted-modal-frame'))throw Error('Undrawn modal '+u.overlayMode);
@@ -44,7 +44,7 @@ const base = process.env.QA_URL || 'http://localhost:5176';
       await page.evaluate(()=>{const u=window.__game.scene.getScene('UIScene'),close=u.damageJournal.list.find(s=>s.name==='journal-close');if(!close?.input?.enabled)throw Error('Journal close missing');close.emit('pointerdown');if(u.overlayMode!=='none')throw Error('Journal close failed');});
       for(const mode of ['settings','shop','gacha','codex','pick']) {
         await page.evaluate(mode=>window.__game.scene.getScene('UIScene').setOverlay(mode),mode);
-        await page.waitForTimeout(120);
+        await page.waitForTimeout(300);
         await page.screenshot({path:`outputs/art-refresh-${mobile?'mobile':'desktop'}-${mode}.png`});
       }
       if(errors.length)throw Error(errors.join('\n'));
@@ -53,3 +53,4 @@ const base = process.env.QA_URL || 'http://localhost:5176';
     }
   } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});
+
