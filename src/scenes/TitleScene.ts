@@ -139,7 +139,6 @@ export class TitleScene extends Phaser.Scene {
     const choice=(y:number,label:string,sub:string,name:string,action:()=>void)=>{
       const width=mobile?GAME_W-44:520;
       const plate=this.add.image(cx,y,'title-menu-frame').setDisplaySize(width,116);
-      const accent=this.add.rectangle(cx-width/2+2,y,3,32,0xe8d49c,.8);
       const arrow=text(cx+width/2-26,y,'›',28,'#c5dace');
       const line=text(cx,y,label,mobile?20:23);
       text(cx,y+39,sub,mobile?10:12,'#a5b8ba');
@@ -149,12 +148,12 @@ export class TitleScene extends Phaser.Scene {
           plate.setTint(0xc6f5ff);line.setColor('#ffe1a0');
           this.tweens.killTweensOf([line,arrow]);
           this.tweens.add({targets:line,x:cx+5,scale:1.08,duration:140});
-          this.tweens.add({targets:arrow,x:cx+width/2-21,duration:140});accent.setFillStyle(0x82ffff);
+          this.tweens.add({targets:arrow,x:cx+width/2-21,duration:140});
         })
         .on('pointerout',()=>{
           if(mobile)return;
           this.tweens.killTweensOf([line,arrow]);
-          plate.clearTint();line.setColor('#eee7d6').setScale(1);line.x=cx;arrow.x=cx+width/2-26;accent.setFillStyle(0xe8d49c);
+          plate.clearTint();line.setColor('#eee7d6').setScale(1);line.x=cx;arrow.x=cx+width/2-26;
         })
         .on('pointerdown',()=>{Audio.playSe('click');action()});
     };

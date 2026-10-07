@@ -37,7 +37,8 @@ export class LegendaryAura {
     for (const cloud of this.smoke) cloud.setVisible(visible);
     for (const cloud of this.painted) cloud.setVisible(visible && this.emerald);
     if (!visible) return;
-    const now = this.scene.time.now, w = s.displayWidth, h = s.displayHeight, rotation = s.rotation + this.artRotation;
+    const diagonalBlade = s.texture.key === 'icon_w_hero_sword';
+    const now = this.scene.time.now, w = s.displayWidth, h = s.displayHeight, rotation = s.rotation + (diagonalBlade ? 0 : this.artRotation);
     for (const [g, offset] of [[this.back, -.001], [this.front, .001]] as const) {
       g.setPosition(s.x, s.y).setRotation(rotation).setDepth(s.depth + offset).setAlpha(s.alpha);
     }
@@ -61,6 +62,18 @@ export class LegendaryAura {
           const g = b.front ? this.front : this.back;
           const x0 = (.5 - s.originX) * w, radius = w * .095;
           const y = (t: number) => (.70 - s.originY - t * .65) * h;
+          if (diagonalBlade) {
+            // Follow the painted blade from the guard to the tip, not the square icon's center.
+            const dx = .48 * w, dy = -.525 * h, length = Math.hypot(dx, dy);
+            const point = (t: number, wave: number) => ({
+              x: (.44 - s.originX) * w + dx * t - dy / length * wave * w * .065 * (1 - .7 * t),
+              y: (.59 - s.originY) * h + dy * t + dx / length * wave * w * .065 * (1 - .7 * t)
+            });
+            const start = point((i - 1) / 64, a.x), end = point(i / 64, b.x);
+            g.lineStyle(Math.max(.65, w * .017), strand ? 0xc9f9ff : 0xffe7a0, b.front ? .85 : .38)
+              .lineBetween(start.x, start.y, end.x, end.y);
+            continue;
+          }
           g.lineStyle(Math.max(.65, w * .017), strand ? 0xc9f9ff : 0xffe7a0, b.front ? .85 : .38)
             .lineBetween(x0 + a.x * radius, y((i - 1) / 64), x0 + b.x * radius, y(i / 64));
         }

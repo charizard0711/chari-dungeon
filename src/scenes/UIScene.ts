@@ -146,7 +146,7 @@ export class UIScene extends Phaser.Scene {
       this.L = {
         hpBar: { x: 938, y: 128, w: 320 },
         items: { x: 730, y: 596, cols: 8 },
-        ov: { x: 200, y: 80, w: 680, h: 460 }
+        ov: { x: 250, y: 100, w: 780, h: 560 }
       };
       this.equipIconSize = 58;
       this.buildFrames();
@@ -1262,12 +1262,18 @@ export class UIScene extends Phaser.Scene {
       : ['itemcatalog', 'equipmentcatalog', 'codex'].includes(this.overlayMode) && !IS_MOBILE
       ? { x: 180, y: 40, w: 920, h: 680 }
       : ['settings', 'shop', 'repair'].includes(this.overlayMode) && !IS_MOBILE
-        ? { x: 200, y: 60, w: 680, h: 620 } : this.L.ov;
+        ? { x: 250, y: 50, w: 780, h: 660 } : this.L.ov;
     const illustrated = ['codex', 'equipmentcatalog'].includes(this.overlayMode);
     this.overlay.add(this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x020307, .72).setInteractive());
-    this.overlay.add(this.add.image(x + w / 2, y + h / 2, 'ui_modal_frame').setDisplaySize(w, h).setName('painted-modal-frame'));
+    const frameScale = IS_MOBILE ? .18 : .22;
+    this.overlay.add(this.add.nineslice(x + w / 2, y + h / 2, 'ui_modal_frame', undefined,
+      w / frameScale, h / frameScale, 256, 256, 256, 256).setScale(frameScale).setName('painted-modal-frame'));
     const header = ({shop:'ui_shop_header', gacha:'ui_gacha_header', settings:'ui_settings_header'} as Record<string,string>)[this.overlayMode];
-    if (header) this.overlay.add(this.add.image(x + w / 2, y + 24, header).setDisplaySize(w - 36, 42).setAlpha(.65).setName('painted-modal-header'));
+    if (header) {
+      const art = this.add.image(x + 58, y + 25, header).setName('painted-modal-header');
+      art.setScale(Math.min(92 / art.width, 32 / art.height));
+      this.overlay.add(art);
+    }
 
     const pickTitles = ['武器を変更', '服を変更', '盾を変更'];
     const title =

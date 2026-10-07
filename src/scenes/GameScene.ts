@@ -8,7 +8,7 @@ import { FINAL_DEPTH_BOSSES, FINAL_ELEMENTS, FINAL_ELEMENT_LABEL, finalDepthMobC
 import { hasFinalDepthTerrain, finalDepthTerrainKey, finalDepthFloorFrame, finalDepthPropKinds, FINAL_DEPTH_COLORS, type FinalDepthPropKind, type FinalDepthPart } from '../finalDepthTerrain';
 import { hasThunderTerrain, thunderTerrainKey, thunderFloorFrame, THUNDER_PROP_KINDS, type ThunderPropKind, type ThunderPart } from '../thunderTerrain';
 import Phaser from 'phaser';
-import { equipmentIconTexture } from '../artRefresh';
+import { equipmentIconTexture, REFRESHED_MONSTER_KEYS } from '../artRefresh';
 import { presentGame } from '../menuPresentation';
 import { GOLDEN_KING, GOLDEN_SHIELD, HALLOWEEN_BOSSES, HALLOWEEN_MOBS, HALLOWEEN_RETAINERS, HALLOWEEN_WEAPONS, HALLOWEEN_SHIELDS, HALLOWEEN_FLOORS, HALLOWEEN_COLORS } from '../halloweenContent';
 import { generateHalloweenDungeon, halloweenDecorations } from '../halloweenDungeon';
@@ -8614,6 +8614,7 @@ export class GameScene extends Phaser.Scene {
       enemies: this.enemies.map(enemy => ({
         state: pickFields(enemy, ENEMY_STATE_KEYS),
         visual: { texture: enemy.sprite.texture.key, scaleX: enemy.sprite.scaleX, scaleY: enemy.sprite.scaleY,
+          sourceWidth: enemy.sprite.width, sourceHeight: enemy.sprite.height,
           alpha: enemy.sprite.alpha, tint: enemy.sprite.tintTopLeft, aura: !!enemy.aura }
       })),
       chests: this.chests.map(({ sprite, glow, ...chest }) => chest),
@@ -8709,10 +8710,25 @@ export class GameScene extends Phaser.Scene {
         saved.visual.tint = 0xffffff;
       }
       const e = this.addEnemy(saved.state.def, saved.state.x, saved.state.y, 1);
+      const currentBaseScale = e.baseScale;
       restoredEnemies[index] = e;
       Object.assign(e, saved.state);
       e.sprite.setTexture(saved.visual.texture).setScale(saved.visual.scaleX, saved.visual.scaleY)
         .setTint(saved.visual.tint).setAlpha(saved.visual.alpha);
+      if ((REFRESHED_MONSTER_KEYS as readonly string[]).includes(e.def.key)) {
+        const visual = saved.visual as typeof saved.visual & { sourceWidth?: number; sourceHeight?: number };
+        if (visual.sourceWidth && visual.sourceHeight) {
+          const ratioX = visual.sourceWidth / e.sprite.width, ratioY = visual.sourceHeight / e.sprite.height;
+          e.baseScale *= Math.max(ratioX, ratioY);
+          e.sprite.setScale(saved.visual.scaleX * ratioX, saved.visual.scaleY * ratioY);
+        } else {
+          // Older saves contain a scale for the former 32px sheet, not a world size.
+          const pulseX = Phaser.Math.Clamp(saved.visual.scaleX / saved.state.baseScale, .8, 1.2);
+          const pulseY = Phaser.Math.Clamp(saved.visual.scaleY / saved.state.baseScale, .8, 1.2);
+          e.baseScale = currentBaseScale * (e.cloneDepth > 0 ? .72 : 1) * e.midBossVisualMultiplier;
+          e.sprite.setScale(e.baseScale * pulseX, e.baseScale * pulseY);
+        }
+      }
       const midBossMultiplier = e.def.isFloorBoss && this.floor >= 11 && this.floor % 5 !== 0 ? 1.5 : 1;
       const sizeRatio = midBossMultiplier / e.midBossVisualMultiplier;
       e.baseScale *= sizeRatio;
