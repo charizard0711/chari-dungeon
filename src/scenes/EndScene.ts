@@ -1,3 +1,4 @@
+import { ensureSceneAssets } from '../assetStreaming';
 import { presentVictory } from '../victoryPresentation';
 import { DIFFICULTY_RULES, difficultyOf, type Difficulty } from '../difficulty';
 import Phaser from 'phaser';
@@ -35,7 +36,8 @@ export class EndScene extends Phaser.Scene {
     super('EndScene');
   }
 
-  create(stats: EndStats) {
+  async create(stats: EndStats) {
+    await ensureSceneAssets(this, stats.floor, !!stats.eventMode, true);
     this.journal = undefined;
     if (stats.eventMode === 'halloween') { this.createHalloweenResult(stats); return; }
     if (!stats.cleared) { this.createDefeat(stats); return; }

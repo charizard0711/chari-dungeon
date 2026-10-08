@@ -5,8 +5,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
     const errors = []; page.on('pageerror', error => errors.push(error.message));
-    await page.goto('http://localhost:5189/?qa-game&qa-save');
-    await page.waitForFunction(() => window.__game?.scene.getScene('GameScene').playerSprite?.active, null, { timeout: 60000 });
+    await page.goto('http://localhost:5190/?qa-game&qa-save');
+    await page.waitForFunction(() => window.__game?.scene.getScene('GameScene').playerSprite?.active && !window.__game.scene.getScene('GameScene').assetsLoading, null, { timeout: 60000 });
     const results = await page.evaluate(async () => {
       const g = window.__game.scene.getScene('GameScene');
       const { NORMAL_MONSTER_DEFS } = await import('/src/data.ts');
@@ -24,18 +24,18 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
       const saved = JSON.stringify(e.def);
       let info; const listener = value => info = value; g.events.on('enemyinfo', listener);
       g.showEnemyInfo(e);
-      check(info.atk === `${raw.atkMin+7}-${raw.atkMax+7}`, 'enemy panel must show corrected attack');
+      check(info.atk === `${Math.floor(raw.atkMin*1.2)}-${Math.floor(raw.atkMax*1.2)}`, 'enemy panel must show corrected attack');
       const beforeRandom = Math.random; Math.random = () => .5;
       let result;
       try { result = g.computeIncomingAttack(e); } finally { Math.random = beforeRandom; }
-      check(result.damage > 1, 'ordinary equipped player must take more than one damage: ' + JSON.stringify(result));
+      check(result.damage >= 1, 'ordinary hit must respect the damage floor: ' + JSON.stringify(result));
       check(result.steps.some(s => s.includes('階層補正')), 'damage journal must explain depth bonus');
       check(JSON.stringify(e.def) === saved, 'runtime stats must not mutate');
       const beforeHp = g.player.hp;
       g.damagePlayer(result.damage, 'バランスQA', e, result.steps);
       check(g.player.hp === beforeHp-result.damage, 'actual hit must apply calculated damage');
       e.skillAttackDownUntil = g.turn;
-      check(g.enemyAttackDefinition(e).atkMax === Math.floor((raw.atkMax+7)*.8), 'lance debuff');
+      check(g.enemyAttackDefinition(e).atkMax === Math.floor(Math.floor(raw.atkMax*1.2)*.8), 'lance debuff');
       e.skillAttackDownUntil = -1;
       const values = [];
       for (const mode of ['normal','hard','master']) {

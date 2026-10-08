@@ -48,7 +48,7 @@ export class TitleScene extends Phaser.Scene {
     }
     Audio.playBgm('title');
     // タイトル表示中に探索BGMを先読み。入力を待たせず、再生時も同じ要求を共有する。
-    Audio.preloadBgm('floor01');
+    // Exploration audio starts when entering the dungeon.
 
     const savedRun = readRunSave();
     let starting = false;
@@ -172,7 +172,7 @@ export class TitleScene extends Phaser.Scene {
         this.tweens.add({targets:prompt,alpha:.45,duration:1500,yoyo:true,repeat:-1});
         this.add.rectangle(cx,mobile?625:618,mobile?180:240,1,0xd4bb79,.65);
         this.add.zone(cx,mobile?589:580,300,90).setName('title-start').setInteractive({useHandCursor:true}).on('pointerdown',()=>render('mode'));
-        text(cx,mobile?656:658,'クリック / ENTER で冒険を始める',11,'#a9b9b8');
+        text(cx,mobile?656:658,mobile?'タップで冒険を始める':'クリック / ENTER で冒険を始める',11,'#a9b9b8');
         this.titleAction=()=>render('mode');this.titleBack=()=>{};
       } else {
         this.add.rectangle(cx,mobile?458:437,mobile?GAME_W-20:650,mobile?500:475,0x071b25,.72).setStrokeStyle(1,0xd6c798,.45);
@@ -202,7 +202,7 @@ export class TitleScene extends Phaser.Scene {
     render(this.initialStage);
     text(mobile?50:70,GAME_H-27,'遊び方',12,'#d6d1bc').setInteractive({useHandCursor:true}).on('pointerdown',()=>help.setVisible(true));
     const sound=text(GAME_W-(mobile?45:70),GAME_H-27,'',22,'#d6d1bc').setPadding(8).setInteractive({useHandCursor:true});
-    const refresh=()=>sound.setText(Audio.bgmOn||Audio.seOn?'🔊':'🔇');
+    const refresh=()=>sound.setText(Audio.bgmOn||Audio.seOn?'音ON':'音OFF').setFontSize(12);
     sound.on('pointerdown',()=>{const on=!(Audio.bgmOn||Audio.seOn);if(Audio.bgmOn!==on)Audio.toggleBgm();if(Audio.seOn!==on)Audio.toggleSe();refresh()});refresh();
     text(cx,GAME_H-27,'CHARI DUNGEON',10,'#7e9696');
   }
@@ -348,7 +348,7 @@ export class TitleScene extends Phaser.Scene {
     const dismiss = this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x020708, 0.88)
       .setInteractive({ useHandCursor: true });
     const panelW = Math.min(GAME_W - 36, 620);
-    const panelH = GAME_W < 700 ? 330 : 280;
+    const panelH = GAME_W < 700 ? 360 : 330;
     const panelX = GAME_W / 2 - panelW / 2;
     const panelY = GAME_H / 2 - panelH / 2;
     const panel = this.add.graphics();
@@ -361,11 +361,14 @@ export class TitleScene extends Phaser.Scene {
       fontStyle: 'bold'
     }).setOrigin(0.5);
     const guide = [
-      '移動　矢印キー / スティック',
+      '移動　床をクリック / タップ、矢印 / スティック',
+      '自動移動　目的地まで進む。連続タップで停止',
       '加速　方向キー / スティックを長押し',
-      '戦闘　敵へ進むと通常攻撃',
-      '道具　アイテム欄からクリック / タップ'
-    ].join('\n\n');
+      '戦闘　敵をクリック / 接近して通常攻撃',
+      'スキル　歩いてチャージ。Q / 右下のボタン',
+      '道具　アイテム欄からクリック / タップ',
+      '強化　失敗しても装備は残る。最大+15'
+    ].join('\n');
     const copy = this.add.text(GAME_W / 2, panelY + 86, guide, {
       fontFamily: FONT,
       fontSize: GAME_W < 700 ? '14px' : '16px',

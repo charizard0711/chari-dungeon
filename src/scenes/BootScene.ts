@@ -1,3 +1,4 @@
+import { captureBootAssets } from '../assetStreaming';
 import { WEAPON_DEFS } from '../data';
 import { configureLazyEquipmentArt } from '../lazyEquipmentArt';
 import { ART_REFRESH } from '../artRefresh';
@@ -208,6 +209,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload() {
+    const finishCapture = captureBootAssets(this);
     for (const [key, path] of Object.entries(HALLOWEEN_ART)) {
       if (key.startsWith('hw_floor_')) this.load.spritesheet(key, path, { frameWidth: 32, frameHeight: 32 });
       else this.load.image(key, path);
@@ -223,6 +225,8 @@ export class BootScene extends Phaser.Scene {
     this.load.image('ui_difficulty_hard', 'assets/ui/difficulty-v1/hard.png');
     this.load.image('ui_difficulty_master', 'assets/ui/difficulty-v1/master.png');
     this.load.image('ui_obsidian_castle', 'assets/ui/obsidian-v1/loading.webp');
+    this.load.image('gacha_shrine_v2', 'assets/ui/gacha-v2/shrine.webp');
+    this.load.spritesheet('gacha_ritual_v2', 'assets/ui/gacha-v2/ritual-atlas.webp', { frameWidth: 627, frameHeight: 627 });
     this.add.text(GAME_W / 2, GAME_H / 2 - 35, 'ちゃりだんじょん', {
       fontFamily: '"Yu Gothic UI", "Meiryo", sans-serif', fontSize: '24px', color: '#ffe1a0'
     }).setOrigin(.5);
@@ -341,16 +345,21 @@ export class BootScene extends Phaser.Scene {
       this.load.image(key, path);
     }
 
+    finishCapture();
     this.load.on('loaderror', (file: Phaser.Loader.File) => {
       console.warn('アセット読み込み失敗:', file.key);
     });
   }
 
-  async create() {
+  private assetsPrepared = false;
+
+  prepareGameTextures() {
     // One cached texture per low wall/background combination, with no per-frame compositing.
     for (const floor of THUNDER_FLOORS) for (const part of ['wall-a', 'wall-b'] as const) {
       const key = thunderTerrainKey(floor, part);
+      if (!this.textures.exists(key) || !this.textures.exists(thunderTerrainKey(floor, 'floor'))) continue;
       for (const ground of ['ground', 'clouds'] as const) {
+        if (this.textures.exists(`${key}_${ground}`)) continue;
         const texture = this.textures.createCanvas(`${key}_${ground}`, 64, 64);
         if (!texture) continue;
         const context = texture.context;
@@ -364,6 +373,7 @@ export class BootScene extends Phaser.Scene {
     // Precompose the transparent low walls once; no extra sprites or animation per cell.
     for (const floor of WATER_FLOORS) for (const part of ['wall-a', 'wall-b'] as const) {
       const key = waterTerrainKey(floor, part);
+      if (!this.textures.exists(key) || !this.textures.exists(waterTerrainKey(floor, 'floor'))) continue;
       for (const ground of ['ground', 'water'] as const) {
         const texture = this.textures.createCanvas(`${key}_${ground}`, 64, 64);
         if (!texture) continue;
@@ -379,6 +389,7 @@ export class BootScene extends Phaser.Scene {
     // Compose the transparent edges with each floor's ground; mirror one variant for variety.
     for (const floor of VOLCANO_FLOORS) for (const part of ['wall-a', 'wall-b'] as const) {
       const key = volcanoTerrainKey(floor, part);
+      if (!this.textures.exists(volcanoTerrainKey(floor, 'floor')) || !this.textures.exists('terrain_volcano_wall_block')) continue;
       for (const ground of ['ground', 'lava'] as const) {
         const texture = this.textures.createCanvas(`${key}_${ground}`, 64, 64);
         if (!texture) continue;
@@ -393,12 +404,11 @@ export class BootScene extends Phaser.Scene {
         texture.refresh();
       }
     }
-    // 1) 代替ドット絵テクスチャを手続き生成（フォールバック）
-    buildAllTextures(this);
-    // 2) アセットシートから実画像を切り抜いて上書き
-    const result = applyRealAssets(this);
-    console.log(`アセット切り抜き: ${result.applied}個適用`, result.skipped.length ? `スキップ: ${result.skipped.join(',')}` : '');
+    if (!this.assetsPrepared) { applyRealAssets(this); this.assetsPrepared = true; }
+  }
 
+  async create() {
+    buildAllTextures(this);
     // 3) 実在する音源ファイルだけを読み込む
     //    （Viteは存在しないパスにindex.htmlを返すため、content-typeで実在判定する。
     //     実ファイルが無い音は manager 側で仮チップチューンが合成される）

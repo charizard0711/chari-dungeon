@@ -41,6 +41,13 @@ export function resolveShieldHit(shield: Shield | null, damage: number, context:
       break;
   }
   if (count % 3 === 0) heal += shieldEnhancementHeal(shield.plus);
+  // Recovery refunds part of the recent damage; weak enemies cannot be used
+  // to generate HP, including when a shield's own passive also heals.
+  shield.guardDamage = (shield.guardDamage ?? 0) + adjusted;
+  if (heal > 0) {
+    heal = Math.min(heal, Math.floor(shield.guardDamage * .35));
+    shield.guardDamage = 0;
+  } else if (count % 12 === 0) shield.guardDamage = 0;
   if (adjusted > 0 && adjusted < damage) message = `${shield.name}の${shield.passive?.name ?? '守り'}でダメージを軽減！`;
   return { damage: adjusted, heal, reflect, message };
 }

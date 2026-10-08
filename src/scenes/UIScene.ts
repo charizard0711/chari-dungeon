@@ -1,3 +1,5 @@
+import { playRitual } from '../gachaPresentation';
+import { createGuideModal } from '../guideModal';
 import { weaponAccessoryKey, weaponAccessoryLabel } from '../equipmentAccessories';
 import { isTwoHanded } from '../equipmentRules';
 import { equipmentIconTexture, equipmentIconFlipX, STAR_EQUIPMENT_BACKGROUND } from '../artRefresh';
@@ -52,6 +54,10 @@ export class UIScene extends Phaser.Scene {
 
   topText!: Phaser.GameObjects.Text;
   goldText?: Phaser.GameObjects.Text;
+  private lastGold?: number;
+  private gachaSavings?: Phaser.GameObjects.Graphics;
+  private gachaSavingsText?: Phaser.GameObjects.Text;
+  private gachaCardGlow?: Phaser.GameObjects.Graphics;
   statusText!: Phaser.GameObjects.Text;
   hpBar!: Phaser.GameObjects.Graphics;
   equipSlots: { kind: 'weapon' | 'armor' | 'shield'; tag: string; bg: Phaser.GameObjects.Graphics; icon: Phaser.GameObjects.Image; name: Phaser.GameObjects.Text; sub: Phaser.GameObjects.Text; rect: [number, number, number, number] }[] = [];
@@ -120,6 +126,8 @@ export class UIScene extends Phaser.Scene {
   }
 
   create() {
+    this.gachaAnimating = false;
+    this.lastGold = undefined;
     this.itemSlotKinds = [];
     this.dynamiteHoverZone = undefined;
     this.secretRewardOpen = false;
@@ -225,6 +233,12 @@ export class UIScene extends Phaser.Scene {
 
     this.refresh();
     this.showHalloweenArrival();
+    if (![...new URLSearchParams(location.search).keys()].some(key => key.startsWith('qa-'))) {
+      this.time.delayedCall(500, () => {
+        try { if (localStorage.getItem('chari-dungeon.controls-guide.v2')) return; } catch { /* guide still works without storage */ }
+        this.showControlsGuide();
+      });
+    }
 
     // ローカル表示確認用。例: ?mobile=1&qa-game&qa-overlay=settings
     if (location.hostname === 'localhost') {
@@ -302,8 +316,10 @@ export class UIScene extends Phaser.Scene {
       fontFamily: '"Yu Gothic UI"', fontSize: '14px', color: this.theme.text, fontStyle: 'bold'
     }).setOrigin(1, 0);
     this.add.image(GAME_W - 144, 22, 'coin').setDisplaySize(26, 26);
-    this.goldText = this.add.text(GAME_W - 26, 13, '', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: '#ffe0a0', fontStyle: 'bold'
+    this.add.rectangle(GAME_W - 86, 22, 148, 32, 0x10231c).setStrokeStyle(1, 0xd6ab57);
+    this.add.image(GAME_W - 144, 22, 'coin').setDisplaySize(25, 25);
+    this.goldText = this.add.text(GAME_W - 26, 9, '', {
+      fontFamily: '"Yu Gothic UI"', fontSize: '22px', color: '#ffe0a0', fontStyle: 'bold'
     }).setOrigin(1, 0);
   }
 
@@ -314,21 +330,32 @@ export class UIScene extends Phaser.Scene {
       { t: '探索', icon: 'ui_nav_explore', f: () => this.setOverlay('none') },
       { t: '持ち物・装備', icon: 'ui_nav_inventory', f: () => this.openInventory() },
       { t: 'ショップ', icon: 'ui_nav_shop', f: () => this.setOverlay('shop') },
-      { t: 'ガチャ', icon: 'ui_nav_gacha', f: () => this.setOverlay('gacha') },
       { t: '冒険図鑑', icon: 'ui_nav_codex', f: () => this.setOverlay('codex') },
       { t: '秘密クエスト', icon: 'ui_nav_quests', f: () => this.setOverlay('quests') },
       { t: '詳細ログ', icon: 'ui_nav_damage_log', f: () => this.setOverlay('details') },
       { t: '設定', icon: 'ui_nav_settings', f: () => this.showSettings() }
     ];
-    let y = 84;
+    this.buildGachaCard();
+    let y = 184;
     for (const it of labels) {
       this.menuButton(16, y, 144, 40, it.icon, it.t, it.f);
-      y += 48;
+      y += 43;
     }
     // ヒント
     this.add.text(16, y + 6, '矢印・クリック：移動\n長押し：加速', {
       fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#789093', lineSpacing: 5
     });
+  }
+
+  private buildGachaCard() {
+    const x = 16, y = 76, w = 144, h = 98;
+    this.gachaCardGlow = this.add.graphics();
+    this.tweens.add({ targets: this.gachaCardGlow, alpha: .8, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.add.image(x + 35, y + 31, 'gacha_ritual_v2', 0).setDisplaySize(62, 62);
+    this.add.text(x + 68, y + 16, 'ガチャ', { fontFamily: '"Yu Mincho", Meiryo', fontSize: '20px', color: '#ffe2a0', fontStyle: 'bold' });
+    this.gachaSavings = this.add.graphics();
+    this.gachaSavingsText = this.add.text(x + w / 2, y + 72, '', { fontFamily: 'Meiryo', fontSize: '10px', color: '#ffe3a9', align: 'center', lineSpacing: 3 }).setOrigin(.5, 0);
+    this.add.zone(x, y, w, h).setOrigin(0).setName('menu-ui_nav_gacha').setInteractive({ useHandCursor: true }).on('pointerdown', () => { Audio.playSe('click'); this.setOverlay('gacha'); });
   }
 
   menuButton(x: number, y: number, w: number, h: number, iconKey: string, label: string, onClick: () => void) {
@@ -450,6 +477,7 @@ export class UIScene extends Phaser.Scene {
     this.hpLabel = this.add.text(20, 77, '', style);
     this.hpBar = this.add.graphics();
     this.atkLabel = this.add.text(370, 77, '', { ...style, fontSize: '10px' }).setOrigin(1, 0);
+    this.goldText = this.add.text(370, 56, '', { ...style, fontSize: '14px', color: '#ffe0a0', fontStyle: 'bold' }).setOrigin(1, 0);
 
     // ---- マップ枠 ----
     const fg = this.add.graphics();
@@ -527,8 +555,9 @@ export class UIScene extends Phaser.Scene {
       const x = 12 + i * step, y = 803, w = step - 4, h = 30;
       const g = this.add.graphics();
       const draw = (c: number) => { g.clear(); g.fillStyle(c, 1).fillRoundedRect(x, y, w, h, 6); };
-      draw(0x25121e);
-      const icon = this.add.image(x + w / 2, y + 10, it.icon).setDisplaySize(21, 21);
+      draw(it.icon === 'ui_nav_gacha' ? 0x284431 : 0x25121e);
+      if (it.icon === 'ui_nav_gacha') g.lineStyle(1, 0xe1ba68).strokeRoundedRect(x, y, w, h, 6);
+      const icon = this.add.image(x + w / 2, y + 10, it.icon === 'ui_nav_gacha' ? 'gacha_ritual_v2' : it.icon, it.icon === 'ui_nav_gacha' ? 0 : undefined).setDisplaySize(21, 21);
       const label = this.add.text(x + w / 2, y + 25, it.label, {
         fontFamily: '"Yu Gothic UI"', fontSize: '8px', color: '#dfe7f0'
       }).setOrigin(.5);
@@ -769,7 +798,7 @@ export class UIScene extends Phaser.Scene {
         ? `${ELEMENT_INFO[shield.element].name}属性防御`
         : `${ELEMENT_INFO[shield.element].name}属性防御（同属性0.75倍・弱点1.5倍）`);
     }
-    if (shield.plus >= 5) effects.push(`強化効果: 3回被攻撃ごとHP${shieldEnhancementHeal(shield.plus)}回復`);
+    if (shield.plus >= 5) effects.push(`強化効果: 3回被攻撃ごと最大HP${shieldEnhancementHeal(shield.plus)}回復（受けたダメージの35%まで）`);
     if (shield.passive) effects.push(compact ? shield.passive.name : `${shield.passive.name}: ${shield.passive.description}`);
     return effects.length ? effects.join(' / ') : 'なし';
   }
@@ -845,6 +874,35 @@ export class UIScene extends Phaser.Scene {
 
   private bindEquipmentTooltip(row: Phaser.GameObjects.Container, icon: Phaser.GameObjects.GameObject, entry: OwnedEquipment) {
     const zone = row.getByName('row-hit') as Phaser.GameObjects.Zone;
+    if (IS_MOBILE && zone) {
+      const p = this.gs.player;
+      const text = row.list.find(child => child instanceof Phaser.GameObjects.Text) as Phaser.GameObjects.Text;
+      const graphic = row.list.find(child => child instanceof Phaser.GameObjects.Graphics) as Phaser.GameObjects.Graphics;
+      const x = zone.x, y = zone.y, width = zone.width;
+      const signed = (value: number) => value > 0 ? `+${value}` : String(value);
+      let title: string, stats: string, difference: string;
+      if (entry.kind === 'weapon') {
+        const item = entry.item, current = p.weapon;
+        title = weaponFullName(item);
+        stats = `攻 ${item.atkMin + item.plus * 2}〜${item.atkMax + item.plus * 4}　耐 ${item.dur}/${item.durMax}`;
+        difference = `装備との差：攻 ${signed(item.atkMin + item.plus * 2 - (current ? current.atkMin + current.plus * 2 : 0))}〜${signed(item.atkMax + item.plus * 4 - (current ? current.atkMax + current.plus * 4 : 0))}`;
+      } else if (entry.kind === 'shield') {
+        const item = entry.item;
+        title = shieldFullName(item); stats = `防 ${item.defBonus + item.plus}　耐 ${item.dur}/${item.durMax}`;
+        difference = `装備との差：防 ${signed(item.defBonus + item.plus - (p.shield ? p.shield.defBonus + p.shield.plus : 0))}`;
+      } else {
+        const item = entry.item;
+        title = armorFullName(item); stats = `防 ${item.defBonus + item.plus}　${armorTraitDescription(item)}`;
+        difference = `装備との差：防 ${signed(item.defBonus + item.plus - (p.armor ? p.armor.defBonus + p.armor.plus : 0))}`;
+      }
+      text.setText(title).setFontSize(11).setOrigin(0).setPosition(x + 8, y + 5).setWordWrapWidth(width - 16);
+      row.add(this.add.text(x + 8, y + 34, stats, { fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: '#e2e9de', wordWrap: { width: width - 16 } }));
+      row.add(this.add.text(x + 8, y + 54, difference, { fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: '#a8d5c2' }));
+      const paint = (hover: boolean) => { graphic.clear().fillStyle(hover ? 0x23483e : 0x102c2b, 1).fillRoundedRect(x, y, width, 72, 5).lineStyle(1, 0x88734a).strokeRoundedRect(x, y, width, 72, 5); };
+      paint(false); zone.setSize(width, 72);
+      zone.removeAllListeners('pointerover'); zone.removeAllListeners('pointerout');
+      zone.on('pointerover', () => paint(true)).on('pointerout', () => paint(false));
+    }
     const art = icon as Phaser.GameObjects.Image;
     art.setInteractive({ useHandCursor: true });
     const show = (pointer: Phaser.Input.Pointer) => {
@@ -918,10 +976,25 @@ export class UIScene extends Phaser.Scene {
     this.statusText.setText(IS_MOBILE
       ? `${p.name} レベル${p.level}  経験値 ${p.exp}/${p.expNext}  ${this.gs.turn}ターン${transformation}`
       : `${p.name}  レベル${p.level}   （経験値 ${p.exp}/${p.expNext}）${transformation}`);
-    this.goldText?.setText(`所持金 ${p.gold}G`);
+    this.goldText?.setText(`${p.gold}G`);
+    if (this.lastGold !== undefined && p.gold > this.lastGold && this.goldText) {
+      const gain = this.add.text(this.goldText.x, this.goldText.y + 25, `＋${p.gold - this.lastGold}G`, { fontFamily: 'Meiryo', fontSize: IS_MOBILE ? '14px' : '19px', color: '#ffda72', fontStyle: 'bold' }).setOrigin(1, 0).setDepth(350).setName('gold-gain');
+      this.tweens.add({ targets: gain, y: gain.y - 16, alpha: 0, duration: 1200, onComplete: () => gain.destroy() });
+    }
+    if (this.lastGold !== undefined && this.lastGold < 500 && p.gold >= 500 && this.overlayMode === 'none') {
+      const notice = this.add.text(MAP_X + MAP_W / 2, MAP_Y + 24, 'ガチャが引けるようになりました！', { fontFamily: 'Meiryo', fontSize: IS_MOBILE ? '12px' : '15px', color: '#ffe3a0', backgroundColor: '#123022', padding: { x: 12, y: 8 } }).setOrigin(.5).setDepth(180);
+      this.tweens.add({ targets: notice, alpha: 0, delay: 1500, duration: 500, onComplete: () => notice.destroy() });
+    }
+    this.lastGold = p.gold;
+    if (this.gachaSavings && this.gachaSavingsText && this.gachaCardGlow) {
+      const ready = p.gold >= 500;
+      this.gachaCardGlow.clear().fillStyle(0x10271e).fillRoundedRect(16, 76, 144, 98, 8).lineStyle(ready ? 2 : 1, ready ? 0xffd579 : 0xb18a49).strokeRoundedRect(16, 76, 144, 98, 8);
+      this.gachaSavings.clear().fillStyle(0x030e0d).fillRoundedRect(26, 139, 124, 7, 3).fillStyle(ready ? 0xffd36c : 0xbba15e).fillRoundedRect(26, 139, 124 * Math.min(1, p.gold / 500), 7, 3);
+      this.gachaSavingsText.setText(ready ? `所持 ${p.gold}G\n${this.gs.weaponWonThisFloor ? '防具を' : ''}召喚できます` : `所持 ${p.gold}G　あと${500 - p.gold}G`);
+    }
     this.hpLabel.setText(`体力  ${p.hp} / ${p.hpMax}`);
     this.atkLabel.setText(IS_MOBILE
-      ? `攻 ${p.atkMin}-${p.atkMax}  防 ${p.def}  ${p.gold}G`
+      ? `攻 ${p.atkMin}-${p.atkMax}  防 ${p.def}`
       : `攻撃力 ${p.atkMin}-${p.atkMax}   防御力 ${p.def}`);
     this.durabilityLabel?.setText(`耐久　武器 ${p.weapon ? `${p.weapon.dur}/${p.weapon.durMax}` : 'なし'}　盾 ${p.shield ? `${p.shield.dur}/${p.shield.durMax}` : 'なし'}`);
     // HPバー（ラベルの下の固定位置。座標はレイアウト設定から）
@@ -1368,7 +1441,7 @@ export class UIScene extends Phaser.Scene {
     const shieldBlocked = this.pickSlot === 2 && isTwoHanded(p.weapon);
     const removeHeight = this.pickSlot === 1 ? 0 : 38;
     const noticeHeight = (shieldBlocked ? 48 : 0) + removeHeight;
-    const rowsPerPage = Math.max(1, Math.floor((h - 52 - noticeHeight - 58) / 38));
+    const rowsPerPage = Math.max(1, Math.floor((h - 52 - noticeHeight - 58) / (IS_MOBILE ? 80 : 38)));
     this.pickPageCount = Math.max(1, Math.ceil(owned.length / rowsPerPage));
     this.pickPageIndex = Phaser.Math.Clamp(this.pickPageIndex, 0, this.pickPageCount - 1);
     const start = this.pickPageIndex * rowsPerPage;
@@ -1407,7 +1480,7 @@ export class UIScene extends Phaser.Scene {
         const row = this.rowButton(x + 58, cy, w - 74, `${equipped ? '▶ ' : '　'}${weaponFullName(wp)}  攻${wp.atkMin}-${wp.atkMax}  耐久${wp.dur}/${wp.durMax}(${risk.label})  効果:${this.weaponEffectText(wp, true)}`, equipped, () => this.gs.equipWeapon(i));
         this.bindEquipmentTooltip(row, icon[1], { kind: 'weapon', item: wp });
         this.overlay.add([...icon, row]);
-        cy += 38;
+        cy += IS_MOBILE ? 80 : 38;
       });
     } else if (this.pickSlot === 1) {
       // 服・鎧
@@ -1422,7 +1495,7 @@ export class UIScene extends Phaser.Scene {
           equipped, () => this.gs.equipArmor(i));
         this.bindEquipmentTooltip(row, icon[1], { kind: 'armor', item: armor });
         this.overlay.add([...icon, row]);
-        cy += 38;
+        cy += IS_MOBILE ? 80 : 38;
       });
     } else {
       // 盾
@@ -1444,7 +1517,7 @@ export class UIScene extends Phaser.Scene {
         const row = this.rowButton(x + 58, cy, w - 74, `${equipped ? '▶ ' : '　'}${shieldFullName(sh)}  防御+${totalDef}  耐久${sh.dur}/${sh.durMax}(${risk.label})  効果:${this.shieldEffectText(sh, true)}`, equipped, () => this.gs.equipShield(i));
         this.bindEquipmentTooltip(row, icon[1], { kind: 'shield', item: sh });
         this.overlay.add([...icon, row]);
-        cy += 38;
+        cy += IS_MOBILE ? 80 : 38;
       });
     }
   }
@@ -1489,7 +1562,7 @@ export class UIScene extends Phaser.Scene {
       ...p.armors.map((item, index) => ({ kind: 'armor' as const, item, index })),
       ...p.shields.map((item, index) => ({ kind: 'shield' as const, item, index }))
     ];
-    const visibleCount = Math.min(8, Math.max(4, Math.floor((h - (pending ? 150 : 118)) / 38)));
+    const visibleCount = Math.min(8, Math.max(4, Math.floor((h - (pending ? 150 : 118)) / (IS_MOBILE ? 80 : 38))));
     this.equipScrollMax = Math.max(0, entries.length - visibleCount);
     this.equipScrollIndex = Phaser.Math.Clamp(this.equipScrollIndex, 0, this.equipScrollMax);
 
@@ -1498,7 +1571,7 @@ export class UIScene extends Phaser.Scene {
     }
 
     entries.slice(this.equipScrollIndex, this.equipScrollIndex + visibleCount).forEach((entry, visibleIndex) => {
-      const cy = listY + visibleIndex * 38;
+      const cy = listY + visibleIndex * (IS_MOBILE ? 80 : 38);
       const sellW = IS_MOBILE ? 86 : 98;
       if (entry.kind === 'weapon') {
         const wp = entry.item;
@@ -1674,7 +1747,7 @@ export class UIScene extends Phaser.Scene {
     }));
 
     const listY = y + 181;
-    const rowHeight = IS_MOBILE ? 64 : 36;
+    const rowHeight = IS_MOBILE ? 82 : 36;
     const visibleCount = Math.max(4, Math.floor((h - 223) / rowHeight));
     this.inventoryScrollMax = Math.max(0, entries.length - visibleCount);
     this.inventoryScrollIndex = Phaser.Math.Clamp(this.inventoryScrollIndex, 0, this.inventoryScrollMax);
@@ -1936,6 +2009,7 @@ export class UIScene extends Phaser.Scene {
   // ============ ガチャ ============
   buildGachaOverlay(x: number, y: number, w: number, h: number) {
     const p = this.gs.player;
+    this.overlay.add(this.add.image(x + w / 2, y + 196 + (h - 220) / 2, 'gacha_shrine_v2').setDisplaySize(w - 32, h - 220).setAlpha(.85));
     // 所持ゴールド（右端の✕ボタンと重ならないよう左に寄せる）
     this.overlay.add(this.add.text(x + w - 60, y + 16, `所持 ${p.gold} G`, {
       fontFamily: '"Yu Gothic UI"', fontSize: '16px', color: this.theme.text, fontStyle: 'bold'
@@ -1975,12 +2049,13 @@ export class UIScene extends Phaser.Scene {
       .setStrokeStyle(1.5, palette.accent, .5);
     const idleRing2 = this.add.circle(x + w / 2, y + h / 2 + 28, 100, palette.accent, .015)
       .setStrokeStyle(1, palette.accent, .25);
-    const idle = this.add.image(x + w / 2, y + h / 2 + 28, 'chest_rare').setDisplaySize(96, 96);
+    const idle = this.add.image(x + w / 2, y + h / 2 + 28, 'gacha_ritual_v2', 0).setDisplaySize(180, 180);
+    const paintedSigil = this.add.image(x + w / 2, y + h / 2 + 81, 'gacha_ritual_v2', 2).setDisplaySize(250, 85).setBlendMode(Phaser.BlendModes.ADD).setAlpha(.55);
     this.tweens.add({ targets: idle, y: '-=10', duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     this.tweens.add({ targets: idleGlow, alpha: 0.15, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     this.tweens.add({ targets: idleRing, angle: 360, duration: 9000, repeat: -1 });
     this.tweens.add({ targets: idleRing2, angle: -360, duration: 13000, repeat: -1 });
-    this.overlay.add([idleGlow, idleRing2, idleRing, idle]);
+    this.overlay.add([idleGlow, idleRing2, idleRing, paintedSigil, idle]);
 
     // 回すボタン
     const bw = 260, bh = 54, bx = x + w / 2 - bw / 2, by = y + h - 84;
@@ -1996,6 +2071,7 @@ export class UIScene extends Phaser.Scene {
       fontFamily: '"Yu Gothic UI"', fontSize: '17px', color: afford ? palette.text : '#5a6577', fontStyle: 'bold'
     }).setOrigin(0.5);
     const zone = this.add.zone(bx, by, bw, bh).setOrigin(0).setInteractive({ useHandCursor: true });
+    zone.setName('gacha-pull');
     zone.on('pointerover', () => { if (afford) draw(palette.hover); });
     zone.on('pointerout', () => draw(afford ? palette.fill : 0x142125));
     zone.on('pointerdown', () => {
@@ -2016,335 +2092,14 @@ export class UIScene extends Phaser.Scene {
   //  ④開いた宝箱から品物が飛び出し、装備の等級を表示。S以上は金吹雪
   // ============================================================
   playGachaAnimation(result: GachaResult) {
+    if (this.gachaAnimating) return;
     this.gachaAnimating = true;
-    // モーダル（ガチャウィンドウ）の矩形。演出はすべてこの中で完結させる
-    const { x: mx, y: my, w: mw, h: mh } = this.L.ov;
-    const cx = mx + mw / 2, cy = Math.min(my + mh / 2 + 10, my + 320);
-    const supreme = result.grade === 'SSS' || result.grade === 'SS' || result.grade === 'S';
-    const high = supreme || result.grade === 'A';
-    const mid = result.grade === 'B';
-    const gradeTitle: Record<GachaResult['grade'], string> = {
-      SSS: '至高遺物', SS: '神話遺物', S: '伝説遺物', A: '秘術遺物', B: '希少遺物', C: '上質な遺物', D: '遺物'
-    };
-    const starCount: Record<GachaResult['grade'], number> = { SSS: 7, SS: 6, S: 5, A: 4, B: 3, C: 2, D: 1 };
-    const objs: Phaser.GameObjects.GameObject[] = [];
-    const timers: Phaser.Time.TimerEvent[] = [];
-    // モーダル外にはみ出た描画はマスクで切り取る（Zoneはクリック判定なので除外）
-    const maskShape = this.make.graphics({}, false);
-    maskShape.fillStyle(0xffffff).fillRoundedRect(mx, my, mw, mh, 10);
-    const mask = maskShape.createGeometryMask();
-    const track = <T extends Phaser.GameObjects.GameObject>(o: T): T => {
-      objs.push(o);
-      if (o.type !== 'Zone') (o as any).setMask?.(mask);
-      return o;
-    };
-    const colHex = '#' + result.color.toString(16).padStart(6, '0');
-
-    const ritualTag = track(this.add.text(cx, my + 28, '禁忌の宝物庫　／　遺物召喚', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: '#69efe4', fontStyle: 'bold', letterSpacing: 3
-    }).setOrigin(.5).setDepth(307));
-    const phaseText = track(this.add.text(cx, my + 49, '封印同調　00%', {
-      fontFamily: '"Yu Gothic UI"', fontSize: '12px', color: '#8ca2a5', fontStyle: 'bold', letterSpacing: 2
-    }).setOrigin(.5).setDepth(307));
-
-    // ---- 暗幕（モーダル内だけ暗くする）----
-    const dim = track(this.add.rectangle(cx, my + mh / 2, mw, mh, 0x000000, 0.88).setDepth(300).setAlpha(0));
-    this.tweens.add({ targets: dim, alpha: 1, duration: 200 });
-
-    // ---- 儀式空間：星屑、走査線、上下のシネマバー ----
-    const vaultBg = track(this.add.graphics().setDepth(300.5).setAlpha(0));
-    vaultBg.fillGradientStyle(0x081e24, 0x081e24, 0x010506, 0x010506, .96);
-    vaultBg.fillRect(mx, my, mw, mh);
-    vaultBg.fillStyle(0x000000, .58).fillRect(mx, my, mw, 62).fillRect(mx, my + mh - 48, mw, 48);
-    vaultBg.lineStyle(1, this.theme.color, .18);
-    for (let sy = my + 66; sy < my + mh - 48; sy += 12) vaultBg.lineBetween(mx + 10, sy, mx + mw - 10, sy);
-    this.tweens.add({ targets: vaultBg, alpha: 1, duration: 320 });
-
-    const cornerFrame = track(this.add.graphics().setDepth(306).setAlpha(0));
-    cornerFrame.lineStyle(2, 0x67eee4, .66);
-    const corner = 34, inset = 15;
-    cornerFrame.lineBetween(mx + inset, my + inset, mx + inset + corner, my + inset);
-    cornerFrame.lineBetween(mx + inset, my + inset, mx + inset, my + inset + corner);
-    cornerFrame.lineBetween(mx + mw - inset, my + inset, mx + mw - inset - corner, my + inset);
-    cornerFrame.lineBetween(mx + mw - inset, my + inset, mx + mw - inset, my + inset + corner);
-    cornerFrame.lineBetween(mx + inset, my + mh - inset, mx + inset + corner, my + mh - inset);
-    cornerFrame.lineBetween(mx + inset, my + mh - inset, mx + inset, my + mh - inset - corner);
-    cornerFrame.lineBetween(mx + mw - inset, my + mh - inset, mx + mw - inset - corner, my + mh - inset);
-    cornerFrame.lineBetween(mx + mw - inset, my + mh - inset, mx + mw - inset, my + mh - inset - corner);
-    this.tweens.add({ targets: cornerFrame, alpha: 1, duration: 500 });
-
-    for (let i = 0; i < (IS_MOBILE ? 22 : 36); i++) {
-      const star = track(this.add.circle(
-        mx + 18 + Math.random() * (mw - 36), my + 66 + Math.random() * (mh - 122),
-        .7 + Math.random() * 1.6, i % 5 === 0 ? this.theme.color : 0x65e9df, .16 + Math.random() * .34
-      ).setDepth(301));
-      this.tweens.add({
-        targets: star, alpha: { from: .08, to: .65 }, scale: { from: .6, to: 1.5 },
-        duration: 750 + Math.random() * 1400, delay: Math.random() * 500,
-        yoyo: true, repeat: -1, ease: 'Sine.easeInOut'
-      });
-    }
-
-    // ---- 隙間から漏れる光（宝箱の奥で脈動）----
-    const leak = track(this.add.image(cx, cy + 40, 'glow').setDepth(301)
-      .setBlendMode(Phaser.BlendModes.ADD).setTint(0xfff2c0).setAlpha(0).setScale(0.5));
-    const sealOuter = track(this.add.circle(cx, cy + 18, 104, this.theme.color, .025)
-      .setStrokeStyle(2, this.theme.color, .38).setDepth(301));
-    const sealInner = track(this.add.circle(cx, cy + 18, 78, 0xffffff, .012)
-      .setStrokeStyle(1, 0xffffff, .22).setDepth(301));
-    this.tweens.add({ targets: sealOuter, angle: 360, duration: 9000, repeat: -1 });
-    this.tweens.add({ targets: sealInner, angle: -360, duration: 6500, repeat: -1 });
-
-    const sigil = track(this.add.graphics().setDepth(302).setAlpha(.72));
-    sigil.lineStyle(1.5, 0x8ffaf1, .38);
-    sigil.strokeTriangle(0, -106, -82, 44, 82, 44);
-    sigil.strokeTriangle(0, 76, -82, -74, 82, -74);
-    sigil.strokeCircle(0, 0, 55);
-    sigil.setPosition(cx, cy + 18);
-    this.tweens.add({ targets: sigil, angle: 360, duration: 18000, repeat: -1 });
-
-    const glyphs = ['ᚱ', 'ᛖ', 'ᛚ', 'ᛁ', 'ᚲ', 'ᛋ'];
-    glyphs.forEach((glyph, index) => {
-      const angle = (index / glyphs.length) * Math.PI * 2 - Math.PI / 2;
-      const glyphText = track(this.add.text(cx + Math.cos(angle) * 126, cy + 18 + Math.sin(angle) * 126, glyph, {
-        fontFamily: 'serif', fontSize: '18px', color: '#7aece4', fontStyle: 'bold'
-      }).setOrigin(.5).setAlpha(.54).setDepth(302));
-      this.tweens.add({ targets: glyphText, alpha: .95, duration: 700 + index * 90, yoyo: true, repeat: -1 });
-    });
-
-    // ---- 宝箱が空から落ちてくる ----
-    const chest = track(this.add.image(cx, -80, 'chest_rare').setDepth(303).setDisplaySize(104, 104));
-    this.tweens.add({ targets: chest, y: cy + 20, duration: 650, ease: 'Bounce.easeOut', delay: 150 });
-
-    // 着地：土煙＋振動
-    this.time.delayedCall(830, () => {
-      phaseText.setText('共鳴を検知　32%');
-      Audio.playSe('hit');
-      this.cameras.main.shake(180, 0.008);
-      for (let i = 0; i < 6; i++) {
-        const puff = track(this.add.image(cx + (Math.random() * 100 - 50), cy + 52, 'glow').setDepth(302)
-          .setTint(0xb0a890).setAlpha(0.65).setDisplaySize(20 + Math.random() * 18, 14));
-        this.tweens.add({
-          targets: puff, x: puff.x + (puff.x < cx ? -45 : 45), alpha: 0,
-          duration: 480 + Math.random() * 200, ease: 'Quad.easeOut', onComplete: () => puff.destroy()
-        });
-      }
-    });
-
-    // ---- 震えフェーズ：ガタガタ揺れ、光が漏れ出す ----
-    this.time.delayedCall(1050, () => {
-      phaseText.setText('遺物等級を鑑定　64%');
-      Audio.playSe('warp');
-      this.tweens.add({ targets: chest, angle: { from: -3.5, to: 3.5 }, duration: 85, yoyo: true, repeat: 13 });
-      this.tweens.add({ targets: leak, alpha: 0.85, scale: 2.3, duration: 1100, ease: 'Quad.easeIn' });
-      // 漏れ光が白→ランク色へ変わる（正体が見え始める）
-      this.time.delayedCall(550, () => {
-        leak.setTint(result.color);
-        sealOuter.setFillStyle(result.color, .035).setStrokeStyle(3, result.color, .72);
-        phaseText.setText('遺物等級が確定　100%').setColor(colHex);
-      });
-      // 隙間から光の粒が吹き出す
-      timers.push(this.time.addEvent({
-        delay: 85, repeat: 11, callback: () => {
-          const sp = track(this.add.image(cx + (Math.random() * 90 - 45), cy + 28, 'glow').setDepth(304)
-            .setBlendMode(Phaser.BlendModes.ADD).setTint(result.color)
-            .setDisplaySize(6 + Math.random() * 9, 6 + Math.random() * 9).setAlpha(0.9));
-          this.tweens.add({
-            targets: sp, y: sp.y - 60 - Math.random() * 60, alpha: 0,
-            duration: 500 + Math.random() * 300, ease: 'Quad.easeOut', onComplete: () => sp.destroy()
-          });
-        }
-      }));
-    });
-
-    // ---- 後片付け＆クローズ ----
-    const cleanup = () => {
-      for (const t of timers) t.remove();
-      for (const o of objs) { this.tweens.killTweensOf(o); o.destroy(); }
-      mask.destroy();
-      maskShape.destroy();
+    playRitual(this, this.L.ov, result, () => {
       this.gachaAnimating = false;
-      this.setOverlay('gacha'); // ゴールド表示などを更新
+      this.setOverlay('gacha');
       this.refresh();
-    };
-
-    // ---- 開封＆リザルト ----
-    const reveal = () => {
-      this.tweens.killTweensOf([chest, leak]);
-      chest.setAngle(0).setTexture('chest_rare_open').setDisplaySize(104, 104);
-      leak.setAlpha(0);
-      ritualTag.setText(`${gradeTitle[result.grade]}　／　獲得`).setColor(colHex);
-      phaseText.setAlpha(0);
-      Audio.playSe(supreme ? 'levelup' : result.grade === 'A' ? 'kill' : 'chest');
-
-      // 開封の炸裂
-      const burst = track(this.add.image(cx, chest.y - 10, 'fx_hit').setDepth(304).setDisplaySize(38.4,38.4)
-        .setBlendMode(Phaser.BlendModes.ADD).setTint(result.color));
-      this.tweens.add({ targets: burst, displayWidth: high ? 176 : 96, displayHeight: high ? 176 : 96, alpha: 0, duration: 500 });
-
-      // 品物のY位置（宝箱の上空・モーダル内に収まる固定高さ）
-      const itemY = IS_MOBILE ? my + 315 : my + Math.min(180, mh * .42);
-
-      const rewardCard = track(this.add.graphics().setDepth(302).setAlpha(0));
-      const cardW = Math.min(mw - 52, IS_MOBILE ? 330 : 500);
-      const cardX = cx - cardW / 2;
-      rewardCard.fillGradientStyle(0x0b2428, 0x0b2428, 0x03090b, 0x03090b, .98);
-      rewardCard.fillRoundedRect(cardX, my + 66, cardW, mh - 112, 18);
-      rewardCard.fillStyle(result.color, .14).fillRoundedRect(cardX + 1, my + 67, cardW - 2, 48, 17);
-      rewardCard.lineStyle(2.5, result.color, .86).strokeRoundedRect(cardX, my + 66, cardW, mh - 112, 18);
-      rewardCard.lineStyle(1, 0xffffff, .13).strokeRoundedRect(cardX + 9, my + 75, cardW - 18, mh - 130, 12);
-      rewardCard.lineStyle(1, result.color, .45).lineBetween(cardX + 22, my + 116, cardX + cardW - 22, my + 116);
-      this.tweens.add({ targets: rewardCard, alpha: 1, duration: 360 });
-
-      // 回転する光背レイ（品物の後ろ）
-      const rays = track(this.add.graphics().setDepth(303).setBlendMode(Phaser.BlendModes.ADD));
-      const rayAlpha = high ? 0.18 : mid ? 0.13 : 0.08;
-      rays.fillStyle(result.color, rayAlpha);
-      for (let i = 0; i < 12; i++) {
-        const a = (i / 12) * Math.PI * 2;
-        const a2 = a + 0.065;
-        rays.fillTriangle(0, 0, Math.cos(a) * 195, Math.sin(a) * 195, Math.cos(a2) * 195, Math.sin(a2) * 195);
-      }
-      rays.setPosition(cx, itemY).setAlpha(0);
-      this.tweens.add({ targets: rays, alpha: 1, duration: 350, delay: 150 });
-      this.tweens.add({ targets: rays, angle: 360, duration: high ? 8000 : 15000, repeat: -1 });
-
-      // 品物が宝箱から飛び出して浮かぶ
-      const itemPlate = track(this.add.circle(cx, itemY, 57, result.texKey.startsWith('star_') ? STAR_EQUIPMENT_BACKGROUND : 0x020708, .82)
-        .setStrokeStyle(2, result.color, .72).setDepth(304).setScale(.45).setAlpha(0));
-      this.tweens.add({ targets: itemPlate, scale: 1, alpha: 1, duration: 420, delay: 160, ease: 'Back.easeOut' });
-      const halo = track(this.add.image(cx, itemY, 'glow').setDepth(305)
-        .setBlendMode(Phaser.BlendModes.ADD).setTint(result.color).setAlpha(0).setScale(1.6));
-      this.tweens.add({ targets: halo, alpha: 0.5, duration: 500, delay: 200 });
-      if (result.hasEffect || result.elementColor !== undefined) {
-        const effectFrame = track(this.add.graphics().setDepth(306).setAlpha(0));
-        effectFrame.lineStyle(4, result.elementColor ?? result.color, 1).strokeRoundedRect(cx - 48, itemY - 48, 96, 96, 12);
-        this.tweens.add({ targets: effectFrame, alpha: 1, duration: 300, delay: 300 });
-      }
-      const icon = track(this.add.image(cx, chest.y - 6, equipmentIconTexture(result.texKey)).setFlipX(equipmentIconFlipX(result.texKey)).setDepth(306).setDisplaySize(22, 22).setAlpha(0));
-      if (result.tintIcon && result.elementColor !== undefined) icon.setTintFill(result.elementColor);
-      this.tweens.add({
-        targets: icon, y: itemY, displayWidth: 78, displayHeight: 78, alpha: 1,
-        duration: 550, ease: 'Back.easeOut'
-      });
-      // ふわふわ浮遊
-      this.tweens.add({ targets: icon, y: itemY - 8, duration: 1100, yoyo: true, repeat: -1, delay: 600, ease: 'Sine.easeInOut' });
-
-      // ランク印が上からドンと落ちてくる
-      const rankText = track(this.add.text(cx, itemY - 118, result.grade, {
-        fontFamily: '"Yu Gothic UI"', fontSize: supreme ? '58px' : '48px', fontStyle: 'bold', color: colHex
-      }).setOrigin(0.5).setStroke('#000000', 8).setShadow(0, 0, colHex, 16, true, true).setScale(3.2).setAlpha(0).setDepth(307));
-      this.tweens.add({
-        targets: rankText, scale: 1, alpha: 1, duration: 240, delay: 420, ease: 'Cubic.easeIn',
-        onComplete: () => {
-          this.cameras.main.shake(160, high ? 0.01 : 0.005);
-          if (high) this.tweens.add({ targets: rankText, scale: 1.15, yoyo: true, repeat: -1, duration: 420, ease: 'Sine.easeInOut' });
-        }
-      });
-
-      const stars = track(this.add.text(cx, itemY - 76, '★'.repeat(starCount[result.grade]), {
-        fontFamily: '"Yu Gothic UI"', fontSize: supreme ? '18px' : '15px',
-        color: colHex, fontStyle: 'bold', letterSpacing: 5
-      }).setOrigin(.5).setStroke('#000000', 4).setAlpha(0).setDepth(307));
-      this.tweens.add({ targets: stars, alpha: 1, y: itemY - 82, duration: 360, delay: 540, ease: 'Back.easeOut' });
-
-      // 品名・性能要約・終了ボタン
-      const nameY = itemY + 66;
-      const nameText = track(this.add.text(cx, nameY + 8, result.name, {
-        fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '15px' : '20px', color: '#ffffff', fontStyle: 'bold',
-        align: 'center', wordWrap: { width: cardW - 48 }
-      }).setOrigin(0.5).setStroke('#000000', 6).setAlpha(0).setDepth(307));
-      if (nameText.width > cardW - 48) nameText.setFontSize(IS_MOBILE ? 12 : 15);
-      this.tweens.add({ targets: nameText, alpha: 1, y: nameY, duration: 350, delay: 500 });
-
-      const metaParts = [`${result.category} / 等級 ${result.grade}`, result.elementName ?? '無属性'];
-      if (result.feature) metaParts.push(`固有効果: ${result.feature}`);
-      const meta = track(this.add.text(cx, itemY + 102, metaParts.join('   ◆   '), {
-        fontFamily: '"Yu Gothic UI"', fontSize: IS_MOBILE ? '9px' : '11px', color: result.feature?.includes('特殊アイテムのドロップ率') ? '#ff83d9' : '#b8d8d6',
-        fontStyle: 'bold', align: 'center', wordWrap: { width: cardW - 52 }
-      }).setOrigin(.5).setAlpha(0).setDepth(307));
-      this.tweens.add({ targets: meta, alpha: 1, duration: 350, delay: 680 });
-
-      const hintY = Math.min(my + mh - 70, itemY + 140);
-      const hintBg = track(this.add.graphics().setDepth(306).setAlpha(0));
-      hintBg.fillStyle(result.color, .14).fillRoundedRect(cx - 105, hintY - 14, 210, 28, 14);
-      hintBg.lineStyle(1, result.color, .52).strokeRoundedRect(cx - 105, hintY - 14, 210, 28, 14);
-      this.tweens.add({ targets: hintBg, alpha: 1, duration: 350, delay: 850 });
-      const hint = track(this.add.text(cx, hintY, 'タップして続ける', {
-        fontFamily: '"Yu Gothic UI"', fontSize: '10px', color: '#f6e2ac', fontStyle: 'bold', letterSpacing: 2
-      }).setOrigin(0.5).setAlpha(0).setDepth(307));
-      this.tweens.add({ targets: hint, alpha: 1, duration: 350, delay: 800 });
-      const acquired = track(this.add.text(cx, my + mh - 38, '新たな遺物を獲得', {
-        fontFamily: '"Yu Gothic UI"', fontSize: '9px', color: '#70898b', fontStyle: 'bold', letterSpacing: 3
-      }).setOrigin(.5).setAlpha(0).setDepth(307));
-      this.tweens.add({ targets: acquired, alpha: 1, duration: 350, delay: 650 });
-
-      // S以上：金の紙吹雪が舞い続ける
-      if (supreme) {
-        const confetti = () => {
-          const colors = [0xffd700, 0xffe680, 0xf5a030, 0xfff0b0];
-          const px = cx + (Math.random() * 380 - 190);
-          const r = track(this.add.rectangle(px, itemY - 130, 5 + Math.random() * 4, 9 + Math.random() * 5,
-            colors[Math.floor(Math.random() * colors.length)]).setDepth(308).setAngle(Math.random() * 360));
-          this.tweens.add({
-            targets: r, y: chest.y + 90 + Math.random() * 60, angle: '+=' + (180 + Math.random() * 360),
-            x: px + (Math.random() * 60 - 30), alpha: 0,
-            duration: 1400 + Math.random() * 700, ease: 'Quad.easeIn',
-            onComplete: () => r.destroy()
-          });
-        };
-        timers.push(this.time.addEvent({ delay: 90, repeat: -1, callback: confetti }));
-        for (let i = 0; i < 10; i++) confetti();
-      }
-
-      // クリックで終了
-      const closeZone = track(this.add.zone(0, 0, GAME_W, GAME_H).setOrigin(0).setDepth(310).setInteractive());
-      closeZone.once('pointerdown', () => { Audio.playSe('click'); cleanup(); });
-    };
-
-    // ---- ランク別のつなぎ演出 ----
-    if (high) {
-      // S/SS：宝箱が宙に浮いて「静寂」→白フラッシュ→光柱と共に爆発開封
-      this.time.delayedCall(1800, () => {
-        this.tweens.killTweensOf(chest);
-        chest.setAngle(0);
-        for (const t of timers) t.remove();
-        timers.length = 0;
-        Audio.playSe('seal');
-        // ゆっくり浮き上がる（不穏な静けさ）
-        this.tweens.add({ targets: chest, y: cy - 30, duration: 620, ease: 'Sine.easeOut' });
-        this.tweens.add({ targets: leak, alpha: 0.12, duration: 450 });
-        this.time.delayedCall(760, () => {
-          // 白フラッシュ＋大振動＋光柱
-          const flash = track(this.add.rectangle(cx, my + mh / 2, mw, mh, 0xffffff, 1).setDepth(309).setAlpha(0));
-          this.tweens.add({ targets: flash, alpha: 1, duration: 90, yoyo: true, onComplete: () => flash.setAlpha(0) });
-          this.cameras.main.shake(500, 0.014);
-          Audio.playSe('bomb');
-          const pillar = track(this.add.rectangle(cx, cy - 130, 30, 480, result.color, 0.9)
-            .setDepth(305).setBlendMode(Phaser.BlendModes.ADD).setScale(0.1, 0));
-          this.tweens.add({ targets: pillar, scaleY: 1, duration: 260, ease: 'Quad.easeOut' });
-          this.tweens.add({ targets: pillar, scaleX: 3.4, alpha: 0, duration: 800, delay: 240 });
-          // 衝撃波リング
-          const ring = track(this.add.image(cx, cy - 30, 'glow').setDepth(304)
-            .setBlendMode(Phaser.BlendModes.ADD).setTint(result.color).setScale(0.4).setAlpha(0.9));
-          this.tweens.add({ targets: ring, scale: 6.0, alpha: 0, duration: 550, ease: 'Quad.easeOut' });
-          this.time.delayedCall(260, reveal);
-        });
-      });
-    } else if (mid) {
-      // A：ひと呼吸ためて色フラッシュ→開封
-      this.time.delayedCall(1700, () => {
-        const flash = track(this.add.rectangle(cx, my + mh / 2, mw, mh, result.color, 1).setDepth(309).setAlpha(0));
-        this.tweens.add({ targets: flash, alpha: 0.45, duration: 90, yoyo: true, onComplete: () => flash.setAlpha(0) });
-        this.cameras.main.shake(200, 0.006);
-        this.time.delayedCall(260, reveal);
-      });
-    } else {
-      // B/C：そのままポンと開封
-      this.time.delayedCall(1720, reveal);
-    }
+    });
   }
-
   rowButton(x: number, y: number, w: number, label: string, highlight: boolean, onClick: () => void,
     enabled = true, palette?: (typeof GACHA_PALETTES)[GachaPool]) {
     const c = this.add.container(0, 0);
@@ -2379,6 +2134,20 @@ export class UIScene extends Phaser.Scene {
     this.setOverlay('settings');
   }
 
+  showControlsGuide() {
+    if (this.gs.busy || this.gs.gameEnded) return;
+    this.gs.stopClickPath(); this.gs.clearMoveInput();
+    this.setOverlay('none'); this.gs.busy = true;
+    createGuideModal(this, [
+      ['目的地へ移動', '明るい床をクリック／タップすると自動で移動します。\n連続クリック／タップで停止。矢印キーやスティックでも移動できます。'],
+      ['敵へ近づいて攻撃', '敵をクリック／タップすると、近づいて通常攻撃します。\n「持ち物・装備」で武器や防具を比較しましょう。盾は耐久がなくなる前に修理を。'],
+      ['スキルと道具', '歩くとスキルがチャージされます。Qキー／右下のボタンで発動できます。\nポーションは道具欄から使用。操作案内は設定からいつでも開けます。'],
+      ['お金がたまったらガチャ！', '敵の討伐や宝箱でお金を集めましょう。\nお金がたまったら「ガチャ」をやりましょう！武器や防具を手に入れて、装備を強くできます。']
+    ], () => {
+      this.gs.busy = false;
+      try { localStorage.setItem('chari-dungeon.controls-guide.v2', 'seen'); } catch { /* optional preference */ }
+    });
+  }
   editCode(value: string) {
     this.codeDigits = value.slice(0, 10);
     this.codeMessage = '';
@@ -2569,7 +2338,7 @@ export class UIScene extends Phaser.Scene {
 
   // ---- 設定オーバーレイ：BGMと効果音（システム音）を別々に調整 ----
   buildSettingsOverlay(x: number, y: number, w: number, h: number) {
-    const returnButton = this.rowButton(x + 20, y + h - 36, w - 40, '冒険を保存してスタート画面へ', true, () => {
+    const returnButton = this.rowButton(x + 20, y + h - 36, w - 166, '保存してタイトルへ', true, () => {
       if (this.gs.busy || this.gs.gameEnded) return;
       this.gs.clearMoveInput();
       this.gs.stopClickPath();
@@ -2579,6 +2348,7 @@ export class UIScene extends Phaser.Scene {
     });
     returnButton.setName('settings-return-title');
     this.overlay.add(returnButton);
+    this.overlay.add(this.rowButton(x + w - 138, y + h - 36, 118, '操作案内', false, () => this.showControlsGuide()).setName('settings-controls-guide'));
     this.overlay.add(this.add.text(x + w - 166, y + 18, 'アクセス計測について', {
       fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#8de0e4', padding: { x: 4, y: 8 }
     }).setInteractive({ useHandCursor: true }).on('pointerdown', () => {

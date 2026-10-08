@@ -13,5 +13,9 @@ export function ordinaryMobAttackBonus(def: MonsterDef, floor: number, mode: Dif
 
 export function ordinaryMobAttackDefinition(def: MonsterDef, floor: number, mode: Difficulty, eventMode = false): MonsterDef {
   const bonus = ordinaryMobAttackBonus(def, floor, mode, eventMode);
-  return bonus ? { ...def, atkMin: def.atkMin + bonus, atkMax: def.atkMax + bonus } : def;
+  // Keep the existing hard-mode attack ceiling; its HP and extra boss turns
+  // continue to distinguish hard without changing any hard/master stats.
+  return bonus ? { ...def,
+    atkMin: Math.min(def.atkMin + bonus, Math.floor(def.atkMin * 1.2)),
+    atkMax: Math.min(def.atkMax + bonus, Math.floor(def.atkMax * 1.2)) } : def;
 }

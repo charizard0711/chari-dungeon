@@ -81,6 +81,7 @@ export interface Shield {
   element?: Element;
   passive?: ShieldPassive;
   guardCounter?: number;
+  guardDamage?: number; // actual damage accumulated for bounded shield recovery
 }
 
 // 服・鎧。装備すると防御力とキャラクターの見た目が同時に変わる。

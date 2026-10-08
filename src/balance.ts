@@ -24,7 +24,7 @@ export const SHOP_PRICES = { potion: 25, repair: 100, slime_scroll: 500, boss5_s
 export type ShopItemKind = keyof typeof SHOP_PRICES;
 
 export function enhancementChance(plus: number): number {
-  return Math.max(0.3, 0.9 - Math.max(0, plus) * 0.1);
+  return Math.max(0.6, 0.9 - Math.max(0, plus) * 0.02);
 }
 
 export const EQUIPMENT_LIMIT = 12;

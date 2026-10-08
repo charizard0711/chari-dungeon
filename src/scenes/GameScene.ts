@@ -1,6 +1,7 @@
+import { ensureSceneAssets } from '../assetStreaming';
 import { weaponAccessoryKey, katanaSlashColor } from '../equipmentAccessories';
 import { isTwoHanded } from '../equipmentRules';
-import { weaponChargeSteps, isRemovedItem } from '../enhancement';
+import { weaponChargeSteps, isRemovedItem, MAX_ENHANCEMENT } from '../enhancement';
 import { SKILL_DRINK_DROP_RATE } from '../balance';
 import { equipmentKeys, readEquipmentCodexSave, writeEquipmentCodexSave, readCodexSave, writeCodexSave } from '../codexSave';
 import { ITEM_CATALOG, ITEM_CATALOG_CODE, type CatalogClaimResult } from '../itemCatalog';
@@ -468,7 +469,14 @@ export class GameScene extends Phaser.Scene {
     super('GameScene');
   }
 
-  create(data?: { resume?: boolean; difficulty?: Difficulty; eventMode?: 'halloween'; startingWeapon?: string; startingArmor?: PlayerArmor }) {
+  private assetsLoading = false;
+
+  async create(data?: { resume?: boolean; difficulty?: Difficulty; eventMode?: 'halloween'; startingWeapon?: string; startingArmor?: PlayerArmor }) {
+    this.assetsLoading = true;
+    const assetResume = data?.resume ? readRunSave(data?.eventMode === 'halloween')?.snapshot : undefined;
+    const assetFloor = assetResume?.state.floor ?? (location.hostname === 'localhost' ? Number(new URLSearchParams(location.search).get('qa-floor')) || 1 : 1);
+    await ensureSceneAssets(this, assetFloor, data?.eventMode === 'halloween');
+    this.assetsLoading = false;
     presentGame(this);
     this.eventMode = data?.eventMode === 'halloween' ? 'halloween' : null;
     this.emeraldGuardFx = undefined;
@@ -679,7 +687,7 @@ export class GameScene extends Phaser.Scene {
       backgroundColor: '#000000aa', padding: { x: 4, y: 2 }
     }).setDepth(30).setVisible(false);
 
-    this.buildFloor(resume?.state.floor ?? startFloor, resume?.state.inBossRoom ?? this.qaBossMode, resume);
+    await this.buildFloor(resume?.state.floor ?? startFloor, resume?.state.inBossRoom ?? this.qaBossMode, resume);
     this.refreshTimeStopEffect();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.clearTimeStopEffect());
     this.restoringRun = false;
@@ -923,7 +931,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ============ フロア生成 ============
-  buildFloor(floor: number, bossRoom = false, snapshot?: RunSnapshot) {
+  async buildFloor(floor: number, bossRoom = false, snapshot?: RunSnapshot) {
+    this.assetsLoading = true;
+    await ensureSceneAssets(this, floor, !!this.eventMode);
+    this.assetsLoading = false;
     this.clearMoveInput();
     if (this.player.fountainBlessingFloor !== floor) this.player.fountainBlessingFloor = null;
     this.floor = floor;
@@ -1086,8 +1097,8 @@ export class GameScene extends Phaser.Scene {
     this.updatePlayerAura();
     this.refreshTransformationVisual();
     // Keep sub-pixel movement, matching the antialiased renderer in main.ts.
-    // Player motion is already tweened; follow it directly without a second, lagging interpolation.
-    this.cameras.main.startFollow(this.playerSprite, false, 1, 1);
+    // Match the gradual camera follow used on October 3.
+    this.cameras.main.startFollow(this.playerSprite, false, 0.15, 0.15);
     this.cameras.main.setZoom(MAP_ZOOM);
 
     // 敵配置
@@ -1639,14 +1650,17 @@ export class GameScene extends Phaser.Scene {
     const cx = pos.x * TILE + TILE / 2;
     const cy = pos.y * TILE + TILE / 2;
     const base = this.add.circle(cx, cy, 12, 0x071319, 0.88)
-      .setStrokeStyle(1.5, 0x6bcac8, 0.62)
+      .setStrokeStyle(2.5, 0xc99c4e, 1)
       .setDepth(2.72);
-    const glow = this.add.circle(cx, cy, 13, 0xe53f83, 0.2)
+    const glow = this.add.circle(cx, cy, 13, 0x64d6c4, 0.13)
       .setDepth(2.76).setBlendMode(Phaser.BlendModes.ADD);
     // 装飾を入れず、一本の太い矢印だけでボス方向を読ませる。
     const arrow = this.add.graphics().setPosition(cx, cy).setDepth(2.82);
-    arrow.lineStyle(1.5, 0xffd7e5, 1);
-    arrow.fillStyle(0xff4f86, 1);
+    arrow.lineStyle(1, 0xffe0a0, 1);
+    arrow.lineStyle(1, 0x947744, .9).strokeCircle(0, 0, 9);
+    for (let i = 0; i < 8; i++) { const angle = i * Math.PI / 4; arrow.lineBetween(Math.sin(angle)*10,Math.cos(angle)*10,Math.sin(angle)*12,Math.cos(angle)*12); }
+    arrow.lineStyle(1, 0xffe0a0, 1);
+    arrow.fillStyle(0xecc875, 1);
     arrow.beginPath();
     arrow.moveTo(0, -11);
     arrow.lineTo(8, -2);
@@ -5109,7 +5123,7 @@ export class GameScene extends Phaser.Scene {
     if (this.emeraldGuardActive()) return { damage: 0, shieldBroke: false, steps: ['氷翠の王域：無敵結界が有効'] };
     const result = computeEnemyAttack(this.player, this.enemyAttackDefinition(e), element);
     const depthBonus = ordinaryMobAttackBonus(e.def, this.floor, this.difficulty, !!this.eventMode);
-    if (depthBonus) result.steps.unshift(`雑魚の階層補正：${this.floor}層／攻撃力 +${depthBonus}（防御・属性・弱体化の計算前）`);
+    if (depthBonus) { const boosted = ordinaryMobAttackDefinition(e.def, this.floor, this.difficulty, !!this.eventMode); result.steps.unshift(`雑魚の階層補正：${this.floor}層／攻撃力 +${boosted.atkMin-e.def.atkMin}〜${boosted.atkMax-e.def.atkMax}（ハードの攻撃力が上限）`); }
     result.steps.unshift(`難易度：${DIFFICULTY_RULES[this.difficulty].name}（敵攻撃 ×${DIFFICULTY_RULES[this.difficulty].attack}を反映済み）`);
     if (e.emedralAffected && e.emedralWeakUntil >= this.turn) result.steps.unshift('氷翠の効果：敵の攻撃力 ×0.7（切り捨て）を反映済み');
     if (e.skillAttackDownUntil >= this.turn) result.steps.unshift('槍スキル：敵の攻撃力 ×0.8（切り捨て）を反映済み');
@@ -7038,7 +7052,7 @@ export class GameScene extends Phaser.Scene {
     return enhancementChance(plus);
   }
 
-  // 強化成功率：+0は90%、強化値ごとに10ポイント低下し、+6以降は30%固定。
+  // 強化成功率：90%から2ポイントずつ低下。失敗でも装備は残る。
   enhanceSuccess(plus: number): boolean {
     return Math.random() < this.enhanceChance(plus);
   }
@@ -7047,6 +7061,7 @@ export class GameScene extends Phaser.Scene {
   useStone(): boolean {
     const w = this.player.weapon;
     if (!w) { this.log('強化する武器を装備していない。', 'sys'); Audio.playSe('deny'); return false; }
+    if ((w.plus ?? 0) >= MAX_ENHANCEMENT) { this.log('武器は最大強化+15です。巻物は消費しません。', 'sys'); return false; }
     if (this.enhanceSuccess(w.plus ?? 0)) {
       // 成功
       w.plus = (w.plus ?? 0) + 1;
@@ -7057,17 +7072,8 @@ export class GameScene extends Phaser.Scene {
       // 強化色の閃光
       this.effectFx(this.player.x, this.player.y, 'fx_levelup', 1.8, 650);
     } else {
-      // 失敗 → 武器が燃えて消滅
-      this.log(`強化失敗… ${w.name} は燃え尽きてしまった！`, 'dmg');
-      Audio.playSe('weaponBreak');
-      // 燃えるエフェクト（ヒットスパークを赤く）
-      const fx = this.add.image(this.playerSprite.x, this.playerSprite.y - 8, 'fx_hit').setDepth(22).setTint(0xff5020).setDisplaySize(38.4,38.4);
-      this.tweens.add({ targets: fx, alpha: 0, displayWidth: 70.4, displayHeight: 70.4, duration: 500, onComplete: () => fx.destroy() });
-      this.cameras.main.shake(150, 0.006);
-      // 所持武器から除去し、別の武器へ持ち替え
-      this.player.weapons = this.player.weapons.filter((x) => x !== w);
-      this.player.weapon = this.player.weapons[0] ?? null;
-      this.updatePlayerAura();
+      this.log(`強化失敗… ${w.name}と強化値はそのまま。巻物だけを消費した。`, 'sys');
+      Audio.playSe('deny');
     }
     this.emitRefresh();
     return true;
@@ -7077,6 +7083,7 @@ export class GameScene extends Phaser.Scene {
   useShieldStone(): boolean {
     const s = this.player.shield;
     if (!s) { this.log('強化する盾を装備していない。', 'sys'); Audio.playSe('deny'); return false; }
+    if ((s.plus ?? 0) >= MAX_ENHANCEMENT) { this.log('盾は最大強化+15です。巻物は消費しません。', 'sys'); return false; }
     if (this.enhanceSuccess(s.plus ?? 0)) {
       s.plus = (s.plus ?? 0) + 1;
       this.log(`盾の強化成功！ +${s.plus} ${s.name}（次回${Math.round(this.enhanceChance(s.plus) * 100)}%）`, 'special');
@@ -7084,13 +7091,8 @@ export class GameScene extends Phaser.Scene {
       this.magicFx(this.player.x, this.player.y);
       this.effectFx(this.player.x, this.player.y, 'fx_levelup', 1.8, 650);
     } else {
-      this.log(`盾の強化失敗… ${s.name} は砕けてしまった！`, 'dmg');
-      Audio.playSe('shieldBreak');
-      const fx = this.add.image(this.playerSprite.x, this.playerSprite.y - 8, 'fx_hit').setDepth(22).setTint(0xff5020).setDisplaySize(38.4,38.4);
-      this.tweens.add({ targets: fx, alpha: 0, displayWidth: 70.4, displayHeight: 70.4, duration: 500, onComplete: () => fx.destroy() });
-      this.cameras.main.shake(150, 0.006);
-      this.player.shields = this.player.shields.filter((x) => x !== s);
-      this.player.shield = isTwoHanded(this.player.weapon) ? null : this.player.shields[0] ?? null;
+      this.log(`盾の強化失敗… ${s.name}と強化値はそのまま。巻物だけを消費した。`, 'sys');
+      Audio.playSe('deny');
     }
     this.emitRefresh();
     return true;
@@ -7580,8 +7582,8 @@ export class GameScene extends Phaser.Scene {
     Audio.playSe('seal');
     const cam = this.cameras.main;
     cam.fadeOut(260, 24, 75, 62);
-    cam.once('camerafadeoutcomplete', () => {
-      this.buildFloor(this.floor, true);
+    cam.once('camerafadeoutcomplete', async () => {
+      await this.buildFloor(this.floor, true);
       cam.fadeIn(340, 0, 0, 0);
       this.emitRefresh();
       this.busy = false;
@@ -7839,7 +7841,7 @@ export class GameScene extends Phaser.Scene {
   // 矢印キーのホールド処理：押した瞬間に1歩、押しっぱなしで歩き続ける
   // （スマホ用十字ボタンの touchDir も同じ仕組みで処理）
   async handleMapClick(pointer: Phaser.Input.Pointer, clickedObjectsOrEnemy?: Phaser.GameObjects.GameObject[] | Enemy) {
-    if (pointer.button !== 0 || this.gameEnded) return;
+    if (this.assetsLoading || pointer.button !== 0 || this.gameEnded) return;
     if (pointer.x < MAP_X || pointer.x >= MAP_X + MAP_W || pointer.y < MAP_Y || pointer.y >= MAP_Y + MAP_H) return;
     const ui = this.scene.get('UIScene') as any;
     if (ui?.isSkillPointer?.(pointer.x, pointer.y)) return;
@@ -8128,6 +8130,7 @@ export class GameScene extends Phaser.Scene {
 
   // 毎フレーム：影の追従・アイドルの呼吸・オーラ＆武器の追従
   update(time: number) {
+    if (this.assetsLoading) return;
     if (this.savePending && !this.busy) this.saveRun();
     const ps = this.playerSprite;
     if (!ps) return;
@@ -8467,7 +8470,7 @@ export class GameScene extends Phaser.Scene {
   updateEnemyDirection(e: Enemy) {
     if (!e.directionArt || !e.sprite.active) return;
     e.sprite.setOrigin(.5, e.def.isBoss || e.def.isFloorBoss ? BOSS_GROUND_ORIGIN_Y : e.directionArt.originY ?? .6);
-    const frame = MONSTER_DIRECTION_FRAME[e.facing];
+    const frame = (e.directionArt.frameOffset ?? 0) + MONSTER_DIRECTION_FRAME[e.facing];
     if (e.sprite.texture.key !== e.directionArt.textureKey || Number(e.sprite.frame.name) !== frame) {
       e.sprite.setTexture(e.directionArt.textureKey, frame).setFlip(false, false).setAngle(0);
     }
@@ -8776,9 +8779,12 @@ export class GameScene extends Phaser.Scene {
       const currentBaseScale = e.baseScale;
       restoredEnemies[index] = e;
       Object.assign(e, saved.state);
-      e.sprite.setTexture(saved.visual.texture).setScale(saved.visual.scaleX, saved.visual.scaleY)
+      // Direction atlases can change between releases; restore size against the current art.
+      e.sprite.setTexture(e.directionArt?.textureKey ?? saved.visual.texture,
+        e.directionArt ? (e.directionArt.frameOffset ?? 0) + MONSTER_DIRECTION_FRAME[e.facing] : undefined).setScale(saved.visual.scaleX, saved.visual.scaleY)
         .setTint(saved.visual.tint).setAlpha(saved.visual.alpha);
-      if ((REFRESHED_MONSTER_KEYS as readonly string[]).includes(e.def.key)) {
+      if ((REFRESHED_MONSTER_KEYS as readonly string[]).includes(e.def.key)
+        || (e.directionArt && saved.visual.texture !== e.directionArt.textureKey)) {
         const visual = saved.visual as typeof saved.visual & { sourceWidth?: number; sourceHeight?: number };
         if (visual.sourceWidth && visual.sourceHeight) {
           const ratioX = visual.sourceWidth / e.sprite.width, ratioY = visual.sourceHeight / e.sprite.height;

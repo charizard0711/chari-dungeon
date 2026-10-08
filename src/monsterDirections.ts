@@ -7,6 +7,7 @@ export interface MonsterDirectionArt {
   readonly originY?: number;
   readonly frameSize: number;
   readonly artSize: number;
+  readonly frameOffset?: number;
 }
 
 export const EMBER_DIRECTIONS: MonsterDirectionArt = {

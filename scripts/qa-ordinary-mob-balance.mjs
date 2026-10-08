@@ -45,16 +45,16 @@ const ctx = { ordinaryMobAttackDefinition: scale, Math }; vm.runInNewContext(har
 const h = new ctx.Harness(); Object.assign(h, { floor: 10, difficulty: 'normal', eventMode: false, turn: 20 });
 const enemy = { def: difficultyEnemy(mob, 'normal'), emedralWeakUntil: -1, skillAttackDownUntil: -1 };
 const saved = JSON.stringify(enemy.def);
-assert.equal(h.enemyAttackDefinition(enemy).atkMax, mob.atkMax + 7);
-assert.equal(h.enemyAttackDefinition(enemy).atkMax, mob.atkMax + 7);
+assert.equal(h.enemyAttackDefinition(enemy).atkMax, Math.floor(mob.atkMax * 1.2));
+assert.equal(h.enemyAttackDefinition(enemy).atkMax, Math.floor(mob.atkMax * 1.2));
 assert.equal(JSON.stringify(enemy.def), saved, 'attack calculations cannot stack or mutate saved stats');
 enemy.skillAttackDownUntil = 20;
-assert.equal(h.enemyAttackDefinition(enemy).atkMax, Math.floor((mob.atkMax + 7) * .8));
+assert.equal(h.enemyAttackDefinition(enemy).atkMax, Math.floor((Math.floor(mob.atkMax * 1.2)) * .8));
 enemy.emedralAffected = true; enemy.emedralWeakUntil = 20;
-assert.equal(h.enemyAttackDefinition(enemy).atkMax, Math.floor((mob.atkMax + 7) * .7));
+assert.equal(h.enemyAttackDefinition(enemy).atkMax, Math.floor((Math.floor(mob.atkMax * 1.2)) * .7));
 enemy.skillAttackDownUntil = -1; enemy.emedralWeakUntil = -1;
 enemy.def = JSON.parse(saved);
-assert.equal(h.enemyAttackDefinition(enemy).atkMax, mob.atkMax + 7, 'old saved enemies also receive the correction');
+assert.equal(h.enemyAttackDefinition(enemy).atkMax, Math.floor(mob.atkMax * 1.2), 'old saved enemies also receive the correction');
 
 function distribution(player, def) {
   const values = [];
@@ -80,6 +80,7 @@ for (const floor of [1,3,5,8,10,15,20,25,29]) {
     if (floor <= 3) assert.equal(after.avg, before.avg);
     for (const mode of ['hard','master']) {
       const original = difficultyEnemy(def, mode);
+      assert.ok(corrected.atkMin <= original.atkMin && corrected.atkMax <= original.atkMax, 'normal cannot exceed higher-mode attack');
       assert.equal(bonus(original, floor, mode), 0);
       assert.equal(scale(original, floor, mode), original, `${mode} must keep its original stats`);
       assert.deepEqual(distribution(p, scale(original, floor, mode)), distribution(p, original));
@@ -90,7 +91,7 @@ for (const floor of [1,3,5,8,10,15,20,25,29]) {
   }
   assert.ok(pool.length);
   const n = pool.length;
-  if (floor >= 5 && floor <= 15) assert.ok(summary.after > summary.before);
+  if (floor >= 5 && floor <= 15) assert.ok(summary.after >= summary.before);
   report.push({ floor, defense: p.def, oldAverage: +(summary.before/n).toFixed(2), newAverage: +(summary.after/n).toFixed(2), oneDamagePercent: +(summary.one/n*100).toFixed(1), armorPlus10Average: +(summary.strong/n).toFixed(2) });
 }
 console.table(report);

@@ -1,3 +1,4 @@
+import { ensureSceneAssets } from '../assetStreaming';
 import Phaser from 'phaser';
 import { equipmentIconTexture } from '../artRefresh';
 import { presentMenu, menuBackdrop } from '../menuPresentation';
@@ -25,7 +26,8 @@ export class HalloweenScene extends Phaser.Scene {
   private collection = WEAPON_DEFS.slice(0, 0);
   private leaving = false;
   constructor() { super('HalloweenScene'); }
-  create() {
+  async create() {
+    await ensureSceneAssets(this, 1, true);
     presentMenu(this);
     this.page = 0; this.leaving = false; this.selected = DEFAULT_PLAYER_WEAPON_KEY;
     const discovered = readEquipmentCodexSave();
