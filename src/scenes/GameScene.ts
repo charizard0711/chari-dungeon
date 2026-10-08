@@ -42,6 +42,7 @@ import { getMonsterAnimation, monsterAnimationFrame } from '../monsterAnimation'
 import type { MonsterAction } from '../monsterAnimation';
 import { AURELIUS_DIRECTIONS, DIRECTIONAL_MONSTERS, MONSTER_DIRECTION_FRAME, monsterDirectionPose } from '../monsterDirections';
 import { computePlayerAttack, computeEnemyAttack, consumeWeaponDurability } from '../combat';
+import { ordinaryMobAttackBonus, ordinaryMobAttackDefinition } from '../ordinaryMobBalance';
 import { appendJournal, type DamageEntry, type AdventureEntry } from '../damageJournal';
 import { planSkill, weaponSkill, directionVector, timeStopDestination } from '../weaponSkills';
 import { Audio } from '../audio/manager';
@@ -5107,6 +5108,8 @@ export class GameScene extends Phaser.Scene {
   computeIncomingAttack(e: Enemy, element?: MonsterElement) {
     if (this.emeraldGuardActive()) return { damage: 0, shieldBroke: false, steps: ['氷翠の王域：無敵結界が有効'] };
     const result = computeEnemyAttack(this.player, this.enemyAttackDefinition(e), element);
+    const depthBonus = ordinaryMobAttackBonus(e.def, this.floor, this.difficulty, !!this.eventMode);
+    if (depthBonus) result.steps.unshift(`雑魚の階層補正：${this.floor}層／攻撃力 +${depthBonus}（防御・属性・弱体化の計算前）`);
     result.steps.unshift(`難易度：${DIFFICULTY_RULES[this.difficulty].name}（敵攻撃 ×${DIFFICULTY_RULES[this.difficulty].attack}を反映済み）`);
     if (e.emedralAffected && e.emedralWeakUntil >= this.turn) result.steps.unshift('氷翠の効果：敵の攻撃力 ×0.7（切り捨て）を反映済み');
     if (e.skillAttackDownUntil >= this.turn) result.steps.unshift('槍スキル：敵の攻撃力 ×0.8（切り捨て）を反映済み');
@@ -5118,8 +5121,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   enemyAttackDefinition(e: Enemy): MonsterDef {
+    const def = ordinaryMobAttackDefinition(e.def, this.floor, this.difficulty, !!this.eventMode);
     const rate = Math.min(e.emedralWeakUntil >= this.turn && e.emedralAffected ? .7 : 1, e.skillAttackDownUntil >= this.turn ? .8 : 1);
-    return rate < 1 ? { ...e.def, atkMin: Math.max(1, Math.floor(e.def.atkMin * rate)), atkMax: Math.max(1, Math.floor(e.def.atkMax * rate)) } : e.def;
+    return rate < 1 ? { ...def, atkMin: Math.max(1, Math.floor(def.atkMin * rate)), atkMax: Math.max(1, Math.floor(def.atkMax * rate)) } : def;
   }
 
   damagePlayer(dmg: number, reason: string, attacker?: Enemy, calculation?: string[]) {
@@ -8425,7 +8429,8 @@ export class GameScene extends Phaser.Scene {
       this.clearEnemyHover();
       return;
     }
-    const key = [target.hp, target.hpMax, target.def.atkMin, target.def.atkMax,
+    const attack = this.enemyAttackDefinition(target);
+    const key = [target.hp, target.hpMax, attack.atkMin, attack.atkMax,
       target.def.def, target.def.behavior, monsterElement(target.def)].join(':');
     if (target === this.hoveredEnemy && key === this.enemyHoverInfoKey) return;
     this.hoveredEnemy = target;
@@ -8435,12 +8440,13 @@ export class GameScene extends Phaser.Scene {
 
   showEnemyInfo(e: Enemy) {
     this.discoverMonster(e.def.key);
+    const attack = this.enemyAttackDefinition(e);
     const element = monsterElement(e.def);
     const weakTo = element ? ELEMENT_INFO[element].weakTo : undefined;
     this.events.emit('enemyinfo', {
       hover: e === this.hoveredEnemy,
       name: e.def.name, hp: e.hp, hpMax: e.hpMax,
-      atk: `${e.def.atkMin}-${e.def.atkMax}`, def: e.def.def,
+      atk: `${attack.atkMin}-${attack.atkMax}`, def: e.def.def,
       behavior: this.behaviorLabel(e.def.behavior),
       description: e.def.description,
       element: e.def.elements ? `全属性（火・水・氷・雷・闇） 現在の核：${element ? FINAL_ELEMENT_LABEL[element] : '火'}` : element ? `${ELEMENT_INFO[element].name}属性（${weakTo ? `弱点: ${ELEMENT_INFO[weakTo].name}属性` : '属性の弱点なし'}）` : '無属性（属性の弱点・耐性なし）'
