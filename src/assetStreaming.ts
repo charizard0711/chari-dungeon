@@ -37,6 +37,10 @@ export function captureBootAssets(scene: Phaser.Scene): () => void {
 function belongs(entry: Entry, floor: number, event: boolean, ending: boolean): boolean {
   if (ending) return entry.key === 'ending_dawn' || entry.key.startsWith('defeat_') || entry.key === 'quest_crest';
   if (entry.key === 'ending_dawn' || entry.key.startsWith('defeat_')) return false;
+  // The codex can display every species, including previously discovered event enemies.
+  // Load portraits and direction sheets on entry; keep terrain and effects streamed.
+  if (MONSTER_DEFS.some(def => def.key === entry.key)
+    || DIRECTIONAL_MONSTERS.some(art => art.textureKey === entry.key)) return true;
   if (/halloween|\/hw_|\/golden-/.test(entry.path) || entry.key.startsWith('hw_')) return event;
   const depth = entry.path.match(/(?:ruins-low-v1|water-v1|volcano-v1|thunder-v1|final-depths-v1)\/(\d+)\//)
     ?? entry.path.match(/ruins-floor-v1\/(\d+)\./);
@@ -52,12 +56,13 @@ function belongs(entry: Entry, floor: number, event: boolean, ending: boolean): 
   return true;
 }
 
-export function ensureSceneAssets(scene: Phaser.Scene, floor = 1, event = false, ending = false): Promise<void> {
+export function ensureSceneAssets(scene: Phaser.Scene, floor = 1, event = false, ending = false, loadingMode: 'entry' | 'stairs' = 'entry'): Promise<void> {
   const run = async () => {
     let remaining = [...manifest.values()].filter(entry => !loaded.has(entry.key) && belongs(entry, floor, event, ending));
-    if (!remaining.length) return;
+    if (!remaining.length && loadingMode !== 'stairs') return;
     const total = remaining.length;
-    showLoading(0, 'ダンジョンの画像を読み込み中…');
+    showLoading(0, loadingMode === 'stairs' ? `第${floor}層へ続く階段を下りています…` : 'ダンジョンの画像を読み込み中…', loadingMode);
+    const startedAt = performance.now();
     try {
       for (let attempt = 0; attempt < 3 && remaining.length; attempt++) {
         const failed = new Set<string>();
@@ -91,7 +96,13 @@ export function ensureSceneAssets(scene: Phaser.Scene, floor = 1, event = false,
       if (remaining.length) console.warn('画像の取得を再試行しました。代替表示を使用:', remaining.map(e => e.key));
       const boot = scene.scene.get('BootScene') as Phaser.Scene & { prepareGameTextures?: () => void };
       if (!ending) boot.prepareGameTextures?.();
-    } finally { finishLoading(); }
+    } finally {
+      if (loadingMode === 'stairs') {
+        updateLoading(1, `第${floor}層に到着しました`);
+        await new Promise(resolve => setTimeout(resolve, Math.max(0, 600 - (performance.now() - startedAt))));
+      }
+      finishLoading();
+    }
   };
   chain = chain.then(run, run);
   return chain;

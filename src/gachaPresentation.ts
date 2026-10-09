@@ -29,7 +29,7 @@ export function playRitual(scene: Phaser.Scene, rect: { x: number; y: number; w:
   const bg = add(scene.add.image(cx, h / 2, 'gacha_shrine_v2'));
   bg.setScale(Math.max(w / bg.width, h / bg.height));
   add(scene.add.rectangle(cx, 46, w, 92, 0x03110f, .78));
-  const phase = add(scene.add.text(cx, 35, '宝箱を召喚', { fontFamily: '"Yu Mincho", Meiryo, serif', fontSize: mobile ? '21px' : '26px', color: '#ffe3a4', fontStyle: 'bold' }).setOrigin(.5));
+  const phase = add(scene.add.text(cx, 35, '宝箱が現れる', { fontFamily: '"Yu Mincho", Meiryo, serif', fontSize: mobile ? '21px' : '26px', color: '#ffe3a4', fontStyle: 'bold' }).setOrigin(.5));
   const sub = add(scene.add.text(cx, 67, '古の宝物庫に、光が集まる…', { fontFamily: 'Meiryo', fontSize: '12px', color: '#bdcfc3' }).setOrigin(.5));
   const sigil = add(scene.add.image(cx, chestY + chestSize * .35, 'gacha_ritual_v2', 2).setDisplaySize(chestSize * 1.6, chestSize * .62).setBlendMode(Phaser.BlendModes.ADD).setAlpha(.55));
   const aura = add(scene.add.image(cx, chestY - 25, 'gacha_ritual_v2', 3).setDisplaySize(chestSize * 1.9, chestSize * 2.2).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0));

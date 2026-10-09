@@ -186,3 +186,48 @@ canvas {
 @keyframes loading-embers { 0% { opacity: 0; transform: translate(0,20px); } 25% { opacity: .9; } 100% { opacity: 0; transform: translate(24px,-150px); } }
 @media (max-width: 520px) { #loading-screen { background-position: 50% 38%; padding: 28px 30px max(46px, env(safe-area-inset-bottom)); } .loading-card h2 { font-size: 17px; letter-spacing: 0; } .loading-status { margin-bottom: 14px; } }
 @media (prefers-reduced-motion: reduce) { .loading-fill::after, .loading-sparks i { animation: none; } .loading-fill { transition: none; } }
+
+#loading-screen[data-mode="boot"] {
+  position: fixed; inset: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: center;
+  padding: 7vh 20px;
+  background: radial-gradient(ellipse at 50% 46%, #21151a 0%, #0b090d 42%, #060609 85%);
+}
+#loading-screen[data-mode="boot"]::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent, rgba(0,0,0,.25)); }
+#loading-screen[data-mode="boot"] .loading-card { position: relative; width: min(520px, 100%); text-align: center; color: #f6deaa; text-shadow: 0 2px 8px #000; }
+
+#loading-screen[data-mode="boot"] .loading-walk { position: relative; width: 210px; height: 210px; margin: 0 auto 12px; }
+#loading-screen[data-mode="boot"] .loading-adventurer {
+  position: relative; z-index: 1; width: 210px; height: 210px;
+  background: url('/assets/ui/walking-loader-v1/walk.webp') 0 0 / 400% 200% no-repeat;
+  animation: loading-walk-cycle .96s steps(1, end) infinite;
+}
+#loading-screen[data-mode="boot"] .loading-ground {
+  position: absolute; bottom: 7px; left: 24px; right: 24px; height: 2px;
+  background: linear-gradient(90deg, transparent, #8f7040, transparent); opacity: .5;
+}
+@keyframes loading-walk-cycle {
+  0%, 100% { background-position: 0% 0%; }
+  12.5% { background-position: 33.333333% 0%; }
+  25% { background-position: 66.666667% 0%; }
+  37.5% { background-position: 100% 0%; }
+  50% { background-position: 0% 100%; }
+  62.5% { background-position: 33.333333% 100%; }
+  75% { background-position: 66.666667% 100%; }
+  87.5% { background-position: 100% 100%; }
+}
+#loading-screen[data-mode="boot"] .loading-card h1 { font-size: clamp(25px, 5vw, 40px); letter-spacing: .12em; margin: 8px 0 12px; }
+#loading-screen[data-mode="boot"] .loading-story { color: #d3bca0; font-size: 14px; margin-bottom: 28px; }
+#loading-screen[data-mode="boot"] .loading-track { height: 10px; border: 1px solid #aa8243; padding: 2px; background: #0b080c; border-radius: 8px; overflow: hidden; }
+#loading-screen[data-mode="boot"] .loading-fill { height: 100%; width: 0; border-radius: 4px; background: linear-gradient(90deg, #84303c, #e4bc6d); transition: width .18s linear; }
+#loading-screen[data-mode="boot"] .loading-status { margin-top: 12px; font-size: 13px; color: #e1d2b6; }
+@media (max-width: 520px) {
+  #loading-screen[data-mode="boot"] .loading-walk, #loading-screen[data-mode="boot"] .loading-adventurer { width: 180px; height: 180px; }
+  #loading-screen[data-mode="boot"] .loading-card h1 { font-size: 27px; }
+}
+@media (prefers-reduced-motion: reduce) { #loading-screen[data-mode="boot"] .loading-adventurer { animation: none; background-position: 0 0; } }
+.loading-walk, .loading-boot-title, .loading-title { display: none; }
+#loading-screen[data-mode="stairs"] { background-image: url('/assets/ui/loading-stairs-v1/stairs.webp'); }
+#loading-screen[data-mode="boot"]::after, #loading-screen[data-mode="boot"] .loading-sparks, #loading-screen[data-mode="boot"] h2, #loading-screen[data-mode="boot"] .loading-percent, #loading-screen[data-mode="boot"] .loading-tip { display: none; }
+#loading-screen[data-mode="boot"] .loading-walk, #loading-screen[data-mode="boot"] .loading-boot-title { display: block; }
+#loading-screen[data-mode="boot"] .loading-fill::after { display: none; }

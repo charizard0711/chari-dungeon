@@ -933,7 +933,7 @@ export class GameScene extends Phaser.Scene {
   // ============ フロア生成 ============
   async buildFloor(floor: number, bossRoom = false, snapshot?: RunSnapshot) {
     this.assetsLoading = true;
-    await ensureSceneAssets(this, floor, !!this.eventMode);
+    await ensureSceneAssets(this, floor, !!this.eventMode, false, floor > this.floor ? 'stairs' : 'entry');
     this.assetsLoading = false;
     this.clearMoveInput();
     if (this.player.fountainBlessingFloor !== floor) this.player.fountainBlessingFloor = null;
@@ -7636,8 +7636,8 @@ export class GameScene extends Phaser.Scene {
     this.busy = true;
     const cam = this.cameras.main;
     cam.fadeOut(280, 0, 0, 0);
-    cam.once('camerafadeoutcomplete', () => {
-      this.buildFloor(nextFloor, false);
+    cam.once('camerafadeoutcomplete', async () => {
+      await this.buildFloor(nextFloor, false);
       cam.fadeIn(300, 0, 0, 0);
       this.emitRefresh();
       this.busy = false;

@@ -990,7 +990,7 @@ export class UIScene extends Phaser.Scene {
       const ready = p.gold >= 500;
       this.gachaCardGlow.clear().fillStyle(0x10271e).fillRoundedRect(16, 76, 144, 98, 8).lineStyle(ready ? 2 : 1, ready ? 0xffd579 : 0xb18a49).strokeRoundedRect(16, 76, 144, 98, 8);
       this.gachaSavings.clear().fillStyle(0x030e0d).fillRoundedRect(26, 139, 124, 7, 3).fillStyle(ready ? 0xffd36c : 0xbba15e).fillRoundedRect(26, 139, 124 * Math.min(1, p.gold / 500), 7, 3);
-      this.gachaSavingsText.setText(ready ? `所持 ${p.gold}G\n${this.gs.weaponWonThisFloor ? '防具を' : ''}召喚できます` : `所持 ${p.gold}G　あと${500 - p.gold}G`);
+      this.gachaSavingsText.setText(ready ? `所持 ${p.gold}G\n回せます` : `所持 ${p.gold}G　あと${500 - p.gold}G`);
     }
     this.hpLabel.setText(`体力  ${p.hp} / ${p.hpMax}`);
     this.atkLabel.setText(IS_MOBILE
@@ -1871,7 +1871,8 @@ export class UIScene extends Phaser.Scene {
     const pageSize = 9, columns = 3, gap = IS_MOBILE ? 7 : 14;
     this.codexScrollMax = Math.max(0, Math.ceil(MONSTER_DEFS.length / pageSize) - 1);
     this.codexScrollRow = Phaser.Math.Clamp(this.codexScrollRow, 0, this.codexScrollMax);
-    label(x + 16, y + 43, `発見 ${this.gs.discovered.size} / ${MONSTER_DEFS.length}体 · 絵を押すと詳しい情報`, IS_MOBILE ? 11 : 15, '#9db8c5');
+    const discoveredCount = MONSTER_DEFS.filter(monster => this.gs.discovered.has(monster.key)).length;
+    label(x + 16, y + 43, `発見 ${discoveredCount} / ${MONSTER_DEFS.length}体 · 絵を押すと詳しい情報`, IS_MOBILE ? 11 : 15, '#9db8c5');
     const colW = (w - 32 - gap * 2) / columns, rowH = (h - 129 - gap * 2) / 3;
     const startY = y + 76;
     MONSTER_DEFS.slice(this.codexScrollRow * pageSize, (this.codexScrollRow + 1) * pageSize).forEach((base, index) => {
@@ -2026,7 +2027,7 @@ export class UIScene extends Phaser.Scene {
     const soldOut = weaponPool && this.gs.weaponWonThisFloor;
 
     // 説明
-    this.overlay.add(this.add.text(x + w / 2, y + 103, weaponPool ? '500Gで武器を1本召喚' : '500Gで盾・服・鎧を1つ召喚', {
+    this.overlay.add(this.add.text(x + w / 2, y + 103, weaponPool ? '500Gで武器を1本手に入れる' : '500Gで盾・服・鎧を1つ手に入れる', {
       fontFamily: '"Yu Gothic UI"', fontSize: '15px', color: palette.text, fontStyle: 'bold'
     }).setOrigin(0.5));
 
@@ -2067,7 +2068,7 @@ export class UIScene extends Phaser.Scene {
       g.lineStyle(2, afford ? palette.accent : 0x555f70).strokeRoundedRect(bx, by, bw, bh, 12);
     };
     draw(afford ? palette.fill : 0x142125);
-    const bt = this.add.text(bx + bw / 2, by + bh / 2, soldOut ? 'この階の武器は取得済み' : `500Gで${weaponPool ? '武器' : '防具'}を召喚`, {
+    const bt = this.add.text(bx + bw / 2, by + bh / 2, soldOut ? 'この階の武器は取得済み' : `500Gで${weaponPool ? '武器' : '防具'}ガチャを回す`, {
       fontFamily: '"Yu Gothic UI"', fontSize: '17px', color: afford ? palette.text : '#5a6577', fontStyle: 'bold'
     }).setOrigin(0.5);
     const zone = this.add.zone(bx, by, bw, bh).setOrigin(0).setInteractive({ useHandCursor: true });
