@@ -1,5 +1,9 @@
 {
-  "publishedAtUtc": "2026-10-09T01:07:06.2922689Z",
-  "sourceCommit": "81740f57973854b46657bdf6cc0dc109d4bff3b4",
-  "entry": "assets/index-BuXM9jIZ.js"
+  "publishedAtUtc": "2026-10-10T14:53:15.4178426Z",
+  "sourceCommit": "4e09fd78ecb17b1d362a6453e701d9a548ead0e6",
+  "entry": "assets/index-CLSN9ker.js",
+  "features": [
+    "English title branding",
+    "Persistent Japanese/English title and settings controls"
+  ]
 }
