@@ -1,3 +1,4 @@
+import { getLanguage, setLanguage } from '../i18n';
 import { playRitual } from '../gachaPresentation';
 import { createGuideModal } from '../guideModal';
 import { weaponAccessoryKey, weaponAccessoryLabel } from '../equipmentAccessories';
@@ -1131,8 +1132,8 @@ export class UIScene extends Phaser.Scene {
       if (!t) continue;
       const l = lines[i];
       if (l) {
-        const message = IS_MOBILE && l.msg.length > 34 ? `${l.msg.slice(0, 34)}…` : l.msg;
-        t.setText(message);
+        t.setData('localeMaxWidth', IS_MOBILE ? 300 : GAME_W - 40);
+        t.setText(l.msg);
         t.setColor(COLORS[l.type] ?? COLORS.sys);
         // 最新行だけ少し強調
         t.setAlpha(i === lines.length - 1 ? 1 : 0.75);
@@ -2111,14 +2112,7 @@ export class UIScene extends Phaser.Scene {
     g.fillStyle(base, 1).fillRoundedRect(x, y, w, 28, 5);
     g.lineStyle(lineWidth, border).strokeRoundedRect(x, y, w, 28, 5);
     const t = this.add.text(x + 10, y + 14, label, { fontFamily: '"Yu Gothic UI"', fontSize: '13px', color: enabled ? (palette?.text ?? '#dfe7f0') : '#66727e', fontStyle: palette && highlight ? 'bold' : 'normal' }).setOrigin(0, 0.5);
-    // 枠からはみ出す場合は末尾を「…」に切り詰める
-    if (t.width > w - 18) {
-      let s = label;
-      while (s.length > 1 && t.width > w - 18) {
-        s = s.slice(0, -1);
-        t.setText(s + '…');
-      }
-    }
+    t.setData('localeMaxWidth', w - 18).setText(label);
     if (enabled) {
       const zone = this.add.zone(x, y, w, 28).setName('row-hit').setOrigin(0).setInteractive({ useHandCursor: true });
       zone.on('pointerover', () => { g.clear(); g.fillStyle(palette?.hover ?? 0x3f8f88, 1).fillRoundedRect(x, y, w, 28, 5); g.lineStyle(lineWidth, palette?.accent ?? 0x3fe0d0).strokeRoundedRect(x, y, w, 28, 5); });
@@ -2350,11 +2344,16 @@ export class UIScene extends Phaser.Scene {
     returnButton.setName('settings-return-title');
     this.overlay.add(returnButton);
     this.overlay.add(this.rowButton(x + w - 138, y + h - 36, 118, '操作案内', false, () => this.showControlsGuide()).setName('settings-controls-guide'));
-    this.overlay.add(this.add.text(x + w - 166, y + 18, 'アクセス計測について', {
+    this.overlay.add(this.add.text(IS_MOBILE ? x + 20 : x + w - 166, IS_MOBILE ? y + h - 120 : y + 18, 'アクセス計測について', {
       fontFamily: '"Yu Gothic UI"', fontSize: '11px', color: '#8de0e4', padding: { x: 4, y: 8 }
     }).setInteractive({ useHandCursor: true }).on('pointerdown', () => {
       window.open('./privacy.html', '_blank', 'noopener,noreferrer');
     }));
+    this.overlay.add(this.rowButton(x + 20, y + h - 82, w - 40,
+      getLanguage() === 'ja' ? '日本語 → English' : 'English → 日本語', false, () => {
+        setLanguage(getLanguage() === 'ja' ? 'en' : 'ja');
+        this.setOverlay('settings');
+      }).setName('settings-language'));
     const rows: {
       label: () => string;
       onMinus: () => void;

@@ -11,13 +11,26 @@ const fs = require('node:fs');
     const page = await context.newPage();
     if(mobile) await page.setViewportSize({width:390,height:844});
     page.on('pageerror', e => errors.push(e.stack));
-    await page.goto(url + '/' + query);
+    await page.goto(url + '/' + (query || '?qa-silent'), {waitUntil:'domcontentloaded',timeout:90000});
     return page;
   };
   const waitGame = p => p.waitForFunction(() => window.__game?.scene.isActive('GameScene') && window.__game.scene.getScene('GameScene').playerSprite?.active, null, { timeout: 60000 });
+  const resume = async p => {
+    await p.waitForFunction(() => window.__game?.scene.isActive('TitleScene') && window.__game.scene.getScene('TitleScene').input.enabled, null, {timeout:60000});
+    await p.evaluate(() => {
+      const title=window.__game.scene.getScene('TitleScene');
+      for(let step=0;step<3;step++) title.titleAction();
+      const all=[];const visit=o=>{all.push(o);o.list?.forEach(visit)};title.children.list.forEach(visit);
+      const button=all.find(o=>o.input && o.list?.some(child=>child.text==='続きから探索'));
+      if(!button)throw Error('Missing resume confirmation');
+      button.emit('pointerdown');
+    });
+    await waitGame(p);
+  };
   const semantic = async p => p.evaluate(() => {
     const s = window.__game.scene.getScene('GameScene').captureRun();
     delete s.logs;
+    delete s.adventureHistory; // Reopening appends resume and floor-entry messages.
     for (const e of s.enemies) delete e.visual;
     return JSON.parse(JSON.stringify(s));
   });
@@ -53,10 +66,10 @@ const fs = require('node:fs');
     await page.close();
     page = await open('',true);
     await page.waitForFunction(() => window.__game?.scene.isActive('TitleScene'), null, { timeout: 60000 });
-    assert.ok(await page.evaluate(() => window.__game.scene.getScene('TitleScene').children.list.some(c => c.text === '続きから' || c.list?.some(t => t.text === '続きから'))));
+    assert.ok(await page.evaluate(() => localStorage.getItem('chari-dungeon.run.v1')));
     fs.mkdirSync('outputs/qa-run-save', { recursive:true });
     await page.screenshot({path:'outputs/qa-run-save/mobile-continue.png'});
-    await page.keyboard.press('Enter');
+    await resume(page);
     await waitGame(page);
     assert.deepEqual(await semantic(page), before, 'closing and reopening restores the complete gameplay snapshot');
     assert.equal(await page.evaluate(() => { const p=window.__game.scene.getScene('GameScene').player; return p.weapon === p.weapons[0] && typeof p.addExp === 'function'; }), true);
@@ -70,10 +83,10 @@ const fs = require('node:fs');
       g.buildFloor(snapshot.state.floor,snapshot.state.inBossRoom,snapshot);
       g.saveRun();
     });
-    await page.evaluate(() => { const g=window.__game.scene.getScene('GameScene'); g.player.weapon.dur--; g.emitRefresh(); });
+    await page.evaluate(() => { const g=window.__game.scene.getScene('GameScene'); g.player.weapon.dur--; g.emitRefresh(); g.saveRun(); });
     await page.reload();
     await page.waitForFunction(() => window.__game?.scene.isActive('TitleScene'), null, { timeout: 60000 });
-    await page.keyboard.press('Enter'); await waitGame(page);
+    await resume(page);
     assert.equal(await page.evaluate(() => window.__game.scene.getScene('GameScene').player.weapon.dur), 41);
     // Resume a milestone boss arena too: no new enemies/rewards may be generated.
     await page.evaluate(() => {
@@ -85,11 +98,11 @@ const fs = require('node:fs');
     const arena = await semantic(page);
     await page.close(); page=await open();
     await page.waitForFunction(() => window.__game?.scene.isActive('TitleScene'), null, {timeout:60000});
-    await page.keyboard.press('Enter'); await waitGame(page);
+    await resume(page);
     assert.deepEqual(await semantic(page), arena, 'milestone boss arena also survives reopening');
     const mapCases=await page.evaluate(()=>{
       const g=window.__game.scene.getScene('GameScene');
-      const normalize=s=>{delete s.logs;for(const e of s.enemies)delete e.visual;return JSON.stringify(s)};
+      const normalize=s=>{delete s.logs;delete s.adventureHistory;for(const e of s.enemies)delete e.visual;return JSON.stringify(s)};
       const cases=[];
       for(const floor of [1,5,10,15,20,25,26,27,28,29,30]) {
         for(const arena of floor===5||floor===30?[true]:floor%5===0?[false,true]:[false]) {

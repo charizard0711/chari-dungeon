@@ -1,3 +1,4 @@
+import { addLanguageControl } from '../i18n';
 import Phaser from 'phaser';
 import { openModalMotion } from '../modalMotion';
 
@@ -32,6 +33,7 @@ export class TitleScene extends Phaser.Scene {
   create(data?: { menuStage?: 'mode' }) {
     this.initialStage = data?.menuStage ?? 'home';
     presentMenu(this);
+    addLanguageControl(this, GAME_W / 2, 32);
     this.selectedDifficulty = readDifficultyProgress().selected;
     document.body.dataset.difficulty = this.selectedDifficulty;
     // ローカルQAだけを無音にする。通常プレイのサウンド設定には影響させない。

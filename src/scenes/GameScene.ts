@@ -6853,24 +6853,18 @@ export class GameScene extends Phaser.Scene {
 
   private useMysteryBread() {
     this.player.hp = this.player.hpMax;
-    const equipped = new Set<Weapon | Shield>([
-      ...(this.player.weapon ? [this.player.weapon] : []),
-      ...(this.player.shield ? [this.player.shield] : [])
-    ]);
-    const targets = new Set<Weapon | Shield>(equipped);
-    for (const collection of [this.player.weapons, this.player.shields]) {
-      const pool = [...new Set<Weapon | Shield>(collection)].filter(item => !equipped.has(item));
-      for (let n = 0; n < 3 && pool.length; n++) {
-        const [item] = pool.splice(Math.floor(Math.random() * pool.length), 1);
-        targets.add(item);
-      }
+    const targets = new Set<Weapon | Shield>();
+    const weaponPool = [...new Set<Weapon>([...this.player.weapons, ...(this.player.weapon ? [this.player.weapon] : [])])];
+    const shieldPool = [...new Set<Shield>([...this.player.shields, ...(this.player.shield ? [this.player.shield] : [])])];
+    for (const pool of [weaponPool, shieldPool]) {
+      if (pool.length) targets.add(pool[Math.floor(Math.random() * pool.length)]);
     }
     for (const item of targets) { item.dur = item.durMax; item.plus = (item.plus ?? 0) + 1; }
     this.updatePlayerAura();
     this.healFx();
     this.effectFx(this.player.x, this.player.y, 'fx_magic', 1.4, 500, 0xffd17d);
     Audio.playSe('heal');
-    this.log('ふしぎパンを食べた！ HP全回復！ 装備中の武器・盾＋予備の武器3本・盾3枚をランダムに修復し、最大8個を+1強化した。', 'special');
+    this.log('ふしぎパンを食べた！ HP全回復！ 所持している武器と盾をランダムで1個ずつ修復し、+1強化した。', 'special');
   }
 
   startTransformation(kind: TransformationKind) {

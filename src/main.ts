@@ -1,3 +1,4 @@
+import { installLocalization } from './i18n';
 import { installScreenSizing } from './menuPresentation';
 import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene';
@@ -28,6 +29,7 @@ const config: Phaser.Types.Core.GameConfig = {
   scene: [BootScene, TitleScene, HalloweenScene, GameScene, UIScene, EndScene]
 };
 
+installLocalization();
 const game = new Phaser.Game(config);
 installScreenSizing(game);
 // デバッグ用に公開

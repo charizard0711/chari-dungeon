@@ -279,7 +279,7 @@ export const ITEM_DEFS: Record<ItemKind, Omit<Item, 'kind'>> = {
   skill_drink: { name: 'スキルドリンク', desc: 'スキルを即時チャージし、待ち歩数を0にする。通常MOBから3%でドロップ。', textureKey: 'i_skill_drink' },
   potion:  { name: '回復ポーション', desc: 'HPを40回復する', textureKey: 'i_potion' },
   torch:   { name: '松明', desc: '10ターンの間、壁の向こうまで明るくする', textureKey: 'i_torch' },
-  mystery_bread: { name: 'ふしぎパン', desc: 'HP全回復。装備中の武器・盾＋ランダムな予備武器3本・盾3枚を修復し+1（最大8個）。', textureKey: 'i_mystery_bread' },
+  mystery_bread: { name: 'ふしぎパン', desc: 'HP全回復。所持している武器と盾からランダムで1個ずつ修復し+1（装備中も抽選対象）。', textureKey: 'i_mystery_bread' },
   dynamite: { name: 'ダイナマイト', desc: '周囲の通常敵を爆風で一撃撃破。ボスには残りHPの10%の固定ダメージ。自分は無傷。', textureKey: 'i_dynamite' },
   warp:    { name: 'リコールベル', desc: '今いる階のスタート位置へ戻る', textureKey: 'i_warp' },
   revive:  { name: '復活のタネ', desc: '倒れた時に一度だけ復活', textureKey: 'i_revive' },

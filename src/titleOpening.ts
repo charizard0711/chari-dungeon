@@ -1,3 +1,4 @@
+import { translate } from './i18n';
 import Phaser from 'phaser';
 import { finishLoading, showLoading, updateLoading } from './loadingScreen';
 
@@ -47,10 +48,10 @@ export function playTitleOpening(scene: Phaser.Scene): void {
   video.playsInline = true;
   video.preload = 'auto';
   const logo = document.createElement('img');
-  logo.src = 'assets/ui/brand-v1/golden-crossed-swords.png';
-  logo.alt = 'ちゃりだんじょん';
+  logo.src = 'assets/ui/brand-v1/chari-desktop-logo.png';
+  logo.alt = 'Chari Dungeon';
   const skip = document.createElement('button');
-  skip.textContent = 'クリック / Enter でスキップ';
+  skip.textContent = translate('クリック / Enter でスキップ');
   overlay.append(video, logo, skip);
   parent.append(overlay);
   scene.input.enabled = false;

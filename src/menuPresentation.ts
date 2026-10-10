@@ -1,3 +1,4 @@
+import { translate } from './i18n';
 import Phaser from 'phaser';
 import { GAME_W, GAME_H, IS_MOBILE } from './layout';
 let game: Phaser.Game | undefined;
@@ -24,11 +25,16 @@ export function installScreenSizing(instance: Phaser.Game) {
     controls.setAttribute('role', 'group');
     controls.setAttribute('aria-label', '画面サイズ');
     const label = document.createElement('span');
-    label.textContent = '画面';
+    label.textContent = translate('画面');
+    window.addEventListener('chari-language-changed', () => {
+      label.textContent = translate('画面');
+      sizeButtons.forEach(button => { button.textContent = translate(button.dataset.size === 'large' ? '大' : '小'); });
+      controls.setAttribute('aria-label', translate('画面サイズ'));
+    });
     controls.append(label);
     for (const [value, title] of [['small', '小'], ['large', '大']]) {
       const button = document.createElement('button');
-      button.type = 'button'; button.textContent = title; button.dataset.size = value;
+      button.type = 'button'; button.textContent = translate(title); button.dataset.size = value;
       button.addEventListener('click', () => { large = value === 'large'; applySize(); button.blur(); });
       controls.append(button); sizeButtons.push(button);
     }
