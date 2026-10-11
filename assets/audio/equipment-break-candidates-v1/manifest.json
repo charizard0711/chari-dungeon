@@ -1,0 +1,38 @@
+[
+  {
+    "key": "weapon_01",
+    "name": "武器① 鋼の刃が折れる（おすすめ）",
+    "duration": 0.74,
+    "peak": 0.72
+  },
+  {
+    "key": "weapon_02",
+    "name": "武器② 重い武器がへし折れる",
+    "duration": 0.74,
+    "peak": 0.72
+  },
+  {
+    "key": "weapon_03",
+    "name": "武器③ 魔法の刃が砕ける",
+    "duration": 0.89,
+    "peak": 0.72
+  },
+  {
+    "key": "shield_01",
+    "name": "盾① 金属の盾が割れる（おすすめ）",
+    "duration": 0.85,
+    "peak": 0.72
+  },
+  {
+    "key": "shield_02",
+    "name": "盾② 重い盾が崩れる",
+    "duration": 0.85,
+    "peak": 0.72
+  },
+  {
+    "key": "shield_03",
+    "name": "盾③ 魔法の盾が砕ける",
+    "duration": 1.03,
+    "peak": 0.72
+  }
+]
