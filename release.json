@@ -1,8 +1,8 @@
 {
-  "publishedAtUtc": "2026-10-11T13:33:07.6964724Z",
+  "publishedAtUtc": "2026-10-11T14:01:08.4559297Z",
   "sourceCommit": "4e09fd78ecb17b1d362a6453e701d9a548ead0e6",
   "sourceState": "working-tree",
-  "entry": "assets/index-4ZgAYb47.js",
+  "entry": "assets/index-9aCpa-az.js",
   "ruleset": "depth-turns-v1",
   "rankingApi": "https://ranking-verifier-production.up.railway.app",
   "verifierDeployment": "21223c27-4199-4dc2-bab2-cf9260336d54",
@@ -11,6 +11,7 @@
     "Required unique adventurer names with Turnstile protection",
     "English, Japanese, Korean and Simplified Chinese with browser language detection",
     "Adventure-menu ranking button and illustrated dialogs",
-    "Gameplay hints during dungeon loading and stairs"
+    "Gameplay hints during dungeon loading and stairs",
+    "Recover failed optimized gate images using original artwork and a door fallback"
   ]
 }
