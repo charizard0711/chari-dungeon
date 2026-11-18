@@ -1,8 +1,8 @@
 {
   "date": "2026-11-18",
   "base": "9ff36b3",
-  "entry": "assets/index-867d9be70836.js",
-  "module": "online-town-29c239a36f3e.js",
+  "entry": "assets/index-1811f7e7614d.js",
+  "module": "online-town-0fb8381316f2.js",
   "features": [
     "online-town",
     "email-auth-turnstile",
@@ -11,12 +11,9 @@
     "localized-confirmation-email",
     "dedicated-email-confirmation-page",
     "resend-confirmation",
-    "localized-confirmation-email",
-    "dedicated-email-confirmation-page",
-    "resend-confirmation",
-    "localized-confirmation-email",
-    "dedicated-email-confirmation-page",
-    "resend-confirmation"
+    "character-slots-two",
+    "shared-solo-hud",
+    "phaser-online-town"
   ],
   "confirmation": "auth-confirm.html"
 }
