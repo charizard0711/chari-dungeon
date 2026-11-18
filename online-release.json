@@ -1,13 +1,16 @@
 {
   "date": "2026-11-18",
   "base": "9ff36b3",
-  "entry": "assets/index-c1f8de262efa.js",
-  "module": "online-town-2a3d1c5c9974.js",
+  "entry": "assets/index-490dc864e9eb.js",
+  "module": "online-town-d1c17757c89a.js",
   "features": [
     "online-town",
     "email-auth-turnstile",
     "solo-online-settings",
     "nonbiri-title-bgm",
+    "localized-confirmation-email",
+    "dedicated-email-confirmation-page",
+    "resend-confirmation",
     "localized-confirmation-email",
     "dedicated-email-confirmation-page",
     "resend-confirmation"
