@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-18",
+  "base": "9ff36b3",
+  "entry": "assets/index-bd44f35a0506.js",
+  "module": "online-town-ba39b571ebe0.js",
+  "features": [
+    "online-town",
+    "email-auth-turnstile",
+    "solo-online-settings",
+    "nonbiri-title-bgm"
+  ]
+}
