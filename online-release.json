@@ -1,8 +1,8 @@
 {
   "date": "2026-11-20",
   "base": "9ff36b3",
-  "entry": "assets/index-65892169d61a.js",
-  "module": "online-town-5ab1e1383117.js",
+  "entry": "assets/index-9a658e7c0f04.js",
+  "module": "online-town-351192aee3ed.js",
   "features": [
     "online-town",
     "email-auth-turnstile",
